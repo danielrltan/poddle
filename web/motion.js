@@ -18,9 +18,12 @@ export const DEFAULTS = {
   WINDUP_MAX: 0, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
-  TRIGGER: 9, PEAK_WINDOW: 0.12, REARM: 3, TAP: 6,
+  TRIGGER: 9, REARM: 3, TAP: 6,               // swing detection, rad/s
+  COMMIT_T: 0.036,                          // report a swing this long after the hand started moving (s): a flick has peaked by then, an arm swing is still speeding up and its peak is predicted
+  ONSET: 75,                                // rad/s^2: a rise gentler than this has not taken off yet
+  FIX_ABS: 1.5, FIX_REL: 0.08,              // once the real peak is in, a 'swingFix' follows if the early power was off by more than this
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
-  ROM_IDLE: 4, ROM_MIN: 25, ROM_FULL: 45, ROM_T_MIN: 0.04, ROM_T_FULL: 0.07,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
+  ROM_IDLE: 4, ROM_MIN: 16, ROM_FULL: 26, ROM_T_MIN: 0.032, ROM_T_FULL: 0.046,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
@@ -192,7 +195,7 @@ export class MotionModel {
     if (was) this.xy.from = this.xy.to = was;
     this.vel = [0, 0, 0]; this.abias = [0, 0, 0]; this.corrSum = 0;
     this.punch = { from: [0, 0, 0], to: [0, 0, 0], t0: s.t, dur: 0.02 };
-    this.sw = null; this.prevRate = 0;
+    this.sw = null; this.prevRate = this.prevRate2 = 0; this.mvI = this.mvR = this.wB = this.w1 = this.w2 = null; this.rom = this.ang = 0;
     this.prev = null;
     this.last = { t: s.t, q: s.q, P, rP: [0, 0, 0], aPar: 0, rate: 0 };
   }
@@ -212,35 +215,65 @@ export class MotionModel {
     let fix = qmul(this._Ptau(tA), qconj(this._curve(L, tA))); if (qangle(fix) > 0.35) fix = IDENT;
     const cur = { t, q: s.q, P, rP, aPar, rate, tA, B: Math.max(t - tA, c.BLEND_MIN), fix };
 
-    // swing detection: trigger, 70 ms peak window, send, keep the peak until re-arm
+    // swing detection: trigger, report early, refine once the real peak is in, keep the peak until re-arm
     let sw = this.sw;
-    // Range of motion: angle swept by the current continuous movement (resets when the hand goes quiet). A wrist flick
-    // is fast but sweeps ~30 deg; a real arm swing sweeps 45+ deg before its peak. Power = peak rate x ROM credit.
-    this.rom = rate < c.ROM_IDLE ? 0 : (this.rom || 0) + rate * dt;
-    this.romT = rate < c.ROM_IDLE ? 0 : (this.romT || 0) + dt;        // ...and how long it has been going: flicks are over in ~60 ms
+    // Range of motion: a wrist flick is fast but reaches its peak ~25 ms and ~25 deg after it takes off; a real arm swing
+    // takes 50+ ms and 35+ deg. Power = peak rate x credit for both. Where a movement took off = where the rate left idle
+    // (mvI) or, when the hand was already moving (a wind-up that loops into the swing), where the angular velocity had
+    // changed by ROM_IDLE since it last stopped accelerating (mvR). Interpolated between samples.
+    const r1 = this.prevRate, r0 = this.prevRate2 || 0, w1 = this.w1 || wP, w2 = this.w2 || w1;
+    this.ang = (this.ang || 0) + 0.5 * (rate + r1) * dt;              // total angle turned, trapezoid
+    const cross = (a, b) => {                                         // a movement starts ~quadratically: interpolate in sqrt()
+      const u = clamp((Math.sqrt(b) - Math.sqrt(c.ROM_IDLE)) / Math.max(Math.sqrt(b) - Math.sqrt(a), 1e-6), 0, 1);
+      return { t: t - dt * u, ang: this.ang - (rate - 0.5 * (rate - r1) * u) * dt * u };
+    };
+    if (rate < c.ROM_IDLE) { this.rom = 0; this.mvI = null; }
+    else { if (!this.mvI) this.mvI = cross(r1, rate); this.rom = (this.rom || 0) + rate * dt; }   // rom: what the events report
     if (!sw) {
-      if (rate > c.TRIGGER) sw = this.sw = { t0: t, peak: rate, sum: [...wP], sent: false, r0: this.prevRate, r1: rate, eff: 0, sweep: 0 };
-    } else {
-      if (!sw.sent) sw.sum = add(sw.sum, wP);
-      if (sw.r1 >= sw.r0 && sw.r1 > rate) {                           // r1 was a local max: parabolic true peak
-        const den = sw.r0 - 2 * sw.r1 + rate, p = den < 0 ? 0.5 * (sw.r0 - rate) / den : 0;
-        sw.peak = Math.max(sw.peak, Math.min(sw.r1 - 0.25 * (sw.r0 - rate) * p, sw.r1 * 1.08));
+      if (!this.wB || len(sub(wP, w2)) < c.ONSET * 2 * dt) { this.wB = wP; this.mvR = null; }   // over two samples: gyro noise must not pass for a take-off
+      else if (!this.mvR && len(sub(wP, this.wB)) >= c.ROM_IDLE) this.mvR = cross(len(sub(w1, this.wB)), len(sub(wP, this.wB)));
+    }
+    this.w2 = w1; this.w1 = wP;
+    if (!sw && rate > c.TRIGGER) { const m = (this.mvR && len(this.wB) >= c.ROM_IDLE ? this.mvR : this.mvI || this.mvR) || { t, ang: this.ang };   // mvR only when the hand really was moving before
+      sw = this.sw = { t0: t, mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: [0, 0, 0], sent: false, fixed: false, eff: 0, sweep: 0 }; }
+    if (sw) {
+      if (!sw.fixed) sw.sum = add(sw.sum, wP);
+      if (rate > sw.peak) { sw.peak = rate; sw.tPk = t; sw.romPk = this.ang - sw.ang0; }
+      if (r1 >= r0 && r1 > rate && r1 > c.TRIGGER) {                  // r1 was a local max: parabolic true peak
+        const den = r0 - 2 * r1 + rate, p = den < 0 ? clamp(0.5 * (r0 - rate) / den, -0.5, 0.5) : 0;
+        const pk = Math.min(r1 - 0.25 * (r0 - rate) * p, r1 * 1.08);
+        if (pk >= sw.peak) { sw.peak = pk; sw.tPk = t - dt + p * dt; sw.romPk = this.ang - sw.ang0 - 0.5 * (rate + r1) * dt + r1 * p * dt; }
       }
-      sw.peak = Math.max(sw.peak, rate); sw.r0 = sw.r1; sw.r1 = rate; sw.sweep = Math.max(sw.sweep, this.rom);
-      const done = rate < c.REARM;
-      // fire at the top of the swing (that's where contact is), not a fixed time after the trigger
-      if (!sw.sent && (done || rate < sw.peak * 0.92 || t - sw.t0 >= c.PEAK_WINDOW - 1e-4)) {
-        const n = len(sw.sum) || 1, rom = sw.sweep / DEG;
-        sw.sent = true;
-        sw.eff = sw.peak * Math.min(clamp((rom - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1), clamp((this.romT - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1));
+      sw.sweep = Math.max(sw.sweep, this.rom);
+      const done = rate < c.REARM, el = t - sw.mv0, past = done || rate < sw.peak * 0.92;
+      const credit = (rom, rise) => Math.min(clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1), clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1));
+      const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN }; };
+      const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
+      // Fire as soon as the swing can be told from a flick, not after its peak: COMMIT_T into the movement a flick is
+      // already slowing down, while an arm swing is still speeding up. Its peak is predicted from how fast the rise is
+      // flattening (rho: last increment / the one before; 1 = mid-rise, 0.5 = ~5 ms from the top of a raised cosine).
+      if (!sw.sent && (past || el >= c.COMMIT_T - 1e-4)) {
+        let pk = sw.peak, rise = sw.tPk - sw.mv0, rom = sw.romPk;
+        if (!past && rate > r1) {
+          const rho = clamp(r1 > r0 ? (rate - r1) / (r1 - r0) : 1, 0, 1.05), k = Math.max(0, rho - 0.5);
+          const lead = Math.min(0.045 * Math.max(0, rho - 0.45), 0.025);
+          pk = rate + Math.min(rate * 0.5 * Math.pow(k, 1.5), 0.7 * (rate - r1)); rise = el + lead; rom = this.ang - sw.ang0 + 0.5 * (rate + pk) * Math.max(lead, 0.02);   // still rising: at least one more sample of sweep to come
+        }
+        sw.sent = true; sw.fixed = past;
         // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
         // never a smash, however fast it was.
-        sw.eff = Math.max(c.TAP, sw.eff);
-        if (true) ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom, dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN });
-        else ev.push({ type: 'flick', raw: sw.peak, rom });           // fast but tiny: tell the player to use their arm
+        sw.eff = Math.max(c.TAP, pk * credit(rom, rise)); Object.assign(sw, shot());
+        ev.push({ type: 'swing', power: sw.eff, raw: pk, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, age, final: past });
+      } else if (!sw.fixed && past) {                                 // the real peak is in: say so if the early call was off
+        sw.fixed = true;
+        const eff = Math.max(c.TAP, sw.peak * credit(sw.romPk, sw.tPk - sw.mv0)), sh = shot();
+        if (Math.abs(eff - sw.eff) > Math.max(c.FIX_ABS, c.FIX_REL * sw.eff) || Math.abs(sh.lob - sw.lob) > 0.15 || Math.abs(sh.dir - sw.dir) > 0.3)
+          ev.push({ type: 'swingFix', power: eff, raw: sw.peak, rom: sw.sweep / DEG, ...sh, age, final: true });
+        sw.eff = eff;
       }
       if (done) { ev.push({ type: 'swingEnd', peak: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, counted: true }); this.sw = null; }
     }
+    this.prevRate2 = this.prevRate;
     this.prevRate = rate;
 
     // Base lock. Yaw both aims the base and is what a swing rotates, so from the wind-up on the base is pinned to the

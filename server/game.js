@@ -11,6 +11,8 @@ const AUTO_SPEED = 5.5;                   // sideways run speed in auto-move mod
 const FOOT_SPEED = 7;                     // auto-footwork forward/back, m/s
 const STANCE = 0.3;                       // stand this far behind the predicted contact: you meet the ball out in front
 const SWING_WINDOW = 0.32;                // s a swing stays "live" waiting for the ball
+const LAG_MAX = 0.15;                     // s a swing may be back-dated by its reported age
+const FIX_WINDOW = 0.15;                  // s after a hit that a corrected power may still re-launch the ball
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 0.9 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
@@ -270,9 +272,17 @@ wss.on('connection', ws => {
         if (serveReach(me)) { ball.serving = null; strike(me, { n: pw, dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1) }); }
         return;                                                  // swung at air: no whiff, no point, the ball keeps hanging
       }
+      const dir = clamp(num(m.dir, 0), -1, 1), lob = clamp(num(m.lob, 0), 0, 1);
+      if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
+        if (me.swing) Object.assign(me.swing, { n: pw, dir, lob });                     // hasn't met the ball yet: just correct it
+        else if (me.hit && now - me.hit.at < FIX_WINDOW && Math.abs(pw - me.hit.n) > 0.1 && ball.live && ball.lastHit === me.side && !ball.bounces)
+          launch(me.side, pw, dir, lob);                         // struck a moment ago on the early guess: re-launch while it is still at the paddle
+        return;
+      }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
-        n: clamp((num(m.power, 6) - 6) / 28, 0, 1),                  // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
-         dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
+        from: now - clamp(num(m.age, 0) / 1000, 0, LAG_MAX),       // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness)
+        n: pw,                                                     // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
+        dir, lob, why: null, best: Infinity };
       broadcast({ type: 'swung', side: me.side });
     } else if (m.type === 'bot') botRequest(me, m.level);
   });
@@ -323,10 +333,12 @@ function step() {
   // contact: a live swing + the ball actually inside the box around that paddle.
   // The ball is NOT moved on contact (no teleport); the paddle lunges to it instead.
   for (const pl of players) {
-    const sw = pl.swing; if (!sw) continue;
     const mine = ball.live && ball.lastHit !== pl.side;          // is this ball mine to hit?
     const z = inZone(pl);
-    if (mine && z.ok) { strike(pl, sw); continue; }
+    if (mine && z.ok && ball.serving == null) pl.inAt = now;     // last moment the ball was in my box
+    const sw = pl.swing; if (!sw) continue;
+    // a swing reaches us ~100 ms after the hand moved: a ball that was in the box at any time since then still counts
+    if (mine && (z.ok || pl.inAt >= sw.from)) { pl.hit = { at: now, n: sw.n }; strike(pl, sw); continue; }
     // remember the near miss closest to the paddle plane, so the reason isn't always 'late' by the time the window ends
     if (mine && z.depth && Math.abs(z.ahead) < sw.best) { sw.best = Math.abs(z.ahead); sw.why = aside(z); }
     if (now > sw.until) {

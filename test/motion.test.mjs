@@ -123,7 +123,7 @@ for (const heading of HEADINGS) for (const grip of GRIPS.slice(0, 2)) {
     ok(Math.abs(sw[0].power - g.peak) / g.peak < 0.10, `${tag}: power ${f(sw[0].power, 1)} vs true peak ${f(g.peak, 1)}`);
     ok(end.length && Math.abs(end[0].peak - g.peak) / g.peak < 0.05, `${tag}: swingEnd peak ${end.length && f(end[0].peak, 1)}`);
     const delay = sw[0].t - trigT;
-    ok(delay >= 0.059 && delay <= 0.085, `${tag}: fired ${f(delay * 1000, 0)} ms after the trigger sample`);
+    ok(delay >= 0 && delay <= 0.045, `${tag}: fired ${f(delay * 1000, 0)} ms after the trigger sample`);   // swings are reported early, on a predicted peak (was: 59-85 ms)
   }
 }
 
