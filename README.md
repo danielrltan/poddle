@@ -1,6 +1,6 @@
 # Poddle 🏓
 
-**Wii-Sports-style pickleball where the controller is an AirPod.** Built at Hack the North 2026.
+**Wii-Sports-style pickleball where the controller is an AirPod.**
 
 Hold one AirPod in your hand, swing it like a paddle, and play a friend online or the built-in bot.
 No extra hardware: AirPods Pro/3/Max have motion sensors (orientation, rotation rate, acceleration at 50 Hz) that macOS

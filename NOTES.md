@@ -1,6 +1,6 @@
 # Poddle — working notes
 
-Build log for Hack the North 2026. What we tried, what broke, and how each problem was solved.
+Build log. What we tried, what broke, and how each problem was solved.
 
 ## 1. Can an AirPod be a controller at all?
 - **Question:** `CMHeadphoneMotionManager` normally only streams while the AirPods are worn.
