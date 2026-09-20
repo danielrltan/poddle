@@ -82,3 +82,9 @@ and "Waiting for a rematch" and are carried into the next match or back to the l
 - The name is asked for ONCE: the first time a player reaches the lobby the field is empty and focused and the tiles stay
   disabled until it has 1+ characters; after that it is remembered (localStorage `poddle.name`) and prefilled, never asked again.
 - Names are rendered with textContent only, never innerHTML.
+
+## Seat status (shown on the character)
+`state.paddles[n].status` is `'calibrating' | 'paused' | 'away' | null`. `calibrating`: no `paddle` received yet from that
+seat, or the client sent `{type:'status', cal:true}` (cleared by `cal:false` or the next `paddle` after it). The next serve
+waits while any human is calibrating. `paused`: the seat that paused the room. `away`: the seat being held for a reconnect.
+Clients white out that character and float a tag over it: Paused / Calibrating / Reconnecting, each with an icon.

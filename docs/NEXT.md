@@ -99,3 +99,27 @@ Analysis scripts: scratchpad/tune.mjs, lobs.mjs, windup.mjs (run against HEAD co
 - web/ui.css: `.logo-mark .lg-a{color:#39434d}` (darker "Pod" in the wordmark, the player asked for more contrast).
 - web/ui.css: `.btn::before` has a clip-path that keeps the gloss inside the button's pill (white chunks used to stick out of
   the Play button's top corners). Any new button style must keep it.
+
+## 14. LATE ADDITIONS (added after the four owners started: the INTEGRATOR builds these; verifiers check them; fixer keeps them)
+### 14a. A player who is paused or calibrating shows it on their character (player request)
+"when a user is paused or calibrating themselves, can you put a white overlay on their character and put an icon too of their
+status? like have it say paused or calibrating with an icon"
+- SERVER: every entry of `state.paddles[n]` gains `status`: `'calibrating' | 'paused' | 'away' | null`.
+  - `calibrating`: the seat has not sent a `paddle` yet (today's `wait:true`, keep `wait` too for compatibility) OR the client
+    said so: new message `{type:'status', cal:boolean}` sent by MAIN when calibration starts (C key, first set-up) and ends.
+    While any human is `calibrating` the NEXT serve is held (same rule as the first set-up); a rally already in flight plays on.
+  - `paused`: the room is paused and this seat is the one that paused it. `away`: this seat is in the 15 s hold (docs/SPECTATE.md).
+  - Matt never has a status. Harden `status` like every other message (booleans only).
+- SCENE: `updatePaddle(side, { ..., status })`. When status is set: the avatar AND its paddle/hand go "whited out" (materials
+  eased toward white with some translucency, about 0.25 s ease in and out, so the character reads as a pale ghost standing
+  still; do not swap materials per frame, keep one tween value per pad), and a billboard tag floats above the head, always
+  facing the camera, constant readable size at any distance, drawn over the scenery: a white rounded pill with a small icon and
+  ONE word: pause bars + "Paused" / a target ring + "Calibrating" / a wifi mark + "Reconnecting". Canvas texture, built once
+  per status, no per-frame allocation. Works in all four spectator views (in split screen each viewport faces its own camera).
+  The local player in first person has no visible avatar: nothing to do there (their own screen already shows the calibration
+  screen / the settings panel). The attract rally never shows a status.
+- MAIN: pass `status` from the state packet into updatePaddle for both seats (spectators too); send `{type:'status', cal}`.
+- UI: the scoreboard sub-label under that player's name shows the same word (it already says "Setting up" for the first case:
+  change that to "Calibrating" so the word is the same everywhere).
+- Test: rooms.test (status field for each case, serve held while calibrating mid-match), a screenshot of each of the three tags
+  from the opponent's view and from the broadcast view: LOOK at them, the word must be readable at 1280x720 from the far baseline.
