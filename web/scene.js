@@ -295,7 +295,9 @@ export function createScene(containerEl) {
   ballMesh.visible = false; scene.add(ballMesh);       // no real shadow: the blob below is the depth cue
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, color: 0x000000, map: glowTex(), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; blob.renderOrder = 3; blob.visible = false; scene.add(blob);
-  const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new THREE.Vector3(0, 1, 0), vel: new THREE.Vector3(), lastBy: -1 };
+  const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new THREE.Vector3(0, 1, 0), vel: new THREE.Vector3(), lastBy: -1,
+    spin: 0, cool: 0,                                      // backspin of a sliced ball (0..1) and the trail tint easing toward it
+    core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false };   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
 
   const TRAIL_N = 22, trail = { pts: [], acc: 0, glow: 0 };
   const trailGeo = new THREE.BufferGeometry();
@@ -355,7 +357,7 @@ export function createScene(containerEl) {
     return { side, group, avatar, hand, forearm, handM: skinM, has: false, init: false, bot: false,
       tgt: { x: 0, y: 1, z: sgn(side) * 6.5, q: new THREE.Quaternion(), off: null },
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
-      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, cheer: 0, world: new THREE.Vector3() };
+      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, cheer: 0, world: new THREE.Vector3() };
   });
   const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
   const D2R = Math.PI / 180;
@@ -394,8 +396,9 @@ export function createScene(containerEl) {
         vA.set(0, FACE_C, 0).applyQuaternion(pd.group.quaternion).add(w);
         pd.reachV.set(clamp(pd.hitP[0] - vA.x, -REACH_MAX, REACH_MAX), clamp(pd.hitP[1] - vA.y, -REACH_MAX, REACH_MAX), 0); pd.reach = false;
       }
-      // ease INTO the ball over ~80 ms and back out over the rest: a 20 ms snap read as the paddle clipping into a pose
-      const ts = (1 - pd.lunge) * 0.32, rk = pd.lunge > 0 ? ease(Math.min(1, ts / 0.08)) * (1 - ease(ts / 0.32)) : 0;
+      // ease INTO the ball over 3 frames and back out over the rest: a 1-frame snap read as the paddle clipping into a pose,
+      // 80 ms read as a late contact. Only the paddle eases: the ball, pop, burst and shake all start on the event's frame.
+      const ts = (1 - pd.lunge) * 0.32, rk = pd.lunge > 0 ? ease(Math.min(1, ts / 0.05)) * (1 - ease(ts / 0.32)) : 0;
       w.x += pd.reachV.x * rk; w.y = Math.max(0.12, w.y + pd.reachV.y * rk);
       pd.group.position.copy(w); pd.hand.position.copy(w);
       if (local) {                                         // ghost forearm: from the hand back toward a virtual elbow
@@ -436,8 +439,14 @@ export function createScene(containerEl) {
       const age = clamp((now - b.stamp) / 1000, 0, 0.1);
       vA.set(b.p[0] + b.v[0] * age, Math.max(BALL_R, b.p[1] + b.v[1] * age - 0.5 * G * age * age), b.p[2] + b.v[2] * age);
       b.vel.set(b.v[0], b.v[1] - G * age, b.v[2]);
-      if (b.snap || vA.distanceToSquared(b.pos) > 2.2) { b.pos.copy(vA); b.snap = false; trail.pts.length = 0; }
-      else { b.pos.addScaledVector(b.vel, dt); b.pos.lerp(vA, damp(dt, 0.018)); }       // predict, then pull to the packet: hides LAN jitter, no lag
+      if (b.blend) {                                       // a hit moved the truth (a late swing meets the ball where it WAS): the drawn ball takes the new
+        b.blend = false; b.err.copy(b.pos).sub(vA);        // velocity on this frame and slides onto the new path, instead of teleporting
+        const e = b.err.length(); if (e > 5) b.snap = true; else { b.core.copy(vA); b.errT = 0; b.errDur = clamp(0.08 + 0.05 * e, 0.08, 0.18); }
+      }
+      if (b.snap || vA.distanceToSquared(b.core) > 2.2) { b.core.copy(vA); b.errT = 1; b.snap = false; trail.pts.length = 0; }
+      else if (b.errT > 0) { b.core.addScaledVector(b.vel, dt); b.core.lerp(vA, damp(dt, 0.018)); }     // predict, then pull to the packet: hides LAN jitter, no lag
+      b.errT += dt / b.errDur;
+      b.pos.copy(b.core); if (b.errT < 1) b.pos.addScaledVector(b.err, 1 - ease(b.errT));
       b.pos.y = Math.max(BALL_R, b.pos.y);
     } else {                                               // rally over: let it bounce away on its own
       b.vel.y -= G * dt; b.pos.addScaledVector(b.vel, dt);
@@ -445,11 +454,13 @@ export function createScene(containerEl) {
     }
     ballMesh.visible = blob.visible = true; ballMesh.position.copy(b.pos);
     const sp2 = Math.hypot(b.vel.x, b.vel.z);
-    if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, Math.min(sp2 / BALL_R * 0.35, 40) * dt); }
+    // rolls the way it flies; a sliced ball visibly spins BACKWARDS, and fast
+    if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -60, b.spin) * dt); }
     const h = b.pos.y - BALL_R, k = 1 / (1 + h * 0.55);
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
-    trail.glow = Math.max(b.live ? 0.1 : 0, trail.glow - dt * 1.6); trail.acc += dt;
+    b.cool += ((b.live ? b.spin : 0) - b.cool) * damp(dt, 0.08);
+    trail.glow = Math.max(b.live ? 0.1 + 0.4 * b.cool : 0, trail.glow - dt * 1.6); trail.acc += dt;
     if (trail.acc >= 1 / 90) { trail.acc = 0; trail.pts.unshift(b.pos.clone()); if (trail.pts.length > TRAIL_N) trail.pts.pop(); }
     const P = trailGeo.attributes.position.array, C = trailGeo.attributes.color.array, n = trail.pts.length;
     for (let i = 0; i < TRAIL_N; i++) {
@@ -457,7 +468,8 @@ export function createScene(containerEl) {
       vA.subVectors(p, q); vB.subVectors(camera.position, p); vA.cross(vB);
       if (vA.lengthSq() < 1e-10) vA.set(0, 0, 0); else vA.normalize().multiplyScalar(BALL_R * 0.7 * f);
       P[i * 6] = p.x + vA.x; P[i * 6 + 1] = p.y + vA.y; P[i * 6 + 2] = p.z + vA.z; P[i * 6 + 3] = p.x - vA.x; P[i * 6 + 4] = p.y - vA.y; P[i * 6 + 5] = p.z - vA.z;
-      const a = f * f * trail.glow; for (let j = 0; j < 6; j += 3) { C[i * 6 + j] = a; C[i * 6 + j + 1] = a * 0.95; C[i * 6 + j + 2] = a * 0.45; }
+      const a = f * f * trail.glow, cr = a * lerp(1, 0.3, b.cool), cg = a * lerp(0.95, 0.85, b.cool), cb = a * lerp(0.45, 1, b.cool);   // warm; a slice trails icy blue
+      for (let j = 0; j < 6; j += 3) { C[i * 6 + j] = cr; C[i * 6 + j + 1] = cg; C[i * 6 + j + 2] = cb; }
     }
     trailGeo.attributes.position.needsUpdate = trailGeo.attributes.color.needsUpdate = true;
   }
@@ -563,7 +575,7 @@ export function createScene(containerEl) {
       noise(d, 3200, 2400, 1800, 0.8, g * 0.5, 0.03, 0.001);
     },
     bounce(x) { if (!ac) return; const d = out(panOf(x)); tone(d, 'sine', 760, 560, 0.03, 0.16, 0.07); tone(d, 'triangle', 300, 250, 0.05, 0.1, 0.1); noise(d, 1500, 1100, 800, 0.7, 0.05, 0.03, 0.001); },
-    whoosh(x, g = 0.2) { if (!ac) return; noise(out(panOf(x)), 420, 2100, 650, 1.3, g, 0.3, 0.09); },
+    whoosh(x, g = 0.2, mine = false) { if (!ac) return; noise(out(panOf(x)), 420, 2100, 650, 1.3, g, mine ? 0.22 : 0.3, mine ? 0.025 : 0.09); },   // mine: no slow swell, it is already late
     chime(win) {
       if (!ac) return; const d = out(0), ns = win ? [783.99, 1174.66] : [587.33, 440];
       ns.forEach((f, i) => { tone(d, 'sine', f, f, 0.01, 0.3, 0.7, i * 0.17); tone(d, 'triangle', f * 2, f * 2, 0.01, 0.07, 0.4, i * 0.17); });
@@ -574,28 +586,32 @@ export function createScene(containerEl) {
   function onEvent(m) {
     if (!m || !m.type) return;
     if (m.type === 'launch') {
-      ball.lastBy = m.by;
+      ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1);
       if (m.land) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
         marker.material.color.set((m.land[1] > 0 ? 0 : 1) === localSide ? 0xffd23a : 0xffffff); }
     } else if (m.type === 'hit') {
       const n = clamp(+m.n || 0, 0, 1), p = m.p || ball.p, pd = pads[m.side], mine = m.side === localSide;
       const rs = mine ? 0.6 : 1;                           // the local hit is 5 m from the lens: keep the ring off the ball
       ring(p, false, 0.1 * rs, (0.42 + n * 0.5) * rs, 0.3, 0xfff2a8); ring(p, false, 0.06 * rs, (0.24 + n * 0.26) * rs, 0.2, 0xffffff);
-      burst(p, n, 10 + Math.round(n * 14), 2.5 + n * 4.5, [0xfff6b0, 0xffd23a, 0xffffff], -sgn(m.side) * (2 + n * 3));
+      burst(p, n, 10 + Math.round(n * 14), 2.5 + n * 4.5, m.spin > 0.5 ? [0xbfe9ff, 0x5ad1ff, 0xffffff] : [0xfff6b0, 0xffd23a, 0xffffff], -sgn(m.side) * (2 + n * 3));
       cam.shake = Math.max(cam.shake, (0.025 + 0.085 * n) * (mine ? 1 : 0.55));
-      trail.glow = 0.55 + 0.45 * n; ball.snap = true; ball.lastBy = m.side;
+      ball.spin = clamp(+m.spin || 0, 0, 1);
+      trail.glow = 0.55 + 0.45 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
+      if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
+        ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : performance.now(); }
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
-      sfx.pock(n, p[0]);
+      sfx.pock(n, p[0]); if (m.spin > 0.5 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.16, 0.11, 0.004);   // a slice also hisses off the face
     } else if (m.type === 'swung') {
       const pd = pads[m.side]; if (!pd) return;
       if (pd.bot && pd.swingT < 0) startSwing(pd);
-      sfx.whoosh(pd.pos.x, m.side === localSide ? 0.22 : 0.12);
+      if (timeS - pd.swungAt < 0.25) return; pd.swungAt = timeS;          // main may play it locally AND the server echoes it: once
+      sfx.whoosh(pd.pos.x, m.side === localSide ? 0.22 : 0.12, m.side === localSide);
     } else if (m.type === 'bounce') {
       const p = m.p || ball.p; ring(p, true, 0.1, 0.55, 0.4, 0xffffff, 0.7, false);
       burst([p[0], 0.06, p[2]], 0, 5, 1.2, [0xd8e6f5, 0xffffff]);
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       sfx.bounce(p[0]);
-    } else if (m.type === 'serve') { ball.snap = true; trail.glow = 0.35; }
+    } else if (m.type === 'serve') { ball.snap = true; ball.spin = 0; trail.glow = 0.35; }
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }
@@ -612,10 +628,11 @@ export function createScene(containerEl) {
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;
   }
 
-  function updateBall(p, v, live, tMs) {                  // tMs optional (tests); default = arrival time, same clock as rAF
+  function updateBall(p, v, live, tMs, spin) {            // tMs optional (tests); default = arrival time, same clock as rAF. spin optional: the state packet's
     if (!p || !v) return;
+    if (isFinite(spin) && spin != null) ball.spin = clamp(+spin, 0, 1);
     if (live && !ball.live) ball.snap = true;
-    ball.p = p; ball.v = v; ball.live = !!live; ball.stamp = tMs == null ? performance.now() : tMs;
+    ball.p = p; ball.v = v; ball.live = !!live; ball.ext = tMs != null; ball.stamp = tMs == null ? performance.now() : tMs;
     if (live) ball.seen = true;
   }
 
@@ -641,6 +658,6 @@ export function createScene(containerEl) {
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y)) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, onEvent, unlockAudio, render, resize,
-    _dbg: { renderer, scene, camera, VIEW, pads },                    // test harness only
+    _dbg: { renderer, scene, camera, VIEW, pads, ball, cam },                    // test harness only
   };
 }
