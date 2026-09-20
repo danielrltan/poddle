@@ -3,6 +3,65 @@
 // Player frame (q, offset): x = player's right, y = up, z = toward the player. Side 1 = world rotated 180deg about Y.
 
 const G = 9.81, BALL_R = 0.11;
+// ---------- riding out a bad connection ----------
+// The server owns the ball. Between packets the client only has to know where that ball is NOW, and between hits a ball
+// is pure physics, so every client works out the same answer. coast() is the server's own flight (spin-lightened
+// gravity, the first bounce with its spin and sideways kick), in closed form, for up to COAST_MAX seconds with no news.
+// The next packet or hit event is the truth again; nothing here decides a hit, a bounce call or a point.
+const COAST_MAX = 0.6;
+const FLOOR = { up: 0.7, along: 0.78 }, SPUN = { lift: 0.3, up: 0.55, along: 0.45 };       // = BOUNCE / SLICE in server/game.js
+// coast(), but it will not carry the ball through the far player. With no news for over 100 ms and the ball arriving at
+// their paddle (farZ, signed), the likeliest truth is that they are hitting it: wait there for the packet. Guessing wrong
+// costs a short pause at the baseline; flying on costs a ball metres behind them that then has to come all the way back.
+export function coastTo(outP, outV, p, v, age, spin, bounces, kick, farZ) {
+  coast(outP, outV, p, v, age, spin, bounces, kick);
+  const s = Math.sign(farZ);
+  if (age <= 0.1 || !s || v[2] * s <= 0 || outP.z * s < farZ * s) return;
+  let lo = 0.1, hi = age;
+  coast(outP, outV, p, v, lo, spin, bounces, kick); if (outP.z * s >= farZ * s) return;      // already there in the last packet's own 100 ms
+  for (let i = 0; i < 10; i++) { const mid = (lo + hi) / 2; coast(outP, outV, p, v, mid, spin, bounces, kick); if (outP.z * s < farZ * s) lo = mid; else hi = mid; }
+  coast(outP, outV, p, v, lo, spin, bounces, kick);
+}
+
+// A ball hanging for the serve is not falling: the server floats it after the server's hand and sends its real drift as
+// v. Carry it along that drift and nothing else. (Gravity here made it sag between packets and snap back up on each one:
+// a millimetre on a LAN, a 5 cm sawtooth on a jittery link.) The drift is a damped spring, so past HOVER_MAX just wait.
+const HOVER_MAX = 0.25;
+export function hover(outP, outV, p, v, age) {
+  outP.set(p[0] + v[0] * age, Math.max(BALL_R, p[1] + v[1] * age), p[2] + v[2] * age); outV.set(v[0], v[1], v[2]);
+}
+
+// Server clock. A packet is stamped with when the server MADE it, not when it got here: a packet that sat 80 ms in a
+// wifi retry is 80 ms old, and drawing it as fresh would yank a fast ball a metre back. The least-delayed packet of the
+// last couple of seconds sets the offset between the two clocks; every other packet is aged by how much later it came.
+export function serverClock() {
+  const d = new Float64Array(96); let n = 0, off = NaN;
+  return { reset() { n = 0; },
+    madeAt(t, arrived) {                                         // t: the packet's server time (s). arrived: local ms. -> local ms it was made
+      if (!isFinite(t)) return arrived;
+      const dd = arrived - t * 1000;
+      if (Math.abs(dd - off) > 1500) n = 0;                      // the server restarted (its clock starts again), or this tab slept
+      d[n++ % 96] = dd;
+      let m = Infinity; for (let i = Math.min(n, 96) - 1; i >= 0; i--) if (d[i] < m) m = d[i];
+      off = m;
+      return Math.max(arrived - COAST_MAX * 1000, t * 1000 + m);
+    } };
+}
+export function coast(outP, outV, p, v, t, spin, bounces, kick) {
+  let x = p[0], y = p[1], z = p[2], vx = v[0], vy = v[1], vz = v[2], b = bounces;
+  for (let i = 0; i < 2 && t > 0; i++) {
+    const g = b ? G : G * (1 - SPUN.lift * spin), disc = vy * vy + 2 * g * Math.max(0, y - BALL_R), tf = (vy + Math.sqrt(disc)) / g;    // time until it reaches the floor
+    const step = Math.min(t, tf);
+    x += vx * step; z += vz * step; y += vy * step - 0.5 * g * step * step; vy -= g * step; t -= step;
+    if (step < tf) break;
+    y = BALL_R;
+    if (b) { vx = vy = vz = 0; break; }                    // a second bounce ends the rally; that call is the server's: wait on the floor
+    const sp = b ? 0 : spin, al = FLOOR.along + (SPUN.along - FLOOR.along) * sp;
+    vy *= -(FLOOR.up + (SPUN.up - FLOOR.up) * sp); vx = vx * al + kick; vz *= al; b++;
+  }
+  outP.set(x, Math.max(BALL_R, y), z); outV.set(vx, vy, vz);
+}
+
 const PADDLE_SCALE = 1.6;                 // Wii-sized so it reads from 5 m behind
 const VIEW_PARALLAX = 1;                  // head-coupled camera strength: 0 = locked-off, 1 = full
 const VIEW = { x: 1.7, y: 0.45, back: 2.2, tau: 0.22 };   // eye travel (m) at viewer = 1: sideways, up, drift back; follow time (s)
@@ -302,7 +361,9 @@ export function createScene(containerEl) {
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; blob.renderOrder = 3; blob.visible = false; scene.add(blob);
   const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new THREE.Vector3(0, 1, 0), vel: new THREE.Vector3(), lastBy: -1,
     spin: 0, cool: 0, pulse: 0,                                      // backspin of a sliced ball (0..1) and the trail tint easing toward it
-    core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false };   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
+    core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false,
+    bounces: 0, kick: 0, held: false };                              // what coast() needs beyond p and v; they ride on the state packet
+  const clock = serverClock(), madeAt = clock.madeAt;   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
 
   const TRAIL_N = 22, trail = { pts: [], acc: 0, glow: 0 };
   const trailGeo = new THREE.BufferGeometry();
@@ -483,9 +544,9 @@ export function createScene(containerEl) {
     const b = ball;
     if (!b.seen) return;
     if (b.live) {
-      const age = clamp((now - b.stamp) / 1000, 0, 0.1);
-      vA.set(b.p[0] + b.v[0] * age, Math.max(BALL_R, b.p[1] + b.v[1] * age - 0.5 * G * age * age), b.p[2] + b.v[2] * age);
-      b.vel.set(b.v[0], b.v[1] - G * age, b.v[2]);
+      const age = clamp((now - b.stamp) / 1000, 0, b.held ? HOVER_MAX : COAST_MAX), far = pads[1 - localSide];
+      if (b.held) hover(vA, b.vel, b.p, b.v, age);
+      else coastTo(vA, b.vel, b.p, b.v, age, b.spin, b.bounces, b.kick, far && far.has ? far.pos.z : 0);
       if (b.blend) {                                       // a hit moved the truth (a late swing meets the ball where it WAS): the drawn ball takes the new
         b.blend = false; b.err.copy(b.pos).sub(vA);        // velocity on this frame and slides onto the new path, instead of teleporting
         const e = b.err.length(); if (e > 5) b.snap = true; else { b.core.copy(vA); b.errT = 0; b.errDur = clamp(0.08 + 0.05 * e, 0.08, 0.18); }
@@ -652,7 +713,7 @@ export function createScene(containerEl) {
   function onEvent(m) {
     if (!m || !m.type) return;
     if (m.type === 'launch') {
-      ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1);
+      ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k;
       if (m.land) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
         marker.material.color.set((m.land[1] > 0 ? 0 : 1) === localSide ? 0xffd23a : 0xffffff); }
     } else if (m.type === 'hit') {
@@ -669,7 +730,8 @@ export function createScene(containerEl) {
       ball.spin = clamp(+m.spin || 0, 0, 1);
       trail.glow = 0.55 + 0.45 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
-        ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : performance.now(); }
+        ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now());
+        ball.bounces = 0; ball.kick = +m.k || 0; ball.held = false; }
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
       sfx.pock(n, p[0]); if (m.spin > 0.5 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.16, 0.11, 0.004);   // a slice also hisses off the face
     } else if (m.type === 'swung') {
@@ -700,11 +762,12 @@ export function createScene(containerEl) {
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;
   }
 
-  function updateBall(p, v, live, tMs, spin) {            // tMs optional (tests); default = arrival time, same clock as rAF. spin optional: the state packet's
-    if (!p || !v) return;
+  function updateBall(p, v, live, tMs, spin, m) {         // tMs optional (tests); default = when the server made it, on the rAF clock. spin optional: the state packet's
+    if (!p || !v) return;                                  // m optional: the state packet itself ({ t, b, k, serving }), for the clock and for coast()
     if (isFinite(spin) && spin != null) ball.spin = clamp(+spin, 0, 1);
     if (live && !ball.live) ball.snap = true;
-    ball.p = p; ball.v = v; ball.live = !!live; ball.ext = tMs != null; ball.stamp = tMs == null ? performance.now() : tMs;
+    if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.held = m.serving != null; }
+    ball.p = p; ball.v = v; ball.live = !!live; ball.ext = tMs != null; ball.stamp = tMs == null ? madeAt(m ? +m.t : NaN, performance.now()) : tMs;
     if (live) ball.seen = true;
   }
 
@@ -725,7 +788,7 @@ export function createScene(containerEl) {
   resize();
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
-    setSide(side) { localSide = side === 1 ? 1 : 0; cam.x = 0; view.x = view.y = view.vx = view.vy = 0; showFences(); for (const pd of pads) pd.init = false; },
+    setSide(side) { localSide = side === 1 ? 1 : 0; clock.reset(); cam.x = 0; view.x = view.y = view.vx = view.vy = 0; showFences(); for (const pd of pads) pd.init = false; },
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y)) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },

@@ -9,8 +9,12 @@ const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
 const HOST = qs.get('host') || location.hash.slice(1) || 'localhost';      // player 2:  /#<server-ip>
 const BRIDGE = `ws://localhost:${qs.get('bridge') || 8787}`;
-const GAME = `ws://${HOST}:${qs.get('game') || 8080}`;
+const HOSTED = HOST === 'localhost' && !['localhost', '127.0.0.1', ''].includes(location.hostname);      // page came from the game server itself (fly.io)
+const GAME = HOSTED ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://${HOST}:${qs.get('game') || 8080}`;
 const AUTOBOT = qs.get('autobot') === '1';
+// One id per tab, kept across reloads and reconnects: the server gives a returning tab its seat back instead of seating
+// it against its own half-dead socket (bad wifi drops connections without telling the server).
+let CID = ''; try { CID = sessionStorage.getItem('cid') || ''; if (!CID) sessionStorage.setItem('cid', CID = Math.random().toString(36).slice(2, 12)); } catch { CID = Math.random().toString(36).slice(2, 12); }
 
 const model = new MotionModel();
 const scene = createScene($('stage'));
@@ -93,7 +97,7 @@ function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
     const url = urls[i % urls.length]; let opened = false;
-    ws = new WebSocket(url);
+    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID : url);
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
       if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Couldn’t reach the saved address — connected to this Mac instead', null, 2800); } }
@@ -131,7 +135,7 @@ const bridge = connect(BRIDGE, 'm', sample => {
         const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.6) / 0.3)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 1.2) / 1.0));
         const amount = Math.max(roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
         const slice = amount * (way || 1);
-        game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, chop: e.chop, age: e.age, slice, fix });
+        game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix });
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') logSwing(e);
@@ -144,10 +148,11 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     side = m.side; if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(side);
     if (AUTOBOT) game.send({ type: 'bot' });
+    net.rejoined();
     return;
   }
   if (m.type === 'state') {
-    state = m; scene.updateBall(m.p, m.v, m.live);
+    state = m; scene.updateBall(m.p, m.v, m.live, undefined, m.spin, m); net.packet();
     serveCoach(m);
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side];
@@ -160,6 +165,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (m.reason) say('Can’t add a bot — two players are connected', null, 1800); else if (m.active && inPlay()) say(`Opponent: ${m.name} Bot`, null, 1400);
     return;
   }
+  if (m.type === 'pong') { net.pong(m); return; }
   if (m.type === 'full') { ui.showOverlay('game-full'); return; }
   if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === side ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
@@ -173,6 +179,31 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); }
   scene.onEvent(m);
 });
+
+// ---------- link quality ----------
+// The ball already rides out gaps by itself (scene.js coast()). This watches the connection so that (1) a swing can be
+// back-dated by the round trip, (2) a struggling link gets half the state packets: over TCP every lost packet stalls
+// everything behind it, so fewer packets means fewer stalls, and (3) the player is told it is the wifi, not the game.
+const net = (() => {
+  const rtts = []; let lastPacket = 0, gaps = 0, late = 0, worst = 0, hz = 60, bad = 0, good = 0, told = false;
+  const floor = () => rtts.length ? Math.min(...rtts) : 0;
+  setInterval(() => game.send({ type: 'ping', c: performance.now() }), 500);
+  setInterval(() => {                                                   // judged every 2 s
+    const lateShare = gaps ? late / gaps : 0, rtt = rtts.length ? rtts[rtts.length - 1] : 0, poor = link.g && gaps > 10 && (lateShare > 0.04 || worst > 250 || floor() > 140);
+    stats.net = { rtt: Math.round(rtt), floor: Math.round(floor()), late: +lateShare.toFixed(3), worst: Math.round(worst), hz };
+    ui.setStat('ping', link.g && rtts.length ? Math.round(rtt) + ' ms' : '–'); ui.setStat('netq', !link.g ? 'offline' : poor ? `weak (worst gap ${Math.round(worst)} ms)` : 'good'); ui.setStat('nethz', hz);
+    if (poor) { bad++; good = 0; } else { good++; bad = 0; }
+    if (bad >= 2 && hz === 60) { hz = 30; game.send({ type: 'net', hz }); if (!told && inPlay()) { told = true; say('Weak connection — smoothing it out', null, 2600); } }
+    if (good >= 8 && hz === 30) { hz = 60; game.send({ type: 'net', hz }); }
+    gaps = late = worst = 0;
+  }, 2000);
+  return {
+    packet() { const t = performance.now(), g = t - lastPacket; lastPacket = t; if (g > 1000) return; gaps++; if (g > worst) worst = g; if (g > 1000 / hz + 45) late++; },
+    pong(m) { const r = performance.now() - m.c; if (r >= 0 && r < 5000) { rtts.push(r); if (rtts.length > 12) rtts.shift(); } },
+    lag: () => Math.round(floor()),                                     // the quietest recent round trip: queueing spikes are not the link's real delay
+    rejoined() { hz = 60; bad = good = 0; rtts.length = 0; },           // a new socket starts at the full rate on the server
+  };
+})();
 
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating) return;

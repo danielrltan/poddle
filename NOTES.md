@@ -159,3 +159,35 @@ Build log for Hack the North 2026. What we tried, what broke, and how each probl
 - **A blur that never switched off.** The paddle's motion blur was first triggered by how fast the paddle tip moved
   through the court, which also happens when the camera-tracked body moves or the footwork carries the player. It is
   now tied to the swing event itself and its brightness follows how hard the swing is.
+
+## 14. Hosting, and playing over a bad connection
+- **Hosted on fly.io** at `https://poddle.fly.dev` (`fly deploy --ha=false`). `server/game.js` now also serves `web/` on
+  its own port, so the hosted game is one process behind one address; a page that did not come from localhost takes its
+  game socket from the address it was loaded from. `bridge/` and `motion/` still run on each player's Mac. There must be
+  exactly one machine: the match lives in that process's memory.
+- **"Why is it so laggy?" It was the wifi, not the host.** Measured on the fly machine itself the server ticks at 60.4/s
+  with a worst gap of 21 ms. From the laptop, pings to its *own router* took 10-250 ms (at one point 700-2100 ms) with
+  packets lost, while the laptop moved 0.1 Mbps. A WebSocket is TCP: one lost packet holds up everything behind it, then
+  the backlog lands in a burst. The old client treated each packet as fresh on arrival and only carried the ball 100 ms
+  past the last one, so the ball froze, jumped back, then leapt forward.
+- **The ball now rides out gaps.** The server still owns the ball, every hit and every point. Between hits a ball is pure
+  physics, so the client carries it forward itself (`coast()` in `web/scene.js`: spin-lightened gravity, the first bounce
+  with its spin and kick) for up to 0.6 s without news. `node test/coast.test.mjs`: 42,432 predictions against the
+  server's own stepping, worst error 5 cm.
+- **Packets are aged by the server's clock, not by arrival.** The least-delayed packet of the last couple of seconds sets
+  the offset between the two clocks; a packet that sat 80 ms in a retry is drawn as 80 ms old instead of pulling a fast
+  ball a metre backwards.
+- **It will not fly through the other player.** With no news and the ball arriving at the far paddle, the likeliest truth
+  is that they are hitting it, so the ball waits there for the packet (`coastTo()`).
+- **Swings are back-dated by the round trip** as well as by the sensor's lateness (the client pings the server twice a
+  second and sends its quietest recent round trip with each swing; still capped by `LAG_MAX`).
+- **A struggling link gets 30 state packets a second instead of 60** (the client asks; fewer packets, fewer stalls; with
+  the ball coasting there is nothing to see), state is never queued behind a stalled socket, and the player gets one
+  "Weak connection" toast. **H** shows ping, connection quality and the packet rate.
+- **Reconnecting.** Each tab carries an id. A tab that reconnects while its old socket is still half-open gets its seat
+  back instead of being matched against its own ghost, and behind the proxy the player's real address comes from the
+  `Fly-Client-IP` header (before, every hosted player looked like the same machine).
+- **How it was measured.** `node test/badwifi.mjs` plays the same 180 s rally through a modelled lossy link into the old
+  and the new client logic. On a link like the one measured (4 % loss, 100-350 ms stalls), for the ball coming at the
+  player: p95 error 223 cm -> 15 cm (6 cm at 30 Hz), frames frozen 2649 -> 0, backward jumps 322 -> 0. What is left is a
+  hit by the other player that has not been heard about yet; nothing can predict that.

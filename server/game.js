@@ -1,6 +1,26 @@
 // ONE shared process. Authoritative ball + contact detection. Clients render and send input.
 const { WebSocketServer } = require('ws');
-const wss = new WebSocketServer({ port: +process.env.PORT || 8080 });
+const http = require('http'), fs = require('fs'), path = require('path');
+
+// The same port also serves web/ over plain HTTP, so a hosted copy (fly.io) is one process behind one address:
+// the page loads from https://<app>/ and its game socket is wss://<app>/. Locally nothing changes.
+const WEB = path.join(__dirname, '..', 'web');
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+  '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const httpServer = http.createServer((req, res) => {
+  let rel; try { rel = decodeURIComponent(req.url.split('?')[0]); } catch { rel = '/'; }
+  const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
+  if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }      // no climbing out of web/
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) { res.writeHead(404); return res.end('not found'); }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Content-Length': st.size,
+      'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : 'no-cache' });     // vendor/ is 18 MB and never changes
+    if (req.method === 'HEAD') return res.end();
+    fs.createReadStream(file).pipe(res);
+  });
+});
+const wss = new WebSocketServer({ server: httpServer });
+httpServer.listen(+process.env.PORT || 8080);
 
 const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
 const G = 9.81, R = 0.11;                 // gravity, ball radius
@@ -109,7 +129,7 @@ function launch(side, n, dir, lob, hit, slice) {
   ball.p[1] = Math.max(ball.p[1], R);
   ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0;
   planFootwork(1 - side);
-  if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin });   // p + v: the hitter's screen bends the ball away on this very frame
+  if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
   broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin });
 }
 
@@ -119,7 +139,7 @@ function reaim(side, n, dir, lob, slice) {
   ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(FIX_EASE / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
   ball.spin = sol.spin; ball.kick = sol.kick;
   planFootwork(1 - side, sol.v);
-  broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin });     // the landing marker moves now
+  broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick });     // the landing marker moves now
 }
 const aimV = [0, 0, 0];
 function easeAim() {
@@ -316,10 +336,16 @@ function runBot(pl, dt) {
   }
 }
 
-wss.on('connection', ws => {
+wss.on('connection', (ws, req) => {
   ws.on('error', () => {});                                    // a bad frame must not take the process down
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
-  ws.addr = ws._socket && ws._socket.remoteAddress;
+  const hdr = req && req.headers || {};                        // hosted: every socket comes from the proxy, the real address is in a header
+  ws.addr = hdr['fly-client-ip'] || ws._socket && ws._socket.remoteAddress;
+  try { ws.cid = new URL(req.url, 'http://x').searchParams.get('cid') || null; } catch { ws.cid = null; }
+  // Bad wifi: the tab reconnects while its old socket is still half-open. That old seat is the SAME player, so it goes
+  // now, whatever else is true. Otherwise you would be matched against your own ghost until the heartbeat clears it.
+  const stale = ws.cid && humans().find(p => p.ws.cid === ws.cid);
+  if (stale) { players.splice(players.indexOf(stale), 1); stale.gone = true; stale.ws.terminate(); }
   if (humans().length >= 2) {                                  // full: a reload / stale tab from the same machine takes over its old seat
     const ghost = AUTOBOT && humans().find(p => p.ws.addr === ws.addr);
     if (!ghost) { ws.send(JSON.stringify({ type: 'full' })); ws.close(); return; }
@@ -366,12 +392,14 @@ wss.on('connection', ws => {
         return;
       }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
-        from: now - clamp(num(m.age, 0) / 1000, 0, LAG_MAX),       // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness)
+        from: now - clamp((num(m.age, 0) + clamp(num(m.net, 0), 0, 250)) / 1000, 0, LAG_MAX),   // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness), and `net` = the round trip: the player saw the ball half a trip ago and the swing took the other half to get here
         n: pw,                                                     // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
         dir, lob, slice, why: null, best: Infinity };
       broadcast({ type: 'swung', side: me.side });
       tryHit(me);                                                // ball already there: struck NOW, not on the next tick
     } else if (m.type === 'bot') botRequest(me, m.level);
+    else if (m.type === 'ping') send(me, { type: 'pong', c: m.c, t: now });     // the client times the round trip itself
+    else if (m.type === 'net') me.every = num(m.hz, 60) <= 30 ? 2 : 1;           // a struggling link asks for half the state packets
   });
 
   ws.on('close', () => {
@@ -461,11 +489,18 @@ function step() {
   const paddles = [null, null];
   for (const pl of players) paddles[pl.side] = { x: pl.x, y: pl.y, z: pl.z, q: pl.q, bot: pl.bot };
   const srv = ball.live && ball.serving != null && bySide(ball.serving);
-  broadcast({ type: 'state', t: now, p: ball.p, v: ball.v, spin: ball.spin, live: ball.live, serving: ball.serving, reach: srv ? serveReach(srv) : false, score, paddles });   // reach: the server could serve it right now
+  const packet = JSON.stringify({ type: 'state', t: now, p: ball.p, v: ball.v, spin: ball.spin, b: ball.bounces, k: ball.kick, live: ball.live, serving: ball.serving, reach: srv ? serveReach(srv) : false, score, paddles });
+  tick++;
+  for (const pl of players) {
+    if (!pl.ws || pl.ws.readyState !== 1) continue;
+    if (pl.every > 1 && tick % pl.every) continue;              // asked for fewer packets (see 'net'): fewer to lose, and every loss stalls a TCP stream
+    if (pl.ws.bufferedAmount > 8192) continue;                  // link stalled: state is disposable, stale copies must not pile up behind the blockage
+    pl.ws.send(packet);
+  }   // reach: the server could serve it right now
 }
 
 // fixed 60Hz steps against the real clock (setInterval alone runs ~2% slow and drifts). One state packet per step.
-let last = process.hrtime.bigint(), acc = 0;
+let last = process.hrtime.bigint(), acc = 0, tick = 0;
 setInterval(() => {
   const t = process.hrtime.bigint(); acc += Number(t - last) / 1e9 * SCALE; last = t;
   let k = 0;
@@ -479,4 +514,4 @@ setInterval(() => {
 }, HEARTBEAT);
 
 console.log('game server on port ' + (+process.env.PORT || 8080));
-module.exports = { COURT, ZONE, BOUNCE, SLICE, G, R, PASSED, solve, shotKind };   // test/server.test.mjs sweeps solve() directly
+module.exports = { COURT, ZONE, BOUNCE, SLICE, G, R, PASSED, solve, shotKind, bounceV, gOf };   // test/server.test.mjs sweeps solve() directly

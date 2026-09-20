@@ -1,0 +1,22 @@
+# fly.io: one small machine in Toronto. The match lives in this one process's memory, so there must be exactly
+# ONE machine: two would put the two players in different games. (`fly scale count 1` if that ever drifts.)
+app = "poddle"
+primary_region = "yyz"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"        # sleeps when nobody is connected; an open WebSocket keeps it awake
+  auto_start_machines = true         # the next visitor wakes it (about a second)
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/"
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
