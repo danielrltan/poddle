@@ -13,6 +13,13 @@ const STANCE = 0.3;                       // stand this far behind the predicted
 const SWING_WINDOW = 0.32;                // s a swing stays "live" waiting for the ball
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 0.9 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
+// Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
+const SERVE_AHEAD = 0.55;                 // it wants to sit this far in front of the paddle
+const SERVE_DEAD = [0.4, 0.2, 0.35];      // x,y,z slack: move this far from it and it stays exactly where it is
+const SERVE_SETTLE = 0.4;                 // once it follows, it keeps drifting until it is back within this share of the slack
+const SERVE_FOLLOW = 3.5;                 // critically damped spring, rad/s: ~0.6 s to cover 63 % of a step, ~1.1 s for 90 %
+const SERVE_ZONE = { x: 0.9, y: 0.9, front: 1.4, behind: 0.5 };   // a serve has to meet the ball: tighter than the rally box
+const SERVE_POWER = 11;                   // swing power (rad/s scale: 6 = twitch/tap, 14+ = real stroke) needed to serve
 const REACH = 3.2;                        // no shot asks the receiver to get the paddle wider than this
 const PASSED = 5.5;                       // a bounced ball this far beyond the baseline is gone
 const SCALE = +process.env.TIMESCALE || 1;                     // tests only: run the sim faster than real time
@@ -24,7 +31,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const num = (v, d) => (Number.isFinite(+v) ? +v : d);          // untrusted input -> finite number
 
 const players = [];                       // { ws|null(bot), side, x, y, z, zT, q, swing, lunge, contact }
-const ball = { serving: null, serveBy: 0, p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
+const ball = { serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
 const score = [0, 0];
 let now = 0, server = 0, serveAt = Infinity;      // sim clock; who serves next; when (sim time)
 
@@ -94,7 +101,8 @@ function reset(by) {
   for (const p of players) p.swing = p.lunge = null;
   ball.live = true; ball.bounces = 0;
   if (SWING_SERVE && pl) {                                     // the ball floats in front of the server until they swing at it
-    ball.serving = by; ball.lastHit = 1 - by; ball.v = [0, 0, 0];
+    ball.serving = by; ball.lastHit = 1 - by;
+    ball.hang = serveSpot(pl); ball.hv = [0, 0, 0]; ball.drag = [false, false, false]; hangBall(0);
     ball.serveBy = now + (pl.bot ? 1.1 : 9);                   // bots serve after a beat; a human who never swings gets served for
     broadcast({ type: 'serve', by, wait: true });
     return;
@@ -102,6 +110,33 @@ function reset(by) {
   ball.p = [(Math.random() - 0.5) * 2, 1.1, s * HIT_LINE];
   launch(by, 0.15, (Math.random() - 0.5) * 1.2, 0.25);
   broadcast({ type: 'serve', by });
+}
+
+// ---------- serve: a ball that hangs, and follows late ----------
+const serveSpot = pl => [pl.x + 0.05 * sgn(pl.side), clamp(pl.y + 0.1, 0.7, 1.8), pl.z - sgn(pl.side) * SERVE_AHEAD];
+function hangBall(dt) {
+  const pl = bySide(ball.serving), s = sgn(pl.side), want = serveSpot(pl), h = ball.hang, hv = ball.hv;
+  for (let i = 0; i < 3; i++) {
+    const off = Math.abs(want[i] - h[i]);
+    if (off > SERVE_DEAD[i]) ball.drag[i] = true; else if (off < SERVE_DEAD[i] * SERVE_SETTLE) ball.drag[i] = false;
+    const pull = ball.drag[i] ? want[i] - h[i] : 0;            // inside the slack nothing pulls it: it just coasts to a stop
+    hv[i] += (SERVE_FOLLOW * SERVE_FOLLOW * pull - 2 * SERVE_FOLLOW * hv[i]) * dt;
+    h[i] += hv[i] * dt;
+  }
+  const x = clamp(h[0], -X_LIMIT, X_LIMIT), z = s * clamp(h[2] * s, 1.0, Z_FAR);       // always on the server's own half
+  if (x !== h[0]) { h[0] = x; hv[0] = 0; } if (z !== h[2]) { h[2] = z; hv[2] = 0; }
+  const w = 3, bob = 0.04;                                     // p/v are what clients see: v is the real drift, so their extrapolation stays smooth
+  ball.p = [h[0], h[1] + Math.sin(now * w) * bob, h[2]]; ball.v = [hv[0], hv[1] + Math.cos(now * w) * w * bob, hv[2]];
+}
+function serveReach(pl) {
+  const s = sgn(pl.side), ahead = -(ball.p[2] - pl.z) * s;
+  return Math.abs(ball.p[0] - pl.x) < SERVE_ZONE.x && Math.abs(ball.p[1] - pl.y) < SERVE_ZONE.y && ahead > -SERVE_ZONE.behind && ahead < SERVE_ZONE.front;
+}
+function strike(pl, sw) {
+  pl.swing = null;
+  pl.lunge = { z: ball.p[2] + sgn(pl.side) * 0.25, until: now + 0.12 };
+  broadcast({ type: 'hit', side: pl.side, n: sw.n, kind: shotKind(sw.n, sw.lob), p: ball.p });
+  launch(pl.side, sw.n, sw.dir, sw.lob);
 }
 
 // a fresh pair (human+human or human+bot): clean score, first serve
@@ -170,8 +205,8 @@ function botRequest(from, level) {
 // Auto-footwork for humans: run to where the ball will be, drift home between shots. Foot speed is finite,
 // so a wide enough shot still beats you.
 function runAuto(pl, dt) {
-  const incoming = ball.live && ball.lastHit !== pl.side;
-  const tgt = incoming ? (pl.contact || [ball.p[0], 1.0]) : [0, 1.0];
+  const incoming = ball.live && ball.lastHit !== pl.side, serving = ball.live && ball.serving === pl.side;
+  const tgt = serving ? [ball.hang[0], ball.hang[1] - 0.1] : incoming ? (pl.contact || [ball.p[0], 1.0]) : [0, 1.0];   // your serve: line up with the hanging ball
   const vx = incoming ? AUTO_SPEED : 2.5;
   if (pl.auto) pl.x = clamp(pl.x + clamp(tgt[0] - pl.x, -vx * dt, vx * dt), -X_LIMIT, X_LIMIT);
   pl.y += clamp(clamp(tgt[1], Y_MIN, Y_MAX) - pl.y, -4 * dt, 4 * dt);
@@ -181,7 +216,7 @@ function runBot(pl, dt) {
   const B = BOTS[botLevel], foe = humans()[0];
   // rubber band: ease off when well ahead, sharpen when well behind, so rallies stay alive in a demo
   const lead = score[pl.side] - score[1 - pl.side], band = clamp(1 - lead * 0.06, 0.7, 1.1);
-  if (!ball.live || ball.lastHit === pl.side) { pl.x += (0 - pl.x) * 2 * dt; pl.y += (1.0 - pl.y) * 2 * dt; return; }
+  if (!ball.live || ball.lastHit === pl.side || ball.serving === pl.side) { pl.x += (0 - pl.x) * 2 * dt; pl.y += (1.0 - pl.y) * 2 * dt; return; }
   if (now < pl.react + B.react - 0.3) return;                  // planFootwork sets react = now + 0.3
   const tgt = pl.contact || [ball.p[0], 1.0], foot = B.foot * band;
   pl.x = clamp(pl.x + clamp(tgt[0] + pl.err * B.err / 0.6 - pl.x, -foot * dt, foot * dt), -X_LIMIT, X_LIMIT);
@@ -229,6 +264,12 @@ wss.on('connection', ws => {
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
     } else if (m.type === 'swing') {
       const pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
+      if (ball.live && ball.serving === me.side) {               // my serve: only a real stroke that meets the ball counts.
+        if (num(m.power, 6) < SERVE_POWER) return;               // a twitch, a flick, a quick step: nothing happens at all
+        broadcast({ type: 'swung', side: me.side });
+        if (serveReach(me)) { ball.serving = null; strike(me, { n: pw, dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1) }); }
+        return;                                                  // swung at air: no whiff, no point, the ball keeps hanging
+      }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
         n: clamp((num(m.power, 6) - 6) / 28, 0, 1),                  // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
          dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
@@ -268,8 +309,7 @@ function step() {
     const pl = bySide(ball.serving);
     if (!pl || ball.lastHit === ball.serving) ball.serving = null;            // it's been struck (or the server left)
     else {
-      const s = sgn(pl.side);
-      ball.p = [pl.x + 0.05 * s, clamp(pl.y + 0.1, 0.8, 1.5) + Math.sin(now * 3) * 0.04, pl.z - s * 0.55]; ball.v = [0, 0, 0];
+      hangBall(DT);
       if (now >= ball.serveBy) {
         ball.serving = null; broadcast({ type: 'swung', side: pl.side }); broadcast({ type: 'hit', side: pl.side, n: 0.3, p: ball.p });
         launch(pl.side, pl.bot ? 0.2 + Math.random() * 0.3 : 0.25, (Math.random() - 0.5) * 1.4, 0.2);
@@ -286,13 +326,7 @@ function step() {
     const sw = pl.swing; if (!sw) continue;
     const mine = ball.live && ball.lastHit !== pl.side;          // is this ball mine to hit?
     const z = inZone(pl);
-    if (mine && z.ok) {
-      pl.swing = null;
-      pl.lunge = { z: ball.p[2] + sgn(pl.side) * 0.25, until: now + 0.12 };
-      broadcast({ type: 'hit', side: pl.side, n: sw.n, kind: shotKind(sw.n, sw.lob), p: ball.p });
-      launch(pl.side, sw.n, sw.dir, sw.lob);
-      continue;
-    }
+    if (mine && z.ok) { strike(pl, sw); continue; }
     // remember the near miss closest to the paddle plane, so the reason isn't always 'late' by the time the window ends
     if (mine && z.depth && Math.abs(z.ahead) < sw.best) { sw.best = Math.abs(z.ahead); sw.why = aside(z); }
     if (now > sw.until) {
@@ -314,7 +348,8 @@ function step() {
 
   const paddles = [null, null];
   for (const pl of players) paddles[pl.side] = { x: pl.x, y: pl.y, z: pl.z, q: pl.q, bot: pl.bot };
-  broadcast({ type: 'state', p: ball.p, v: ball.v, live: ball.live, serving: ball.serving, score, paddles });
+  const srv = ball.live && ball.serving != null && bySide(ball.serving);
+  broadcast({ type: 'state', p: ball.p, v: ball.v, live: ball.live, serving: ball.serving, reach: srv ? serveReach(srv) : false, score, paddles });   // reach: the server could serve it right now
 }
 
 // fixed 60Hz steps against the real clock (setInterval alone runs ~2% slow and drifts). One state packet per step.

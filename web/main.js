@@ -65,6 +65,18 @@ const WHY_WON = { 'double bounce': 'They couldn’t reach it', out: 'Their shot 
 const WHY_LOST = { 'double bounce': 'It bounced twice on your side', out: 'Your shot went out', passed: 'It got past you' };
 let oppName = 'Opponent';
 
+// My serve: the ball hangs and follows late. One quiet nudge per serve, from the server's reach hint, never in reply to a swing.
+let svT = 0, svFar = 0, svSaid = true;
+function serveCoach(m) {
+  const t = performance.now();
+  if (m.serving !== side || calibrating) { svT = 0; return; }
+  if (!svT) { svT = t; svFar = 0; svSaid = false; }
+  svFar = m.reach ? 0 : svFar || t;
+  if (svSaid) return;
+  if (svFar && t - svFar > 1500 && t - svT > 2800) { svSaid = true; say('Line up with the ball, then swing', null, 2200); }
+  else if (m.reach && t - svT > 4500) { svSaid = true; say('Swing through the ball to serve', null, 2200); }
+}
+
 // ---------- peak logger ----------
 let peaks = [], sessionPeak = 0, log10 = [];
 function logSwing(e) {
@@ -141,6 +153,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'state') {
     state = m; scene.updateBall(m.p, m.v, m.live);
+    serveCoach(m);
     for (const [id, v] of [['sc-me', m.score[side]], ['sc-them', m.score[1 - side]]]) if ($(id).textContent !== String(v)) { $(id).textContent = v; pop($(id)); }
     const o = m.paddles[1 - side];
     players = o ? 2 : 1; if (!o) { $('themname').textContent = 'Waiting…'; } else if (!o.bot) { oppName = 'Player 2'; $('themname').textContent = oppName; $('bot').textContent = 'Far side'; }

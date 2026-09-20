@@ -12,19 +12,15 @@ function oneEuro(minCut, beta) {
 const EDGE = 0.08;                                    // keep this much of the frame as margin so you never have to leave it
 
 export async function createBodyTracker(video, canvas) {
-  const T = { ready: false, error: null, reach: 0.3, reachY: 0.14, seenAt: 0, cx: 0.5, cx0: 0.5, cy: 0.5, cy0: 0.5, fw: 0, fw0: 0, fps: 0, via: '-' };
-  const fx = oneEuro(0.7, 9), fy = oneEuro(0.7, 9), fw = oneEuro(0.35, 4);        // face size is noisier: smooth it harder
+  const T = { ready: false, error: null, reach: 0.3, reachY: 0.14, seenAt: 0, cx: 0.5, cx0: 0.5, cy: 0.5, cy0: 0.5, fps: 0, via: '-' };
+  const fx = oneEuro(0.7, 9), fy = oneEuro(0.7, 9);
   let detector, poser, ctx = canvas.getContext('2d'), lastT = 0, lastPose = 0;
   T.seen = () => T.ready && performance.now() - T.seenAt < 400;
   // here is centre
-  T.center = () => { T.cx0 = T.cx; T.cy0 = T.cy; T.fw0 = T.fw; };
+  T.center = () => { T.cx0 = T.cx; T.cy0 = T.cy; };
   // local court metres, + = your right. The camera faces you, so your right is the image's left.
   const span = dir => Math.max(0.05, Math.min(T.reach, dir < 0 ? T.cx0 - EDGE : 1 - EDGE - T.cx0));    // frame fraction available on that side
   T.x = () => { const d = T.cx - T.cx0; return -d / span(d) * 3.0; };
-  // Depth: your face gets bigger as you step toward the laptop. distance ~ 1/size, so size0/size - 1 is how much
-  // further (+) or closer (-) you are than where you calibrated. 30% closer = up at the kitchen line; 20% back = baseline.
-  // Returns distance from the net in metres (6.5 = where you calibrated), or null when only the body model sees you.
-  T.z = () => { if (!T.fw0 || !T.fw || T.via !== 'face') return null; const rel = T.fw0 / T.fw - 1; return 6.5 + (rel < 0 ? rel * 13 : rel * 3.5); };
   // paddle height, metres: standing as calibrated = 1.0; duck to go low, stretch up to go high (image y grows downward)
   T.y = () => 1.0 - (T.cy - T.cy0) / T.reachY * 0.8;
   try {
@@ -46,7 +42,7 @@ export async function createBodyTracker(video, canvas) {
         const K = d.keypoints || [];
         if (K.length >= 4) { cx = K.reduce((a, k) => a + k.x, 0) / K.length; cy = K.reduce((a, k) => a + k.y, 0) / K.length; }
         else { cx = (d.boundingBox.originX + d.boundingBox.width / 2) / W; cy = (d.boundingBox.originY + d.boundingBox.height / 2) / Hh; }
-        T.via = 'face'; T.fw = fw(d.boundingBox.width / W, now); }
+        T.via = 'face'; }
       else if (poser && now - lastPose > 50) {                       // heavier model: only when the face is lost, and at most 20 Hz
         lastPose = now;
         const L = (poser.detectForVideo(video, now).landmarks || [])[0];
