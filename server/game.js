@@ -98,8 +98,10 @@ function point(winner, why) {
   const loser = bySide(1 - winner);
   if (loser && loser.swing && ball.lastHit === winner) send(loser, { type: 'whiff', why: whyMissed(loser.swing, inZone(loser)) });
   for (const pl of players) pl.swing = null;
-  broadcast({ type: 'point', winner, why, score });
+  const final = WIN_AT > 0 && score[winner] >= WIN_AT && score[winner] - score[1 - winner] >= 2;
+  broadcast({ type: 'point', winner, why, score, final });
   server = 1 - server; serveAt = now + 1.5;                    // serve alternates every point
+  if (final) { broadcast({ type: 'match', winner, score: [...score] }); newMatchAt = now + 5; serveAt = Infinity; }
 }
 
 function inZone(pl) {
@@ -122,7 +124,9 @@ const BOTS = [
   { name: 'Pro',    react: 0.18, foot: 4.2, err: 0.2, reach: 0.90, power: [0.45, 0.95], place: 0.9, lob: 0.10, whiff: 0.02 },
 ];
 let botLevel = 1, botJoinAt = Infinity;
-const AUTOBOT = process.env.AUTOBOT !== '0';            // tests turn off auto-join and seat takeover
+const AUTOBOT = process.env.AUTOBOT !== '0';
+const WIN_AT = process.env.WIN_AT != null ? +process.env.WIN_AT : (AUTOBOT ? 11 : 0);   // first to 11, win by 2 (off in tests)
+let newMatchAt = Infinity;            // tests turn off auto-join and seat takeover
 const humans = () => players.filter(p => !p.bot);
 const theBot = () => players.find(p => p.bot);
 const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name) });
@@ -225,6 +229,7 @@ const DT = 1 / 60;
 function step() {
   now += DT;
   if (now >= botJoinAt) { botJoinAt = Infinity; addBot(); }
+  if (now >= newMatchAt) { newMatchAt = Infinity; if (players.length === 2) startMatch(1 - server); }
   if (!ball.live && now >= serveAt) { serveAt = Infinity; if (players.length === 2) reset(server); }
 
   for (const pl of players) {

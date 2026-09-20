@@ -3,64 +3,132 @@
 <link rel="icon" href="data:,">
 <title>Poddle</title>
 <style>
+  :root{--me:#2f8cff;--me2:#1463d8;--them:#ff7a3d;--them2:#e4521b;--ink:#1d2b3a;--card:#ffffff;--good:#22c55e;--bad:#ef4444;--gold:#ffc83d;
+        --font:ui-rounded,"SF Pro Rounded","Arial Rounded MT Bold","Nunito","Helvetica Neue",Arial,sans-serif}
   [hidden]{display:none!important}
-  html,body{margin:0;height:100%;background:#0b0f14;color:#e6edf3;font:13px ui-monospace,Menlo,monospace;overflow:hidden}
+  html,body{margin:0;height:100%;background:#0b0f14;color:var(--ink);font:600 14px var(--font);overflow:hidden;-webkit-font-smoothing:antialiased}
   #stage{position:fixed;inset:0}
-  .panel{position:fixed;z-index:10;line-height:1.7;text-shadow:0 1px 3px #000;pointer-events:none}
-  #hud{top:12px;left:14px}
-  #score{top:8px;right:18px;font-size:34px;letter-spacing:3px;font-weight:600}
-  #peaks{bottom:12px;left:14px}
-  #peaks b{font-size:20px}
-  #hint{bottom:14px;right:18px;text-align:right}
-  .bad{color:#ff6b6b}.good{color:#4ade80}.dim{color:#9fb0c0}.warn{color:#ffe066}
-  #bar{width:220px;height:8px;background:rgba(30,39,51,.8);border-radius:4px;overflow:hidden;margin:3px 0;position:relative}
-  #barf{height:100%;width:0;background:#4ade80}
-  #barpk{position:absolute;top:0;width:2px;height:100%;background:#ffe066;left:0}
-  #camwrap{max-width:252px;position:fixed;right:14px;top:58px;z-index:10;text-align:center;font-size:11px;background:rgba(11,15,20,.55);border-radius:12px;padding:6px 6px 8px;text-shadow:0 1px 3px #000}
-  #camc{border-radius:8px;display:block;margin:0 auto 4px}
-  #podwrap{position:fixed;right:14px;bottom:58px;z-index:10;text-align:center;font-size:11px;background:rgba(11,15,20,.55);border-radius:12px;padding:4px 8px 8px;text-shadow:0 1px 3px #000}
-  #msg{position:fixed;top:54%;width:100%;text-align:center;font-size:34px;font-weight:600;z-index:9;opacity:0;
-       transition:opacity .25s;text-shadow:0 2px 10px #000;pointer-events:none}
-  #down{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:15;background:#7f1d1d;color:#fff;padding:10px 18px;border-radius:8px;text-align:center;line-height:1.6}
-  #cal{position:fixed;inset:0;z-index:20;background:rgba(11,15,20,.86);display:flex;flex-direction:column;
-       align-items:center;justify-content:center;text-align:center;gap:16px}
-  #cal h1{font-size:24px;margin:0;font-weight:600}
-  #cal p{margin:0;max-width:460px;line-height:1.6;color:#b6c2cf;font-size:14px}
-  #ring{width:180px;height:180px;transform:rotate(-90deg)}
-  #ring circle{fill:none;stroke-width:10}
-  #calmsg{font-size:16px;min-height:24px}
+  .card{background:linear-gradient(#fff,#eef3f9);border-radius:22px;box-shadow:0 6px 0 rgba(20,40,70,.18),0 14px 30px rgba(10,25,50,.28);border:3px solid #fff}
+
+  /* ---------- scoreboard ---------- */
+  #board{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:12;display:flex;align-items:stretch;gap:0;padding:6px;border-radius:28px}
+  .side{display:flex;align-items:center;gap:12px;padding:6px 18px;border-radius:20px;color:#fff;min-width:170px}
+  .side.me{background:linear-gradient(var(--me),var(--me2));flex-direction:row}
+  .side.them{background:linear-gradient(var(--them),var(--them2));flex-direction:row-reverse;text-align:right}
+  .side .who{font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.92;line-height:1.15;flex:1}
+  .side .who small{display:block;font-size:10.5px;opacity:.8;letter-spacing:.05em;font-weight:600}
+  .side .num{font-size:44px;font-weight:800;line-height:1;min-width:52px;text-align:center;text-shadow:0 3px 0 rgba(0,0,0,.18);display:inline-block}
+  .serve{width:12px;height:12px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(255,255,255,.55);visibility:hidden}
+  .serve.on{visibility:visible;animation:pulse 1s infinite}
+  #mid{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px;color:var(--ink)}
+  #mid b{font-size:11px;letter-spacing:.14em;opacity:.55}
+  #rally{font-size:22px;font-weight:800;line-height:1}
+  .pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.55) rotate(-4deg)}100%{transform:scale(1)}}
+  @keyframes pulse{50%{transform:scale(1.35)}}
+
+  /* ---------- banner (point / match) ---------- */
+  #banner{position:fixed;left:0;right:0;top:30%;z-index:14;display:flex;justify-content:center;pointer-events:none}
+  #banner .rib{min-width:46%;text-align:center;padding:18px 60px 20px;color:#fff;border-radius:26px;transform:translateX(-120vw) skewX(-8deg);
+      box-shadow:0 8px 0 rgba(0,0,0,.2),0 20px 40px rgba(0,0,0,.35);border:4px solid rgba(255,255,255,.9)}
+  #banner.show .rib{animation:ribbon 1.7s cubic-bezier(.2,.9,.2,1) forwards}
+  #banner.long.show .rib{animation-duration:4.6s}
+  #banner h1{margin:0;font-size:58px;font-weight:800;letter-spacing:.02em;text-shadow:0 4px 0 rgba(0,0,0,.2);transform:skewX(8deg)}
+  #banner p{margin:2px 0 0;font-size:18px;opacity:.95;transform:skewX(8deg);letter-spacing:.06em;text-transform:uppercase}
+  @keyframes ribbon{0%{transform:translateX(-120vw) skewX(-8deg)}14%{transform:translateX(2vw) skewX(-8deg)}20%,80%{transform:translateX(0) skewX(-8deg)}100%{transform:translateX(120vw) skewX(-8deg)}}
+
+  /* ---------- hit confirmation ---------- */
+  #hitfx{position:fixed;left:50%;top:62%;z-index:13;pointer-events:none;transform:translate(-50%,-50%);text-align:center}
+  #hitword{font-size:40px;font-weight:800;color:#fff;-webkit-text-stroke:2px rgba(0,0,0,.25);text-shadow:0 4px 0 rgba(0,0,0,.25);opacity:0}
+  #hitword.go{animation:word .7s ease-out}
+  @keyframes word{0%{opacity:0;transform:scale(.4) translateY(10px)}25%{opacity:1;transform:scale(1.15)}60%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1) translateY(-26px)}}
+  #flash{position:fixed;inset:0;z-index:11;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 65%,rgba(255,255,255,.55),rgba(255,255,255,0) 45%)}
+  #flash.go{animation:flash .28s ease-out}
+  @keyframes flash{0%{opacity:1}100%{opacity:0}}
+  #meter{width:230px;height:16px;border-radius:10px;background:rgba(255,255,255,.35);border:3px solid #fff;overflow:hidden;margin:8px auto 0;opacity:0;transition:opacity .2s;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+  #meter.on{opacity:1}
+  #meter i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#4ade80,#ffe066 60%,#ff5a3d)}
+
+  /* ---------- toasts ---------- */
+  #msg{position:fixed;bottom:96px;left:50%;transform:translate(-50%,12px);z-index:13;padding:10px 22px;border-radius:999px;background:rgba(20,32,48,.86);color:#fff;
+       font-size:17px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;border:2px solid rgba(255,255,255,.25)}
+  #msg.on{opacity:1;transform:translate(-50%,0)}
+  .confetti{position:fixed;top:-20px;width:11px;height:16px;z-index:13;pointer-events:none;border-radius:3px;animation:fall linear forwards}
+  @keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
+
+  /* ---------- insets ---------- */
+  .inset{position:fixed;z-index:10;padding:6px 6px 7px;text-align:center;font-size:11px;color:#51647a;border-radius:18px}
+  #camwrap{right:14px;top:14px;max-width:252px}
+  #camc{border-radius:13px;display:block;margin:0 auto 4px}
+  #podwrap{right:14px;bottom:14px}
+  #keys{position:fixed;left:14px;bottom:14px;z-index:10;color:#fff;font-size:12px;opacity:.75;text-shadow:0 1px 3px rgba(0,0,0,.6);line-height:1.6}
+  #keys b{background:rgba(255,255,255,.22);padding:1px 6px;border-radius:6px;margin-right:2px}
+  .dots{position:fixed;left:14px;top:14px;z-index:10;display:flex;gap:8px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+  .dot{display:flex;align-items:center;gap:5px;background:rgba(20,32,48,.55);padding:4px 10px;border-radius:999px}
+  .dot i{width:8px;height:8px;border-radius:50%;background:var(--bad)} .dot.good i{background:var(--good)}
+
+  /* ---------- dev panel (H) ---------- */
+  #dev{position:fixed;left:14px;top:48px;z-index:10;padding:10px 14px;font-size:12px;line-height:1.7;color:#33475b;border-radius:16px;font-weight:600;max-width:330px}
+  #bar{width:220px;height:8px;background:#d5deea;border-radius:4px;overflow:hidden;margin:3px 0;position:relative}
+  #barf{height:100%;width:0;background:var(--good)} #barpk{position:absolute;top:0;width:2px;height:100%;background:#f59e0b;left:0}
+  #dev b.big{font-size:18px}
+
+  #down{position:fixed;top:100px;left:50%;transform:translateX(-50%);z-index:15;background:var(--bad);color:#fff;padding:12px 22px;border-radius:16px;text-align:center;line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+
+  /* ---------- calibration ---------- */
+  #cal{position:fixed;inset:0;z-index:20;background:rgba(8,20,40,.62);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
+  #calcard{width:min(520px,88vw);padding:26px 34px 30px;text-align:center}
+  #steps{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
+  #steps span{padding:4px 14px;border-radius:999px;background:#dfe7f1;color:#6b7f95;font-size:12px;letter-spacing:.08em}
+  #steps span.on{background:var(--me);color:#fff}
+  #cal h1{font-size:30px;margin:0 0 8px;font-weight:800;color:var(--ink)}
+  #cal p{margin:0 auto 14px;max-width:420px;line-height:1.55;color:#51647a;font-size:15px;font-weight:600}
+  #ring{width:170px;height:170px;transform:rotate(-90deg)}
+  #ring circle{fill:none;stroke-width:14}
+  #calmsg{font-size:17px;min-height:24px;margin-top:8px;font-weight:700}
+  .good{color:var(--good)}.bad{color:var(--bad)}.warn{color:#f59e0b}
 </style>
 
 <div id="stage"></div>
+<div id="flash"></div>
 
-<div id="hud" class="panel">
-  airpod <span id="m" class="bad">off</span> · game <span id="g" class="bad">off</span> · side <span id="side">?</span><br>
-  power <span id="pw">0.0</span> rad/s
-  <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
-  paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m · move <span id="mode" class="warn">body</span>
+<div class="dots"><span class="dot" id="dm"><i></i>AirPod</span><span class="dot" id="dg"><i></i>Game</span><span class="dot good" id="dmode"><i></i><span id="mode">body</span> move</span></div>
+
+<div id="board" class="card">
+  <div class="side me"><span class="serve" id="sv-me"></span><span class="who">You<small id="sidelbl">near side</small></span><span class="num" id="sc-me">0</span></div>
+  <div id="mid"><b>RALLY</b><span id="rally">0</span></div>
+  <div class="side them"><span class="serve" id="sv-them"></span><span class="who"><span id="themname">Waiting…</span><small id="bot">press B for a bot</small></span><span class="num" id="sc-them">0</span></div>
 </div>
-<div id="score" class="panel">0 : 0</div>
-<div id="peaks" class="panel">
-  session peak <b id="pkmax">0.0</b> · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
-  <span class="dim">last swings, power (range of motion):</span> <span id="pklist">–</span>
-</div>
-<div id="hint" class="panel dim">
-  opponent bot: <span id="bot" class="warn">none</span> · <b>B</b> / <b>1 2 3</b> difficulty<br>
-  <b>M</b> move mode · <b>[ ]</b> sensitivity · <b>C</b> calibrate · <b>R</b> re-center · <b>P</b> reset peaks
-</div>
-<div id="camwrap" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas><div class="dim">stay in frame · yellow = sidelines · <b>[ ]</b> range</div></div>
-<div id="podwrap"><div id="pod"></div><div class="dim">your AirPod · <b>V</b> hide</div></div>
+
+<div id="banner"><div class="rib" id="rib"><h1 id="bh">POINT!</h1><p id="bp"></p></div></div>
+<div id="hitfx"><div id="hitword">NICE!</div><div id="meter"><i id="meterf"></i></div></div>
 <div id="msg"></div>
-<div id="down" hidden>can't reach the game server at <span id="downurl"></span> — retrying…<br><span class="dim">is <b>node server/game.js</b> running? if you are player 2, check the host IP after the # in the URL</span></div>
+<div id="down" hidden>Can't reach the game server at <span id="downurl"></span> — retrying…<br><small>is <b>node server/game.js</b> running? Player 2: check the host IP after the # in the URL</small></div>
+
+<div id="dev" class="card" hidden>
+  <span id="m" hidden></span><span id="g" hidden></span><span id="side" hidden></span>
+  swing speed <span id="pw">0.0</span> rad/s
+  <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
+  paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m<br>
+  session peak <b class="big" id="pkmax">0.0</b> · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
+  last swings, power (range of motion):<br><span id="pklist">–</span>
+</div>
+
+<div id="camwrap" class="inset card" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas>stay in frame · yellow = sidelines</div>
+<div id="podwrap" class="inset card"><div id="pod"></div>your AirPod</div>
+<div id="keys"><b>M</b>move mode <b>B</b>bot <b>1 2 3</b>level <b>C</b>calibrate <b>R</b>re-center <b>[ ]</b>range <b>V</b>AirPod <b>H</b>stats</div>
 
 <div id="cal">
-  <h1 id="calh">Step 1 of 2 — hold your grip</h1>
-  <p id="calp">Stand centred in the camera view (any distance, as long as it can see you). Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.</p>
-  <svg id="ring" viewBox="0 0 200 200">
-    <circle cx="100" cy="100" r="85" stroke="#1e2733"/>
-    <circle id="arc" cx="100" cy="100" r="85" stroke="#4ade80" stroke-linecap="round" stroke-dasharray="534" stroke-dashoffset="534"/>
-  </svg>
-  <div id="calmsg">waiting for the AirPod…</div>
+  <div id="calcard" class="card">
+    <div id="steps"><span id="st1" class="on">1 · HOLD</span><span id="st2">2 · TIP UP</span></div>
+    <h1 id="calh">Hold your grip</h1>
+    <p id="calp">Stand centred in the camera view. Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.</p>
+    <svg id="ring" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="82" stroke="#dfe7f1"/>
+      <circle id="arc" cx="100" cy="100" r="82" stroke="#22c55e" stroke-linecap="round" stroke-dasharray="515" stroke-dashoffset="515"/>
+    </svg>
+    <div id="calmsg">Waiting for the AirPod…</div>
+  </div>
 </div>
 
 <script src="vendor/three.min.js"></script>

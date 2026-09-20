@@ -35,10 +35,32 @@ const s = () => (side === 0 ? 1 : -1);
 
 // ---------- messages ----------
 let sayT;
-function say(text, color = '#e6edf3', ms = 1100) {
-  const el = $('msg'); el.textContent = text; el.style.color = color; el.style.opacity = 1;
-  clearTimeout(sayT); sayT = setTimeout(() => (el.style.opacity = 0), ms);
+function say(text, _color, ms = 1200) {                       // small pill toast
+  const el = $('msg'); el.textContent = text; el.classList.add('on');
+  clearTimeout(sayT); sayT = setTimeout(() => el.classList.remove('on'), ms);
 }
+const pop = el => { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); };
+function banner(title, sub, color, long) {
+  const b = $('banner'); $('bh').textContent = title; $('bp').textContent = sub || '';
+  $('rib').style.background = color; b.classList.remove('show', 'long'); void b.offsetWidth; b.classList.add('show'); if (long) b.classList.add('long');
+}
+function confetti(colors, n = 46) {
+  for (let i = 0; i < n; i++) { const c = document.createElement('div'); c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw'; c.style.background = colors[i % colors.length];
+    c.style.setProperty('--dx', (Math.random() * 30 - 15) + 'vw'); c.style.setProperty('--rot', (Math.random() * 1400 - 700) + 'deg');
+    c.style.animationDuration = 1.4 + Math.random() * 1.2 + 's'; c.style.animationDelay = Math.random() * 0.25 + 's';
+    document.body.appendChild(c); setTimeout(() => c.remove(), 3200); }
+}
+let rally = 0, meterT;
+function hitFx(mine, n) {
+  if (!mine) return;
+  const w = $('hitword'); w.textContent = n > 0.8 ? 'SMASH!' : n > 0.55 ? 'GREAT!' : n > 0.3 ? 'NICE!' : 'GOT IT';
+  w.style.color = n > 0.8 ? '#ff5a3d' : n > 0.55 ? '#ffe066' : '#ffffff';
+  w.classList.remove('go'); $('flash').classList.remove('go'); void w.offsetWidth; w.classList.add('go'); $('flash').classList.add('go');
+  $('meterf').style.width = Math.round(12 + n * 88) + '%'; $('meter').classList.add('on');
+  clearTimeout(meterT); meterT = setTimeout(() => $('meter').classList.remove('on'), 900);
+}
+const WHY = { 'double bounce': 'it bounced twice', out: 'out of bounds', passed: 'it got past' };
 const WHIFF = { early: 'too early', late: 'too late', left: 'ball was to your left', right: 'ball was to your right', high: 'ball was above you', low: 'ball was below you' };
 
 // ---------- peak logger ----------
@@ -61,12 +83,13 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; $('sw').textCon
 function showCal(e) {
   $('cal').hidden = false;
   const tilt = e.stage === 'tilt';
-  $('calh').textContent = tilt ? 'Step 2 of 2 — tip it up' : 'Step 1 of 2 — hold your grip';
+  $('calh').textContent = tilt ? 'Tip it up' : 'Hold your grip';
+  $('st1').className = tilt ? '' : 'on'; $('st2').className = tilt ? 'on' : '';
   $('calp').textContent = tilt
     ? 'Now tip the front of the AirPod UP toward the ceiling, like raising a paddle. This tells the game which way is up and which way is right for your grip.'
     : "Stand centred in the camera view (any distance, as long as it can see you). Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.";
-  $('arc').style.strokeDashoffset = 534 * (1 - e.progress);
-  $('arc').style.stroke = e.ok ? '#4ade80' : '#ff6b6b';
+  $('arc').style.strokeDashoffset = 515 * (1 - e.progress);
+  $('arc').style.stroke = e.ok ? '#22c55e' : '#ef4444';
   $('calmsg').textContent = e.msg; $('calmsg').className = e.ok ? 'good' : 'bad';
 }
 function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); $('cal').hidden = false; }
@@ -80,11 +103,11 @@ function connect(urls, el, onmsg, onopen) {
     const url = urls[i % urls.length]; let opened = false;
     ws = new WebSocket(url);
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
-    ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; $(el).textContent = 'live'; $(el).className = 'good';
+    ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; $(el).textContent = 'live'; $('d' + el).classList.add('good');
       if (el === 'g') { $('down').hidden = true; if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say(`old address unreachable — using this Mac's game server`, '#ffe066', 2500); } }
       onopen && onopen(); };
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
-    ws.onclose = () => { $(el).textContent = 'off'; $(el).className = 'bad';
+    ws.onclose = () => { $(el).textContent = 'off'; $('d' + el).classList.remove('good');
       if (!opened) { i++; fails++; }                                   // never connected: try the next candidate
       if (el === 'g' && fails >= urls.length) { $('downurl').textContent = urls.join('  or  '); $('down').hidden = false; }
       setTimeout(open, opened ? 300 : delay); delay = Math.min(delay * 1.5, 3000); };
@@ -109,28 +132,32 @@ const bridge = connect(BRIDGE, 'm', sample => {
 const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'welcome') {
-    side = m.side; $('side').textContent = side === 0 ? 'near (0)' : 'far (1)';
+    side = m.side; $('sidelbl').textContent = side === 0 ? 'near side' : 'far side';
     scene.setCourt(m.court); scene.setSide(side);
     if (AUTOBOT) game.send({ type: 'bot' });
     return;
   }
   if (m.type === 'state') {
     state = m; scene.updateBall(m.p, m.v, m.live);
-    $('score').textContent = `${m.score[side]} : ${m.score[1 - side]}`;
+    for (const [id, v] of [['sc-me', m.score[side]], ['sc-them', m.score[1 - side]]]) if ($(id).textContent !== String(v)) { $(id).textContent = v; pop($(id)); }
     const o = m.paddles[1 - side];
-    players = o ? 2 : 1;
+    players = o ? 2 : 1; if (!o) { $('themname').textContent = 'Waiting…'; } else if (!o.bot) { $('themname').textContent = 'Player 2'; $('bot').textContent = 'human'; }
     if (o) scene.updatePaddle(1 - side, { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot });
     return;
   }
   if (m.type === 'botinfo') {
-    $('bot').textContent = m.active ? m.name : 'none';
+    if (m.active) { $('themname').textContent = m.name + ' Bot'; $('bot').textContent = 'B = change level'; } else $('bot').textContent = 'press B for a bot';
     if (m.reason) say(`no bot: ${m.reason}`, '#ff6b6b', 1600); else if (m.active) say(`bot: ${m.name}`, '#ffe066', 1300);
     return;
   }
   if (m.type === 'full') { say('game is full (2 players already connected)', '#ff6b6b', 4000); return; }
-  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; }
+  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; $('rally').textContent = rally; pop($('rally')); hitFx(m.side === side, m.n); }
+  if (m.type === 'serve') { rally = 0; $('rally').textContent = 0; $('sv-me').classList.toggle('on', m.by === side); $('sv-them').classList.toggle('on', m.by !== side); }
+  if (m.type === 'match') { const won = m.winner === side; banner(won ? 'YOU WIN!' : 'GAME OVER', `${m.score[side]} – ${m.score[1 - side]} · new game in a moment`, won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)', true); if (won) { confetti(['#2f8cff', '#ffc83d', '#22c55e', '#ffffff'], 120); setTimeout(() => confetti(['#2f8cff', '#ffc83d', '#ffffff'], 80), 900); } return; }
   if (m.type === 'whiff') { stats.whiffs++; say(WHIFF[m.why] || 'missed', '#ff6b6b'); }
-  if (m.type === 'point') say(m.winner === side ? `your point — ${m.why}` : `their point — ${m.why}`, m.winner === side ? '#4ade80' : '#ff6b6b', 1400);
+  if (m.type === 'point' && !m.final) { const won = m.winner === side;
+    banner(won ? (rally >= 6 ? 'WHAT A RALLY!' : 'POINT!') : 'THEIR POINT', WHY[m.why] || m.why, won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)');
+    if (won) confetti(['#2f8cff', '#ffc83d', '#ffffff']); }
   scene.onEvent(m);
 });
 
@@ -151,6 +178,7 @@ addEventListener('keydown', e => {
   if (k === 'r') { model.recenter(); if (body) body.center(); say('re-centered', '#ffe066'); }
   if (k === 'p') resetPeaks();
   if (k === 'v') $('podwrap').hidden = !$('podwrap').hidden;
+  if (k === 'h') $('dev').hidden = !$('dev').hidden;
   if (k === 'm') { let i = MODES.indexOf(mode); do { i = (i + 1) % 3; } while (MODES[i] === 'body' && !(body && body.ready)); setMode(MODES[i]); }
   if (k === '[' || k === ']') {                                  // [ = less sensitive, ] = more, for whichever move mode is on
     if (usingBody()) { body.reach = Math.max(0.08, Math.min(0.42, body.reach + (k === ']' ? -0.03 : 0.03))); say(`move ${(body.reach * 100).toFixed(0)}% of the camera view to reach the sideline`, '#ffe066'); }
