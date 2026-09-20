@@ -20,7 +20,9 @@ const stats = window.__stats = { get cam() { return body ? { ready: body.ready, 
 let side = 0, state = null, players = 0, calibrating = true;
 // body: webcam tracks where you actually stand. auto: server runs you to the ball. aim: wrist angle moves you.
 const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'body-move: step left and right, the camera follows you', auto: 'auto-move: you just swing', aim: 'aim-move: turn your wrist to move' };
-let sideDeg = 75;
+let sideDeg = 75, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
+// critically damped follow (frame-rate independent): smooth, no overshoot
+function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
 let mode = MODES.includes(qs.get('move')) ? qs.get('move') : 'body', body = null, bodyX = 0;
 if (qs.get('cam') !== '0') createBodyTracker($('camv'), $('camc')).then(t => {
   body = t; $('camwrap').hidden = !t.ready;
@@ -70,13 +72,22 @@ function showCal(e) {
 function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); $('cal').hidden = false; }
 
 // ---------- sockets (auto-reconnect) ----------
-function connect(url, el, onmsg, onopen) {
-  let ws, delay = 500;
+// urls: tried in turn until one opens. A stale '#<old-ip>' in the address bar must never strand you: this machine's
+// own server is always the second candidate, and when it wins the dead address is dropped from the URL.
+function connect(urls, el, onmsg, onopen) {
+  urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
+    const url = urls[i % urls.length]; let opened = false;
     ws = new WebSocket(url);
-    ws.onopen = () => { delay = 500; $(el).textContent = 'live'; $(el).className = 'good'; if (el === 'g') $('down').hidden = true; onopen && onopen(); };
+    const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
+    ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; $(el).textContent = 'live'; $(el).className = 'good';
+      if (el === 'g') { $('down').hidden = true; if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say(`old address unreachable — using this Mac's game server`, '#ffe066', 2500); } }
+      onopen && onopen(); };
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
-    ws.onclose = () => { $(el).textContent = 'off'; $(el).className = 'bad'; if (el === 'g') $('down').hidden = false; setTimeout(open, delay); delay = Math.min(delay * 1.7, 4000); };
+    ws.onclose = () => { $(el).textContent = 'off'; $(el).className = 'bad';
+      if (!opened) { i++; fails++; }                                   // never connected: try the next candidate
+      if (el === 'g' && fails >= urls.length) { $('downurl').textContent = urls.join('  or  '); $('down').hidden = false; }
+      setTimeout(open, opened ? 300 : delay); delay = Math.min(delay * 1.5, 3000); };
     ws.onerror = () => {};
   };
   open();
@@ -96,7 +107,7 @@ const bridge = connect(BRIDGE, 'm', sample => {
   }
 });
 
-const game = connect(GAME, 'g', m => {
+const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'welcome') {
     side = m.side; $('side').textContent = side === 0 ? 'near (0)' : 'far (1)';
@@ -127,7 +138,7 @@ const game = connect(GAME, 'g', m => {
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode !== 'aim', x: (usingBody() ? bodyX : p.x) * s(), y: p.y, q: p.P });
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, q: p.P });
 }, 50);
 
 // ---------- input ----------
@@ -159,10 +170,14 @@ let lastPos = null;
   if (p.calibrated) {
     const mine = state && state.paddles[side];
     const z = mine ? mine.z : s() * 6.5;
-    if (usingBody() && body.seen()) bodyX += (Math.max(-3.5, Math.min(3.5, body.x())) - bodyX) * 0.5;
+    const dt = Math.min(0.05, (now - lastFrame) / 1000); lastFrame = now;
+    if (usingBody() && body.seen()) {
+      [bodyX, vX] = damp(bodyX, Math.max(-3.5, Math.min(3.5, body.x())), vX, 0.085, dt);
+      [bodyY, vY] = damp(bodyY, Math.max(0.3, Math.min(2.3, body.y())), vY, 0.085, dt);
+    }
     const auto = autoNow() && mine;
-    const wx = auto ? mine.x : (usingBody() ? bodyX : p.x) * s(), wy = mine && mode !== 'aim' ? mine.y : p.y;
-    if (auto && usingBody()) bodyX = mine.x * s();                 // hand back smoothly when the camera finds you again
+    const wx = auto ? mine.x : (usingBody() ? bodyX : p.x) * s(), wy = auto || (mine && mode === 'auto') ? mine.y : usingBody() ? bodyY : p.y;
+    if (auto && usingBody()) { bodyX = mine.x * s(); bodyY = mine.y; vX = vY = 0; }                 // hand back smoothly when the camera finds you again
     scene.updatePaddle(side, { x: wx, y: wy, z, q: p.P, offset: p.offset, bot: false });
     $('px').textContent = (wx * s()).toFixed(1); $('py').textContent = wy.toFixed(1);
     const pos = [p.x + p.offset[0], p.y + p.offset[1], p.offset[2]];
