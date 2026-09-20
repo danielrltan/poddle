@@ -208,8 +208,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'botinfo') {
-    if (m.active) { oppName = m.name + ' Bot'; ui.setNames({ them: oppName, themSub: '', meSub: '' }); }
-    if (m.reason) say('Can’t add a bot with two players in', null, 1800); else if (m.active && inPlay()) say(`${m.name} Bot`, null, 1400);
+    if (m.active) { oppName = 'Matt'; ui.setNames({ them: oppName, themSub: m.name, meSub: '' }); }      // the bot is Matt at every level; the level is his subtitle
+    if (m.reason) say('Can’t add a bot with two players in', null, 1800); else if (m.active && inPlay()) say(`Matt · ${m.name}`, null, 1400);
     return;
   }
   if (m.type === 'pong') { net.pong(m); return; }

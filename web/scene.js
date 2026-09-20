@@ -70,7 +70,7 @@ const COL = {
   skyTop: '#2f7fd6', skyMid: '#8cc4ee', horizon: '#d6ecf7',
   grass: 0x4f9a4a, apron: 0x2e7d56, court: 0x2a66b3, kitchen: 0xe0813f, line: 0xffffff,
   screen: 0x17513a, skin: 0xf2c9a0,
-  matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a Black man in an orange shirt, whichever end he plays
+  matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a bald Black man in an orange shirt, whichever end he plays
   shirt: [0xe5484d, 0xf5b324], hair: [0x3a2a1e, 0x1d1d26], face: ['#e5484d', '#f5b324'],
 };
 
@@ -191,7 +191,7 @@ function buildAvatar(side) {
   g.add(body, shorts, head, offHand);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.scale.setScalar(1.3);
-  g.userData = { head, body, offHand, skin, shirt, hairM, whites };
+  g.userData = { head, body, offHand, skin, shirt, hairM, whites, hair };
   return g;
 }
 
@@ -769,7 +769,7 @@ export function createScene(containerEl) {
     if (!d) { pd.has = pd.init = false; return; }
     const t = pd.tgt; pd.has = true;
     if (pd.bot !== !!d.bot) { pd.bot = !!d.bot; const u = pd.avatar.userData, m = pd.bot ? COL.matt : null;      // a seat changes hands between a person and Matt: repaint, don't rebuild
-      u.skin.color.setHex(m ? m.skin : COL.skin); u.shirt.color.setHex(m ? m.shirt : COL.shirt[pd.side]); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); pd.handM.color.setHex(m ? m.skin : COL.skin); for (const w of u.whites) w.visible = pd.bot; }
+      u.skin.color.setHex(m ? m.skin : COL.skin); u.shirt.color.setHex(m ? m.shirt : COL.shirt[pd.side]); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); pd.handM.color.setHex(m ? m.skin : COL.skin); for (const w of u.whites) w.visible = pd.bot; u.hair.visible = !pd.bot; }      // Matt is bald
     if (isFinite(d.x)) t.x = d.x; if (isFinite(d.y)) t.y = d.y; if (isFinite(d.z)) t.z = d.z;
     if (d.q && d.q.length === 4 && isFinite(d.q[0] + d.q[1] + d.q[2] + d.q[3])) { t.q.set(d.q[0], d.q[1], d.q[2], d.q[3]); if (t.q.lengthSq() > 1e-6) t.q.normalize(); else t.q.identity(); }
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;

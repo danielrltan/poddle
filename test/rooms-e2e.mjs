@@ -71,7 +71,7 @@ for (let i = 0; i < 900 && !(agree >= 3 && last.s.hits >= 2 && last.s.points >= 
 ok(last.s.serves >= 1 && last.t.serves >= 1, `a serve happened (a saw ${last.s.serves}, b saw ${last.t.serves})`);
 ok(last.s.hits >= 2 && last.t.hits >= 2 && Math.abs(last.s.hits - last.t.hits) <= 1, `a rally: ${last.s.hits} hits on a (${last.s.myHits} mine), ${last.t.hits} on b (${last.t.myHits} mine)`);
 ok(agree >= 3 && last.s.points >= 1, `scores agree: a ${last.s.me}-${last.s.op}, b ${last.t.me}-${last.t.op} after ${last.s.points} points`);
-ok(!/Bot/.test(last.s.them + last.t.them), `still no bot (${last.s.them} / ${last.t.them})`); await shot(a, '7-hud-rally'); await shot(b, '7-hud-rally');
+ok(!/Matt/.test(last.s.them + last.t.them), `still no bot (${last.s.them} / ${last.t.them})`); await shot(a, '7-hud-rally'); await shot(b, '7-hud-rally');
 
 // ---- 2. a third tab with the link finds the room full ----
 const c = await open('c', '&room=' + CODE.toLowerCase()); s = await st(c); ok(s.chip === 'Joining room ' + CODE, `c title chip: "${s.chip}"`); await shot(c, '8-title-link');
@@ -92,7 +92,7 @@ ok(s.pill === CODE && s.meSub === 'Near side', `a is back in ${s.pill} on the ${
 await b.keyboard.press('KeyQ'); s = await until(b, s => s.toast, 2000, 'b first Q'); ok(s.toast === 'Press Q again to leave' && s.screen === 'hud', `b first Q only asks: "${s.toast}"`); await shot(b, '9-leave-ask');
 await b.keyboard.press('KeyQ'); const leftAt = Date.now();
 s = await until(a, s => s.toast === 'Opponent left', 3000, 'a gets the toast'); ok(s.toast === 'Opponent left', `a toast: "${s.toast}"`); await shot(a, '9-opponent-left');
-s = await until(a, s => / Bot$/.test(s.them), 8000, 'the bot comes back for a'); ok(/ Bot$/.test(s.them), `a plays "${s.them}" ${((Date.now() - leftAt) / 1000).toFixed(1)} s after b left`);
+s = await until(a, s => s.them === 'Matt', 8000, 'the bot comes back for a'); ok(s.them === 'Matt' && /Rookie|Club|Pro/.test(s.themSub), `a plays "${s.them}" ${((Date.now() - leftAt) / 1000).toFixed(1)} s after b left`);
 s = await until(b, s => s.screen === 'lobby' && s.view === 'home', 2000, 'b back in the lobby'); ok(s.pill === null && !/room=/.test(s.search) && s.toast === null, `b is in the lobby, no room pill, clean address bar, no stale toast`);
 await c.click('#btn-join'); s = await until(c, s => s.screen !== 'lobby', 4000, 'c joins once there is a seat'); ok(s.pill === CODE, `c takes the free seat in ${s.pill} (screen ${s.screen})`);
 await c.browser().close(); await a.browser().close();

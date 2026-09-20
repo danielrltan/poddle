@@ -66,7 +66,7 @@ if (!seen.rally) await shot(a, 'ui-5-hud-rally.png');
 if (!seen.banner) { await a.evaluate(() => window.__ui.pointBanner(true)); await sleep(600); await shot(a, 'ui-6-point-banner.png'); }
 if (!seen.callout) { await a.evaluate(() => window.__ui.callout('smash')); await sleep(500); await shot(a, 'ui-7-callout.png'); }
 let matchShown = false;                                   // a live 'serve' closes the result card (by design), so retry until one survives the medal drop
-for (let k = 0; k < 6 && !matchShown; k++) { await a.evaluate(() => { window.__ui.matchResult(true, 11, 7, 'Rookie Bot'); window.__ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 60); }); await sleep(1400);
+for (let k = 0; k < 6 && !matchShown; k++) { await a.evaluate(() => { window.__ui.matchResult(true, 11, 7, 'Matt'); window.__ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 60); }); await sleep(1400);
   matchShown = (await ui(a)).overlay === 'match'; if (matchShown) await shot(a, 'ui-8-match-result.png'); }
 check(matchShown, 'match result overlay did not open'); await a.evaluate(() => window.__ui.showOverlay(null));
 const st = await a.evaluate(() => window.__stats), st1 = b ? await b.evaluate(() => window.__stats) : null;
