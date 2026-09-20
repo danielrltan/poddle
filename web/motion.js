@@ -3,21 +3,23 @@
 const DEG = Math.PI / 180;
 
 export const DEFAULTS = {
+  BUFFER_PAD: 0.008, BUFFER_MIN: 0.025, BUFFER_MAX: 0.12,   // jitter buffer: render this far behind the newest sample (s)
   HOLD_MS: 5000, HOLD_DEG: 10,              // step 1: still within HOLD_DEG for HOLD_MS
   TILT_DEG: 25, TILT_MIN_HORIZ: 0.75,       // step 2: tip up; axis must be mostly horizontal
   TILT_REARM_DEG: 12,                       // after a rejected twist, come back inside this before retrying
-  X_PER_RAD: 3.0 / (35 * DEG), X_MAX: 3.8,  // pointer yaw -> lateral metres
-  Y_MID: 1.0, Y_PER_RAD: 0.9 / (30 * DEG), Y_MIN: 0.3, Y_MAX: 2.3,
-  BASE_TAU: 0.06,                           // base smoothing, s
-  GATE_LO: 3.0,                             // base follows fully below this rate, not at all at FREEZE_RATE
-  FREEZE_RATE: 5.5, RELEASE_RATE: 3.0, RELEASE_HOLD: 0.06,
+  X_SIN: 3.0 / Math.sin(58 * DEG), X_MAX: 3.5,   // lateral metres = X_SIN * sin(yaw): follows the sideways travel of a hand on an arm; sideline at ~58 deg
+  Y_MID: 1.0, Y_PER_RAD: 0.9 / (45 * DEG), Y_MIN: 0.3, Y_MAX: 2.3,
+  BASE_TAU: 0.03,                           // base smoothing, s
+  GATE_LO: 9.0,                             // base follows fully below this rate, not at all at FREEZE_RATE
+  FREEZE_RATE: 12.0, RELEASE_RATE: 3.0, RELEASE_HOLD: 0.06,
   ROLLBACK: 0.13,                           // on lock, base + arm reference go back this far
   RELEASE_DEG: 20, RELEASE_TIMEOUT: 1.2,    // a swing's lock lets go when the pointer is back near the locked aim, or this long after the hand settled
-  BASE_SPEED: 5.0,                          // m/s, hard limit on rendered base x and y: never a jump
+  BASE_SPEED: 14.0,                         // m/s, hard limit on rendered base x and y: never a jump
   WINDUP_MAX: 0.6, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
-  TRIGGER: 9, PEAK_WINDOW: 0.07, REARM: 3,  // swing detection, rad/s and s
+  TRIGGER: 13, PEAK_WINDOW: 0.16, REARM: 3,
+  ROM_IDLE: 4, ROM_MIN: 30, ROM_FULL: 55, ROM_T_MIN: 0.06, ROM_T_FULL: 0.1,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
@@ -71,6 +73,7 @@ export function qslerp(a, b, u) {
 }
 
 // The pure kinematic arm: where the end of the forearm goes for a player-frame rotation P, relative to rest.
+export const xOf = (yaw, c = DEFAULTS) => c.X_SIN * Math.sin(clamp(yaw, -Math.PI / 2, Math.PI / 2));
 export function armOffset(P, arm = DEFAULTS.ARM) { return sub(qrot(P, arm), arm); }
 
 export class MotionModel {
@@ -80,6 +83,7 @@ export class MotionModel {
     this.off = null;                         // local clock (s) - sample clock (s), min-tracked
     this.jit = 0;                            // mean arrival lateness, s
     this.last = null;                        // last sample + derived state
+    this.snap = []; this.jmax = 0; this.D = 0.04;   // jitter buffer: per-sample snapshots, worst recent lateness, render delay
     this.startCalibration();
   }
 
@@ -112,6 +116,7 @@ export class MotionModel {
     if (this.off == null || o < this.off || o - this.off > 0.5) this.off = o;
     else this.off += Math.min(o - this.off, 2e-5);
     this.jit += (Math.min(o - this.off, 0.1) - this.jit) * 0.05;
+    this.jmax = Math.max(o - this.off, this.jmax - 1e-4);              // worst recent arrival lateness (decays 5 ms/s)
     s.arr = s.t + (o - this.off);                                     // arrival, on the sample clock
 
     if (!this.calibrated) { this._calibrate(s, ev); return ev; }
@@ -167,7 +172,7 @@ export class MotionModel {
   _target(q) {
     const c = this.c, B = this.B, p = qrot(this._d(q), B.F);
     const yaw = Math.atan2(dot(p, B.R), dot(p, B.F)), pitch = Math.asin(clamp(dot(p, B.U), -1, 1));
-    return { p, yaw, pitch, ux: yaw * c.X_PER_RAD, uy: c.Y_MID + pitch * c.Y_PER_RAD, x: clamp(yaw * c.X_PER_RAD, -c.X_MAX, c.X_MAX), y: clamp(c.Y_MID + pitch * c.Y_PER_RAD, c.Y_MIN, c.Y_MAX) };
+    return { p, yaw, pitch, ux: xOf(yaw, c), uy: c.Y_MID + pitch * c.Y_PER_RAD, x: clamp(xOf(yaw, c), -c.X_MAX, c.X_MAX), y: clamp(c.Y_MID + pitch * c.Y_PER_RAD, c.Y_MIN, c.Y_MAX) };
   }
 
   _reset(t, P, x, y) {
@@ -175,7 +180,7 @@ export class MotionModel {
     this.xy = { from: { x, y }, to: { x, y }, t0: t, dur: 0.02 };
     this.refSeg = { from: P, to: P, t0: t, dur: 0.02, ease: false };
     this.lock = null; this.refFrozen = false; this.tRamp = -1e9;
-    this.hist = [];
+    this.hist = []; this.snap = [];
   }
   _start(s) {
     const P = this._P(s.q), tg = this._target(s.q);
@@ -206,22 +211,29 @@ export class MotionModel {
 
     // swing detection: trigger, 70 ms peak window, send, keep the peak until re-arm
     let sw = this.sw;
+    // Range of motion: angle swept by the current continuous movement (resets when the hand goes quiet). A wrist flick
+    // is fast but sweeps ~30 deg; a real arm swing sweeps 45+ deg before its peak. Power = peak rate x ROM credit.
+    this.rom = rate < c.ROM_IDLE ? 0 : (this.rom || 0) + rate * dt;
+    this.romT = rate < c.ROM_IDLE ? 0 : (this.romT || 0) + dt;        // ...and how long it has been going: flicks are over in ~60 ms
     if (!sw) {
-      if (rate > c.TRIGGER) sw = this.sw = { t0: t, peak: rate, sum: [...wP], sent: false, r0: this.prevRate, r1: rate };
+      if (rate > c.TRIGGER) sw = this.sw = { t0: t, peak: rate, sum: [...wP], sent: false, r0: this.prevRate, r1: rate, eff: 0, sweep: 0 };
     } else {
       if (!sw.sent) sw.sum = add(sw.sum, wP);
       if (sw.r1 >= sw.r0 && sw.r1 > rate) {                           // r1 was a local max: parabolic true peak
         const den = sw.r0 - 2 * sw.r1 + rate, p = den < 0 ? 0.5 * (sw.r0 - rate) / den : 0;
         sw.peak = Math.max(sw.peak, Math.min(sw.r1 - 0.25 * (sw.r0 - rate) * p, sw.r1 * 1.08));
       }
-      sw.peak = Math.max(sw.peak, rate); sw.r0 = sw.r1; sw.r1 = rate;
+      sw.peak = Math.max(sw.peak, rate); sw.r0 = sw.r1; sw.r1 = rate; sw.sweep = Math.max(sw.sweep, this.rom);
       const done = rate < c.REARM;
-      if (!sw.sent && (done || t - sw.t0 >= c.PEAK_WINDOW - 1e-4)) {
-        const n = len(sw.sum) || 1;
+      // fire at the top of the swing (that's where contact is), not a fixed time after the trigger
+      if (!sw.sent && (done || rate < sw.peak * 0.92 || t - sw.t0 >= c.PEAK_WINDOW - 1e-4)) {
+        const n = len(sw.sum) || 1, rom = sw.sweep / DEG;
         sw.sent = true;
-        ev.push({ type: 'swing', power: sw.peak, dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN });
+        sw.eff = sw.peak * Math.min(clamp((rom - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1), clamp((this.romT - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1));
+        if (sw.eff >= c.TRIGGER) ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom, dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN });
+        else ev.push({ type: 'flick', raw: sw.peak, rom });           // fast but tiny: tell the player to use their arm
       }
-      if (done) { ev.push({ type: 'swingEnd', peak: sw.peak }); this.sw = null; }
+      if (done) { ev.push({ type: 'swingEnd', peak: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, counted: sw.eff >= c.TRIGGER }); this.sw = null; }
     }
     this.prevRate = rate;
 
@@ -285,6 +297,12 @@ export class MotionModel {
 
     this.hist.push({ t, bx: this.bx, by: this.by, ux: tg.ux, uy: tg.uy, p: tg.p, P, rate, frozen: !!lk });
     while (this.hist.length && this.hist[0].t < t - 1.0) this.hist.shift();
+    { const on = (this.sw && this.rom > c.ROM_MIN * DEG) || (this.lock && this.lock.swung) ? 1 : 0;
+      this.armW = (this.armW || 0) + (on - (this.armW || 0)) * (1 - Math.exp(-dt / (on ? 0.05 : 0.2))); }
+    // Jitter buffer. Real AirPods deliver samples in PAIRS every ~40 ms (gaps up to ~80 ms), so rendering "now" means
+    // extrapolate-stall-snap. Instead pose() replays these snapshots a little in the past and only ever interpolates.
+    this.snap.push({ t, P, ref: this.refFrozen ? this._refAt(t) : this.ref2, x: this.xy.to.x, y: this.xy.to.y, pu, w: this.armW });
+    while (this.snap.length > 2 && this.snap[1].t < t - 0.4) this.snap.shift();
     this.prev = L; this.last = cur;
   }
 
@@ -338,8 +356,18 @@ export class MotionModel {
     const c = this.c;
     if (!this.calibrated || !this.last) return { calibrated: false, x: 0, y: c.Y_MID, P: [0, 0, 0, 1], offset: [0, 0, 0], power: 0, swinging: false, rate: 0 };
     const ts = nowMs == null ? this.last.t : nowMs / 1000 - this.off;
-    const P = this._Pat(ts), S = this._xyAt(ts), punch = this._punchAt(ts);
-    const offset = add(sub(qrot(P, c.ARM), qrot(this._refAt(ts), c.ARM)), punch);
+    const N = this.snap, n = N.length;
+    let P, S, punch, ref, w = this.armW || 0;
+    if (nowMs != null && n >= 2 && N[n - 1].t === this.last.t) {
+      const want = clamp(this.jmax + c.BUFFER_PAD, c.BUFFER_MIN, c.BUFFER_MAX);
+      this.D += clamp(want - this.D, -0.0004, 0.003);                  // ease the delay, never jump it
+      const tau = clamp(ts - this.D, N[0].t, N[n - 1].t);
+      let i = n - 2; while (i > 0 && N[i].t > tau) i--;
+      const a = N[i], b = N[i + 1], u = clamp((tau - a.t) / (b.t - a.t || 1), 0, 1);
+      P = qslerp(a.P, b.P, u); ref = qslerp(a.ref, b.ref, u);
+      S = { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) }; punch = add(mul(a.pu, 1 - u), mul(b.pu, u)); w = lerp(a.w, b.w, u);
+    } else { P = this._Pat(ts); S = this._xyAt(ts); punch = this._punchAt(ts); ref = this._refAt(ts); }
+    const offset = mul(add(sub(qrot(P, c.ARM), qrot(ref, c.ARM)), punch), w);
     return { calibrated: true, x: S.x, y: S.y, P, offset, power: this.sw ? this.sw.peak : 0, swinging: !!this.sw, rate: this.last.rate, punch, locked: !!this.lock };
   }
 }

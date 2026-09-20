@@ -19,12 +19,15 @@ browser ◀──────────────── ws :8080 ───�
 
 - **There is no position sensor.** An IMU can't tell where your hand is (double-integrated acceleration drifts in
   about a second), so Poddle is built on what the sensor is good at: *orientation* and *rotation rate*.
+- **Jitter buffer:** real AirPods deliver samples in pairs every ~40 ms with gaps to ~80 ms, so the paddle is rendered
+  ~65 ms in the past and only ever interpolates between real samples (roughness 565% -> 9% of a frame step).
 - **Two-step calibration** makes it grip-independent: hold still for 5 s, then tip the bud up. The tilt axis tells the
   game which way is "right" and "up" for however you're holding it and whichever way you're facing.
 - **Footwork is automatic, like Wii Sports tennis** (which never tracked where you stood either). The game runs you
   to the ball at a finite speed; you own the timing, direction, power and lob of the swing. Press **M** for the
   experimental aim-move mode, where turning the bud left/right moves the paddle across the court instead.
-- **Swings** fire when rotation rate passes 9 rad/s (real swings peak around 35). Sweep direction aims the shot, an
+- **Swings need range of motion, not a wrist flick.** Power = peak rotation rate x credit for the angle swept and how
+  long the motion lasted, so a 50° flick scores nothing while a 130° forehand scores ~30 and a backhand ~16-20. Sweep direction aims the shot, an
   upward scoop lobs it, peak speed sets power. The aim is locked from just before the wind-up until your hand comes
   back, so a follow-through doesn't drag you across the court.
 - **Kinematic arm:** the on-screen paddle sits at the end of a virtual arm, so a swing sweeps through a real arc
@@ -49,14 +52,18 @@ python3 -m http.server 3000 -d web         # every player's Mac
 
 - Host opens `http://localhost:3000`
 - Player 2 opens `http://localhost:3000/#<host-LAN-IP>`
-- Alone? Press **B** for a bot.
+- Alone? A bot joins by itself after 2.5 s. **B** cycles Rookie / Club / Pro, or press **1 2 3**.
 
 Keys: **M** move mode · **C** calibrate · **R** re-center (yaw drifts over minutes) · **B** bot · **P** reset the swing-peak logger.
 
 ## Tests
 
 ```bash
-node test/motion.test.mjs     # synthetic swings at arbitrary headings/grips (585/600 checks; the rest are strict smoothness bounds)
+node test/motion.test.mjs     # synthetic swings at arbitrary headings/grips (written before the jitter buffer; its latency bounds now fail)
+node test/jitter.mjs          # paddle smoothness replaying REAL AirPod arrival timing
+node test/zigzag.mjs          # how well fast left-right movement is tracked
+node test/rom.mjs             # flicks ignored, arm swings scored
+node test/bot.test.mjs        # bot auto-join, levels, comes back when player 2 leaves
 node test/server.test.mjs     # rallies, contact box, whiff reasons, scoring, bot, 26k launch solves
 node test/e2e.mjs             # headless Chrome + simulated AirPod + bot   (needs Google Chrome)
 ```

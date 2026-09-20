@@ -28,7 +28,7 @@ let nextPort = 8141;
 function startServer(scale = SCALE) {
   const port = nextPort++;
   return new Promise((res, rej) => {
-    const proc = spawn(process.execPath, [GAME], { env: { ...process.env, PORT: String(port), TIMESCALE: String(scale) } });
+    const proc = spawn(process.execPath, [GAME], { env: { ...process.env, PORT: String(port), TIMESCALE: String(scale), AUTOBOT: '0' } });
     const sv = { port, proc, dead: false, out: '' };
     procs.add(proc);
     proc.stdout.on('data', d => { sv.out += d; if (/game server on port/.test(sv.out)) res(sv); });
@@ -436,7 +436,7 @@ async function suiteBot() {
   ok(W, H.hits.length - h0 >= 5, 'humans could not rally after replacing bot');
 
   // third connection is refused and harmless
-  await new Promise(res => { const x = new WebSocket('ws://localhost:' + sv.port); x.on('close', res); x.on('error', res); x.on('message', () => fail(W, 'third client got a message')); setTimeout(res, 2000); });
+  await new Promise(res => { const x = new WebSocket('ws://localhost:' + sv.port); x.on('close', res); x.on('error', res); x.on('message', raw => { if (JSON.parse(raw).type !== 'full') fail(W, 'third client got a message'); }); setTimeout(res, 2000); });
 
   // hostile input mid-rally
   for (const junk of ['null', '[]', '"x"', '7', '{', '{"type":"swing"}', '{"type":"swing","power":"abc","dir":null,"lob":{}}', '{"type":"swing","power":1e999,"dir":-1e999,"lob":1e999}',

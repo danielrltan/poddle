@@ -18,6 +18,7 @@
   #barpk{position:absolute;top:0;width:2px;height:100%;background:#ffe066;left:0}
   #msg{position:fixed;top:54%;width:100%;text-align:center;font-size:34px;font-weight:600;z-index:9;opacity:0;
        transition:opacity .25s;text-shadow:0 2px 10px #000;pointer-events:none}
+  #down{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:15;background:#7f1d1d;color:#fff;padding:10px 18px;border-radius:8px;text-align:center;line-height:1.6}
   #cal{position:fixed;inset:0;z-index:20;background:rgba(11,15,20,.86);display:flex;flex-direction:column;
        align-items:center;justify-content:center;text-align:center;gap:16px}
   #cal h1{font-size:24px;margin:0;font-weight:600}
@@ -37,14 +38,15 @@
 </div>
 <div id="score" class="panel">0 : 0</div>
 <div id="peaks" class="panel">
-  session peak <b id="pkmax">0.0</b> rad/s · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
-  <span class="dim">last swings:</span> <span id="pklist">–</span>
+  session peak <b id="pkmax">0.0</b> <span class="dim">(solid forehand ≈ 30, backhand ≈ 16–20)</span> · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
+  <span class="dim">last swings, power (range of motion):</span> <span id="pklist">–</span>
 </div>
 <div id="hint" class="panel dim">
-  <span id="bothint" class="warn" hidden>alone? press <b>B</b> to play the bot<br></span>
-  <b>M</b> move mode · <b>C</b> calibrate · <b>R</b> re-center · <b>B</b> bot · <b>P</b> reset peaks
+  opponent bot: <span id="bot" class="warn">none</span> · <b>B</b> / <b>1 2 3</b> difficulty<br>
+  <b>M</b> move mode · <b>C</b> calibrate · <b>R</b> re-center · <b>P</b> reset peaks
 </div>
 <div id="msg"></div>
+<div id="down" hidden>can't reach the game server at <span id="downurl"></span> — retrying…<br><span class="dim">is <b>node server/game.js</b> running? if you are player 2, check the host IP after the # in the URL</span></div>
 
 <div id="cal">
   <h1 id="calh">Step 1 of 2 — hold your grip</h1>

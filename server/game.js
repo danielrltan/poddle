@@ -71,7 +71,7 @@ function planFootwork(side) {
   const pl = bySide(side); if (!pl) return;
   const s = sgn(side);
   const p = [...ball.p], v = [...ball.v]; let bounced = false;
-  pl.zT = s * HIT_LINE; pl.contact = null; pl.react = now + 0.3; pl.err = (Math.random() - 0.5) * 0.6;     // react/err: bot only
+  pl.zT = s * HIT_LINE; pl.contact = null; pl.botSwung = false; pl.react = now + 0.3; pl.err = (Math.random() - 0.5) * 0.6;     // react/err: bot only
   for (let t = 0; t < 4; t += 1 / 120) {
     v[1] -= G / 120; for (let i = 0; i < 3; i++) p[i] += v[i] / 120;
     if (p[1] < R) { if (bounced) break; p[1] = R; v[1] *= -BOUNCE.up; v[0] *= BOUNCE.along; v[2] *= BOUNCE.along; bounced = true; }
@@ -112,13 +112,40 @@ function inZone(pl) {
 const aside = z => (Math.abs(z.dx) >= ZONE.x ? (z.dx * z.s > 0 ? 'right' : 'left') : (z.dy > 0 ? 'high' : 'low'));
 const whyMissed = (sw, z) => sw.why || (z.depth ? aside(z) : z.ahead >= ZONE.front ? 'early' : 'late');
 
+// ---------- bot opponent ----------
+// Joins by itself when a human is alone, leaves when a second human connects, comes back when they go.
+// react: s before it starts moving. foot: m/s. err: how far it misjudges x (m). reach: how centred the ball must be
+// before it swings. place: 0 = hits anywhere, 1 = always away from you. whiff: chance it simply mistimes a swing.
+const BOTS = [
+  { name: 'Rookie', react: 0.45, foot: 1.9, err: 0.9, reach: 0.55, power: [0.10, 0.40], place: 0.0, lob: 0.25, whiff: 0.18 },
+  { name: 'Club',   react: 0.30, foot: 2.5, err: 0.5, reach: 0.70, power: [0.25, 0.65], place: 0.5, lob: 0.15, whiff: 0.07 },
+  { name: 'Pro',    react: 0.18, foot: 4.2, err: 0.2, reach: 0.90, power: [0.45, 0.95], place: 0.9, lob: 0.10, whiff: 0.02 },
+];
+let botLevel = 1, botJoinAt = Infinity;
+const AUTOBOT = process.env.AUTOBOT !== '0';            // tests turn off auto-join and seat takeover
+const humans = () => players.filter(p => !p.bot);
+const theBot = () => players.find(p => p.bot);
+const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name) });
+
 function addBot() {
-  if (players.length !== 1 || !players[0].ws) return;
-  players.push(newPlayer(null, 1 - players[0].side));
-  console.log('bot joined');
-  startMatch(players[0].side);
+  if (theBot() || humans().length !== 1) return;
+  players.push(newPlayer(null, 1 - humans()[0].side));
+  console.log(`bot joined (${BOTS[botLevel].name})`);
+  broadcast(botInfo());
+  startMatch(humans()[0].side);
 }
-// Beatable on purpose: slow to react, limited foot speed, misjudges x a little, only swings at a ball close to its paddle.
+function removeBot() {
+  const i = players.findIndex(p => p.bot);
+  if (i >= 0) { players.splice(i, 1); ball.live = false; serveAt = Infinity; broadcast(botInfo()); }
+}
+// B key: alone -> join now; already playing the bot -> next difficulty; two humans -> say why not.
+function botRequest(from, level) {
+  if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
+  if (Number.isInteger(level)) botLevel = clamp(level, 0, BOTS.length - 1);
+  else if (theBot()) botLevel = (botLevel + 1) % BOTS.length;
+  if (!theBot()) addBot(); else broadcast(botInfo());
+}
+
 // Auto-footwork for humans: run to where the ball will be, drift home between shots. Foot speed is finite,
 // so a wide enough shot still beats you.
 function runAuto(pl, dt) {
@@ -130,30 +157,44 @@ function runAuto(pl, dt) {
 }
 
 function runBot(pl, dt) {
+  const B = BOTS[botLevel], foe = humans()[0];
+  // rubber band: ease off when well ahead, sharpen when well behind, so rallies stay alive in a demo
+  const lead = score[pl.side] - score[1 - pl.side], band = clamp(1 - lead * 0.06, 0.7, 1.1);
   if (!ball.live || ball.lastHit === pl.side) { pl.x += (0 - pl.x) * 2 * dt; pl.y += (1.0 - pl.y) * 2 * dt; return; }
-  if (now < pl.react) return;
-  const tgt = pl.contact || [ball.p[0], 1.0];
-  pl.x = clamp(pl.x + clamp(tgt[0] + pl.err - pl.x, -2.5 * dt, 2.5 * dt), -X_LIMIT, X_LIMIT);
+  if (now < pl.react + B.react - 0.3) return;                  // planFootwork sets react = now + 0.3
+  const tgt = pl.contact || [ball.p[0], 1.0], foot = B.foot * band;
+  pl.x = clamp(pl.x + clamp(tgt[0] + pl.err * B.err / 0.6 - pl.x, -foot * dt, foot * dt), -X_LIMIT, X_LIMIT);
   pl.y += clamp(clamp(tgt[1], Y_MIN, Y_MAX) - pl.y, -4 * dt, 4 * dt);
   const z = inZone(pl);
-  if (!pl.swing && z.ok && z.ahead < 0.7 && Math.abs(z.dx) < 0.6) {
-    pl.swing = { until: now + 0.1, n: 0.25 + Math.random() * 0.45, dir: (Math.random() - 0.5) * 1.8, lob: Math.random() < 0.2 ? 0.6 : 0, why: null, best: Infinity };
+  if (!pl.swing && !pl.botSwung && z.ok && z.ahead < 0.7 && Math.abs(z.dx) < B.reach) {
+    pl.botSwung = true;                                        // one decision per incoming ball
     broadcast({ type: 'swung', side: pl.side });
+    if (Math.random() < B.whiff / band) return;                // mistimed it: the ball goes past
+    const away = foe ? -Math.sign(foe.x || (Math.random() - 0.5)) * 2.1 : 0;           // world x, the side you are NOT on
+    const tx = lerp((Math.random() - 0.5) * 4.2, away + (Math.random() - 0.5) * 0.8, B.place);
+    const lob = Math.random() < B.lob ? 0.6 : 0;
+    pl.swing = { until: now + 0.1, n: lerp(B.power[0], B.power[1], Math.random()) * (lob ? 0.5 : 1), dir: clamp(tx / (2.4 * sgn(pl.side)), -1, 1), lob, why: null, best: Infinity };
   }
 }
 
 wss.on('connection', ws => {
   ws.on('error', () => {});                                    // a bad frame must not take the process down
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
-  const botIdx = players.findIndex(p => p.bot);
-  if (botIdx >= 0) { players.splice(botIdx, 1); ball.live = false; serveAt = Infinity; }      // a human replaces the bot
-  if (players.length >= 2) { ws.close(); return; }
+  ws.addr = ws._socket && ws._socket.remoteAddress;
+  if (humans().length >= 2) {                                  // full: a reload / stale tab from the same machine takes over its old seat
+    const ghost = AUTOBOT && humans().find(p => p.ws.addr === ws.addr);
+    if (!ghost) { ws.send(JSON.stringify({ type: 'full' })); ws.close(); return; }
+    players.splice(players.indexOf(ghost), 1); ghost.gone = true; ghost.ws.close();
+  }
+  if (humans().length >= 1) removeBot();                       // a second human replaces the bot
+  botJoinAt = Infinity;
   const side = players.length && players[0].side === 0 ? 1 : 0;
   const me = newPlayer(ws, side);
   players.push(me);
   ws.send(JSON.stringify({ type: 'welcome', side, court: COURT }));
   console.log(`player joined as side ${side} (${players.length} connected)`);
-  if (players.length === 2) startMatch(0);
+  if (players.length === 2) startMatch(0); else if (AUTOBOT) botJoinAt = now + 2.5;       // alone: the bot shows up by itself
+  ws.send(JSON.stringify(botInfo()));
 
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
@@ -168,14 +209,14 @@ wss.on('connection', ws => {
     } else if (m.type === 'swing') {
       me.swing = { until: now + SWING_WINDOW, n: clamp((num(m.power, 9) - 9) / 26, 0, 1), dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
       broadcast({ type: 'swung', side: me.side });
-    } else if (m.type === 'bot') addBot();
+    } else if (m.type === 'bot') botRequest(me, m.level);
   });
 
   ws.on('close', () => {
     const i = players.indexOf(me); if (i < 0) return;
     players.splice(i, 1);
-    const b = players.findIndex(p => p.bot); if (b >= 0) players.splice(b, 1);
-    ball.live = false; serveAt = Infinity;
+    removeBot(); ball.live = false; serveAt = Infinity;
+    botJoinAt = AUTOBOT && humans().length === 1 ? now + 2.5 : Infinity;   // whoever is left gets the bot back
     console.log(`side ${side} left (${players.length} connected)`);
   });
 });
@@ -183,6 +224,7 @@ wss.on('connection', ws => {
 const DT = 1 / 60;
 function step() {
   now += DT;
+  if (now >= botJoinAt) { botJoinAt = Infinity; addBot(); }
   if (!ball.live && now >= serveAt) { serveAt = Infinity; if (players.length === 2) reset(server); }
 
   for (const pl of players) {

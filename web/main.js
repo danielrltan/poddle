@@ -11,6 +11,7 @@ const AUTOBOT = qs.get('autobot') === '1';
 
 const model = new MotionModel();
 const scene = createScene($('stage'));
+$('downurl').textContent = GAME;
 const stats = window.__stats = { hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, state = null, players = 0, calibrating = true;
@@ -26,17 +27,20 @@ function say(text, color = '#e6edf3', ms = 1100) {
 const WHIFF = { early: 'too early', late: 'too late', left: 'ball was to your left', right: 'ball was to your right', high: 'ball was above you', low: 'ball was below you' };
 
 // ---------- peak logger ----------
-let peaks = [], sessionPeak = 0;
-function logSwing(pk) {
+let peaks = [], sessionPeak = 0, log10 = [];
+function logSwing(e) {
+  const pk = e.peak, tag = `${e.counted ? pk.toFixed(0) : '×'}(${e.rom.toFixed(0)}°)`;
+  log10.push(tag); if (log10.length > 8) log10.shift();
+  $('pklist').textContent = log10.join('  ');
+  console.log(`swing power=${pk.toFixed(1)} raw=${e.raw.toFixed(1)} rad/s rom=${e.rom.toFixed(0)}deg counted=${e.counted}`);
+  if (!e.counted) return;
   peaks.push(pk); sessionPeak = Math.max(sessionPeak, pk);
   $('sw').textContent = peaks.length;
   $('pkmax').textContent = sessionPeak.toFixed(1);
   $('pkavg').textContent = (peaks.reduce((a, b) => a + b, 0) / peaks.length).toFixed(1);
-  $('pklist').textContent = peaks.slice(-10).map(v => v.toFixed(0)).join('  ');
   $('barpk').style.left = Math.min(100, sessionPeak / 40 * 100) + '%';
-  console.log(`swing #${peaks.length} peak=${pk.toFixed(1)} rad/s`);
 }
-function resetPeaks() { peaks = []; sessionPeak = 0; $('sw').textContent = '0'; $('pkmax').textContent = '0.0'; $('pkavg').textContent = '–'; $('pklist').textContent = '–'; $('barpk').style.left = '0'; }
+function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; $('sw').textContent = '0'; $('pkmax').textContent = '0.0'; $('pkavg').textContent = '–'; $('pklist').textContent = '–'; $('barpk').style.left = '0'; }
 
 // ---------- calibration overlay ----------
 function showCal(e) {
@@ -57,9 +61,9 @@ function connect(url, el, onmsg, onopen) {
   let ws, delay = 500;
   const open = () => {
     ws = new WebSocket(url);
-    ws.onopen = () => { delay = 500; $(el).textContent = 'live'; $(el).className = 'good'; onopen && onopen(); };
+    ws.onopen = () => { delay = 500; $(el).textContent = 'live'; $(el).className = 'good'; if (el === 'g') $('down').hidden = true; onopen && onopen(); };
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
-    ws.onclose = () => { $(el).textContent = 'off'; $(el).className = 'bad'; setTimeout(open, delay); delay = Math.min(delay * 1.7, 4000); };
+    ws.onclose = () => { $(el).textContent = 'off'; $(el).className = 'bad'; if (el === 'g') $('down').hidden = false; setTimeout(open, delay); delay = Math.min(delay * 1.7, 4000); };
     ws.onerror = () => {};
   };
   open();
@@ -74,7 +78,8 @@ const bridge = connect(BRIDGE, 'm', sample => {
     if (e.type === 'cal') showCal(e);
     else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; $('cal').hidden = true; say('calibrated', '#4ade80'); }
     else if (e.type === 'swing') { stats.swings++; if (!calibrating) game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob }); }
-    else if (e.type === 'swingEnd') logSwing(e.peak);
+    else if (e.type === 'flick') { if (!calibrating) say(`too small (${e.rom.toFixed(0)}°) — swing your whole arm`, '#ffe066', 1200); }
+    else if (e.type === 'swingEnd') logSwing(e);
   }
 });
 
@@ -90,10 +95,16 @@ const game = connect(GAME, 'g', m => {
     state = m; scene.updateBall(m.p, m.v, m.live);
     $('score').textContent = `${m.score[side]} : ${m.score[1 - side]}`;
     const o = m.paddles[1 - side];
-    players = o ? 2 : 1; $('bothint').hidden = !!o;
+    players = o ? 2 : 1;
     if (o) scene.updatePaddle(1 - side, { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot });
     return;
   }
+  if (m.type === 'botinfo') {
+    $('bot').textContent = m.active ? m.name : 'none';
+    if (m.reason) say(`no bot: ${m.reason}`, '#ff6b6b', 1600); else if (m.active) say(`bot: ${m.name}`, '#ffe066', 1300);
+    return;
+  }
+  if (m.type === 'full') { say('game is full (2 players already connected)', '#ff6b6b', 4000); return; }
   if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; }
   if (m.type === 'whiff') { stats.whiffs++; say(WHIFF[m.why] || 'missed', '#ff6b6b'); }
   if (m.type === 'point') say(m.winner === side ? `your point — ${m.why}` : `their point — ${m.why}`, m.winner === side ? '#4ade80' : '#ff6b6b', 1400);
@@ -117,7 +128,8 @@ addEventListener('keydown', e => {
   if (k === 'r') { model.recenter(); say('re-centered', '#ffe066'); }
   if (k === 'p') resetPeaks();
   if (k === 'm') { autoMove = !autoMove; $('mode').textContent = autoMove ? 'auto' : 'aim'; say(autoMove ? 'auto-move: you just swing' : 'aim-move: turn your wrist to move', '#ffe066', 1600); }
-  if (k === 'b') { game.send({ type: 'bot' }); say('bot requested', '#ffe066'); }
+  if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty
+  if ('123'.includes(k)) game.send({ type: 'bot', level: +k - 1 });
 });
 addEventListener('resize', () => scene.resize());
 
