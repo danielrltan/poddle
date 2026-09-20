@@ -123,3 +123,13 @@ status? like have it say paused or calibrating with an icon"
   change that to "Calibrating" so the word is the same everywhere).
 - Test: rooms.test (status field for each case, serve held while calibrating mid-match), a screenshot of each of the three tags
   from the opponent's view and from the broadcast view: LOOK at them, the word must be readable at 1280x720 from the far baseline.
+### 14b. Matt is BALD, and he is just "Matt" (player request, already live from commit 3cd5656; INTEGRATOR: make sure the owners' rewrites kept it)
+- web/scene.js: when a pad is the bot, the hair mesh is hidden (`avatar.userData.hair.visible = !bot`), alongside the Matt colours and eye whites. The SCENE owner restructured that code after the hand edit: re-check that Matt renders bald in play AND in the attract rally.
+- Naming: the opponent's name is exactly `Matt`; his difficulty (Rookie / Club / Pro) is the SUBTITLE under the name (scoreboard sub-label, lobby tile, result screen). Never "Club Bot", never "Matt Bot". Toast on level change: `Matt · Club`.
+- test/rooms-e2e.mjs and test/e2e.mjs were updated by hand to expect `Matt` + a level subtitle: keep those expectations.
+
+### 14c. Say COURT, not room (player request: "instead of saying room in the url or as a convention, use the term court since this is pickleball")
+- Everything a player can read or type: "Create court", "Court WPB7", "Open courts", "Leave court", "Court is full. Watch instead?", "Joining court ...", share text, tooltips, README, error messages.
+- The page URL is `?court=CODE` (and `&watch=1`). `?room=CODE` keeps working as a silent alias so links already shared do not break; the address bar is rewritten to `?court=`.
+- Internal names stay as they are (message types `room`/`join`, `createRoom`, docs/ROOMS.md, the socket's `room=` query): renaming the wire protocol buys nothing and risks the tests. Only what a person sees changes.
+- Update the tests that assert on those strings/URLs. Lint at the end: grep the player-facing strings for /\broom/i: zero hits outside comments and internals.
