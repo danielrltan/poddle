@@ -19,12 +19,13 @@ export const DEFAULTS = {
   WINDUP_MAX: 0, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
-  TRIGGER: 9, REARM: 3, TAP: 6,               // swing detection, rad/s
-  COMMIT_T: 0.036,                          // report a swing this long after the hand started moving (s): a flick has peaked by then, an arm swing is still speeding up and its peak is predicted
+  TRIGGER: 7.5, REARM: 3, TAP: 6,               // swing detection, rad/s
+  COMMIT_T: 0.26,                           // report a swing this long after the hand started moving (s): a flick has peaked by then, an arm swing is still speeding up and its peak is predicted
   ONSET: 75,                                // rad/s^2: a rise gentler than this has not taken off yet
   FIX_ABS: 1.5, FIX_REL: 0.08,              // once the real peak is in, a 'swingFix' follows if the early power was off by more than this
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
-  ROM_IDLE: 4, ROM_MIN: 16, ROM_FULL: 26, ROM_T_MIN: 0.032, ROM_T_FULL: 0.046,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
+  POWER_MAX: 34,
+  ROM_IDLE: 4, ROM_MIN: 40, ROM_FULL: 130, ROM_T_MIN: 0.10, ROM_T_FULL: 0.20,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
@@ -146,7 +147,7 @@ export class MotionModel {
       const sg = dot4(s.q, cal.anchor) < 0 ? -1 : 1;
       for (let i = 0; i < 4; i++) cal.sum[i] += sg * s.q[i];
       const progress = clamp((s.t - cal.t0) * 1000 / c.HOLD_MS, 0, 1);
-      if (progress >= 1) { this.calib = qnorm(cal.sum); cal.stage = 'tilt'; }
+      if (progress >= 1) { this.calib = qnorm(cal.sum); this.holdQ = this.calib; cal.stage = 'tilt'; }
       ev.push({ type: 'cal', stage: 'hold', progress, ok, msg: ok ? 'Hold it like a paddle, pointed at the screen. Keep still…' : 'You moved — hold still and we’ll start again.' });
       return;
     }
@@ -180,6 +181,12 @@ export class MotionModel {
     const progress = clamp((s.t - cal.t0) * 1000 / c.SETTLE_MS, 0, 1);
     if (progress < 1) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Good — now hold it how you’ll play.' }); return; }
     this.calib = qnorm(cal.sum);                               // axes R,U,F are world vectors, so they stay valid
+    // What the screen shows is the bud's REAL attitude, not "neutral = upright": in step 1 it lay flat, pointed at the
+    // screen, so there the paddle points flat at the net; tipped up 60 deg it stands 60 deg up; straight up is upright.
+    // K carries the hold pose into the resting pose and lays the upright model forward. Everything else (aim, tilt-walk,
+    // swing arc) keeps measuring from the resting pose.
+    { const d = qmul(this.calib, qconj(this.holdQ || this.calib)), v = this._vecP(d), h = Math.SQRT1_2;
+      this.K = qmul([v[0], v[1], v[2], d[3]], [-h, 0, 0, h]); }
     this.yawFix = IDENT;
     this.calibrated = true;
     this._start(s);
@@ -261,8 +268,14 @@ export class MotionModel {
         if (pk >= sw.peak) { sw.peak = pk; sw.tPk = t - dt + p * dt; sw.romPk = this.ang - sw.ang0 - 0.5 * (rate + r1) * dt + r1 * p * dt; }
       }
       sw.sweep = Math.max(sw.sweep, this.rom);
-      const done = rate < c.REARM, el = t - sw.mv0, past = done || rate < sw.peak * 0.92;
-      const credit = (rom, rise) => Math.min(clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1), clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1));
+      const done = rate < c.REARM, el = t - sw.mv0;
+      // a slow wide swing is bumpy: a small dip is not its peak. Only a fast movement, a long one, or a real collapse is "past".
+      const past = done || rate < sw.peak * 0.6 || (rate < sw.peak * 0.92 && (sw.peak > 18 || el > 0.2));
+      // Power is EFFORT, not snap. Measured on the real player: a snappy flick peaks at ~30 rad/s but gets there in
+      // 80-100 ms; a wide arm swing only reaches 9-14 rad/s, takes 240-340 ms to get there and sweeps 100-190 deg on the
+      // way. So rotation speed says almost nothing; how far and how long the hand travelled before the peak says it all.
+      const credit = (rom, rise) => clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1) * clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1);
+      const powerOf = (pk, rom, rise) => c.TAP + (c.POWER_MAX - c.TAP) * credit(rom, rise) * (0.8 + 0.2 * clamp(pk / 14, 0, 1));
       const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN }; };
       const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
       // Fire as soon as the swing can be told from a flick, not after its peak: COMMIT_T into the movement a flick is
@@ -278,11 +291,11 @@ export class MotionModel {
         sw.sent = true; sw.fixed = past;
         // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
         // never a smash, however fast it was.
-        sw.eff = Math.max(c.TAP, pk * credit(rom, rise)); Object.assign(sw, shot());
+        sw.eff = powerOf(pk, rom, rise); Object.assign(sw, shot());
         ev.push({ type: 'swing', power: sw.eff, raw: pk, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, age, final: past });
       } else if (!sw.fixed && past) {                                 // the real peak is in: say so if the early call was off
         sw.fixed = true;
-        const eff = Math.max(c.TAP, sw.peak * credit(sw.romPk, sw.tPk - sw.mv0)), sh = shot();
+        const eff = powerOf(sw.peak, sw.romPk, sw.tPk - sw.mv0), sh = shot();
         if (Math.abs(eff - sw.eff) > Math.max(c.FIX_ABS, c.FIX_REL * sw.eff) || Math.abs(sh.lob - sw.lob) > 0.15 || Math.abs(sh.dir - sw.dir) > 0.3)
           ev.push({ type: 'swingFix', power: eff, raw: sw.peak, rom: sw.sweep / DEG, ...sh, age, final: true });
         sw.eff = eff;
@@ -413,7 +426,7 @@ export class MotionModel {
 
   pose(nowMs) {
     const c = this.c;
-    if (!this.calibrated || !this.last) return { calibrated: false, x: 0, y: c.Y_MID, P: [0, 0, 0, 1], offset: [0, 0, 0], power: 0, swinging: false, rate: 0 };
+    if (!this.calibrated || !this.last) return { calibrated: false, x: 0, y: c.Y_MID, P: [0, 0, 0, 1], Pd: [0, 0, 0, 1], offset: [0, 0, 0], power: 0, swinging: false, rate: 0 };
     const ts = nowMs == null ? this.last.t : nowMs / 1000 - this.off;
     const N = this.snap, n = N.length;
     let P, S, punch, ref, w = this.armW || 0;
@@ -432,7 +445,7 @@ export class MotionModel {
     const relC = ang > 1e-6 ? qslerp([0, 0, 0, 1], rel[3] < 0 ? mul4(rel, -1) : rel, lim * Math.tanh(ang / lim) / ang) : rel;
     const o = mul(add(sub(qrot(qmul(relC, ref), c.ARM), qrot(ref, c.ARM)), punch), w);
     const offset = [clamp(o[0], -0.75, 0.75), clamp(o[1], -0.5, 0.6), clamp(o[2], -0.6, 0.2)];                        // +z is toward the camera
-    return { calibrated: true, x: S.x, y: S.y, P, offset, power: this.sw ? this.sw.peak : 0, swinging: !!this.sw, rate: this.last.rate, tilt: this.tilt || 0, punch, locked: !!this.lock };
+    return { calibrated: true, x: S.x, y: S.y, P, Pd: qmul(P, this.K || IDENT), offset, power: this.sw ? this.sw.peak : 0, swinging: !!this.sw, rate: this.last.rate, tilt: this.tilt || 0, punch, locked: !!this.lock };
   }
 }
 

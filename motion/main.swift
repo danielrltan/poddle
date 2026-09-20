@@ -41,7 +41,8 @@ mgr.startDeviceMotionUpdates(to: .main) { motion, error in
     count += 1
     if count == 1 { log("[OK] first sample received - motion is LIVE") }
     let q = m.attitude.quaternion, r = m.rotationRate, a = m.userAcceleration
-    let obj: [String: Any] = ["t": m.timestamp,
+    // loc: which bud is streaming (1 = left, 2 = right, 0 = unknown) — the game uses it for handedness
+    let obj: [String: Any] = ["t": m.timestamp, "loc": m.sensorLocation.rawValue,
                               "q": [q.x, q.y, q.z, q.w],
                               "r": [r.x, r.y, r.z],
                               "a": [a.x, a.y, a.z]]

@@ -83,7 +83,7 @@ const clamp01 = v => Math.max(0, Math.min(1, v));
 
 // ---------- reusable script pieces ----------
 export const CALIBRATE = [{ T: 0.5, axis: [0.3, 1, 0.2], deg: 4 }, { T: 0.5, axis: [0.3, 1, 0.2], deg: -4 },   // 1 s settle
-  { T: 6 }, { T: 0.7, axis: [1, 0, 0], deg: 35 }, { T: 0.3 }, { T: 0.7, axis: [1, 0, 0], deg: -35 }, { T: 0.5 }];
+  { T: 6 }, { T: 0.7, axis: [1, 0, 0], deg: 35 }, { T: 1.4 }];   // hold, tip up, then REST there: that resting pose becomes neutral
 export const SESSION_LOOP = [
   { T: 0.35, axis: [0, 1, 0], deg: 18, tag: 'left' }, { T: 0.8 }, { T: 0.35, axis: [0, 1, 0], deg: -18 },
   { T: 0.45, axis: [0, 1, 0], deg: -18, tag: 'right' }, { T: 0.7 }, { T: 0.45, axis: [0, 1, 0], deg: 18 }, { T: 0.3 },

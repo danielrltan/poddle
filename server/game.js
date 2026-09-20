@@ -6,16 +6,18 @@ const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
 const G = 9.81, R = 0.11;                 // gravity, ball radius
 const HIT_LINE = 6.5;                     // where you stand by default (distance from net)
 const X_LIMIT = 3.8, Y_MIN = 0.3, Y_MAX = 2.3;
-const Z_NEAR = 2.6, Z_FAR = 7.0;          // footwork range (distance from net)
+const Z_NEAR = 2.6, Z_FAR = 8.4;          // footwork range (distance from net)
 const AUTO_SPEED = 5.5;                   // sideways run speed in auto-move mode, m/s
 const FOOT_SPEED = 7;                     // auto-footwork forward/back, m/s
 const STANCE = 0.3;                       // stand this far behind the predicted contact: you meet the ball out in front
 const SWING_WINDOW = 0.32;                // s a swing stays "live" waiting for the ball
-const LAG_MAX = 0.15;                     // s a swing may be back-dated by its reported age
+const LAG_MAX = 0.3;                     // s a swing may be back-dated by its reported age
 const FIX_WINDOW = 0.15;                  // s after a hit that a corrected power may still re-launch the ball
-const Z_ASSIST = 0.8;                      // share of the forward/back footwork the game does for a player who walks themselves
+const Z_ASSIST = 0.9;                      // share of the forward/back footwork the game does for a player who walks themselves
+const BLOCK_ON = process.env.BLOCK !== '0';   // scripted tests with a parked paddle turn the net block off
 const BLOCK = { within: 4.3, x: 0.75, y: 0.65, front: 0.9, behind: 0.2 };   // up at the net a paddle simply held in the ball's path taps it back
-const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 0.9 };   // contact box around the paddle
+const REACH_X = 1.0, REACH_Y = 0.5;          // extra metres of reach for a full-effort swing
+const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
 const SERVE_AHEAD = 0.55;                 // it wants to sit this far in front of the paddle
@@ -51,7 +53,7 @@ function newPlayer(ws, side) {
 // and clears the net. Every shot is "in" by construction; the skill is reaching and timing it.
 // how underhand was the swing? lob is the upward-scoop share of the stroke, 0..0.8 from the client
 const underhand = lob => { const t = clamp((lob / 0.8 - 0.3) / 0.45, 0, 1); return t * t * (3 - 2 * t); };
-const shotKind = (n, lob) => (underhand(lob) > 0.5 ? (n < 0.45 ? 'dink' : 'lob') : n > 0.9 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
+const shotKind = (n, lob) => (underhand(lob) > 0.5 ? (n < 0.45 ? 'dink' : 'lob') : n > 0.72 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
 
 function solve(p, side, n, dir, lob) {
   const s = sgn(side);
@@ -163,7 +165,10 @@ function inZone(pl) {
   const s = sgn(pl.side);
   const dx = ball.p[0] - pl.x, dy = ball.p[1] - pl.y, ahead = -(ball.p[2] - pl.z) * s;
   const depth = ahead > -ZONE.behind && ahead < ZONE.front;
-  return { ok: depth && Math.abs(dx) < ZONE.x && Math.abs(dy) < ZONE.y, depth, dx, dy, ahead, s };
+  // Reach: a big committed swing is a stretched arm. The sensor can't see the arm extend, but it can see the effort, so
+  // the harder the swing, the further out to the side (and up) it connects. A poke reaches no further than before.
+  const r = pl.swing && !pl.bot ? pl.swing.n : 0;
+  return { ok: depth && Math.abs(dx) < ZONE.x + REACH_X * r && Math.abs(dy) < ZONE.y + REACH_Y * r, depth, dx, dy, ahead, s };
 }
 // reason = where the ball was relative to the paddle (player's own left/right) or the timing
 const aside = z => (Math.abs(z.dx) >= ZONE.x ? (z.dx * z.s > 0 ? 'right' : 'left') : (z.dy > 0 ? 'high' : 'low'));
@@ -319,7 +324,7 @@ function step() {
       const want = clamp(assist + (pl.ownZ - HIT_LINE), Z_NEAR, Z_FAR + 0.4);
       pl.z += clamp(sd * want - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT); continue;
     }
-    const home = !ball.live || ball.lastHit === pl.side;
+    const home = !ball.live || ball.serving != null || ball.lastHit === pl.side;   // nobody wanders off while a serve is hanging
     const zT = home ? sgn(pl.side) * HIT_LINE : pl.zT;
     pl.z += clamp(zT - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT);
   }
@@ -342,7 +347,7 @@ function step() {
   // Close to the net you don't need a swing: hold the paddle in the ball's path and it pops back as a soft dink.
   // Only for players who place the paddle themselves, never on a serve, never twice in a row.
   for (const pl of players) {
-    if (pl.bot || pl.auto || pl.swing || !ball.live || ball.serving != null || ball.lastHit === pl.side) continue;
+    if (!BLOCK_ON || pl.bot || pl.auto || pl.swing || !ball.live || ball.serving != null || ball.lastHit === pl.side) continue;
     const z = inZone(pl);
     if (Math.abs(pl.z) <= BLOCK.within && Math.abs(z.dx) < BLOCK.x && Math.abs(z.dy) < BLOCK.y && z.ahead < BLOCK.front && z.ahead > -BLOCK.behind)
       strike(pl, { n: 0.06, dir: clamp(-pl.x * sgn(pl.side) / 3, -0.6, 0.6), lob: 0.6, kind: 'block' });

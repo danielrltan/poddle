@@ -2,7 +2,7 @@
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
 const PORT = 8151, root = new URL('..', import.meta.url).pathname;
-const proc = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '1', WIN_AT: '0' } });
+const proc = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '1', BLOCK: '0', WIN_AT: '0' } });
 const wait = ms => new Promise(r => setTimeout(r, ms));
 await wait(700);
 let fails = 0, bad = 0, states = 0;

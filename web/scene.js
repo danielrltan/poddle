@@ -380,7 +380,12 @@ export function createScene(containerEl) {
       } else if (local) pd.q.copy(t.q); else pd.q.slerp(t.q, damp(dt, 0.045));
       // swing-arc offset (player frame): given for the local player, else the kinematic arm of the SMOOTHED q
       if (t.off && !pd.bot) pd.off.set(t.off[0], t.off[1], t.off[2]);
-      else { const o = armOffset([pd.q.x, pd.q.y, pd.q.z, pd.q.w]); pd.off.set(o[0], o[1], o[2]); }
+      else {                                                   // high-passed: a held pose relaxes to no offset at all
+        const o = armOffset([pd.q.x, pd.q.y, pd.q.z, pd.q.w]), k = damp(dt, 0.35);
+        if (!pd.offRef) pd.offRef = [o[0], o[1], o[2]];
+        for (let i = 0; i < 3; i++) pd.offRef[i] += (o[i] - pd.offRef[i]) * k;
+        pd.off.set(o[0] - pd.offRef[0], o[1] - pd.offRef[1], o[2] - pd.offRef[2]);
+      }
       pd.lunge = Math.max(0, pd.lunge - dt / 0.22);
       const lg = Math.sin(Math.min(1, pd.lunge * 1.15) * Math.PI) * 0.34;      // out and back
       const w = pd.world.set(pd.pos.x + s * pd.off.x, Math.max(0.12, pd.pos.y + pd.off.y + lg * 0.12), pd.pos.z + s * (pd.off.z - lg));
