@@ -62,7 +62,7 @@ const underhand = lob => { const t = clamp((lob / 0.8 - 0.55) / 0.3, 0, 1); retu
 // spin is easy to put on: it starts at 0.25 and is full by 0.6. |slice| = how much, its sign = which way it breaks.
 const sliced = (slice, lob) => { const t = clamp((Math.abs(slice || 0) - 0.3) / 0.4, 0, 1); return t * t * (3 - 2 * t) * (1 - 0.6 * underhand(lob)); };
 const hard = n => { const t = clamp((n - 0.45) / 0.25, 0, 1); return t * t * (3 - 2 * t); };   // 0 below n 0.45, 1 from 0.7: power beats spin
-const shotKind = (n, lob, slice) => (n > 0.62 && underhand(lob) <= 0.5 ? 'smash' : sliced(slice, lob) * (1 - hard(n)) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.62 ? 'smash' : n < 0.1 ? 'tap' : 'drive');
+const shotKind = (n, lob, slice) => (n > 0.62 && underhand(lob) <= 0.5 ? 'smash' : sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.62 ? 'smash' : n < 0.1 ? 'tap' : 'drive');
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
@@ -82,7 +82,7 @@ function solve(p, side, n, dir, lob, slice) {
   const tz = -s * Math.min(6.2, depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
   let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)), lerp(1.2, 1.95, nu), u);   // underhands always travel on a high, slow arc
-  const spin = sliced(slice, lob) * (1 - hard(n)), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
+  const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
   T *= 1 + SLICE.slow * spin;                                  // same depth (power still sets it), slower and floatier
   const v = [0, 0, 0]; T = fly(v, px, py, pz, tx, tz, T, g, lerp(0.25, SLICE.clear, spin));
   // wide balls keep drifting after the bounce; pull the target in so the top of the bounce stays within REACH

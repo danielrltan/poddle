@@ -516,18 +516,24 @@ export function createScene(containerEl) {
     // ribbon trail, camera-facing
     b.cool += ((b.live ? b.spin : 0) - b.cool) * damp(dt, 0.08);
     b.hot = (b.hot || 0) + ((b.live ? b.power || 0 : 0) - (b.hot || 0)) * damp(dt, 0.05);
-    trail.glow = Math.max(b.live ? 0.16 + 0.45 * Math.max(b.cool, b.hot || 0) : 0, trail.glow - dt * 1.6); trail.acc += dt;
+    if (b.live && b.hot > 0.6) { b.ember = (b.ember || 0) + dt;
+      if (b.ember > 0.028) { b.ember = 0; burst([b.pos.x, b.pos.y, b.pos.z], 0.2, 3, 1.6, b.cool > 0.3 ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0]); } }
+    trail.glow = Math.max(b.live ? 0.16 + 0.6 * Math.max(b.cool, b.hot || 0) : 0, trail.glow - dt * 1.6); trail.acc += dt;
     if (trail.acc >= 1 / 90) { trail.acc = 0; trail.pts.unshift(b.pos.clone()); if (trail.pts.length > TRAIL_N) trail.pts.pop(); }
     const P = trailGeo.attributes.position.array, C = trailGeo.attributes.color.array, n = trail.pts.length;
     for (let i = 0; i < TRAIL_N; i++) {
       const p = trail.pts[Math.min(i, n - 1)] || b.pos, q = trail.pts[Math.min(i + 1, n - 1)] || p, f = i < n ? 1 - i / TRAIL_N : 0;
       vA.subVectors(p, q); vB.subVectors(camera.position, p); vA.cross(vB);
-      if (vA.lengthSq() < 1e-10) vA.set(0, 0, 0); else vA.normalize().multiplyScalar(BALL_R * 0.7 * f);
+      const fire = Math.max(0, ((b.hot || 0) - 0.55) / 0.45);   // 0 below smash power, 1 at full
+      if (vA.lengthSq() < 1e-10) vA.set(0, 0, 0); else vA.normalize().multiplyScalar(BALL_R * (0.7 + 1.5 * fire * (0.75 + 0.25 * Math.sin(timeS * 47 + i * 1.9))) * f);   // a smash drags a fat, licking flame
       P[i * 6] = p.x + vA.x; P[i * 6 + 1] = p.y + vA.y; P[i * 6 + 2] = p.z + vA.z; P[i * 6 + 3] = p.x - vA.x; P[i * 6 + 4] = p.y - vA.y; P[i * 6 + 5] = p.z - vA.z;
       // the trail is an intensity scale: white tap -> yellow -> orange -> red smash (continuous in power); a slice pulls it icy blue
       const a = f * f * trail.glow, h = b.hot || 0, u = h * 3;
       const hg = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2), hb = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2);
-      const cr = a * lerp(1, 0.3, b.cool), cg = a * lerp(hg, 0.85, b.cool), cb = a * lerp(hb, 1, b.cool);
+      let cr = a * lerp(1, 0.3, b.cool), cg = a * lerp(hg, 0.85, b.cool), cb = a * lerp(hb, 1, b.cool);
+      const pm = Math.min(1, Math.min(fire * 1.4, b.cool * 1.8));                      // a smash WITH spin burns purple
+      cr = lerp(cr, a * 0.78, pm); cg = lerp(cg, a * 0.22, pm); cb = lerp(cb, a * 1.0, pm);
+      const boost = 1 + 0.9 * fire; cr *= boost; cg *= boost; cb *= boost;
       for (let j = 0; j < 6; j += 3) { C[i * 6 + j] = cr; C[i * 6 + j + 1] = cg; C[i * 6 + j + 2] = cb; }
     }
     trailGeo.attributes.position.needsUpdate = trailGeo.attributes.color.needsUpdate = true;
@@ -658,6 +664,8 @@ export function createScene(containerEl) {
       burst(p, n, 22 + Math.round(n * 30), 3.6 + n * 6.5, m.spin > 0.5 ? [0xbfe9ff, 0x5ad1ff, 0xffffff] : [0xfff6b0, 0xffd23a, 0xffffff], -sgn(m.side) * (2.5 + n * 4));
       cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * (mine ? 1 : 0.55));
       flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = n;
+      if (m.kind === 'smash') { const purple = m.spin > 0.3; ring(p, false, 0.1 * rs, 2.6 * rs, 0.6, purple ? 0xb070ff : 0xff5a1f, 0.7); flashAt(p, 2.2);
+        burst(p, 1, 40, 9, purple ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0], -sgn(m.side) * 6); cam.shake = Math.max(cam.shake, mine ? 0.34 : 0.18); }
       ball.spin = clamp(+m.spin || 0, 0, 1);
       trail.glow = 0.55 + 0.45 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet

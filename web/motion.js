@@ -3,9 +3,10 @@
 const DEG = Math.PI / 180;
 
 export const DEFAULTS = {
-  SETTLE_MS: 800, SETTLE_DEG: 7,             // after the tilt: rest this long within this wobble and that pose becomes neutral
+  HOLD_GRACE: 2.5,                           // s after the hold screen appears before a movement is called out
+  SETTLE_MS: 800, SETTLE_DEG: 10,            // after the tilt: rest this long within this wobble and that pose becomes neutral
   BUFFER_PAD: 0.008, BUFFER_MIN: 0.025, BUFFER_MAX: 0.12,   // jitter buffer: render this far behind the newest sample (s)
-  HOLD_MS: 5000, HOLD_DEG: 10,              // step 1: still within HOLD_DEG for HOLD_MS
+  HOLD_MS: 5000, HOLD_DEG: 17,              // step 1: still within HOLD_DEG for HOLD_MS
   TILT_DEG: 25, TILT_MIN_HORIZ: 0.75,       // step 2: tip up; axis must be mostly horizontal
   TILT_REARM_DEG: 12,                       // after a rejected twist, come back inside this before retrying
   X_SIN: 3.0 / Math.sin(75 * DEG), X_MAX: 3.5,   // lateral metres = X_SIN * sin(yaw): follows the sideways travel of a hand on an arm; sideline at ~75 deg (setSidelineDeg changes it live)
@@ -100,7 +101,7 @@ export class MotionModel {
 
   startCalibration() {
     this.calibrated = false;
-    this.cal = { stage: 'hold', anchor: null, sum: null, t0: 0, blocked: false };
+    this.cal = { stage: 'hold', anchor: null, sum: null, t0: 0, blocked: false, begin: null };
     this.sw = null;
   }
 
@@ -144,8 +145,10 @@ export class MotionModel {
     if (cal.stage === 'settle') return this._settle(s, ev);
     if (cal.stage === 'hold') {
       let ok = true;
+      if (cal.begin == null) cal.begin = s.t;
       if (!cal.anchor || qangle(qmul(s.q, qconj(cal.anchor))) > c.HOLD_DEG * DEG) {
-        ok = !cal.anchor; cal.anchor = s.q; cal.sum = [0, 0, 0, 0]; cal.t0 = s.t;
+        // no scolding while the player is still getting into position: for the first moments a move just restarts the count quietly
+        ok = !cal.anchor || s.t - cal.begin < c.HOLD_GRACE; cal.anchor = s.q; cal.sum = [0, 0, 0, 0]; cal.t0 = s.t;
       }
       const sg = dot4(s.q, cal.anchor) < 0 ? -1 : 1;
       for (let i = 0; i < 4; i++) cal.sum[i] += sg * s.q[i];
