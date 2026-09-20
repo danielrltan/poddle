@@ -133,3 +133,13 @@ status? like have it say paused or calibrating with an icon"
 - The page URL is `?court=CODE` (and `&watch=1`). `?room=CODE` keeps working as a silent alias so links already shared do not break; the address bar is rewritten to `?court=`.
 - Internal names stay as they are (message types `room`/`join`, `createRoom`, docs/ROOMS.md, the socket's `room=` query): renaming the wire protocol buys nothing and risks the tests. Only what a person sees changes.
 - Update the tests that assert on those strings/URLs. Lint at the end: grep the player-facing strings for /\broom/i: zero hits outside comments and internals.
+### 14d. Movement style leaves the court; bot difficulty takes its place (player request)
+"can we maybe remove the ability to change movement style in the court and make it only in the settings menu? and then replace that with being able to change bot difficulty."
+- The **M** key no longer does anything during play, and its keycap hint is removed. Movement style (Body / Auto / Aim) is a row in the settings panel only (segmented control, the current one highlighted, Body disabled with a short reason when there is no camera). `?move=` still works for tests.
+- The bottom-left hints become: **C** Calibrate, and ONLY when the opponent is Matt: **1 2 3** `Difficulty: Club` (the word updates when it changes). Against a human that second hint is absent. B keeps working silently.
+- Settings panel also gets a Difficulty row (Rookie / Club / Pro) when the opponent is Matt.
+
+### 14e. "Select difficulty" (player request: "there is no context on the diff selection part")
+- The Play a bot step in the lobby needs a heading above the three choices: `Select difficulty`. One short line under each level is allowed if it helps (Rookie: "Slow and forgiving", Club: "A fair match", Pro: "Fast and accurate") but nothing longer. Same heading on the settings Difficulty row.
+
+### 14f. KNOWN BUG, handled by the NEXT workflow (not yours unless you trip over the cause): the player reports that cycling the movement mode away from Body and back "just breaks ... i think it switches back to an old deprecated version". Suspects: state that is only maintained while in Body mode and never reset on re-entry (bodyX / bodyY / bodyZ, vX / vY, walkV / walkHold, body.center(), the head-coupled scene.setViewer offset left at its last value when leaving Body), and the server keeping `ownZ` / `auto` / `autoY` from the previous mode for a tick. If you touch setMode(), make every mode switch re-initialise that state in ONE place.
