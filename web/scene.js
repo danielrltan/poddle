@@ -4,6 +4,8 @@
 
 const G = 9.81, BALL_R = 0.11;
 const PADDLE_SCALE = 1.6;                 // Wii-sized so it reads from 5 m behind
+const VIEW_PARALLAX = 1;                  // head-coupled camera strength: 0 = locked-off, 1 = full
+const VIEW = { x: 1.7, y: 0.45, back: 2.2, tau: 0.22 };   // eye travel (m) at viewer = 1: sideways, up, drift back; follow time (s)
 const DEFAULT_COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
 const COL = {
   skyTop: '#2f7fd6', skyMid: '#8cc4ee', horizon: '#d6ecf7',
@@ -154,6 +156,7 @@ export function createScene(containerEl) {
   scene.fog = new THREE.Fog(new THREE.Color(COL.horizon), 38, 160);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.3, 500);
   const cam = { x: 0, shake: 0, fovBase: 44 };
+  const view = { x: 0, y: 0, vx: 0, vy: 0, inX: 0, inY: 0, at: -9 };      // smoothed viewer offset + last setViewer()
 
   // lights: hemisphere fill + ONE shadow-casting sun, frustum fitted to court + player run-off
   scene.add(new THREE.HemisphereLight(0xd6e9ff, 0x4f7a4a, 1.35));
@@ -186,6 +189,8 @@ export function createScene(containerEl) {
 
   // ---------- court (rebuilt by setCourt) ----------
   let courtGroup = null;
+  const backFence = [[], []];                             // per side: the windscreen behind that baseline (hidden for the local side)
+  const showFences = () => backFence.forEach((a, side) => a.forEach(o => { o.visible = side !== localSide; }));
   const speckle = canvasTex(256, 256, (g, w, h) => {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); const rnd = rng(3);
     for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.07})`; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); }
@@ -200,7 +205,7 @@ export function createScene(containerEl) {
   function buildCourt() {
     if (courtGroup) { scene.remove(courtGroup); courtGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     const g = courtGroup = new THREE.Group(), { halfW: W, halfL: L, kitchen: K, net: N } = court, LW = 0.07;
-    const fenceZ = L + 7.2, fenceX = W + 5.2;
+    const fenceZ = L + 7.2, fenceX = W + 5.2; backFence[0].length = backFence[1].length = 0;
     g.add(slab(600, 600, COL.grass, -0.02));
     g.add(slab(fenceX * 2, fenceZ * 2, COL.apron, 0, 0, 0, 0.6));
     g.add(slab(W * 2, L * 2, COL.court, 0.004, 0, 0, 0.6));
@@ -252,10 +257,11 @@ export function createScene(containerEl) {
     const railM = new THREE.MeshStandardMaterial({ color: 0xd9dde3, roughness: 0.4, metalness: 0.6 });
     for (const s of [-1, 1]) {
       const back = new THREE.Mesh(new THREE.PlaneGeometry(fenceX * 2, 2.4), screenM); back.position.set(0, 1.2, s * fenceZ); back.rotation.y = s > 0 ? Math.PI : 0; g.add(back);
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(fenceX * 2, 0.07, 0.07), railM); rail.position.set(0, 2.43, s * fenceZ); g.add(rail);
+      const mine = backFence[s > 0 ? 0 : 1]; mine.push(back);      // the camera drifts back through its own fence when the player is deep or far offside
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(fenceX * 2, 0.07, 0.07), railM); rail.position.set(0, 2.43, s * fenceZ); g.add(rail); mine.push(rail);
       const sd = new THREE.Mesh(new THREE.PlaneGeometry(fenceZ * 2, 1.3), sideM); sd.position.set(s * fenceX, 0.65, 0); sd.rotation.y = -s * Math.PI / 2; g.add(sd);
       const srail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, fenceZ * 2), railM); srail.position.set(s * fenceX, 1.33, 0); g.add(srail);
-      for (let i = -3; i <= 3; i++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.5, 8), railM); p.position.set(i * fenceX / 3, 1.25, s * (fenceZ + 0.05)); g.add(p); }
+      for (let i = -3; i <= 3; i++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.5, 8), railM); p.position.set(i * fenceX / 3, 1.25, s * (fenceZ + 0.05)); g.add(p); mine.push(p); }
     }
     // trees outside the fence
     const rnd = rng(11), N_T = 46, trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.3, 1, 8), new THREE.MeshStandardMaterial({ color: 0x7a5535, roughness: 1 }), N_T);
@@ -272,7 +278,7 @@ export function createScene(containerEl) {
       M.compose(new THREE.Vector3(x + r * 0.5, h + r * 0.2, z + r * 0.3), Q, new THREE.Vector3(r * 0.65, r * 0.6, r * 0.65)); leaves[1 - k].setMatrixAt(cnt[1 - k]++, M);
     }
     leaves.forEach((l, k) => { l.count = cnt[k]; g.add(l); }); g.add(trunks);
-    scene.add(g);
+    scene.add(g); showFences();
   }
   buildCourt();
 
@@ -474,16 +480,42 @@ export function createScene(containerEl) {
     }
   }
 
+  // Head-coupled perspective (the Johnny Lee Wii-remote trick): the screen is a window onto the court. The window is a
+  // fixed rectangle through the court centre, square to the locked-off view; the eye slides with the player and the
+  // frustum goes off-axis so the window stays put. The net and far court never move on screen, near things shift
+  // against the eye, and the paddle stays well inside the frame at the sideline.
+  function spring(o, k, vk, target, tau, dt) {             // critically damped follow (no overshoot, no allocations)
+    const w = 2 / tau, x = w * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), c = o[k] - target, tmp = (o[vk] + w * c) * dt;
+    o[vk] = (o[vk] - w * tmp) * e; o[k] = target + (c + tmp) * e;
+  }
   function updateCamera(dt) {
     const s = sgn(localSide), me = pads[localSide];
-    cam.x = lerp(cam.x, me.has ? me.pos.x * 0.35 : 0, damp(dt, 0.25));
+    // viewer offset: setViewer() while it is fresh, else wherever the local paddle stands
+    let tx = 0, ty = 0;
+    if (timeS - view.at < 0.5) { tx = view.inX; ty = view.inY; }
+    else if (me.has) { tx = me.pos.x * s / court.halfW; ty = (me.pos.y - 1) / 1.3; }
+    spring(view, 'x', 'vx', clamp(tx, -1, 1), VIEW.tau, dt); spring(view, 'y', 'vy', clamp(ty, -1, 1), VIEW.tau, dt);
     // the server runs you back for deep balls (up to ~2 m behind the baseline). The camera goes with you, or the
     // paddle drops off the bottom of the screen exactly when the ball arrives.
     { const back = me.has ? me.pos.z * s - 6.5 : 0; cam.z = lerp(cam.z || 0, back > 0 ? back : back * 0.5, damp(dt, 0.18)); }
     cam.shake = Math.max(0, cam.shake - dt * (0.35 + cam.shake * 6));
     const k = cam.shake, t = timeS * 1000;
-    camera.position.set(cam.x + Math.sin(t * 0.093) * k, 3.1 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 5.4 + (cam.z || 0)) + Math.sin(t * 0.071 + 2) * k * 0.5);
-    camera.lookAt(cam.x * 0.45, 0.35, s * (0.4 + (cam.z || 0) * 0.6));
+    // locked-off pose (+ shake): fixes the view direction and the window
+    camera.position.set(Math.sin(t * 0.093) * k, 3.1 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 5.4 + (cam.z || 0)) + Math.sin(t * 0.071 + 2) * k * 0.5);
+    vB.set(0, 0.35, s * (0.4 + (cam.z || 0) * 0.6)); camera.lookAt(vB);
+    // window = the net plane: depth of the net's centre along the view axis (the look target itself moves with the run-back)
+    const D = vB.set(0, court.net / 2, 0).sub(camera.position).dot(vA.set(0, 0, -1).applyQuaternion(camera.quaternion)), hh = D * Math.tan(camera.fov * D2R / 2), hw = hh * camera.aspect;
+    // slide the eye in the camera's own axes (side 1's right is world -x, which the camera's right already is);
+    // far offside it also drifts back so the whole near court still fits beside the paddle
+    const g = VIEW_PARALLAX, ex = view.x * VIEW.x * g * clamp(hw / 8, 0.4, 1),   // less sideways travel through a narrow window
+      ey = view.y * VIEW.y * g, eb = view.x * view.x * VIEW.back * g;
+    camera.position.add(vA.set(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(ex));
+    camera.position.add(vA.set(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(ey));
+    camera.position.add(vA.set(0, 0, 1).applyQuaternion(camera.quaternion).multiplyScalar(eb));
+    cam.x = camera.position.x;
+    const n = camera.near / (D + eb);
+    camera.projectionMatrix.makePerspective((-hw - ex) * n, (hw - ex) * n, (hh - ey) * n, (-hh - ey) * n, camera.near, camera.far);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   }
 
   // ---------- WebAudio, no assets ----------
@@ -598,8 +630,11 @@ export function createScene(containerEl) {
   resize();
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
-    setSide(side) { localSide = side === 1 ? 1 : 0; cam.x = 0; for (const pd of pads) pd.init = false; },
+    setSide(side) { localSide = side === 1 ? 1 : 0; cam.x = 0; view.x = view.y = view.vx = view.vy = 0; showFences(); for (const pd of pads) pd.init = false; },
+    // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
+    // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
+    setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y)) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, onEvent, unlockAudio, render, resize,
-    _dbg: { renderer, scene, camera },                    // test harness only
+    _dbg: { renderer, scene, camera, VIEW, pads },                    // test harness only
   };
 }

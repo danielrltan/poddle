@@ -214,6 +214,7 @@ let lastPos = null;
     if (usingBody() && body.seen()) {
       [bodyX, vX] = damp(bodyX, Math.max(-3.5, Math.min(3.5, body.x())), vX, 0.085, dt);
       [bodyY, vY] = damp(bodyY, Math.max(0.3, Math.min(2.3, body.y())), vY, 0.085, dt);
+      scene.setViewer({ x: bodyX / 3, y: (bodyY - 1) / 1.3 });          // head-coupled camera: the screen is a window onto the court
       // Forward/back is a tilt, like pushing a stick: tip the AirPod forward to walk up to the kitchen, tip it back to
       // retreat, hold it level to stay put. Ignored while the hand is moving fast, and for a moment after a swing.
       if (p.swinging || p.rate > 3.5) walkHold = now + 450;

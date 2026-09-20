@@ -13,6 +13,8 @@ const STANCE = 0.3;                       // stand this far behind the predicted
 const SWING_WINDOW = 0.32;                // s a swing stays "live" waiting for the ball
 const LAG_MAX = 0.15;                     // s a swing may be back-dated by its reported age
 const FIX_WINDOW = 0.15;                  // s after a hit that a corrected power may still re-launch the ball
+const Z_ASSIST = 0.8;                      // share of the forward/back footwork the game does for a player who walks themselves
+const BLOCK = { within: 4.3, x: 0.75, y: 0.65, front: 0.9, behind: 0.2 };   // up at the net a paddle simply held in the ball's path taps it back
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 0.9 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
@@ -137,7 +139,7 @@ function serveReach(pl) {
 function strike(pl, sw) {
   pl.swing = null;
   pl.lunge = { z: ball.p[2] + sgn(pl.side) * 0.25, until: now + 0.12 };
-  broadcast({ type: 'hit', side: pl.side, n: sw.n, kind: shotKind(sw.n, sw.lob), p: ball.p });
+  broadcast({ type: 'hit', side: pl.side, n: sw.n, kind: sw.kind || shotKind(sw.n, sw.lob), p: ball.p });
   launch(pl.side, sw.n, sw.dir, sw.lob);
 }
 
@@ -309,7 +311,14 @@ function step() {
       pl.z += clamp(pl.lunge.z - pl.z, -3 * FOOT_SPEED * DT, 3 * FOOT_SPEED * DT);
       continue;
     }
-    if (pl.ownZ != null && !pl.auto) { pl.z += clamp(sgn(pl.side) * pl.ownZ - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT); continue; }   // you walk yourself
+    if (pl.ownZ != null && !pl.auto) {
+      // Forward/back is shared. The game carries you most of the way to where the ball can be reached (a short ball in the
+      // kitchen must never be unreachable); your own lean on the AirPod (ownZ, 6.5 = neutral) adds the rest, either way.
+      const sd = sgn(pl.side), incoming = ball.live && ball.serving == null && ball.lastHit !== pl.side;
+      const assist = incoming ? lerp(HIT_LINE, pl.zT * sd, Z_ASSIST) : HIT_LINE;
+      const want = clamp(assist + (pl.ownZ - HIT_LINE), Z_NEAR, Z_FAR + 0.4);
+      pl.z += clamp(sd * want - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT); continue;
+    }
     const home = !ball.live || ball.lastHit === pl.side;
     const zT = home ? sgn(pl.side) * HIT_LINE : pl.zT;
     pl.z += clamp(zT - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT);
@@ -328,6 +337,15 @@ function step() {
   } else if (ball.live) {
     ball.v[1] -= G * DT;
     for (let i = 0; i < 3; i++) ball.p[i] += ball.v[i] * DT;
+  }
+
+  // Close to the net you don't need a swing: hold the paddle in the ball's path and it pops back as a soft dink.
+  // Only for players who place the paddle themselves, never on a serve, never twice in a row.
+  for (const pl of players) {
+    if (pl.bot || pl.auto || pl.swing || !ball.live || ball.serving != null || ball.lastHit === pl.side) continue;
+    const z = inZone(pl);
+    if (Math.abs(pl.z) <= BLOCK.within && Math.abs(z.dx) < BLOCK.x && Math.abs(z.dy) < BLOCK.y && z.ahead < BLOCK.front && z.ahead > -BLOCK.behind)
+      strike(pl, { n: 0.06, dir: clamp(-pl.x * sgn(pl.side) / 3, -0.6, 0.6), lob: 0.6, kind: 'block' });
   }
 
   // contact: a live swing + the ball actually inside the box around that paddle.
