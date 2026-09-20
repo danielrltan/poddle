@@ -24,7 +24,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const num = (v, d) => (Number.isFinite(+v) ? +v : d);          // untrusted input -> finite number
 
 const players = [];                       // { ws|null(bot), side, x, y, z, zT, q, swing, lunge, contact }
-const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
+const ball = { serving: null, serveBy: 0, p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
 const score = [0, 0];
 let now = 0, server = 0, serveAt = Infinity;      // sim clock; who serves next; when (sim time)
 
@@ -80,10 +80,16 @@ function planFootwork(side) {
 }
 
 function reset(by) {
-  const s = sgn(by);
+  const s = sgn(by), pl = bySide(by);
+  for (const p of players) p.swing = p.lunge = null;
+  ball.live = true; ball.bounces = 0;
+  if (SWING_SERVE && pl) {                                     // the ball floats in front of the server until they swing at it
+    ball.serving = by; ball.lastHit = 1 - by; ball.v = [0, 0, 0];
+    ball.serveBy = now + (pl.bot ? 1.1 : 9);                   // bots serve after a beat; a human who never swings gets served for
+    broadcast({ type: 'serve', by, wait: true });
+    return;
+  }
   ball.p = [(Math.random() - 0.5) * 2, 1.1, s * HIT_LINE];
-  ball.live = true;
-  for (const pl of players) pl.swing = pl.lunge = null;
   launch(by, 0.15, (Math.random() - 0.5) * 1.2, 0.25);
   broadcast({ type: 'serve', by });
 }
@@ -125,6 +131,7 @@ const BOTS = [
 ];
 let botLevel = 1, botJoinAt = Infinity;
 const AUTOBOT = process.env.AUTOBOT !== '0';
+const SWING_SERVE = process.env.SWING_SERVE != null ? process.env.SWING_SERVE !== '0' : AUTOBOT;   // off in tests
 const WIN_AT = process.env.WIN_AT != null ? +process.env.WIN_AT : (AUTOBOT ? 11 : 0);   // first to 11, win by 2 (off in tests)
 let newMatchAt = Infinity;            // tests turn off auto-join and seat takeover
 const humans = () => players.filter(p => !p.bot);
@@ -244,7 +251,18 @@ function step() {
     pl.z += clamp(zT - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT);
   }
 
-  if (ball.live) {
+  if (ball.live && ball.serving != null) {
+    const pl = bySide(ball.serving);
+    if (!pl || ball.lastHit === ball.serving) ball.serving = null;            // it's been struck (or the server left)
+    else {
+      const s = sgn(pl.side);
+      ball.p = [pl.x + 0.05 * s, clamp(pl.y + 0.1, 0.8, 1.5) + Math.sin(now * 3) * 0.04, pl.z - s * 0.55]; ball.v = [0, 0, 0];
+      if (now >= ball.serveBy) {
+        ball.serving = null; broadcast({ type: 'swung', side: pl.side }); broadcast({ type: 'hit', side: pl.side, n: 0.3, p: ball.p });
+        launch(pl.side, pl.bot ? 0.2 + Math.random() * 0.3 : 0.25, (Math.random() - 0.5) * 1.4, 0.2);
+      }
+    }
+  } else if (ball.live) {
     ball.v[1] -= G * DT;
     for (let i = 0; i < 3; i++) ball.p[i] += ball.v[i] * DT;
   }
@@ -266,7 +284,7 @@ function step() {
     if (mine && z.depth && Math.abs(z.ahead) < sw.best) { sw.best = Math.abs(z.ahead); sw.why = aside(z); }
     if (now > sw.until) {
       pl.swing = null;
-      if (mine) send(pl, { type: 'whiff', why: whyMissed(sw, z) });
+      if (mine && ball.serving == null) send(pl, { type: 'whiff', why: whyMissed(sw, z) });
     }
   }
 
@@ -283,7 +301,7 @@ function step() {
 
   const paddles = [null, null];
   for (const pl of players) paddles[pl.side] = { x: pl.x, y: pl.y, z: pl.z, q: pl.q, bot: pl.bot };
-  broadcast({ type: 'state', p: ball.p, v: ball.v, live: ball.live, score, paddles });
+  broadcast({ type: 'state', p: ball.p, v: ball.v, live: ball.live, serving: ball.serving, score, paddles });
 }
 
 // fixed 60Hz steps against the real clock (setInterval alone runs ~2% slow and drifts). One state packet per step.

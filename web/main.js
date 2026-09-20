@@ -152,7 +152,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'full') { say('game is full (2 players already connected)', '#ff6b6b', 4000); return; }
   if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; $('rally').textContent = rally; pop($('rally')); hitFx(m.side === side, m.n); }
-  if (m.type === 'serve') { rally = 0; $('rally').textContent = 0; $('sv-me').classList.toggle('on', m.by === side); $('sv-them').classList.toggle('on', m.by !== side); }
+  if (m.type === 'serve') { if (m.wait) say(m.by === side ? 'Your serve — swing to hit it!' : 'Their serve', null, m.by === side ? 2600 : 1200); rally = 0; $('rally').textContent = 0; $('sv-me').classList.toggle('on', m.by === side); $('sv-them').classList.toggle('on', m.by !== side); }
   if (m.type === 'match') { const won = m.winner === side; banner(won ? 'YOU WIN!' : 'GAME OVER', `${m.score[side]} – ${m.score[1 - side]} · new game in a moment`, won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)', true); if (won) { confetti(['#2f8cff', '#ffc83d', '#22c55e', '#ffffff'], 120); setTimeout(() => confetti(['#2f8cff', '#ffc83d', '#ffffff'], 80), 900); } return; }
   if (m.type === 'whiff') { stats.whiffs++; say(WHIFF[m.why] || 'missed', '#ff6b6b'); }
   if (m.type === 'point' && !m.final) { const won = m.winner === side;

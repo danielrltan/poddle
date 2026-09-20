@@ -15,6 +15,8 @@ function run(name, totalDeg, peak) {
 run('wrist flick 40° @ 20 rad/s', 40, 20);
 run('hard wrist flick 50° @ 30 rad/s', 50, 30);
 run('lazy half swing 70° @ 16', 70, 16);
+run('short backhand 70° @ 14', 70, 14);
+run('backhand 85° @ 16', 85, 16);
 run('backhand 100° @ 18', 100, 18);
 run('solid forehand 130° @ 30', 130, 30);
 run('huge forehand 160° @ 38', 160, 38);

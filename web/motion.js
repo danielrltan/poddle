@@ -18,9 +18,9 @@ export const DEFAULTS = {
   WINDUP_MAX: 0, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
-  TRIGGER: 13, PEAK_WINDOW: 0.16, REARM: 3,
-  ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
-  ROM_IDLE: 4, ROM_MIN: 30, ROM_FULL: 55, ROM_T_MIN: 0.06, ROM_T_FULL: 0.1,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
+  TRIGGER: 11, PEAK_WINDOW: 0.16, REARM: 3,
+  ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
+  ROM_IDLE: 4, ROM_MIN: 25, ROM_FULL: 45, ROM_T_MIN: 0.04, ROM_T_FULL: 0.07,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
@@ -374,9 +374,15 @@ export class MotionModel {
       P = qslerp(a.P, b.P, u); ref = qslerp(a.ref, b.ref, u);
       S = { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) }; punch = add(mul(a.pu, 1 - u), mul(b.pu, u)); w = lerp(a.w, b.w, u);
     } else { P = this._Pat(ts); S = this._xyAt(ts); punch = this._punchAt(ts); ref = this._refAt(ts); }
-    const offset = mul(add(sub(qrot(P, c.ARM), qrot(ref, c.ARM)), punch), w);
+    // Arc from a COMPRESSED rotation: a real hand stays in front of the body, so however far the bud turns (a backhand
+    // turns it 120deg+ across you, plus a roll) the arc angle saturates at ARC_MAX and the paddle never comes back at the camera.
+    const rel = qmul(P, qconj(ref)), ang = qangle(rel), lim = c.ARC_MAX * DEG;
+    const relC = ang > 1e-6 ? qslerp([0, 0, 0, 1], rel[3] < 0 ? mul4(rel, -1) : rel, lim * Math.tanh(ang / lim) / ang) : rel;
+    const o = mul(add(sub(qrot(qmul(relC, ref), c.ARM), qrot(ref, c.ARM)), punch), w);
+    const offset = [clamp(o[0], -0.75, 0.75), clamp(o[1], -0.5, 0.6), clamp(o[2], -0.6, 0.2)];                        // +z is toward the camera
     return { calibrated: true, x: S.x, y: S.y, P, offset, power: this.sw ? this.sw.peak : 0, swinging: !!this.sw, rate: this.last.rate, punch, locked: !!this.lock };
   }
 }
 
+const mul4 = (q, k) => [q[0] * k, q[1] * k, q[2] * k, q[3] * k];
 function dot4(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; }
