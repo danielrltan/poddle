@@ -52,9 +52,9 @@ function confetti(colors, n = 46) {
     document.body.appendChild(c); setTimeout(() => c.remove(), 3200); }
 }
 let rally = 0, meterT;
-function hitFx(mine, n) {
+function hitFx(mine, n, kind) {
   if (!mine) return;
-  const w = $('hitword'); w.textContent = n > 0.8 ? 'SMASH!' : n > 0.55 ? 'GREAT!' : n > 0.3 ? 'NICE!' : 'GOT IT';
+  const w = $('hitword'); w.textContent = kind === 'dink' ? 'DINK!' : kind === 'lob' ? 'LOB!' : kind === 'smash' ? 'SMASH!' : n > 0.55 ? 'GREAT!' : n > 0.3 ? 'NICE!' : 'GOT IT';
   w.style.color = n > 0.8 ? '#ff5a3d' : n > 0.55 ? '#ffe066' : '#ffffff';
   w.classList.remove('go'); $('flash').classList.remove('go'); void w.offsetWidth; w.classList.add('go'); $('flash').classList.add('go');
   $('meterf').style.width = Math.round(12 + n * 88) + '%'; $('meter').classList.add('on');
@@ -153,7 +153,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'full') { say('This game is full — two players are already connected', null, 4000); return; }
-  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; $('rally').textContent = rally; pop($('rally')); hitFx(m.side === side, m.n); }
+  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; $('rally').textContent = rally; pop($('rally')); hitFx(m.side === side, m.n, m.kind); }
   if (m.type === 'serve') { bodyZ = 6.5; walkV = 0; if (m.wait) if (m.by === side) say('Your serve — swing to hit it!', null, 2600); rally = 0; $('rally').textContent = 0; $('sv-me').classList.toggle('on', m.by === side); $('sv-them').classList.toggle('on', m.by !== side); }
   if (m.type === 'match') { const won = m.winner === side; banner(won ? 'YOU WIN!' : `${oppName.toUpperCase()} WINS`, `${m.score[side]} – ${m.score[1 - side]} · New game starting…`, won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)', true); if (won) { confetti(['#2f8cff', '#ffc83d', '#22c55e', '#ffffff'], 120); setTimeout(() => confetti(['#2f8cff', '#ffc83d', '#ffffff'], 80), 900); } return; }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed

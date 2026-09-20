@@ -38,13 +38,22 @@ function newPlayer(ws, side) {
 
 // Ballistic solve: pick where the ball should land, find the velocity that gets it there
 // and clears the net. Every shot is "in" by construction; the skill is reaching and timing it.
+// how underhand was the swing? lob is the upward-scoop share of the stroke, 0..0.8 from the client
+const underhand = lob => { const t = clamp((lob / 0.8 - 0.3) / 0.45, 0, 1); return t * t * (3 - 2 * t); };
+const shotKind = (n, lob) => (underhand(lob) > 0.5 ? (n < 0.45 ? 'dink' : 'lob') : n > 0.9 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
+
 function solve(p, side, n, dir, lob) {
   const s = sgn(side);
   let tx = s * clamp(dir * 2.4, -2.5, 2.5);
-  // power decides the shot: a tap is a slow dink that drops in the kitchen, a full swing is a fast drive to the baseline
-  const tz = -s * Math.min(6.2, lerp(2.0, 5.9, n) + lob * 0.8);
+  // The stroke decides the shot, the way it does on a real court:
+  //   level swing      -> a drive: more power = deeper and flatter
+  //   underhand scoop  -> the ball goes UP, and much softer: a gentle one is a dink that drops in the kitchen,
+  //                       a big one is a lob that floats high and lands deep
+  const u = underhand(lob), nu = 0.95 * Math.pow(n, 1.4);                  // an underhand takes a lot of pace off
+  const depth = lerp(lerp(2.6, 5.9, n), lerp(1.2, 6.0, nu), u);
+  const tz = -s * Math.min(6.2, depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
-  let T = lerp(1.3, 0.58, Math.pow(n, 0.85)) + lob * 0.6, v;
+  let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)), lerp(1.2, 1.95, nu), u), v;   // underhands always travel on a high, slow arc
   for (let i = 0; i < 80; i++) {
     v = [(tx - px) / T, (R - py) / T + 0.5 * G * T, (tz - pz) / T];
     const tn = -pz / v[2];                                  // time the ball crosses the net plane (always > 0)
@@ -280,7 +289,7 @@ function step() {
     if (mine && z.ok) {
       pl.swing = null;
       pl.lunge = { z: ball.p[2] + sgn(pl.side) * 0.25, until: now + 0.12 };
-      broadcast({ type: 'hit', side: pl.side, n: sw.n, p: ball.p });
+      broadcast({ type: 'hit', side: pl.side, n: sw.n, kind: shotKind(sw.n, sw.lob), p: ball.p });
       launch(pl.side, sw.n, sw.dir, sw.lob);
       continue;
     }
