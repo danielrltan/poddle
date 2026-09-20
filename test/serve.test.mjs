@@ -93,7 +93,7 @@ ok(tl && tl.by === 1 && tl.at - tS1 > 8.5 && tl.at - tS1 < 9.8 && tl.land[1] > 0
 await until(() => since(tS1, 'point').length, 8000, 'the point');
 
 // 5. serves go through the normal shot maths: an underhand scoop is a lob, a soft one a dink
-for (const [power, lob, kind] of [[30, 0.8, 'lob'], [13, 0.8, 'dink']]) {
+for (const [power, lob, kind] of [[30, 0.8, 'lob'], [11.2, 0.8, 'dink']]) {
   await until(() => st.serving != null, 4000, 'next serve');
   if (st.serving === 1) { const t1 = t(); await wait(300); B.send({ type: 'swing', power: 20, dir: 0, lob: 0 }); await until(() => since(t1, 'point').length, 9000, 'side 1 point'); await until(() => st.serving === 0, 4000, 'side 0 serve'); }
   await wait(300); tHit = t(); A.send({ type: 'swing', power, dir: -0.3, lob });

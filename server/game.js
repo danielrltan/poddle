@@ -57,10 +57,10 @@ function newPlayer(ws, side) {
 // Ballistic solve: pick where the ball should land, find the velocity that gets it there
 // and clears the net. Every shot is "in" by construction; the skill is reaching and timing it.
 // how underhand was the swing? lob is the upward-scoop share of the stroke, 0..0.8 from the client
-const underhand = lob => { const t = clamp((lob / 0.8 - 0.3) / 0.45, 0, 1); return t * t * (3 - 2 * t); };
+const underhand = lob => { const t = clamp((lob / 0.8 - 0.18) / 0.3, 0, 1); return t * t * (3 - 2 * t); };   // upward share of the stroke: 0.18 starts to count, 0.48 is fully underhand
 // how sliced? slice = how flat / open the paddle face was through the swing, 0..1 from the client. A scoop is never a slice.
 const sliced = (slice, lob) => { const t = clamp(((slice || 0) - 0.45) / 0.3, 0, 1); return t * t * (3 - 2 * t) * (1 - underhand(lob)); };
-const shotKind = (n, lob, slice) => (sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.45 ? 'dink' : 'lob') : n > 0.72 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
+const shotKind = (n, lob, slice) => (sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.62 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
@@ -75,7 +75,7 @@ function solve(p, side, n, dir, lob, slice) {
   //   level swing      -> a drive: more power = deeper and flatter
   //   underhand scoop  -> the ball goes UP, and much softer: a gentle one is a dink that drops in the kitchen,
   //                       a big one is a lob that floats high and lands deep
-  const u = underhand(lob), nu = 0.95 * Math.pow(n, 1.4);                  // an underhand takes a lot of pace off
+  const u = underhand(lob), nu = n < 0.2 ? n * 0.6 : lerp(0.45, 1, (n - 0.2) / 0.8);   // gentle = dink in the kitchen; anything more = a proper lob, deep and high                  // an underhand takes a lot of pace off
   const depth = lerp(lerp(2.6, 5.9, n), lerp(1.2, 6.0, nu), u);
   const tz = -s * Math.min(6.2, depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
@@ -341,7 +341,10 @@ wss.on('connection', ws => {
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
     } else if (m.type === 'swing') {
-      const pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
+      let pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
+      // an overhead is a smash: the paddle comes DOWN through the ball. Any committed downward swing gets smash pace,
+      // the player doesn't also have to make it their biggest, longest swing of the day.
+      if (clamp(num(m.chop, 0), 0, 1) > 0.45 && pw > 0.25) pw = Math.max(pw, 0.86);
       if (ball.live && ball.serving === me.side) {               // my serve: only a real stroke that meets the ball counts.
         if (num(m.power, 6) < SERVE_POWER) return;               // a twitch, a flick, a quick step: nothing happens at all
         broadcast({ type: 'swung', side: me.side });

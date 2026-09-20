@@ -370,14 +370,15 @@ export function createScene(containerEl) {
     return { mesh: m, pos, col, n: 0, heat: 0, tint: new THREE.Color(color), lastTip: new THREE.Vector3(), lastQ: new THREE.Quaternion(), has: false };
   }
   const swTip = new THREE.Vector3(), swBase = new THREE.Vector3();
-  function updateSwoosh(sw, group, dt) {
+  function updateSwoosh(sw, group, dt, swinging) {
     swTip.set(0, FACE_C * 2.05, 0).applyQuaternion(group.quaternion).add(group.position);
     swBase.set(0, FACE_C * 0.35, 0).applyQuaternion(group.quaternion).add(group.position);
     // Only a HARD swing blurs: the paddle itself must be whipping round (not just carried along by footwork, the
     // camera-tracked body or the hit lunge), and its tip must really be travelling.
     const speed = sw.has ? swTip.distanceTo(sw.lastTip) / Math.max(dt, 1e-3) : 0; sw.lastTip.copy(swTip);
     const spinRate = sw.has ? 2 * Math.acos(Math.min(1, Math.abs(sw.lastQ.dot(group.quaternion)))) / Math.max(dt, 1e-3) : 0; sw.lastQ.copy(group.quaternion); sw.has = true;
-    const want = spinRate > 12 && speed > 5 ? Math.min(1, (spinRate - 12) / 12) : 0;
+    // only while a swing is actually in progress (the 'swung' event opens a short window); harder swing = brighter
+    const want = swinging && spinRate > 7 && speed > 3 ? Math.min(1, 0.25 + (spinRate - 7) / 20) : 0;
     sw.heat += (want - sw.heat) * (want > sw.heat ? 0.5 : Math.min(1, dt * 16));
     if (sw.heat < 0.06 && want === 0) sw.heat = 0;                               // no ghost line lingering after it fades
     const P = sw.pos; P.copyWithin(6, 0, (SW_N - 1) * 6);                       // shift the history back one slot
@@ -446,7 +447,7 @@ export function createScene(containerEl) {
       w.x += pd.reachV.x * rk; w.y = Math.max(0.12, w.y + pd.reachV.y * rk);
       pd.group.position.copy(w); pd.hand.position.copy(w);
       if (!pd.swoosh) pd.swoosh = makeSwoosh(local ? 0xfff1c9 : 0xffd0b8);
-      updateSwoosh(pd.swoosh, pd.group, dt);
+      updateSwoosh(pd.swoosh, pd.group, dt, timeS < (pd.swooshUntil || 0));
       if (local) {                                         // ghost forearm: from the hand back toward a virtual elbow
         vA.set(pd.pos.x + s * 0.2, Math.max(0.2, pd.pos.y - 0.3), pd.pos.z + s * 0.72).sub(w).normalize();
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
@@ -665,6 +666,7 @@ export function createScene(containerEl) {
       sfx.pock(n, p[0]); if (m.spin > 0.5 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.16, 0.11, 0.004);   // a slice also hisses off the face
     } else if (m.type === 'swung') {
       const pd = pads[m.side]; if (!pd) return;
+      pd.swooshUntil = timeS + 0.5;                          // the blur belongs to the swing, never to plain movement
       if (pd.bot && pd.swingT < 0) startSwing(pd);
       if (timeS - pd.swungAt < 0.25) return; pd.swungAt = timeS;          // main may play it locally AND the server echoes it: once
       sfx.whoosh(pd.pos.x, m.side === localSide ? 0.22 : 0.12, m.side === localSide);

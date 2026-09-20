@@ -125,7 +125,7 @@ const bridge = connect(BRIDGE, 'm', sample => {
       if (!calibrating) {
                 // "point it horizontally": 1 when the paddle's long axis lies level, 0 when it stands upright
         const top = qrot(model.pose(performance.now()).Pd, [0, 1, 0]), slice = Math.max(0, 1 - Math.abs(top[1]) / 0.6);
-        game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, age: e.age, slice, fix });
+        game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, chop: e.chop, age: e.age, slice, fix });
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') logSwing(e);

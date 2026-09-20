@@ -28,7 +28,7 @@ export const DEFAULTS = {
   FIX_ABS: 1.5, FIX_REL: 0.08, FIX_STEP: 3, FIX_GAP: 0.06,   // once the real peak is in, a 'swingFix' follows if the call was off by more than this; on the way there, when it has moved by STEP, at most every GAP s
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
   POWER_MAX: 34,
-  ROM_IDLE: 4, ROM_MIN: 40, ROM_FULL: 130, ROM_T_MIN: 0.10, ROM_T_FULL: 0.20,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
+  ROM_IDLE: 4, ROM_MIN: 35, ROM_FULL: 110, ROM_T_MIN: 0.10, ROM_T_FULL: 0.18,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
@@ -284,7 +284,7 @@ export class MotionModel {
       // way. So rotation speed says almost nothing; how far and how long the hand travelled before the peak says it all.
       const credit = (rom, rise) => clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1) * clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1);
       const powerOf = (pk, rom, rise) => c.TAP + (c.POWER_MAX - c.TAP) * credit(rom, rise) * (0.8 + 0.2 * clamp(pk / 14, 0, 1));
-      const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN }; };
+      const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1) }; };   // chop: downward share (an overhead)
       const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
       // The real score needs the peak, and waiting for it is 150-300 ms of dead air. But the two movements part ways in
       // the first 40-60 ms: a flick takes off at 250-500 rad/s^2, an arm swing at 25-125. So a hard take-off is called
@@ -303,7 +303,7 @@ export class MotionModel {
         // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
         // never a smash, however fast it was.
         sw.eff = call(); Object.assign(sw, shot());
-        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, age, final: past });
+        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, age, final: past });
       } else if (sw.sent && !sw.fixed) {                              // the call moved, or the real peak is in and the call was off
         const eff = call(), sh = shot();
         if ((past || t - sw.tFix >= c.FIX_GAP - 1e-4) && (Math.abs(eff - sw.eff) > (past ? Math.max(c.FIX_ABS, c.FIX_REL * sw.eff) : c.FIX_STEP) || Math.abs(sh.lob - sw.lob) > 0.15 || Math.abs(sh.dir - sw.dir) > 0.3)) {
