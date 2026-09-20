@@ -147,12 +147,13 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
   background:linear-gradient(180deg,#fff,var(--sky-2));color:var(--ink-strong);font:800 var(--t-xs)/1 var(--font);letter-spacing:.04em;box-shadow:0 .0625rem .125rem rgba(40,80,110,.18)}
 /* the key strip is help, not HUD: it shows on a key press / pointer move and when the HUD first appears, then gets out of the way.
    It also yields the bottom band to a toast (body.has-toast). */
-.keyhints{position:fixed;left:var(--edge);bottom:var(--edge);z-index:var(--z-hud);max-width:min(46vw, calc(100vw - 11.25rem - 3 * var(--edge)));padding:.375rem .625rem;border-radius:var(--r-md);
-  background:rgba(255,255,255,.90);border:.09375rem solid rgba(255,255,255,.95);box-shadow:var(--sh-hud);
-  color:var(--ink);font-size:max(var(--t-xs),11px);font-weight:700;line-height:1;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
+/* no plate behind it: two white keys and their words straight on the court, so the words carry their own dark edge */
+.keyhints{position:fixed;left:var(--edge);bottom:var(--edge);z-index:var(--z-hud);max-width:min(46vw, calc(100vw - 11.25rem - 3 * var(--edge)));padding:0;
+  color:#fff;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.75), 0 0 .5rem rgba(10,30,45,.45);font-size:max(var(--t-sm),12px);font-weight:800;line-height:1;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
 .keyhints.is-idle,body.has-toast .keyhints{opacity:0;transform:translateY(.5rem)}
 body.has-toast .keyhints{transition-duration:140ms}                 /* out of the toast's way before it has faded in */
-.keyhints .keycap{min-width:1.375rem;height:1.375rem;font-size:max(var(--t-xs),11px)}
+.keyhints .keycap{min-width:1.625rem;height:1.625rem;font-size:max(var(--t-xs),11px);background:#fff;border-color:#fff;border-bottom-color:#c9d6de;text-shadow:none;box-shadow:0 .0625rem .25rem rgba(10,30,45,.45)}
+.keyhints .key-off{display:none}                        /* Q still leaves; it is not advertised (it moves to the settings panel) */
 .keyhints ul{display:flex;flex-wrap:wrap;gap:.375rem .875rem;list-style:none;margin:0;padding:0}
 .keyhints li{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap}
 .keyhints p{display:none}

@@ -70,6 +70,7 @@ const COL = {
   skyTop: '#2f7fd6', skyMid: '#8cc4ee', horizon: '#d6ecf7',
   grass: 0x4f9a4a, apron: 0x2e7d56, court: 0x2a66b3, kitchen: 0xe0813f, line: 0xffffff,
   screen: 0x17513a, skin: 0xf2c9a0,
+  matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a Black man in an orange shirt, whichever end he plays
   shirt: [0xe5484d, 0xf5b324], hair: [0x3a2a1e, 0x1d1d26], face: ['#e5484d', '#f5b324'],
 };
 
@@ -173,12 +174,16 @@ function buildAvatar(side) {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.42, 6, 20), shirt); body.position.y = 0.74;
   const shorts = new THREE.Mesh(new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), dark); shorts.position.y = 0.55;
   const head = new THREE.Group(); head.position.y = 1.47;
+  const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [];
   head.add(new THREE.Mesh(new THREE.SphereGeometry(0.27, 28, 20), skin));
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.283, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.48), new THREE.MeshStandardMaterial({ color: COL.hair[side], roughness: 0.9 }));
+  const hairM = new THREE.MeshStandardMaterial({ color: COL.hair[side], roughness: 0.9 });
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.283, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.48), hairM);
   hair.rotation.x = 0.42; head.add(hair);
   for (const sx of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), dark);
     eye.scale.set(1, 1.55, 0.5); eye.position.set(sx * 0.095, 0.0, -0.25); head.add(eye);
+    const white = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), whiteM);                  // dark eyes vanish on dark skin: Matt gets whites behind them
+    white.scale.set(1, 1.5, 0.4); white.position.set(sx * 0.095, 0.0, -0.236); white.visible = false; head.add(white); whites.push(white);
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), dark);
     foot.scale.set(1, 0.6, 1.5); foot.position.set(sx * 0.15, 0.065, -0.04); g.add(foot);
   }
@@ -186,7 +191,7 @@ function buildAvatar(side) {
   g.add(body, shorts, head, offHand);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.scale.setScalar(1.3);
-  g.userData = { head, body, offHand };
+  g.userData = { head, body, offHand, skin, shirt, hairM, whites };
   return g;
 }
 
@@ -762,7 +767,9 @@ export function createScene(containerEl) {
   function updatePaddle(side, d) {
     const pd = pads[side]; if (!pd) return;
     if (!d) { pd.has = pd.init = false; return; }
-    const t = pd.tgt; pd.has = true; pd.bot = !!d.bot;
+    const t = pd.tgt; pd.has = true;
+    if (pd.bot !== !!d.bot) { pd.bot = !!d.bot; const u = pd.avatar.userData, m = pd.bot ? COL.matt : null;      // a seat changes hands between a person and Matt: repaint, don't rebuild
+      u.skin.color.setHex(m ? m.skin : COL.skin); u.shirt.color.setHex(m ? m.shirt : COL.shirt[pd.side]); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); pd.handM.color.setHex(m ? m.skin : COL.skin); for (const w of u.whites) w.visible = pd.bot; }
     if (isFinite(d.x)) t.x = d.x; if (isFinite(d.y)) t.y = d.y; if (isFinite(d.z)) t.z = d.z;
     if (d.q && d.q.length === 4 && isFinite(d.q[0] + d.q[1] + d.q[2] + d.q[3])) { t.q.set(d.q[0], d.q[1], d.q[2], d.q[3]); if (t.q.lengthSq() > 1e-6) t.q.normalize(); else t.q.identity(); }
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;

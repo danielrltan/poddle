@@ -88,7 +88,14 @@ Analysis scripts: scratchpad/tune.mjs, lobs.mjs, windup.mjs (run against HEAD co
   itself: give the ball material enough emissive that its shaded face does not go dark and its lit face stays clearly lighter
   than the sky (check both ends, against sky, ficus band and court; do not blow out the trail colours).
 
+## 10b. Names, added by the player AFTER docs/API-NEXT.md was written (owners: read docs/SPECTATE.md "Names" again)
+- "you also never asked for my name when i joined the game and cached it. you should be able to change ur name in settings btw"
+- UI owner: a Name row in the settings panel (input, 12 chars, saves on Enter/blur) + the first-visit behaviour of the lobby field. MAIN owner: localStorage `poddle.name`, send `{type:'name', name}` when changed inside a room. SERVER owner: handle `name`, broadcast `names`.
+
 ## 13. Small things already done by hand, do not undo
+- web/index.html + ui.css + ui.js: the three status lights (#st-airpod/#st-game/#st-camera) are ALREADY removed from the HUD (setStatus is null-safe; #lights now only holds the room pill) and the key strip is ALREADY two white keycaps (C Calibrate, M Move) with no backing plate, bottom-left, fading when idle; #key-leave is kept in the DOM but never shown (.key-off). UI owner: keep these, build the rest on top.
+- CORNERS (checked on a real HUD screenshot): the status lights were TOP-LEFT next to the room pill; top-right holds the webcam + AirPod insets. The HAMBURGER goes TOP-LEFT where the lights were, with the room pill beside it. The player calls this corner "top right"; what he means is "where the lights were".
+- web/scene.js: the bot avatar is already Matt (COL.matt: skin 0x6b4226, shirt 0xf26b1d, hair 0x15110e, eye whites, repainted in updatePaddle when pd.bot flips, paddle hand included). SCENE owner: keep it, reuse it for the attract rally's Matt.
 - web/ui.css: `.logo-mark .lg-a{color:#39434d}` (darker "Pod" in the wordmark, the player asked for more contrast).
 - web/ui.css: `.btn::before` has a clip-path that keeps the gloss inside the button's pill (white chunks used to stick out of
   the Play button's top corners). Any new button style must keep it.

@@ -76,4 +76,9 @@ and "Waiting for a rematch" and are carried into the next match or back to the l
 - Names are used wherever the game says who did something: scoreboard, point banner ("Daniel scores"), serve
   indicator, match result ("Daniel wins"), rematch votes, hold ("Waiting for Daniel"), spectator HUD. The local player
   may still be addressed as "You" where that reads better ("You win"); spectators always see names.
+- Changing it later: the settings panel has a Name row (same field, same rules). In a room the client sends
+  `{type:'name', name}`; the server sanitises, stores it on the seat and sends `names` to the room. In the lobby it only
+  updates localStorage. Spectators may send it too (stored, shown nowhere).
+- The name is asked for ONCE: the first time a player reaches the lobby the field is empty and focused and the tiles stay
+  disabled until it has 1+ characters; after that it is remembered (localStorage `poddle.name`) and prefilled, never asked again.
 - Names are rendered with textContent only, never innerHTML.

@@ -95,7 +95,7 @@ export function setStatus(next) {
     const v = next[key]; if (!ROW[key] || !STATE_WORD[v]) continue;
     if (status[key] !== v) {
       status[key] = v; badSince[key] = v === 'bad' ? now : 0; told[key] = false;
-      for (const el of [$('st-' + key), $('row-' + key)]) { el.classList.remove('is-ok', 'is-wait', 'is-bad', 'is-off'); el.classList.add('is-' + v); }
+      for (const el of [$('st-' + key), $('row-' + key)]) if (el) { el.classList.remove('is-ok', 'is-wait', 'is-bad', 'is-off'); el.classList.add('is-' + v); }      // the HUD lights are gone; the rows on the set-up screen stay
       $(`row-${key}-text`).textContent = ROW[key][v] || ''; $(`row-${key}-state`).textContent = STATE_WORD[v];
       $('lights').classList.toggle('all-ok', ['airpod', 'game', 'camera'].every(k => status[k] === 'ok' || status[k] === 'off'));
     }

@@ -15,9 +15,6 @@
 <!-- ============================================== HUD ============================================== -->
 <div id="hud" hidden>
   <div class="status-lights" id="lights" data-fit>
-    <span class="status-pill is-wait" id="st-airpod"><span class="light"></span>AirPod</span>
-    <span class="status-pill is-wait" id="st-game"><span class="light"></span>Game</span>
-    <span class="status-pill is-wait" id="st-camera"><span class="light"></span>Camera</span>
     <button class="status-pill room-pill" id="room-pill" hidden>Room <b id="room-code"></b></button>
   </div>
 
@@ -52,9 +49,8 @@
 
   <div class="keyhints" id="keys" data-fit>
     <ul>
-      <li><span class="keycap">M</span>Move: <span id="mode">Body</span></li><li><span class="keycap">B</span>Bot</li><li><span class="keycap">1 2 3</span>Level</li>
-      <li><span class="keycap">C</span>Calibrate</li><li><span class="keycap">R</span>Re-center</li><li><span class="keycap">[ ]</span>Range</li>
-      <li><span class="keycap">V</span>AirPod</li><li><span class="keycap">H</span>Stats</li><li><span class="keycap">F</span>Full screen</li><li id="key-leave" hidden><span class="keycap">Q</span>Leave</li>
+      <li><span class="keycap">C</span>Calibrate</li><li><span class="keycap">M</span>Move: <span id="mode">Body</span></li>
+      <li id="key-leave" class="key-off" hidden><span class="keycap">Q</span>Leave</li>
     </ul>
   </div>
 </div>
