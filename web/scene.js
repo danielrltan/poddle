@@ -301,7 +301,7 @@ export function createScene(containerEl) {
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, color: 0x000000, map: glowTex(), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; blob.renderOrder = 3; blob.visible = false; scene.add(blob);
   const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new THREE.Vector3(0, 1, 0), vel: new THREE.Vector3(), lastBy: -1,
-    spin: 0, cool: 0,                                      // backspin of a sliced ball (0..1) and the trail tint easing toward it
+    spin: 0, cool: 0, pulse: 0,                                      // backspin of a sliced ball (0..1) and the trail tint easing toward it
     core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false };   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
 
   const TRAIL_N = 22, trail = { pts: [], acc: 0, glow: 0 };
@@ -319,6 +319,14 @@ export function createScene(containerEl) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide }));
     m.visible = false; m.renderOrder = 4; scene.add(m); rings.push({ m, t: 1, dur: 1, r0: 0, r1: 1, a: 1 });
   }
+  const flashMat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+  { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,244,190,.75)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    flashMat.map = new THREE.CanvasTexture(c); }
+  const flash = new THREE.Sprite(flashMat); flash.visible = false; scene.add(flash); let flashT = 0, flashS = 1;
+  function flashAt(p, size) { flash.position.set(p[0], p[1], p[2]); flashT = 1; flashS = size; flash.visible = true; }
+  function updateFlash(dt) { if (flashT <= 0) return; flashT = Math.max(0, flashT - dt / 0.14); const k = 1 - flashT;
+    flash.scale.setScalar(flashS * (0.6 + 2.4 * k)); flashMat.opacity = flashT * flashT; if (flashT === 0) flash.visible = false; }
   function ring(p, flat, r0, r1, dur, color, a = 1, additive = true) {
     const r = rings.reduce((b, c) => (c.t / c.dur > b.t / b.dur ? c : b));
     Object.assign(r, { t: 0, dur, r0, r1, a, flat }); r.m.visible = true; r.m.material.color.set(color);
@@ -350,6 +358,32 @@ export function createScene(containerEl) {
   const mk = { t: 9, fade: 0 };
 
   // ---------- paddles / avatars ----------
+  // Motion blur for the paddle: a ribbon swept between the throat and the tip of the face over the last few frames.
+  // Additive, so alpha lives in the vertex colour. Preallocated; nothing is created per frame.
+  const SW_N = 14;
+  function makeSwoosh(color) {
+    const g = new THREE.BufferGeometry(), pos = new Float32Array(SW_N * 2 * 3), col = new Float32Array(SW_N * 2 * 3), idx = [];
+    for (let i = 0; i < SW_N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.frustumCulled = false; m.visible = false; scene.add(m);
+    return { mesh: m, pos, col, n: 0, heat: 0, tint: new THREE.Color(color), lastTip: new THREE.Vector3(), has: false };
+  }
+  const swTip = new THREE.Vector3(), swBase = new THREE.Vector3();
+  function updateSwoosh(sw, group, dt) {
+    swTip.set(0, FACE_C * 2.05, 0).applyQuaternion(group.quaternion).add(group.position);
+    swBase.set(0, FACE_C * 0.35, 0).applyQuaternion(group.quaternion).add(group.position);
+    const speed = sw.has ? swTip.distanceTo(sw.lastTip) / Math.max(dt, 1e-3) : 0; sw.lastTip.copy(swTip); sw.has = true;
+    sw.heat += ((speed > 3.2 ? Math.min(1, (speed - 3.2) / 7) : 0) - sw.heat) * (speed > 3.2 ? 0.6 : Math.min(1, dt * 9));   // on fast, off gently
+    const P = sw.pos; P.copyWithin(6, 0, (SW_N - 1) * 6);                       // shift the history back one slot
+    P[0] = swBase.x; P[1] = swBase.y; P[2] = swBase.z; P[3] = swTip.x; P[4] = swTip.y; P[5] = swTip.z;
+    sw.n = Math.min(SW_N, sw.n + 1);
+    for (let i = 0; i < SW_N; i++) { const k = i < sw.n ? sw.heat * Math.pow(1 - i / SW_N, 1.6) * 0.75 : 0, o = i * 6;
+      if (i >= sw.n) { P[o] = P[o - 6]; P[o + 1] = P[o - 5]; P[o + 2] = P[o - 4]; P[o + 3] = P[o - 3]; P[o + 4] = P[o - 2]; P[o + 5] = P[o - 1]; }
+      sw.col[o] = sw.col[o + 3] = sw.tint.r * k; sw.col[o + 1] = sw.col[o + 4] = sw.tint.g * k; sw.col[o + 2] = sw.col[o + 5] = sw.tint.b * k; }
+    sw.mesh.visible = sw.heat > 0.02;
+    sw.mesh.geometry.attributes.position.needsUpdate = true; sw.mesh.geometry.attributes.color.needsUpdate = true;
+  }
   const pads = [0, 1].map(side => {
     const group = buildPaddle(side), avatar = buildAvatar(side);
     const skinM = new THREE.MeshStandardMaterial({ color: COL.skin, roughness: 0.7 });
@@ -406,6 +440,8 @@ export function createScene(containerEl) {
       const ts = (1 - pd.lunge) * 0.32, rk = pd.lunge > 0 ? ease(Math.min(1, ts / 0.05)) * (1 - ease(ts / 0.32)) : 0;
       w.x += pd.reachV.x * rk; w.y = Math.max(0.12, w.y + pd.reachV.y * rk);
       pd.group.position.copy(w); pd.hand.position.copy(w);
+      if (!pd.swoosh) pd.swoosh = makeSwoosh(local ? 0xfff1c9 : 0xffd0b8);
+      updateSwoosh(pd.swoosh, pd.group, dt);
       if (local) {                                         // ghost forearm: from the hand back toward a virtual elbow
         vA.set(pd.pos.x + s * 0.2, Math.max(0.2, pd.pos.y - 0.3), pd.pos.z + s * 0.72).sub(w).normalize();
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
@@ -458,6 +494,8 @@ export function createScene(containerEl) {
       if (b.pos.y < BALL_R) { b.pos.y = BALL_R; b.vel.y = Math.abs(b.vel.y) * 0.6; b.vel.x *= 0.75; b.vel.z *= 0.75; if (b.vel.y < 0.6) b.vel.y = 0; }
     }
     ballMesh.visible = blob.visible = true; ballMesh.position.copy(b.pos);
+    if (b.pulse > 0) { b.pulse = Math.max(0, b.pulse - dt / 0.16); ballMesh.scale.setScalar(1 + 0.9 * b.pulse * b.pulse); } else ballMesh.scale.setScalar(1);
+    updateFlash(dt);
     const sp2 = Math.hypot(b.vel.x, b.vel.z);
     // rolls the way it flies; a sliced ball visibly spins BACKWARDS, and fast
     // 60 rad/s at 60 fps is ~1 rad a frame on a ball with a regular hole pattern: it strobes and reads as NOT spinning.
@@ -471,7 +509,8 @@ export function createScene(containerEl) {
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
     b.cool += ((b.live ? b.spin : 0) - b.cool) * damp(dt, 0.08);
-    trail.glow = Math.max(b.live ? 0.1 + 0.4 * b.cool : 0, trail.glow - dt * 1.6); trail.acc += dt;
+    b.hot = (b.hot || 0) + ((b.live ? b.power || 0 : 0) - (b.hot || 0)) * damp(dt, 0.05);
+    trail.glow = Math.max(b.live ? 0.16 + 0.45 * Math.max(b.cool, b.hot || 0) : 0, trail.glow - dt * 1.6); trail.acc += dt;
     if (trail.acc >= 1 / 90) { trail.acc = 0; trail.pts.unshift(b.pos.clone()); if (trail.pts.length > TRAIL_N) trail.pts.pop(); }
     const P = trailGeo.attributes.position.array, C = trailGeo.attributes.color.array, n = trail.pts.length;
     for (let i = 0; i < TRAIL_N; i++) {
@@ -479,7 +518,10 @@ export function createScene(containerEl) {
       vA.subVectors(p, q); vB.subVectors(camera.position, p); vA.cross(vB);
       if (vA.lengthSq() < 1e-10) vA.set(0, 0, 0); else vA.normalize().multiplyScalar(BALL_R * 0.7 * f);
       P[i * 6] = p.x + vA.x; P[i * 6 + 1] = p.y + vA.y; P[i * 6 + 2] = p.z + vA.z; P[i * 6 + 3] = p.x - vA.x; P[i * 6 + 4] = p.y - vA.y; P[i * 6 + 5] = p.z - vA.z;
-      const a = f * f * trail.glow, cr = a * lerp(1, 0.3, b.cool), cg = a * lerp(0.95, 0.85, b.cool), cb = a * lerp(0.45, 1, b.cool);   // warm; a slice trails icy blue
+      // the trail is an intensity scale: white tap -> yellow -> orange -> red smash (continuous in power); a slice pulls it icy blue
+      const a = f * f * trail.glow, h = b.hot || 0, u = h * 3;
+      const hg = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2), hb = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2);
+      const cr = a * lerp(1, 0.3, b.cool), cg = a * lerp(hg, 0.85, b.cool), cb = a * lerp(hb, 1, b.cool);
       for (let j = 0; j < 6; j += 3) { C[i * 6 + j] = cr; C[i * 6 + j + 1] = cg; C[i * 6 + j + 2] = cb; }
     }
     trailGeo.attributes.position.needsUpdate = trailGeo.attributes.color.needsUpdate = true;
@@ -581,7 +623,8 @@ export function createScene(containerEl) {
   }
   const sfx = {
     pock(n, x) {                                          // hollow plastic: pitched body + low cavity + bright click
-      if (!ac) return; const d = out(panOf(x)), f = 880 + 520 * n, g = 0.4 + 0.55 * n;
+      if (!ac) return; const d = out(panOf(x)), f = 880 + 520 * n, g = 0.6 + 0.7 * n;
+      tone(d, 'sine', 170 + 60 * n, 70, 0.004, 0.35 + 0.5 * n, 0.16);          // the thump you feel: gets heavier with power
       tone(d, 'sine', f * 1.6, f, 0.018, g, 0.085); tone(d, 'triangle', f * 0.5, f * 0.46, 0.05, g * 0.5, 0.13);
       noise(d, 3200, 2400, 1800, 0.8, g * 0.5, 0.03, 0.001);
     },
@@ -603,9 +646,12 @@ export function createScene(containerEl) {
     } else if (m.type === 'hit') {
       const n = clamp(+m.n || 0, 0, 1), p = m.p || ball.p, pd = pads[m.side], mine = m.side === localSide;
       const rs = mine ? 0.6 : 1;                           // the local hit is 5 m from the lens: keep the ring off the ball
-      ring(p, false, 0.1 * rs, (0.42 + n * 0.5) * rs, 0.3, 0xfff2a8); ring(p, false, 0.06 * rs, (0.24 + n * 0.26) * rs, 0.2, 0xffffff);
-      burst(p, n, 10 + Math.round(n * 14), 2.5 + n * 4.5, m.spin > 0.5 ? [0xbfe9ff, 0x5ad1ff, 0xffffff] : [0xfff6b0, 0xffd23a, 0xffffff], -sgn(m.side) * (2 + n * 3));
-      cam.shake = Math.max(cam.shake, (0.025 + 0.085 * n) * (mine ? 1 : 0.55));
+      // impact: three rings, a flash, twice the sparks, a harder shake and a ball that swells for a beat
+      ring(p, false, 0.12 * rs, (0.7 + n * 0.9) * rs, 0.34, 0xfff2a8); ring(p, false, 0.08 * rs, (0.42 + n * 0.5) * rs, 0.24, 0xffffff);
+      ring(p, false, 0.05 * rs, (1.0 + n * 1.3) * rs, 0.5, m.spin > 0.5 ? 0x9fe3ff : 0xffd23a, 0.55);
+      burst(p, n, 22 + Math.round(n * 30), 3.6 + n * 6.5, m.spin > 0.5 ? [0xbfe9ff, 0x5ad1ff, 0xffffff] : [0xfff6b0, 0xffd23a, 0xffffff], -sgn(m.side) * (2.5 + n * 4));
+      cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * (mine ? 1 : 0.55));
+      flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = n;
       ball.spin = clamp(+m.spin || 0, 0, 1);
       trail.glow = 0.55 + 0.45 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
@@ -622,7 +668,7 @@ export function createScene(containerEl) {
       burst([p[0], 0.06, p[2]], 0, 5, 1.2, [0xd8e6f5, 0xffffff]);
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       sfx.bounce(p[0]);
-    } else if (m.type === 'serve') { ball.snap = true; ball.spin = 0; trail.glow = 0.35; }
+    } else if (m.type === 'serve') { ball.snap = true; ball.spin = 0; ball.power = 0; trail.glow = 0.35; }
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }

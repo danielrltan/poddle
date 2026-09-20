@@ -23,7 +23,7 @@ const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 };   // contact box ar
 const BOUNCE = { up: 0.7, along: 0.78 };
 // Slice = backspin (flat, open paddle face). It floats: lift takes a share of gravity off and the same depth takes longer.
 // Then it bites: the first bounce stays low, loses most of its forward speed and kicks a little the way it was aimed.
-const SLICE = { lift: 0.3, slow: 0.3, up: 0.5, along: 0.45, kick: 0.9, clear: 0.15 };
+const SLICE = { lift: 0.3, slow: 0.3, up: 0.55, along: 0.45, kick: 3.4, clear: 0.15 };   // kick: sideways m/s the bounce throws the ball — a spinning ball does not come off the floor straight
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
 const SERVE_AHEAD = 0.55;                 // it wants to sit this far in front of the paddle
 const SERVE_DEAD = [0.4, 0.2, 0.35];      // x,y,z slack: move this far from it and it stays exactly where it is
@@ -80,7 +80,7 @@ function solve(p, side, n, dir, lob, slice) {
   const tz = -s * Math.min(6.2, depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
   let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)), lerp(1.2, 1.95, nu), u);   // underhands always travel on a high, slow arc
-  const spin = sliced(slice, lob), g = gOf(spin), kick = s * dir * SLICE.kick * spin;
+  const spin = sliced(slice, lob), g = gOf(spin), kick = s * (dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
   T *= 1 + SLICE.slow * spin;                                  // same depth (power still sets it), slower and floatier
   const v = [0, 0, 0]; T = fly(v, px, py, pz, tx, tz, T, g, lerp(0.25, SLICE.clear, spin));
   // wide balls keep drifting after the bounce; pull the target in so the top of the bounce stays within REACH
