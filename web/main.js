@@ -60,9 +60,6 @@ function hitFx(mine, n, kind) {
   $('meterf').style.width = Math.round(12 + n * 88) + '%'; $('meter').classList.add('on');
   clearTimeout(meterT); meterT = setTimeout(() => $('meter').classList.remove('on'), 900);
 }
-// why a point ended, from each side's point of view
-const WHY_WON = { 'double bounce': 'They couldn’t reach it', out: 'Their shot went out', passed: 'Too fast for them' };
-const WHY_LOST = { 'double bounce': 'It bounced twice on your side', out: 'Your shot went out', passed: 'It got past you' };
 let oppName = 'Opponent';
 
 // My serve: the ball hangs and follows late. One quiet nudge per serve, from the server's reach hint, never in reply to a swing.
@@ -138,7 +135,8 @@ const bridge = connect(BRIDGE, 'm', sample => {
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
     else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; $('cal').hidden = true; if (body) body.center(); say('Calibrated — let’s play!'); }
-    else if (e.type === 'swing') { stats.swings++; if (!calibrating) game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob }); }
+    else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
+      if (!calibrating) game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, age: e.age, fix }); }
     else if (e.type === 'swingEnd') logSwing(e);
   }
 });
@@ -171,7 +169,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'match') { const won = m.winner === side; banner(won ? 'YOU WIN!' : `${oppName.toUpperCase()} WINS`, `${m.score[side]} – ${m.score[1 - side]} · New game starting…`, won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)', true); if (won) { confetti(['#2f8cff', '#ffc83d', '#22c55e', '#ffffff'], 120); setTimeout(() => confetti(['#2f8cff', '#ffc83d', '#ffffff'], 80), 900); } return; }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && !m.final) { const won = m.winner === side;
-    banner(won ? (rally >= 6 ? 'WHAT A RALLY!' : 'POINT!') : `${oppName.toUpperCase()} SCORES`, (won ? WHY_WON : WHY_LOST)[m.why] || '', won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)');
+    banner(won ? 'Your point!' : 'Enemy’s point!', '', won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)');
     if (won) confetti(['#2f8cff', '#ffc83d', '#ffffff']); }
   scene.onEvent(m);
 });
