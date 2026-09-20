@@ -135,7 +135,7 @@ function buildAvatar(side) {
 const IDLE = [14, -12, 12];
 const SWING = [[0, ...IDLE], [0.13, -64, 12, -30], [0.29, 72, 22, 38], [0.40, 62, 18, 30], [0.74, ...IDLE]];
 const SWING_CONTACT = 0.2;
-const FACE_C = 0.23 * PADDLE_SCALE, REACH_MAX = 0.75;     // grip -> face centre; how far a hit may tug the paddle toward the ball
+const FACE_C = 0.23 * PADDLE_SCALE, REACH_MAX = 0.4;      // grip -> face centre; how far a hit may tug the paddle toward the ball
 const BODY = [0.5, 0.68];                 // avatar centre, left of / behind the paddle base (player frame)
 function swingEuler(t, out) {
   let i = 0; while (i < SWING.length - 2 && t > SWING[i + 1][0]) i++;
@@ -386,15 +386,16 @@ export function createScene(containerEl) {
         for (let i = 0; i < 3; i++) pd.offRef[i] += (o[i] - pd.offRef[i]) * k;
         pd.off.set(o[0] - pd.offRef[0], o[1] - pd.offRef[1], o[2] - pd.offRef[2]);
       }
-      pd.lunge = Math.max(0, pd.lunge - dt / 0.22);
-      const lg = Math.sin(Math.min(1, pd.lunge * 1.15) * Math.PI) * 0.34;      // out and back
+      pd.lunge = Math.max(0, pd.lunge - dt / 0.32);
+      const lg = Math.sin(Math.min(1, pd.lunge * 1.15) * Math.PI) * 0.2;       // out and back, gently
       const w = pd.world.set(pd.pos.x + s * pd.off.x, Math.max(0.12, pd.pos.y + pd.off.y + lg * 0.12), pd.pos.z + s * (pd.off.z - lg));
       pd.group.quaternion.set(s * pd.q.x, pd.q.y, s * pd.q.z, pd.q.w);         // T*P*T^-1 for side 1
       if (pd.reach) {                                      // just hit: the server's contact box is generous, so pull the FACE onto the ball for a beat
         vA.set(0, FACE_C, 0).applyQuaternion(pd.group.quaternion).add(w);
         pd.reachV.set(clamp(pd.hitP[0] - vA.x, -REACH_MAX, REACH_MAX), clamp(pd.hitP[1] - vA.y, -REACH_MAX, REACH_MAX), 0); pd.reach = false;
       }
-      const ts = (1 - pd.lunge) * 0.22, rk = pd.lunge > 0 ? Math.min(1, ts / 0.02) * (1 - ease(ts / 0.22)) : 0;
+      // ease INTO the ball over ~80 ms and back out over the rest: a 20 ms snap read as the paddle clipping into a pose
+      const ts = (1 - pd.lunge) * 0.32, rk = pd.lunge > 0 ? ease(Math.min(1, ts / 0.08)) * (1 - ease(ts / 0.32)) : 0;
       w.x += pd.reachV.x * rk; w.y = Math.max(0.12, w.y + pd.reachV.y * rk);
       pd.group.position.copy(w); pd.hand.position.copy(w);
       if (local) {                                         // ghost forearm: from the hand back toward a virtual elbow

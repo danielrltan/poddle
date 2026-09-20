@@ -140,7 +140,7 @@ function serveReach(pl) {
 }
 function strike(pl, sw) {
   pl.swing = null;
-  pl.lunge = { z: ball.p[2] + sgn(pl.side) * 0.25, until: now + 0.12 };
+  pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * 0.25 - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
   broadcast({ type: 'hit', side: pl.side, n: sw.n, kind: sw.kind || shotKind(sw.n, sw.lob), p: ball.p });
   launch(pl.side, sw.n, sw.dir, sw.lob);
 }
@@ -313,7 +313,7 @@ function step() {
   for (const pl of players) {
     if (pl.bot) runBot(pl, DT); else if (pl.auto || pl.autoY) runAuto(pl, DT);
     if (pl.lunge && now < pl.lunge.until) {                     // just hit: step into the ball so it leaves from the paddle
-      pl.z += clamp(pl.lunge.z - pl.z, -3 * FOOT_SPEED * DT, 3 * FOOT_SPEED * DT);
+      pl.z += clamp(pl.lunge.z - pl.z, -1.2 * FOOT_SPEED * DT, 1.2 * FOOT_SPEED * DT);
       continue;
     }
     if (pl.ownZ != null && !pl.auto) {
