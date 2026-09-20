@@ -20,7 +20,7 @@ const stats = window.__stats = { get cam() { return body ? { ready: body.ready, 
 let side = 0, state = null, players = 0, calibrating = true;
 // body: webcam tracks where you actually stand. auto: server runs you to the ball. aim: wrist angle moves you.
 const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'body-move: step left and right, the camera follows you', auto: 'auto-move: you just swing', aim: 'aim-move: turn your wrist to move' };
-let sideDeg = 75, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
+let sideDeg = 75, bodyZ = 6.5, vZ = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
 // critically damped follow (frame-rate independent): smooth, no overshoot
 function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
 let mode = MODES.includes(qs.get('move')) ? qs.get('move') : 'body', body = null, bodyX = 0;
@@ -102,7 +102,6 @@ const bridge = connect(BRIDGE, 'm', sample => {
     if (e.type === 'cal') showCal(e);
     else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; $('cal').hidden = true; if (body) body.center(); say('calibrated', '#4ade80'); }
     else if (e.type === 'swing') { stats.swings++; if (!calibrating) game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob }); }
-    else if (e.type === 'flick') { if (!calibrating) say(`too small (${e.rom.toFixed(0)}°) — swing your whole arm`, '#ffe066', 1200); }
     else if (e.type === 'swingEnd') logSwing(e);
   }
 });
@@ -138,7 +137,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, q: p.P });
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.P });
 }, 50);
 
 // ---------- input ----------
@@ -174,6 +173,7 @@ let lastPos = null;
     if (usingBody() && body.seen()) {
       [bodyX, vX] = damp(bodyX, Math.max(-3.5, Math.min(3.5, body.x())), vX, 0.085, dt);
       [bodyY, vY] = damp(bodyY, Math.max(0.3, Math.min(2.3, body.y())), vY, 0.085, dt);
+      const bz = body.z(); if (bz != null) [bodyZ, vZ] = damp(bodyZ, Math.max(2.6, Math.min(7.4, bz)), vZ, 0.15, dt);
     }
     const auto = autoNow() && mine;
     const wx = auto ? mine.x : (usingBody() ? bodyX : p.x) * s(), wy = auto || (mine && mode === 'auto') ? mine.y : usingBody() ? bodyY : p.y;

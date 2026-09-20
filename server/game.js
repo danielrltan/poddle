@@ -6,7 +6,7 @@ const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
 const G = 9.81, R = 0.11;                 // gravity, ball radius
 const HIT_LINE = 6.5;                     // where you stand by default (distance from net)
 const X_LIMIT = 3.8, Y_MIN = 0.3, Y_MAX = 2.3;
-const Z_NEAR = 2.6, Z_FAR = 8.4;          // footwork range (distance from net)
+const Z_NEAR = 2.6, Z_FAR = 7.0;          // footwork range (distance from net)
 const AUTO_SPEED = 5.5;                   // sideways run speed in auto-move mode, m/s
 const FOOT_SPEED = 7;                     // auto-footwork forward/back, m/s
 const STANCE = 0.3;                       // stand this far behind the predicted contact: you meet the ball out in front
@@ -201,7 +201,8 @@ wss.on('connection', ws => {
     if (!m || typeof m !== 'object') return;
     if (m.type === 'paddle') {
       me.auto = !!m.auto;                                        // auto: the server runs you to the ball, you just swing
-      me.autoY = !!m.autoY;                                      // autoY: you move sideways yourself, the game handles paddle height
+      me.autoY = !!m.autoY;
+      me.ownZ = Number.isFinite(m.z) ? clamp(m.z, Z_NEAR, Z_FAR + 0.4) : null;   // camera depth: distance from the net, chosen by the player                                      // autoY: you move sideways yourself, the game handles paddle height
       if (!me.auto) me.x = clamp(num(m.x, me.x), -X_LIMIT, X_LIMIT);
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
@@ -232,6 +233,7 @@ function step() {
       pl.z += clamp(pl.lunge.z - pl.z, -3 * FOOT_SPEED * DT, 3 * FOOT_SPEED * DT);
       continue;
     }
+    if (pl.ownZ != null && !pl.auto) { pl.z += clamp(sgn(pl.side) * pl.ownZ - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT); continue; }   // you walk yourself
     const home = !ball.live || ball.lastHit === pl.side;
     const zT = home ? sgn(pl.side) * HIT_LINE : pl.zT;
     pl.z += clamp(zT - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT);
