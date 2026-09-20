@@ -123,8 +123,12 @@ const bridge = connect(BRIDGE, 'm', sample => {
         setTimeout(() => { if (inPlay()) say(state && state.serving === side ? 'Your serve — swing to hit it!' : 'Calibrated — let’s play!', null, 2600); }, 380); }, 900); }     // after the fade
     else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
       if (!calibrating) {
-                // "point it horizontally": 1 when the paddle's long axis lies level, 0 when it stands upright
-        const top = qrot(model.pose(performance.now()).Pd, [0, 1, 0]), slice = Math.max(0, 1 - Math.abs(top[1]) / 0.6);
+                // Spin comes from any of three things, whichever is strongest: the paddle held level (a slice), the wrist
+        // rolling through the ball, or a curved "C" shaped swing. Its sign says which way the ball breaks off the bounce.
+        const top = qrot(model.pose(performance.now()).Pd, [0, 1, 0]);
+        const level = Math.max(0, 1 - Math.abs(top[1]) / 0.75), roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.4) / 0.4)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 0.7) / 1.0));   // measured on real play: a plain swing wanders ~0.4 rad and rolls ~0.2, so spin starts above that
+        const amount = Math.max(level, roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
+        const slice = amount * (way || 1);
         game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, chop: e.chop, age: e.age, slice, fix });
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }

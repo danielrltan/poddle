@@ -17,7 +17,7 @@ const FIX_EASE = 0.1;                     // s that re-aim is spread over: the b
 const CONTACT = 0.25;                     // a stroke meets the ball this far in front of the paddle
 const Z_ASSIST = 0.9;                      // share of the forward/back footwork the game does for a player who walks themselves
 const BLOCK_ON = process.env.BLOCK !== '0';   // scripted tests with a parked paddle turn the net block off
-const BLOCK = { within: 4.3, x: 0.75, y: 0.65, front: 0.9, behind: 0.2 };   // up at the net a paddle simply held in the ball's path taps it back
+const BLOCK = { within: 5.0, x: 0.95, y: 0.8, front: 1.2, behind: 0.3, volley: 5.2 };   // up at the net a paddle simply held in the ball's path taps it back
 const REACH_X = 1.0, REACH_Y = 0.5;          // extra metres of reach for a full-effort swing
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
@@ -59,7 +59,8 @@ function newPlayer(ws, side) {
 // how underhand was the swing? lob is the upward-scoop share of the stroke, 0..0.8 from the client
 const underhand = lob => { const t = clamp((lob / 0.8 - 0.18) / 0.3, 0, 1); return t * t * (3 - 2 * t); };   // upward share of the stroke: 0.18 starts to count, 0.48 is fully underhand
 // how sliced? slice = how flat / open the paddle face was through the swing, 0..1 from the client. A scoop is never a slice.
-const sliced = (slice, lob) => { const t = clamp(((slice || 0) - 0.45) / 0.3, 0, 1); return t * t * (3 - 2 * t) * (1 - underhand(lob)); };
+// spin is easy to put on: it starts at 0.25 and is full by 0.6. |slice| = how much, its sign = which way it breaks.
+const sliced = (slice, lob) => { const t = clamp((Math.abs(slice || 0) - 0.25) / 0.35, 0, 1); return t * t * (3 - 2 * t) * (1 - 0.6 * underhand(lob)); };
 const shotKind = (n, lob, slice) => (sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.62 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
@@ -80,7 +81,7 @@ function solve(p, side, n, dir, lob, slice) {
   const tz = -s * Math.min(6.2, depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
   let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)), lerp(1.2, 1.95, nu), u);   // underhands always travel on a high, slow arc
-  const spin = sliced(slice, lob), g = gOf(spin), kick = s * (dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
+  const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
   T *= 1 + SLICE.slow * spin;                                  // same depth (power still sets it), slower and floatier
   const v = [0, 0, 0]; T = fly(v, px, py, pz, tx, tz, T, g, lerp(0.25, SLICE.clear, spin));
   // wide balls keep drifting after the bounce; pull the target in so the top of the bounce stays within REACH
@@ -188,6 +189,9 @@ function serveReach(pl) {
   return Math.abs(ball.p[0] - pl.x) < SERVE_ZONE.x && Math.abs(ball.p[1] - pl.y) < SERVE_ZONE.y && ahead > -SERVE_ZONE.behind && ahead < SERVE_ZONE.front;
 }
 function strike(pl, sw) {
+  // A ball taken out of the air up near the net with a short, soft stroke is a block: it just pops back over, soft and short.
+  if (!sw.kind && ball.serving == null && ball.bounces === 0 && Math.abs(pl.z) <= BLOCK.volley && sw.n < 0.4 && underhand(sw.lob) < 0.5)
+    sw = { ...sw, kind: 'block', n: Math.min(sw.n, 0.12), lob: 0.55 };
   pl.swing = null; pl.hit = sw.kind ? null : { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0 };   // a swing (not a block) may still be corrected
   pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
   launch(pl.side, sw.n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n: sw.n, kind: sw.kind || shotKind(sw.n, sw.lob, sw.slice) }, sw.slice);
@@ -348,14 +352,14 @@ wss.on('connection', ws => {
       if (ball.live && ball.serving === me.side) {               // my serve: only a real stroke that meets the ball counts.
         if (num(m.power, 6) < SERVE_POWER) return;               // a twitch, a flick, a quick step: nothing happens at all
         broadcast({ type: 'swung', side: me.side });
-        if (serveReach(me)) { ball.serving = null; strike(me, { n: pw, dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), slice: clamp(num(m.slice, 0), 0, 1) }); }   // struck on arrival, not on the next tick
+        if (serveReach(me)) { ball.serving = null; strike(me, { n: pw, dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), slice: clamp(num(m.slice, 0), -1, 1) }); }   // struck on arrival, not on the next tick
         return;                                                  // swung at air: no whiff, no point, the ball keeps hanging
       }
-      const dir = clamp(num(m.dir, 0), -1, 1), lob = clamp(num(m.lob, 0), 0, 1), slice = clamp(num(m.slice, 0), 0, 1);   // slice: 0 when the client sends none
+      const dir = clamp(num(m.dir, 0), -1, 1), lob = clamp(num(m.lob, 0), 0, 1), slice = clamp(num(m.slice, 0), -1, 1);   // signed spin, 0 when the client sends none
       if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
         if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice });                     // hasn't met the ball yet: just correct it
         else if (me.hit && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
-          && (Math.abs(pw - me.hit.n) > 0.04 || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2)) {
+          && (Math.abs(pw - me.hit.n) > 0.04 || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
           Object.assign(me.hit, { n: pw, dir, lob, slice }); reaim(me.side, pw, dir, lob, slice);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side
         }
         return;

@@ -87,3 +87,51 @@ Build log for Hack the North 2026. What we tried, what broke, and how each probl
 - Known: several scripted scenarios in `test/server.test.mjs` and `test/motion.test.mjs` encode earlier geometry and
   latency bounds and now fail; the behaviours they cover were changed on purpose.
 - Not verified by tests: face detection on a real face, and the feel of tilt-to-walk. Those were checked by hand.
+
+## 12. Day two: tuning on the real player instead of on assumptions
+- **Power was backwards.** Tests built from idealised swing shapes said a fast swing is a strong swing. On the real
+  player it was the opposite: a snappy wrist flick peaks at 28-38 rad/s and gets there in 80-100 ms, while a wide arm
+  swing only reaches 9-14 rad/s, takes 240-340 ms and sweeps 100-190 degrees. Rotation speed says almost nothing about
+  effort. Power is now effort: how far and how long the hand travelled before the peak. `data/live-swings.jsonl` is the
+  labelled recording that settled it and `node test/real.mjs` replays it.
+- **Fixing power made everything late.** Waiting for the peak meant reporting 130 ms (flick) to 265 ms (wide) after the
+  hand moved. The two movements already differ in the first 40-60 ms (angular acceleration, g-force), so the swing is
+  now reported early with a provisional power (flick ~50 ms, wide ~105 ms) and refined with follow-up messages. Found
+  on the way: a swing that started out of another swing's follow-through was swallowed entirely.
+- **The server added its own delay.** A swing waited for the next 60 Hz tick; now it is checked the instant it arrives
+  (11.7 ms -> 0.8 ms). A hit granted slightly late used to launch the ball from behind the player; now it launches from
+  where the ball crossed the paddle, the drawn ball blends onto the new path, and a power refinement is eased in over
+  100 ms instead of kinking the flight.
+- **Jitter, properly diagnosed.** The replay buffer ran dry about twice a second (the delay sank below what the
+  Bluetooth link needs), freezing the paddle for up to 50 ms and then snapping it. Measured with `node test/smooth.mjs`;
+  the write-up with patches is in `docs/jitter-diagnosis.md`.
+- **Short balls were unreachable.** When forward/back became the player's job, the automatic footwork was switched off
+  and a ball dying in the kitchen left them stranded. Forward/back is now shared: the game does 90 % of the run, a lean
+  on the AirPod adds the rest. Deep balls get the same help backwards, and a serve can no longer be left hanging out of
+  the server's reach.
+- **Serving felt glued to the paddle, and twitches served.** The ball now hangs and follows loosely (dead zone, ~0.6 s
+  lag), and only a deliberate swing that actually meets it serves.
+- **Calibration neutral was the wrong pose.** People keep the AirPod tipped up after the tilt step because that is how a
+  paddle is held; the on-screen paddle leaned back by that angle. The resting pose after the tilt is now neutral, and
+  the paddle shows the bud's real attitude (flat toward the screen = flat toward the net).
+- **Shots that match the stroke.** Underhand = lob (a very gentle one is a kitchen dink), a downward overhead = smash,
+  a paddle simply held in the ball's path near the net = block, and a soft volley out of the air near the net is a
+  block too. Spin comes from a level paddle, a rolling wrist or a curved "C" shaped swing; thresholds were set from the
+  distribution of real swings so a plain swing stays flat. A spinning ball floats, stays low, loses half its pace on the
+  bounce and breaks sideways.
+- **Spin you could not see.** Backspin drawn at 60 rad/s strobes at 60 fps and reads as not spinning. It is drawn at
+  about three turns a second with streaks around the ball.
+- **Head-coupled camera.** The screen behaves like a window pinned to the net (off-axis projection), so the court stays
+  framed and the paddle stays on screen however far to the side the player stands.
+- **Feel.** Hit effects were doubled, the ball trail is a continuous power scale (white -> yellow -> orange -> red, icy
+  blue for spin), and the paddle leaves a motion blur only during a real swing.
+- **UI.** Rebuilt by a design -> critique -> implement -> verify pipeline in the glossy, rounded visual language of
+  mid-2000s console sports games, using only original assets and an open-licence typeface stored with the game.
+- **Working with parallel agents.** Several agents edited the project at once. What kept that safe: each owned named
+  files, used its own port range, never touched the live servers, and had to prove its change with a numeric test.
+  What went wrong: a long multi-agent run stalled twice when the laptop slept, and a page reload while the UI agent was
+  mid-rewrite looked like "the hit effects are gone".
+- **Tests that age.** Several older scripted scenarios encode geometry, latency bounds or synthetic swing shapes that
+  were changed on purpose (`test/motion.test.mjs`, `test/latency.mjs`, `test/rom.mjs`, parts of
+  `test/server.test.mjs`). The tests that reflect the current game are: real, serve, kitchen, deep, slice, lagcomp,
+  feel, hitblend, bot, parallax, strokes and e2e.

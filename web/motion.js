@@ -267,6 +267,11 @@ export class MotionModel {
       sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), sent: false, fixed: false, eff: 0, sweep: 0, k: 1 }; }
     if (sw) {
       if (!sw.fixed) sw.sum = add(sw.sum, mul(wP, rate));             // sweep direction, weighted by rate: the slow first samples are mostly noise
+      // Curl: a straight swing keeps turning about one axis; a "C" shaped swing (or a rolling wrist) swings that axis
+      // round as it goes. turn = how far the axis has wandered (rad), curl = which way (+ = curling to the player's right).
+      if (!sw.fixed && rate > 5) { const u = mul(wP, 1 / rate);
+        if (sw.u0) { const d = clamp(dot(u, sw.u0), -1, 1); sw.turn = (sw.turn || 0) + Math.acos(d); sw.curl = (sw.curl || 0) + (sw.u0[1] - u[1]) + 0.6 * (u[2] - sw.u0[2]); }
+        sw.u0 = u; }
       if (rate > sw.peak) { sw.peak = rate; sw.tPk = t; sw.romPk = this.ang - sw.ang0; }
       if (r1 >= r0 && r1 > rate && r1 > c.TRIGGER) {                  // r1 was a local max: parabolic true peak
         const den = r0 - 2 * r1 + rate, p = den < 0 ? clamp(0.5 * (r0 - rate) / den, -0.5, 0.5) : 0;
@@ -284,7 +289,8 @@ export class MotionModel {
       // way. So rotation speed says almost nothing; how far and how long the hand travelled before the peak says it all.
       const credit = (rom, rise) => clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1) * clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1);
       const powerOf = (pk, rom, rise) => c.TAP + (c.POWER_MAX - c.TAP) * credit(rom, rise) * (0.8 + 0.2 * clamp(pk / 14, 0, 1));
-      const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1) }; };   // chop: downward share (an overhead)
+      const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1),
+        roll: sw.sum[2] / n, turn: sw.turn || 0, curl: sw.curl || 0 }; };   // chop: downward share (an overhead)
       const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
       // The real score needs the peak, and waiting for it is 150-300 ms of dead air. But the two movements part ways in
       // the first 40-60 ms: a flick takes off at 250-500 rad/s^2, an arm swing at 25-125. So a hard take-off is called
@@ -303,7 +309,7 @@ export class MotionModel {
         // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
         // never a smash, however fast it was.
         sw.eff = call(); Object.assign(sw, shot());
-        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, age, final: past });
+        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, roll: sw.roll || 0, turn: sw.turn || 0, curl: sw.curl || 0, age, final: past });
       } else if (sw.sent && !sw.fixed) {                              // the call moved, or the real peak is in and the call was off
         const eff = call(), sh = shot();
         if ((past || t - sw.tFix >= c.FIX_GAP - 1e-4) && (Math.abs(eff - sw.eff) > (past ? Math.max(c.FIX_ABS, c.FIX_REL * sw.eff) : c.FIX_STEP) || Math.abs(sh.lob - sw.lob) > 0.15 || Math.abs(sh.dir - sw.dir) > 0.3)) {
