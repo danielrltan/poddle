@@ -367,21 +367,26 @@ export function createScene(containerEl) {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     m.frustumCulled = false; m.visible = false; scene.add(m);
-    return { mesh: m, pos, col, n: 0, heat: 0, tint: new THREE.Color(color), lastTip: new THREE.Vector3(), has: false };
+    return { mesh: m, pos, col, n: 0, heat: 0, tint: new THREE.Color(color), lastTip: new THREE.Vector3(), lastQ: new THREE.Quaternion(), has: false };
   }
   const swTip = new THREE.Vector3(), swBase = new THREE.Vector3();
   function updateSwoosh(sw, group, dt) {
     swTip.set(0, FACE_C * 2.05, 0).applyQuaternion(group.quaternion).add(group.position);
     swBase.set(0, FACE_C * 0.35, 0).applyQuaternion(group.quaternion).add(group.position);
-    const speed = sw.has ? swTip.distanceTo(sw.lastTip) / Math.max(dt, 1e-3) : 0; sw.lastTip.copy(swTip); sw.has = true;
-    sw.heat += ((speed > 3.2 ? Math.min(1, (speed - 3.2) / 7) : 0) - sw.heat) * (speed > 3.2 ? 0.6 : Math.min(1, dt * 9));   // on fast, off gently
+    // Only a HARD swing blurs: the paddle itself must be whipping round (not just carried along by footwork, the
+    // camera-tracked body or the hit lunge), and its tip must really be travelling.
+    const speed = sw.has ? swTip.distanceTo(sw.lastTip) / Math.max(dt, 1e-3) : 0; sw.lastTip.copy(swTip);
+    const spinRate = sw.has ? 2 * Math.acos(Math.min(1, Math.abs(sw.lastQ.dot(group.quaternion)))) / Math.max(dt, 1e-3) : 0; sw.lastQ.copy(group.quaternion); sw.has = true;
+    const want = spinRate > 12 && speed > 5 ? Math.min(1, (spinRate - 12) / 12) : 0;
+    sw.heat += (want - sw.heat) * (want > sw.heat ? 0.5 : Math.min(1, dt * 16));
+    if (sw.heat < 0.06 && want === 0) sw.heat = 0;                               // no ghost line lingering after it fades
     const P = sw.pos; P.copyWithin(6, 0, (SW_N - 1) * 6);                       // shift the history back one slot
     P[0] = swBase.x; P[1] = swBase.y; P[2] = swBase.z; P[3] = swTip.x; P[4] = swTip.y; P[5] = swTip.z;
     sw.n = Math.min(SW_N, sw.n + 1);
-    for (let i = 0; i < SW_N; i++) { const k = i < sw.n ? sw.heat * Math.pow(1 - i / SW_N, 1.6) * 0.75 : 0, o = i * 6;
+    for (let i = 0; i < SW_N; i++) { const k = i < sw.n ? sw.heat * Math.pow(1 - i / SW_N, 1.6) * 0.5 : 0, o = i * 6;
       if (i >= sw.n) { P[o] = P[o - 6]; P[o + 1] = P[o - 5]; P[o + 2] = P[o - 4]; P[o + 3] = P[o - 3]; P[o + 4] = P[o - 2]; P[o + 5] = P[o - 1]; }
       sw.col[o] = sw.col[o + 3] = sw.tint.r * k; sw.col[o + 1] = sw.col[o + 4] = sw.tint.g * k; sw.col[o + 2] = sw.col[o + 5] = sw.tint.b * k; }
-    sw.mesh.visible = sw.heat > 0.02;
+    sw.mesh.visible = sw.heat > 0.06;
     sw.mesh.geometry.attributes.position.needsUpdate = true; sw.mesh.geometry.attributes.color.needsUpdate = true;
   }
   const pads = [0, 1].map(side => {
