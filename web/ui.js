@@ -10,9 +10,9 @@ export const SHOTS = { dink: 'Dink', lob: 'Lob', tap: 'Tap', drive: 'Drive', sma
 export const shotName = kind => !kind ? '' : SHOTS[kind] || String(kind).replace(/[_-]+/g, ' ').replace(/^./, c => c.toUpperCase());
 
 // ---------- screens ----------
-// Two independent slots. Menu screens (opaque: title, connect, calibrate) cover everything; overlays (match, server-down,
+// Two independent slots. Menu screens (title and lobby on glass over the live court; connect and calibrate opaque) cover everything; overlays (match, server-down,
 // game-full) sit over the court, under any menu screen (ui.css lifts game-full above them: that one cannot wait). The HUD leaves the render tree under a menu screen.
-const MENU = ['title', 'connect', 'calibrate'], OVERLAY = ['match', 'server-down', 'game-full'];
+const MENU = ['title', 'lobby', 'connect', 'calibrate'], OVERLAY = ['match', 'server-down', 'game-full'];
 const screenEl = name => document.querySelector(`.screen[data-screen="${name}"]`);
 const slots = { menu: null, overlay: null }, hideT = {};
 function swap(slot, name) {
@@ -51,7 +51,7 @@ export function callout(kind, them = false) {              // only the shot's na
   const el = $('callout'); el.textContent = text; el.dataset.text = text; el.classList.toggle('is-them', them); restart(el, 'go');
 }
 export function pointBanner(won) {                         // small tag under the scoreboard; these two strings and nothing else
-  const b = $('banner'); $('banner-text').textContent = won ? 'Your point!' : 'Enemy’s point!';
+  const b = $('banner'); $('banner-text').textContent = won ? 'Your point!' : 'Their point';
   b.classList.toggle('is-me', won); b.classList.toggle('is-them', !won); restart(b, 'show');
 }
 let toastT;
@@ -59,6 +59,7 @@ export function toast(text, ms = 1200) {
   const el = $('toast'), b = document.body; el.textContent = text; el.classList.add('on'); b.classList.add('has-toast');     // .has-toast: the key strip yields the bottom band
   clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('on'); b.classList.remove('has-toast'); }, ms);
 }
+export function toastOff() { clearTimeout(toastT); $('toast').classList.remove('on'); document.body.classList.remove('has-toast'); }     // the screen it spoke about is gone
 export function confetti(colors, n = 46) {
   if (reduced()) return;
   const frag = document.createDocumentFragment(), made = [];
@@ -81,12 +82,12 @@ export function matchResult(won, me, them, name) {
 
 // ---------- connection status ----------
 const ROW = {
-  airpod: { ok: 'Connected.', wait: 'Waiting for motion data. Take one AirPod out and hold it in your hand.', bad: 'The motion data stopped. Check that the AirPod is still connected to this Mac.' },
-  game: { ok: 'Connected.', wait: 'Looking for the game server…', bad: 'Can’t reach the game server. Trying again…' },
-  camera: { ok: 'Ready. Stand where it can see you.', wait: 'Choose “Allow” when the browser asks to use the camera.', bad: 'No camera found. Press M during play to pick another way to move.', off: 'No camera. Press M during play to pick how you move.' },
+  airpod: { ok: '', wait: 'Take one AirPod out and hold it in your hand.', bad: 'Signal lost. Check the AirPod is still connected to this Mac.' },
+  game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
+  camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera when the browser asks.', bad: 'No camera. Press M to change how you move.', off: 'No camera. Press M to change how you move.' },
 };
 const STATE_WORD = { ok: 'Ready', wait: 'Waiting', bad: 'Problem', off: 'Off' };
-const LOST = { airpod: 'AirPod signal lost', game: 'Reconnecting to the game…' };
+const LOST = { airpod: 'AirPod signal lost', game: 'Reconnecting to the game' };
 const status = {}, badSince = {}, told = {};
 export function setStatus(next) {
   const now = performance.now();
@@ -109,7 +110,7 @@ export function setServerAddress(text) { setText($('downurl'), String(text).repl
 // e = the MotionModel 'cal' event { stage: 'hold'|'tilt', progress, ok, msg }. The big headline always says what to do NOW
 // (it is the only thing read from two metres away), so it follows the event, not just the stage.
 const HOLD_SECONDS = 5;
-const LEAD = { hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', settle: 'Bring it to your ready position and keep it there.', done: 'Nice and steady. Here comes the court!' };
+const LEAD = { hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', settle: 'Keep it there until the bar fills.', done: 'Here comes the court.' };
 let calPrev = { ok: true, msg: '' }, badUntil = 0, badHead = '';
 export function calibrationReset() {
   calPrev = { ok: true, msg: '' }; badUntil = 0;
@@ -117,7 +118,7 @@ export function calibrationReset() {
 }
 export function calibration(e, { waiting = false, camLost = false } = {}) {
   const msg = e.msg || '', tilt = e.stage === 'tilt', settle = tilt && msg.startsWith('Good'), done = msg.startsWith('All set');
-  let head = done ? 'All set!' : settle ? 'Now hold it how you’ll play' : tilt ? (e.ok ? 'Tip it up' : 'Level out, then tip straight up') : (e.ok ? 'Hold still' : 'You moved — hold still');
+  let head = done ? 'All set' : settle ? 'Now hold it how you’ll play' : tilt ? (e.ok ? 'Tip it up' : 'Level out, then tip straight up') : (e.ok ? 'Hold still' : 'You moved. Hold still');
   // "You moved" is a single 20 ms sample in the model: hold the red headline long enough to be read
   const now = performance.now(), fresh = !e.ok && now >= badUntil;
   if (!e.ok) { badUntil = now + 1400; badHead = head; }
@@ -135,7 +136,7 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
   count.style.visibility = settle && !done ? 'hidden' : '';                  // settling: the bar alone counts; a tick would read as 'finished'
   $('cal-num').hidden = !showNum; $('cal-up').toggleAttribute('hidden', showNum || settle || done); $('cal-check').toggleAttribute('hidden', !done);
   if (showNum) setText($('cal-num'), String(bad ? HOLD_SECONDS : Math.max(1, Math.ceil(HOLD_SECONDS * (1 - e.progress)))));
-  const m = $('calmsg'); setText(m, waiting ? 'Waiting for the AirPod…' : camLost && !tilt ? 'The camera can’t see you yet — step into its view.' : '');
+  const m = $('calmsg'); setText(m, waiting ? 'Waiting for the AirPod' : camLost && !tilt ? 'The camera can’t see you. Step into view.' : '');
   // replay the sideways nudge for every new mistake (also a second one in a row), not for every 20 ms sample
   if (fresh || (!e.ok && calPrev.msg !== msg)) restart($('calcard'), 'is-error'); else if (!bad) $('calcard').classList.remove('is-error');
   calPrev = { ok: e.ok, msg };
@@ -164,3 +165,81 @@ $('banner').addEventListener('animationend', e => { if (e.animationName === 'ban
 for (const id of ['sc-me', 'sc-them', 'rally']) $(id).addEventListener('animationend', e => e.currentTarget.classList.remove('pop'));
 export function onStart(fn) { $('btn-start').addEventListener('click', fn); }
 export function onRetry(fn) { $('btn-retry').addEventListener('click', fn); }
+
+// ---------- lobby ----------
+// Four views inside #screen-lobby, one at a time: home (three tiles + open rooms), create (public / private), share (the
+// new room's code and link), code (four letter boxes). main.js owns the socket; this only draws and reports what was chosen.
+const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
+export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /ROOM=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
+const VIEW_TITLE = { home: 'Play', create: 'Create room', share: 'Your room', code: 'Enter code' };
+const boxes = () => [...$('code-boxes').children];
+let view = 'home', roomsKey = '', on = {};
+export function onLobby(handlers) { on = handlers; }                                    // { quick(), create(isPublic), join(code), start(), back(), copied() }
+export function lobbyView(name, { code } = {}) {
+  if (!name) return view;
+  view = VIEW_TITLE[name] ? name : 'home';
+  for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view;
+  setText($('lobby-title'), VIEW_TITLE[view]); codeError('');
+  if (view === 'code') setCode(code || '');
+  const first = { home: $('btn-quick'), create: $('btn-create-go'), share: $('btn-share-go'), code: boxes().find(b => !b.value) || $('btn-join') }[view];
+  setTimeout(() => { if (slots.menu === 'lobby') first.focus({ preventScroll: true, focusVisible: true }); }, 60);    // after the key that brought us here is up: a held Enter must not press it
+}
+export function lobbyRooms(rooms = [], online = 0) {
+  const list = $('room-list'), key = rooms.map(r => r.code + r.players).join();
+  $('lobby-online').hidden = !(online > 1); setText($('lobby-online'), `${online} online`);      // 1 online is you: say nothing
+  if (key === roomsKey) return; roomsKey = key;                                       // the list arrives every second: only touch the DOM (and the focus) when it changed
+  const had = document.activeElement && document.activeElement.dataset.code;
+  list.textContent = '';
+  for (const r of rooms.slice(0, 12)) { const li = document.createElement('li'), b = document.createElement('button');
+    b.className = 'room-row'; b.dataset.code = r.code; b.dataset.nav = ''; b.innerHTML = `<b></b><span>${r.players ? '1 player' : 'Empty'}</span>`; b.firstChild.textContent = r.code;
+    li.appendChild(b); list.appendChild(li); }
+  $('room-empty').hidden = rooms.length > 0;
+  if (had) (list.querySelector(`[data-code="${had}"]`) || $('btn-quick')).focus({ preventScroll: true });
+}
+export function lobbyBusy(busy) { $('screen-lobby').setAttribute('aria-busy', busy ? 'true' : 'false'); }
+export function lobbyLink(up) { $('lobby-down').hidden = up; $('screen-lobby').classList.toggle('is-down', !up); if (!up) lobbyRooms([], 0); }      // a list from before the drop is not worth tapping
+export function codeError(text) {
+  setText($('code-err'), text); $('code-boxes').classList.toggle('is-bad', !!text);
+  if (text) { restart($('code-boxes'), 'is-error'); boxes()[3].focus(); }
+}
+function setCode(code) { boxes().forEach((b, i) => { b.value = code[i] || ''; }); $('btn-join').disabled = code.length < 4; }
+const getCode = () => boxes().map(b => b.value).join('');
+// room: the code I am seated in (null = none). link: the address to share, or '' when this page is only reachable on this computer.
+export function setRoom(code, link = '') {
+  $('room-pill').hidden = $('key-leave').hidden = !code; setText($('room-code'), code || ''); $('room-pill').title = link ? 'Copy link' : '';      // no link on localhost: promise nothing
+  for (const b of document.querySelectorAll('.screen:not(#screen-lobby) [data-back]')) b.hidden = !code;      // set-up screens: Back only when there is a lobby to go back to
+  [...$('share-code').children].forEach((el, i) => setText(el, code ? code[i] : ''));
+  $('share-row').hidden = !link; setText($('share-link'), link.replace(/^https?:\/\//, '')); $('share-link').dataset.href = link;
+}
+export function titleRoom(code) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); }     // opened from a shared link
+async function copyLink(btn) {
+  const href = $('share-link').dataset.href; if (!href) return;
+  try { await navigator.clipboard.writeText(href); } catch { const r = document.createRange(); r.selectNodeContents($('share-link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); try { document.execCommand('copy'); } catch { /* still selected: Cmd+C works */ } }
+  if (btn.id === 'btn-copy') { setText(btn, 'Copied'); setTimeout(() => setText(btn, 'Copy link'), 1500); } else on.copied && on.copied();
+}
+{
+  $('btn-quick').addEventListener('click', () => on.quick && on.quick());
+  $('btn-create').addEventListener('click', () => lobbyView('create'));
+  $('btn-code').addEventListener('click', () => lobbyView('code'));
+  $('btn-create-go').addEventListener('click', () => on.create && on.create($('seg').querySelector('[aria-checked="true"]').dataset.public === '1'));
+  $('btn-share-go').addEventListener('click', () => on.start && on.start());
+  $('btn-copy').addEventListener('click', e => copyLink(e.currentTarget)); $('room-pill').addEventListener('click', e => copyLink(e.currentTarget));
+  for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => on.back && on.back());
+  $('room-list').addEventListener('click', e => { const b = e.target.closest('.room-row'); if (b && on.join) on.join(b.dataset.code); });
+  const pick = opt => { for (const o of $('seg').children) { const yes = o === opt; o.setAttribute('aria-checked', yes); o.tabIndex = yes ? 0 : -1; } setText($('seg-note'), opt.dataset.public === '1' ? 'Shows in open rooms' : 'Join by code only'); };
+  $('seg').addEventListener('click', e => { const o = e.target.closest('.seg-opt'); if (o) pick(o); });
+  $('lobby-create').addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); const o = $('seg').children[e.key === 'ArrowLeft' ? 0 : 1]; pick(o); if ($('seg').contains(document.activeElement)) o.focus(); });   // Left = Public, Right = Private, from anywhere on the card
+  // code boxes: type, paste (a code or a whole link), Backspace walks back, arrows move, Enter joins
+  const form = $('lobby-code'), fill = (from, text) => { const bs = boxes(), chars = cleanCode(text); if (chars.length === 4) from = 0;
+    [...chars].forEach((c, i) => { if (bs[from + i]) bs[from + i].value = c; }); (bs[Math.min(3, from + chars.length)] || bs[3]).focus(); $('btn-join').disabled = getCode().length < 4; codeError(''); };
+  form.addEventListener('input', e => { const b = e.target, i = boxes().indexOf(b); if (i < 0) return; const t = b.value; b.value = ''; if (cleanCode(t)) fill(i, t); else $('btn-join').disabled = getCode().length < 4; });
+  form.addEventListener('paste', e => { e.preventDefault(); fill(0, (e.clipboardData || window.clipboardData).getData('text')); });
+  form.addEventListener('focusin', e => { if (e.target.select) e.target.select(); });
+  form.addEventListener('keydown', e => { const bs = boxes(), i = bs.indexOf(e.target); if (i < 0) return;
+    if (e.key === 'Backspace' && !e.target.value && i > 0) { e.preventDefault(); bs[i - 1].value = ''; bs[i - 1].focus(); $('btn-join').disabled = true; }
+    else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); bs[i - 1].focus(); } else if (e.key === 'ArrowRight' && i < 3) { e.preventDefault(); bs[i + 1].focus(); } });
+  form.addEventListener('submit', e => { e.preventDefault(); const c = getCode(); if (c.length === 4 && on.join) on.join(c); });
+  // arrows walk the tiles and the room list in reading order (Tab works too)
+  $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
+    const nav = [...$('lobby-home').querySelectorAll('[data-nav]')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });
+}

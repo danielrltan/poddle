@@ -154,21 +154,21 @@ export class MotionModel {
       for (let i = 0; i < 4; i++) cal.sum[i] += sg * s.q[i];
       const progress = clamp((s.t - cal.t0) * 1000 / c.HOLD_MS, 0, 1);
       if (progress >= 1) { this.calib = qnorm(cal.sum); this.holdQ = this.calib; cal.stage = 'tilt'; }
-      ev.push({ type: 'cal', stage: 'hold', progress, ok, msg: ok ? 'Hold it like a paddle, pointed at the screen. Keep still…' : 'You moved — hold still and we’ll start again.' });
+      ev.push({ type: 'cal', stage: 'hold', progress, ok, msg: ok ? 'Hold it like a paddle, pointed at the screen. Keep still.' : 'You moved. Hold still.' });
       return;
     }
     let d = qmul(s.q, qconj(this.calib)); if (d[3] < 0) d = d.map(v => -v);
     const ang = qangle(d), progress = clamp(ang / (c.TILT_DEG * DEG), 0, 1);
     if (cal.blocked) {
       if (ang < c.TILT_REARM_DEG * DEG) cal.blocked = false;
-      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' });
+      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist. Level out, then tip it straight up.' });
       return;
     }
     if (ang < c.TILT_DEG * DEG) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Now tip the front of the AirPod up.' }); return; }
     const ax = mul([d[0], d[1], d[2]], 1 / len([d[0], d[1], d[2]])), h = Math.hypot(ax[0], ax[1]);
     if (h < c.TILT_MIN_HORIZ) {
       cal.blocked = true;
-      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' });
+      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist. Level out, then tip it straight up.' });
       return;
     }
     const R = [ax[0] / h, ax[1] / h, 0], U = [0, 0, 1];
@@ -176,7 +176,7 @@ export class MotionModel {
     // The tilt only teaches the axes. Neutral is wherever the hand comes to rest AFTER it: people keep the bud tipped
     // up because that is how a paddle is held, and the on-screen paddle must stand upright in exactly that pose.
     cal.stage = 'settle'; cal.anchor = null;
-    ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: true, msg: 'Good — now hold it how you’ll play.' });
+    ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: true, msg: 'Good. Now hold it how you’ll play.' });
   }
 
   _settle(s, ev) {
@@ -185,7 +185,7 @@ export class MotionModel {
     const sg = dot4(s.q, cal.anchor) < 0 ? -1 : 1;
     for (let i = 0; i < 4; i++) cal.sum[i] += sg * s.q[i];
     const progress = clamp((s.t - cal.t0) * 1000 / c.SETTLE_MS, 0, 1);
-    if (progress < 1) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Good — now hold it how you’ll play.' }); return; }
+    if (progress < 1) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Good. Now hold it how you’ll play.' }); return; }
     this.calib = qnorm(cal.sum);                               // axes R,U,F are world vectors, so they stay valid
     // What the screen shows is the bud's REAL attitude, not "neutral = upright": in step 1 it lay flat, pointed at the
     // screen, so there the paddle points flat at the net; tipped up 60 deg it stands 60 deg up; straight up is upright.
@@ -196,7 +196,7 @@ export class MotionModel {
     this.yawFix = IDENT;
     this.calibrated = true;
     this._start(s);
-    ev.push({ type: 'cal', stage: 'tilt', progress: 1, ok: true, msg: 'All set!' });
+    ev.push({ type: 'cal', stage: 'tilt', progress: 1, ok: true, msg: 'All set' });
     ev.push({ type: 'calibrated' });
   }
 

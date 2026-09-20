@@ -106,7 +106,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .menu-body{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-5);padding:var(--s-5) var(--s-7)}
 
 /* veil: sits over the live court for result / error cards */
-/* no backdrop blur anywhere: it is a full-screen two-pass filter re-run on every WebGL frame, and not part of this look */
+/* no backdrop blur here or on any overlay: it is a full-screen two-pass filter re-run on every WebGL frame. The one exception is .glass (title + lobby), where nothing is being played */
 .veil{background:var(--tex-scan), linear-gradient(180deg,rgba(255,255,255,.92),rgba(226,240,248,.88));align-items:center;justify-content:center;z-index:var(--z-veil)}
 .veil.is-result{background:repeating-linear-gradient(135deg, rgba(52,190,237,.075) 0 14px, transparent 14px 32px), linear-gradient(180deg,#fff,var(--sky-2))}          /* a results ground, fully opaque */
 
@@ -130,7 +130,10 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:var(--s-3);height:3.75rem;padding:0 2.75rem;border-radius:var(--r-pill);
   border:.1875rem solid var(--line);background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:700 var(--t-lg)/1 var(--font);letter-spacing:.02em;
   box-shadow:var(--sh-2), var(--inner-hi);cursor:pointer;transition:transform var(--d-fast) var(--ease-bounce);-webkit-tap-highlight-color:transparent;outline:0;isolation:isolate}
-.btn::before{content:"";position:absolute;left:.5rem;right:.5rem;top:.125rem;height:48%;border-radius:var(--r-pill);background:linear-gradient(180deg,#fff,rgba(255,255,255,.55));opacity:1;pointer-events:none;z-index:-1}
+/* the gloss is a short pill, so its tight corners used to poke out past the button's wide ones. The clip is the button's own
+   inner pill, written from the gloss's box: out by its top and side offsets, down by the 52% of the button below it. */
+.btn::before{content:"";position:absolute;left:.5rem;right:.5rem;top:.125rem;height:48%;border-radius:var(--r-pill);background:linear-gradient(180deg,#fff,rgba(255,255,255,.55));opacity:1;pointer-events:none;z-index:-1;
+  clip-path:inset(-.125rem -.5rem calc(-108.334% + .125rem) round 999px)}
 .btn::after{content:"";position:absolute;inset:-.1875rem;border-radius:inherit;box-shadow:var(--glow);opacity:0;pointer-events:none;transition:opacity var(--d-fast) linear}
 .btn:hover::after,.btn:focus-visible::after{opacity:.7}
 .btn.is-focus::after{opacity:.8;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
@@ -230,7 +233,7 @@ body[data-overlay] .toast.on{opacity:0}
 .is-off > .light,.light.is-off{background:radial-gradient(circle at 35% 30%,#fff,var(--sky-4) 55%,var(--ink-faint));box-shadow:0 0 0 .125rem #fff}
 .light-lg{width:1.125rem;height:1.125rem}
 .status-lights{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;gap:.375rem}
-.status-lights{align-items:center}
+.status-lights{align-items:center;flex-wrap:wrap;max-width:calc(50vw - 21.5rem - var(--edge))}   /* never under the scoreboard (40.3rem, centred, drawn above): three worded pills plus the room code wrap to a second row */
 .status-pill{display:inline-flex;align-items:center;gap:.5rem;height:1.875rem;padding:0 .75rem 0 .625rem;border-radius:var(--r-pill);background:rgba(255,255,255,.92);border:.09375rem solid rgba(255,255,255,.95);
   box-shadow:var(--sh-hud);font-size:max(var(--t-xs),11px);font-weight:800;letter-spacing:.04em;color:var(--ink)}
 /* everything fine = three quiet dots; a problem changes SHAPE and FILL, not just hue (colour-blind safe, readable from the play position) */
@@ -319,7 +322,7 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
    ========================================================================================================== */
 .logo{display:flex;flex-direction:column;align-items:center;gap:.5rem}
 .logo-mark{display:flex;align-items:center;font-size:8.5rem;font-weight:900;line-height:1;letter-spacing:-.01em;filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
-.logo-mark .lg-a{color:#8d979f} .logo-mark .lg-b{color:var(--line)}
+.logo-mark .lg-a{color:#39434d} .logo-mark .lg-b{color:var(--line)}
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
   background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
     radial-gradient(circle at 22% 62%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 78% 54%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 48% 82%, var(--ball-deep) 0 7%, transparent 8%),
@@ -411,3 +414,127 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
   .confetti{display:none}
 }
 @keyframes banner-hold{0%,85%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+
+/* ==========================================================================================================
+   GLASS MENUS (title + lobby): the live court stays visible, soft and bright, behind the menu.
+   One shared layer (#glass) instead of a blur per screen, so the blur does not dip while title cross-fades to lobby.
+   This is the ONE place a backdrop blur is allowed: nothing is being played under it. It leaves the render tree
+   (visibility:hidden) the moment a set-up screen or the HUD takes over, so a rally never pays for it.
+   ========================================================================================================== */
+.glass{position:fixed;inset:0;z-index:calc(var(--z-screen) - 1);pointer-events:none;opacity:0;visibility:hidden;
+  background:var(--tex-vignette), linear-gradient(180deg,rgba(255,255,255,.50) 0%,rgba(240,248,252,.34) 45%,rgba(222,238,247,.50) 100%);
+  -webkit-backdrop-filter:blur(.875rem) saturate(1.2) brightness(1.08);backdrop-filter:blur(.875rem) saturate(1.2) brightness(1.08);
+  transition:opacity var(--d-med) var(--ease-soft), visibility 0s linear var(--d-med)}
+body[data-screen="title"] .glass,body[data-screen="lobby"] .glass{opacity:1;visibility:visible;transition-delay:0s}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){          /* no blur available: a milkier wash keeps the text readable */
+  .glass{background:var(--tex-vignette), var(--tex-scan), linear-gradient(180deg,rgba(255,255,255,.86),rgba(226,240,248,.80))}
+}
+.menu-glass{background:none}
+.menu-glass .menu-head,.menu-glass .menu-foot{background:var(--tex-diag), linear-gradient(180deg,rgba(255,255,255,.92),rgba(234,243,248,.86))}
+.menu-glass .menu-foot{color:var(--ink)}
+.menu-glass .logo-mark{filter:drop-shadow(0 .05em 0 rgba(255,255,255,.9)) drop-shadow(0 .09em .12em rgba(30,70,100,.28))}
+.menu-glass .logo-tag,.menu-glass .t-note{color:var(--ink-strong);text-shadow:0 0 .5rem #fff, 0 0 .125rem #fff}
+.menu-glass .logo-tag{margin-top:.25rem}
+body[data-screen="lobby"] .inset{opacity:0;pointer-events:none}
+/* the glass is see-through, so the 'server down' card (an overlay, under the menus) would show through it: the title does not need it and the lobby says it itself */
+body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-server-down{opacity:0}
+
+/* the extra-large pill: Play */
+.btn-xl{height:5.75rem;min-width:21rem;padding:0 4.5rem;font-size:var(--t-2xl);font-weight:800;letter-spacing:.04em;border-width:.25rem}
+.btn:disabled{opacity:.5;cursor:default;box-shadow:var(--sh-1)} .btn:disabled::after{display:none}
+.btn-back{position:absolute;left:var(--s-5);top:50%;translate:0 -50%;padding:0 1.25rem 0 1rem;gap:.5rem}
+.btn-back svg{width:.625rem;height:1rem;fill:none;stroke:var(--line-deep);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.room-chip{display:inline-flex;align-items:center;gap:.375rem;height:2.25rem;padding:0 1.125rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-1);font-size:var(--t-md);font-weight:700;color:var(--ink)}
+.room-chip b,.room-pill b{font-weight:900;letter-spacing:.14em;color:var(--me-ink);margin-right:-.14em}
+
+/* lobby header bits */
+.lobby-online{position:absolute;right:var(--s-7);top:50%;translate:0 -50%;display:inline-flex;align-items:center;gap:.5rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
+.lobby-online::before{content:"";width:.625rem;height:.625rem;border-radius:50%;background:var(--good);box-shadow:0 0 0 .125rem #fff}
+.lobby-down{display:inline-flex;align-items:center;gap:.625rem;margin:0;height:2.75rem;padding:0 1.5rem;border-radius:var(--r-pill);background:#fff6e0;border:.125rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-md);font-weight:700;box-shadow:var(--sh-1)}
+.lobby-down .light{background:radial-gradient(circle at 35% 30%,#ffe2a8,var(--warn) 55%,var(--warn-lamp));box-shadow:0 0 0 .125rem #fff}
+.lobby-down .dots-wait i{background:var(--warn-lamp)}
+
+/* views: one at a time */
+.lobby-view{animation:panel-in var(--d-med) var(--ease-out) both}
+.lobby-home{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);width:100%}
+.panel.lobby-view{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);padding:var(--s-6)}
+#screen-lobby[aria-busy="true"] .lobby-view{pointer-events:none;opacity:.6;transition:opacity var(--d-fast) linear 250ms}      /* 250 ms: an answer normally beats it, so no flicker */
+#screen-lobby.is-down .rooms{display:none}
+#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join{pointer-events:none;opacity:.5}
+
+/* the three big tiles */
+.tiles{display:flex;gap:var(--s-5);justify-content:center}
+.tile{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-3);width:17rem;height:14.5rem;padding:0;border-radius:var(--r-xl);
+  border:.25rem solid rgba(255,255,255,.9);background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 var(--t-xl)/1.1 var(--font);letter-spacing:.02em;
+  box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce)}
+.tile::before{content:"";position:absolute;inset:.375rem .375rem auto;height:46%;border-radius:calc(var(--r-xl) - .5rem) calc(var(--r-xl) - .5rem) 50% 50% / calc(var(--r-xl) - .5rem) calc(var(--r-xl) - .5rem) 1.25rem 1.25rem;background:linear-gradient(180deg,#fff,rgba(255,255,255,.4));pointer-events:none;z-index:-1}
+.tile::after{content:"";position:absolute;inset:-.25rem;border-radius:inherit;box-shadow:var(--glow);opacity:0;pointer-events:none;transition:opacity var(--d-fast) linear}
+.tile svg{width:6.5rem;height:6.5rem}
+.tile b{font-weight:800}
+.tile:hover,.tile:focus-visible{border-color:var(--line)}       /* the outline blue marks the ONE selected tile, as on a console menu; the rest are plain white */
+.tile:hover{transform:translateY(-.25rem) scale(1.02)} .tile:hover::after{opacity:.7}
+.tile:focus-visible{transform:translateY(-.25rem) scale(1.03)} .tile:focus-visible::after{opacity:1;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+.tile:active{transform:scale(.97);background:linear-gradient(180deg,#e4f3fa,#d3ebf6)}
+
+/* open rooms: a compact strip of pills under the tiles */
+.rooms{display:flex;flex-direction:column;align-items:center;gap:var(--s-2);width:min(55rem,100%);padding:var(--s-3) var(--s-5) var(--s-4);border-radius:var(--r-lg);background:rgba(255,255,255,.66);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1)}
+.rooms h2{margin:0;color:var(--ink-soft)}
+.rooms .t-note{text-shadow:none;color:var(--ink)}
+.room-list{display:flex;flex-wrap:wrap;justify-content:center;gap:.625rem;list-style:none;margin:0;padding:.25rem;max-height:7.5rem;overflow-y:auto}
+.room-list:empty{display:none}
+.room-row{position:relative;display:inline-flex;align-items:center;gap:.75rem;height:3rem;padding:0 1rem 0 1.25rem;border-radius:var(--r-pill);border:.15625rem solid var(--line);background:linear-gradient(180deg,#fff,#eaf3f8);
+  color:var(--ink);font:700 var(--t-md)/1 var(--font);box-shadow:var(--sh-1);cursor:pointer;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}
+.room-row b{font-size:var(--t-lg);font-weight:900;letter-spacing:.14em;color:var(--me-ink)}
+.room-row::after{content:"";width:.5rem;height:.5rem;border:solid var(--line);border-width:.1875rem .1875rem 0 0;rotate:45deg;margin-left:.125rem}
+.room-row:hover,.room-row:focus-visible{transform:scale(1.05);box-shadow:var(--glow)}
+.room-row:active{transform:scale(.96)}
+
+/* public / private switch */
+.seg{display:inline-flex;padding:.3125rem;gap:.3125rem;border-radius:var(--r-pill);background:var(--sky-2);border:.125rem solid var(--line-faint);box-shadow:inset 0 .125rem .375rem rgba(120,170,200,.25)}
+.seg-opt{height:3.5rem;min-width:10rem;padding:0 2rem;border-radius:var(--r-pill);border:.1875rem solid transparent;background:none;color:var(--ink-soft);font:700 var(--t-lg)/1 var(--font);cursor:pointer;outline:0}
+.seg-opt[aria-checked="true"]{background:linear-gradient(180deg,#fff,#f0f7fb);border-color:var(--line);color:var(--ink-strong);box-shadow:var(--sh-1)}
+.seg-opt:focus-visible{box-shadow:var(--glow)}
+
+/* room code: four big boxes (inputs on Enter code, spans on the share card) */
+.code-boxes{display:flex;gap:.75rem;justify-content:center}
+.code-box{width:5.5rem;height:6.75rem;padding:0;border-radius:var(--r-lg);border:.1875rem solid var(--sky-4);background:linear-gradient(180deg,var(--sky-1),#fff);box-shadow:inset 0 .1875rem .5rem rgba(120,170,200,.25);
+  color:var(--ink-strong);font:900 3.75rem/1 var(--font);text-align:center;text-transform:uppercase;caret-color:var(--line);outline:0;display:inline-grid;place-items:center}
+input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1875rem .5rem rgba(120,170,200,.25)}
+.code-boxes.is-static .code-box{border-color:var(--line);color:var(--me-ink);user-select:all}
+.code-boxes.is-bad .code-box{border-color:var(--bad)}
+.code-boxes.is-error{animation:nudge 420ms var(--ease-soft) 1}
+.code-err{min-height:1.5em;margin:calc(var(--s-3) * -1) 0;font-size:var(--t-md);font-weight:700;color:var(--bad-deep)}
+.share-link{display:flex;align-items:center;gap:var(--s-3);max-width:100%;padding:.5rem .5rem .5rem 1.25rem;border-radius:var(--r-pill)}
+.share-link .addr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-md);font-weight:700;color:var(--ink);user-select:all}
+
+/* HUD: the room code, small, next to the lights. It keeps its text when the lights collapse to dots. */
+.room-pill{cursor:pointer;font-family:var(--font);gap:.375rem;padding:0 .75rem}
+.status-lights.all-ok .status-pill.room-pill{font-size:max(var(--t-xs),11px);gap:.375rem;padding:0 .75rem;opacity:.9}
+.room-pill:hover,.room-pill:focus-visible{background:#fff;outline:0;box-shadow:var(--glow)}
+
+/* narrow / tall windows: stack the tiles as wide bars */
+@media (max-aspect-ratio: 1/1){
+  .menu-glass .menu-body{padding:var(--s-4);justify-content:safe center;overflow-y:auto}
+  .tiles{flex-direction:column;width:100%;align-items:center;gap:var(--s-3)}
+  .tile{flex-direction:row;justify-content:flex-start;width:min(34rem,100%);height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);font-size:var(--t-xl)}
+  .tile svg{width:4.75rem;height:4.75rem}
+  .menu-glass .logo-mark{font-size:6.25rem}
+  .btn-xl{min-width:0;width:min(21rem,100%)}
+  .code-box{width:4.75rem;height:6rem;font-size:3.25rem}
+  .seg-opt{min-width:0;padding:0 1.5rem}
+  .lobby-online{right:var(--s-4)} .btn-back{left:var(--s-3)}
+  .menu-glass .menu-foot{height:3.5rem;padding:0 var(--s-4)} .menu-glass .menu-foot .caps{display:none}
+  .safety{flex-direction:column;text-align:center;gap:var(--s-2)}
+}
+
+/* narrow windows (the root size is at or near its 10px floor, so the HUD no longer shrinks with the window): the scoreboard gives way to
+   the corners. Lights and room code stack in a column on the left, the webcam inset shrinks to the AirPod's width on the right. */
+@media (max-width: 900px){
+  .status-lights{flex-direction:column;align-items:flex-start;max-width:none}
+  .status-lights.all-ok{flex-direction:row;max-width:7rem}
+  .inset-cam{width:9rem} .inset-pod{top:calc(var(--edge) + 5.6875rem + .5rem)}       /* 5.6875rem = the smaller webcam frame's height */
+  .scoreboard{width:min(41rem, calc(100vw - 2 * (10rem + var(--edge))))}
+  .score-tab{flex:1 1 0;width:auto;min-width:0;gap:.375rem}
+  .score-num{min-width:2.25rem} .rally{min-width:3rem;padding:0 .375rem}
+  .score-tab .chip{display:none} .score-tab,.score-tab.is-them{padding:0 .75rem}       /* the coloured underline already says whose tab it is; the name and its sub-label need the room */
+}

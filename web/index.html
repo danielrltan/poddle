@@ -18,6 +18,7 @@
     <span class="status-pill is-wait" id="st-airpod"><span class="light"></span>AirPod</span>
     <span class="status-pill is-wait" id="st-game"><span class="light"></span>Game</span>
     <span class="status-pill is-wait" id="st-camera"><span class="light"></span>Camera</span>
+    <button class="status-pill room-pill" id="room-pill" hidden>Room <b id="room-code"></b></button>
   </div>
 
   <div class="scoreboard" id="board" data-fit>
@@ -30,7 +31,7 @@
     <div class="rally"><small>Rally</small><b id="rally">0</b></div>
     <div class="score-tab is-them">
       <span class="chip chip-them"></span>
-      <span class="score-who"><b id="name-them">Waiting…</b><small id="sub-them">Press B to add a bot</small></span>
+      <span class="score-who"><b id="name-them">Waiting</b><small id="sub-them"></small></span>
       <span class="serve-ind" id="sv-them"></span>
       <span class="score-num" id="sc-them">0</span>
     </div>
@@ -44,16 +45,16 @@
     Swing speed <b id="pw">0.0</b> rad/s<br>
     Paddle x <b id="px">0.0</b> · y <b id="py">1.0</b> m<br>
     Session peak <b class="big" id="pkmax">0.0</b><br>
-    Swings <b id="sw">0</b> · Average <b id="pkavg">–</b><br>
-    Last swings — power (range of motion)<br><span id="pklist">–</span><br>
-    Ping <b id="ping">–</b> · Connection <b id="netq">–</b> · <b id="nethz">60</b> Hz
+    Swings <b id="sw">0</b> · Average <b id="pkavg">-</b><br>
+    Last swings: power (range of motion)<br><span id="pklist">-</span><br>
+    Ping <b id="ping">-</b> · Connection <b id="netq">-</b> · <b id="nethz">60</b> Hz
   </div>
 
   <div class="keyhints" id="keys" data-fit>
     <ul>
       <li><span class="keycap">M</span>Move: <span id="mode">Body</span></li><li><span class="keycap">B</span>Bot</li><li><span class="keycap">1 2 3</span>Level</li>
       <li><span class="keycap">C</span>Calibrate</li><li><span class="keycap">R</span>Re-center</li><li><span class="keycap">[ ]</span>Range</li>
-      <li><span class="keycap">V</span>AirPod</li><li><span class="keycap">H</span>Stats</li><li><span class="keycap">F</span>Full screen</li>
+      <li><span class="keycap">V</span>AirPod</li><li><span class="keycap">H</span>Stats</li><li><span class="keycap">F</span>Full screen</li><li id="key-leave" hidden><span class="keycap">Q</span>Leave</li>
     </ul>
   </div>
 </div>
@@ -63,48 +64,110 @@
 <div class="inset inset-pod" id="podwrap" data-fit><div id="pod"></div></div>
 <div class="toast" id="toast" data-fit role="status"></div>
 
+<!-- ============================================== GLASS (shared ground of title + lobby: the live court, blurred) ============================================== -->
+<div class="glass" id="glass" aria-hidden="true"></div>
+
 <!-- ============================================== TITLE ============================================== -->
-<section class="screen menu-bg" id="screen-title" data-screen="title" hidden>
-  <div class="menu-body" style="gap:var(--s-7)">
+<section class="screen menu-glass" id="screen-title" data-screen="title" hidden>
+  <div class="menu-body" style="gap:var(--s-6)">
     <div class="logo" data-fit>
       <div class="logo-mark" aria-label="Poddle"><span class="lg-a">P</span><span class="logo-ball"></span><span class="lg-a">d</span><span class="lg-b">dle</span></div>
+      <p class="logo-tag">AirPod pickleball</p>
     </div>
-    <p class="logo-tag" style="margin-top:-1rem">AirPod Pickleball</p>
     <div class="title-prompt" data-fit>
-      <button class="btn btn-lg is-focus" id="btn-start">Swing to start</button>
-      <p class="t-note">or press <span class="keycap">Space</span></p>
+      <span class="room-chip" id="title-room" hidden>Joining room <b id="title-room-code"></b></span>
+      <button class="btn btn-xl is-focus" id="btn-start">Play</button>
+      <p class="t-note">or swing the AirPod</p>
     </div>
     <div class="panel panel-sm safety" id="safety" data-fit>
       <svg class="safety-icon" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="33" fill="#eaf6fc" stroke="#a9e0f6" stroke-width="2.5"/><g class="art-line" style="stroke-width:3.6"><circle cx="36" cy="21" r="5.5"/><path d="M36 28v17M36 45l-7 13M36 45l7 13M24 31l12 4 12-4"/></g><g class="art-accent" style="stroke-width:3.2"><path d="M13 30a24 24 0 0 0 0 16M59 30a24 24 0 0 1 0 16"/></g></svg>
       <div>
-        <h3>Make some room first</h3>
-        <p>Clear the space around you and check behind you before you swing. Hold the AirPod firmly in your hand — it has no strap — and leave the other one in its case.</p>
+        <h3>Clear some space</h3>
+        <p>Check behind you before you swing. Hold the AirPod tight, it has no strap.</p>
       </div>
     </div>
   </div>
-  <footer class="menu-foot"><span class="caps">Hack the North 2026</span><span>One AirPod · one webcam · first to 11, win by 2</span></footer>
+  <footer class="menu-foot"><span class="caps">Hack the North 2026</span><span>First to 11, win by 2</span></footer>
+</section>
+
+<!-- ============================================== LOBBY ============================================== -->
+<section class="screen menu-glass" id="screen-lobby" data-screen="lobby" hidden>
+  <header class="menu-head">
+    <button class="btn btn-sm btn-back" data-back><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Back</button>
+    <span class="menu-title" id="lobby-title">Play</span>
+    <span class="lobby-online" id="lobby-online" hidden></span>
+  </header>
+  <div class="menu-body">
+    <p class="lobby-down" id="lobby-down" role="status" hidden><span class="light"></span>Can’t reach the game. Trying again<span class="dots-wait"><i></i><i></i><i></i></span></p>
+
+    <div class="lobby-view lobby-home" id="lobby-home" data-view="home">
+      <div class="tiles" data-fit>
+        <button class="tile" id="btn-quick" data-nav>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><circle class="art-fill" cx="48" cy="48" r="34" style="stroke-width:4.5"/><path class="art-accent-fill" d="M40 33 66 48 40 63Z"/></svg>
+          <b>Quick play</b></button>
+        <button class="tile" id="btn-create" data-nav>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill" x="14" y="22" width="68" height="52" rx="14" style="stroke-width:4.5"/><path class="art-accent" d="M48 35v26M35 48h26" style="stroke-width:7"/></svg>
+          <b>Create room</b></button>
+        <button class="tile" id="btn-code" data-nav>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="10" y="30" width="22" height="36" rx="7"/><rect x="37" y="30" width="22" height="36" rx="7"/><rect x="64" y="30" width="22" height="36" rx="7"/></g><g class="art-accent" style="stroke-width:6"><path d="M21 44v8M48 44v8"/></g><path class="art-line" d="M75 42v12" style="stroke-width:3"/></svg>
+          <b>Enter code</b></button>
+      </div>
+      <div class="rooms" data-fit>
+        <h2 class="caps">Open rooms</h2>
+        <ul class="room-list" id="room-list"></ul>
+        <p class="t-note" id="room-empty">No open rooms. Quick play starts one.</p>
+      </div>
+    </div>
+
+    <div class="panel panel-narrow lobby-view" id="lobby-create" data-view="create" data-fit hidden>
+      <div class="seg" id="seg" role="radiogroup" aria-label="Room type">
+        <button class="seg-opt" role="radio" aria-checked="true" data-public="1">Public</button>
+        <button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-public="0">Private</button>
+      </div>
+      <p class="t-note" id="seg-note">Shows in open rooms</p>
+      <button class="btn btn-lg" id="btn-create-go">Create</button>
+    </div>
+
+    <div class="panel panel-narrow lobby-view" id="lobby-share" data-view="share" data-fit hidden>
+      <p class="caps">Room code</p>
+      <div class="code-boxes is-static" id="share-code" aria-live="polite"><span class="code-box"></span><span class="code-box"></span><span class="code-box"></span><span class="code-box"></span></div>
+      <div class="share-link well" id="share-row"><span class="addr" id="share-link"></span><button class="btn btn-sm" id="btn-copy">Copy link</button></div>
+      <button class="btn btn-lg" id="btn-share-go">Start</button>
+    </div>
+
+    <form class="panel panel-narrow lobby-view" id="lobby-code" data-view="code" data-fit hidden autocomplete="off">
+      <div class="code-boxes" id="code-boxes">
+        <input class="code-box" maxlength="4" aria-label="Code, 1 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+        <input class="code-box" maxlength="4" aria-label="2 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+        <input class="code-box" maxlength="4" aria-label="3 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+        <input class="code-box" maxlength="4" aria-label="4 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+      </div>
+      <p class="code-err" id="code-err" role="alert"></p>
+      <button class="btn btn-lg" id="btn-join" disabled>Join</button>
+    </form>
+  </div>
+  <footer class="menu-foot"><span></span><ul class="keyhints-inline"><li><span class="keycap">Esc</span>Back</li><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CONNECT ============================================== -->
 <section class="screen menu-bg" id="screen-connect" data-screen="connect" hidden>
-  <header class="menu-head"><span class="menu-title">Getting ready</span></header>
+  <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Back</button><span class="menu-title">Getting ready</span></header>
   <div class="menu-body">
     <div class="panel panel-mid" data-fit>
-      <h1 class="t-title">Connecting your gear</h1>
-      <p class="t-lead" style="margin:.5rem 0 1.5rem">This only takes a moment. We’ll begin as soon as your AirPod is connected.</p>
+      <h1 class="t-title" style="margin-bottom:1.5rem">Connect your AirPod</h1>
       <ul class="status-list">
-        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name">AirPod</b><span class="status-text" id="row-airpod-text">Waiting for motion data. Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
-        <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game server</b><span class="status-text" id="row-game-text">Looking for the game server…</span><em class="status-state" id="row-game-state">Waiting</em></li>
-        <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Choose “Allow” when the browser asks to use the camera.</span><em class="status-state" id="row-camera-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name">AirPod</b><span class="status-text" id="row-airpod-text">Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game</b><span class="status-text" id="row-game-text">Finding the game</span><em class="status-state" id="row-game-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Allow the camera when the browser asks.</span><em class="status-state" id="row-camera-state">Waiting</em></li>
       </ul>
     </div>
   </div>
-  <footer class="menu-foot"><span>No camera? Press M later to let the game move you instead.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+  <footer class="menu-foot"><span>Still waiting? Start the AirPod bridge on this Mac.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CALIBRATE ============================================== -->
 <section class="screen menu-bg" id="cal" data-screen="calibrate" hidden>
-  <header class="menu-head"><span class="menu-title">Calibration</span></header>
+  <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Back</button><span class="menu-title">Calibration</span></header>
   <div class="menu-body">
     <ol class="steps" id="steps"><li id="st1" class="is-on"><i>1</i>Hold still</li><li id="st2"><i>2</i>Tip up</li></ol>
     <div class="panel panel-cal" id="calcard" data-fit>
@@ -142,10 +205,10 @@
           <svg id="cal-up" viewBox="0 0 24 24" hidden><path d="M12 20V5M5 12l7-7 7 7"/></svg>
           <svg id="cal-check" viewBox="0 0 24 24" hidden><path d="M5 13l5 5 9-11"/></svg></span>
       </div>
-      <p class="cal-msg" id="calmsg">Waiting for the AirPod…</p>
+      <p class="cal-msg" id="calmsg">Waiting for the AirPod</p>
     </div>
   </div>
-  <footer class="menu-foot"><span>Any grip works — the game learns yours.</span><ul class="keyhints-inline"><li><span class="keycap">C</span>Start over</li></ul></footer>
+  <footer class="menu-foot"><span>Any grip works. The game learns yours.</span><ul class="keyhints-inline"><li><span class="keycap">C</span>Start over</li></ul></footer>
 </section>
 
 <!-- ============================================== MATCH RESULT ============================================== -->
@@ -158,7 +221,7 @@
       <span class="tally-num" id="tally-sc-me">11</span><span class="tally-dash"></span><span class="tally-num is-them" id="tally-sc-them">0</span>
       <div class="tally-side" id="tally-them"><span class="chip chip-them chip-lg"></span><b id="tally-name-them">Opponent</b></div>
     </div>
-    <div class="next-up"><span>New game starting…</span><div class="next-bar"><i></i></div></div>
+    <div class="next-up"><span>New game starting</span><div class="next-bar"><i></i></div></div>
   </div>
 </section>
 
@@ -167,9 +230,10 @@
   <div class="panel notice" id="down" data-fit>
     <div class="notice-icon well"><svg viewBox="0 0 68 68" aria-hidden="true"><g class="art-line" style="stroke-width:4.5"><rect x="9" y="12" width="50" height="18" rx="7"/><rect x="9" y="38" width="50" height="18" rx="7"/></g><circle cx="20" cy="21" r="3.5" fill="#ffb534"/><circle cx="20" cy="47" r="3.5" fill="#ffb534"/><path class="art-line" style="stroke-width:4.5" d="M34 21h16M34 47h16"/></svg></div>
     <div>
-      <h2>Can’t reach the game server</h2>
-      <p>Looking for it at <span class="addr" id="downurl"></span>. Start the game server on this computer and this message will close by itself.</p>
-      <p class="t-note" style="display:block;font-weight:500">Joining as Player 2? Check the host address after the # in the page address.</p>
+      <h2>Can’t reach the game</h2>
+      <p>No answer from <span class="addr" id="downurl"></span></p>
+      <p class="t-note" id="down-net" style="display:block;font-weight:500" hidden>Check your internet.</p>
+      <p class="t-note" id="down-lan" style="display:block;font-weight:500">Hosting? Run <span class="addr">node server/game.js</span> on this Mac. Joining a friend’s Mac? Check the address after the # in your link.</p>
       <p class="t-note is-wait"><span class="light"></span>Trying again<span class="dots-wait"><i></i><i></i><i></i></span></p>
     </div>
   </div>
@@ -180,7 +244,7 @@
     <div class="notice-icon well"><svg viewBox="0 0 68 68" aria-hidden="true"><g class="art-line" style="stroke-width:4.5"><circle cx="23" cy="24" r="8"/><path d="M8 52c1-11 8-15 15-15s14 4 15 15"/><circle cx="47" cy="24" r="8" style="stroke:#34beed"/><path d="M44 37c9-1 15 4 16 15" style="stroke:#34beed"/></g></svg></div>
     <div>
       <h2>This game is full</h2>
-      <p>Two players are already connected. When one of them leaves, choose Try again to take their place.</p>
+      <p>Two players are already in. Wait for one to leave.</p>
       <p class="t-note" style="margin-top:1rem"><button class="btn btn-sm is-focus" id="btn-retry">Try again</button></p>
     </div>
   </div>

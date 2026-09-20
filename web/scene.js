@@ -218,7 +218,7 @@ export function createScene(containerEl) {
   const view = { x: 0, y: 0, vx: 0, vy: 0, inX: 0, inY: 0, at: -9 };      // smoothed viewer offset + last setViewer()
 
   // lights: hemisphere fill + ONE shadow-casting sun, frustum fitted to court + player run-off
-  scene.add(new THREE.HemisphereLight(0xd6e9ff, 0x4f7a4a, 1.35));
+  const hemi = new THREE.HemisphereLight(0xd6e9ff, 0x4f7a4a, 1.35); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d2, 3.3);
   sun.position.set(-7, 16, 9); sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -235,6 +235,7 @@ export function createScene(containerEl) {
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
     }) }));
   scene.add(sky);
+  const plainSky = [sky];                                  // what web/scenery/ replaces when it loads (see docs/SCENERY.md)
   {
     const rnd = rng(7), geo = new THREE.SphereGeometry(1, 12, 8), mat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
     const clouds = new THREE.InstancedMesh(geo, mat, 70), m = new THREE.Matrix4(), q = new THREE.Quaternion(); let n = 0;
@@ -243,8 +244,13 @@ export function createScene(containerEl) {
       for (let k = 0; k < 5; k++) m.compose(new THREE.Vector3(cx + (k - 2) * sz * 0.8 + rnd() * 3, cy + rnd() * 2 - (k % 2) * 1.5, cz + rnd() * 6), q,
         new THREE.Vector3(sz * (1.1 - Math.abs(k - 2) * 0.22), sz * (0.55 - Math.abs(k - 2) * 0.1), sz * 0.8)), clouds.setMatrixAt(n++, m);
     }
-    scene.add(clouds);
+    scene.add(clouds); plainSky.push(clouds);
   }
+
+  // ---------- everything beyond the fences lives in web/scenery/ (docs/SCENERY.md). Missing or broken: the plain sky above stays. ----------
+  let scenery = null;
+  import('./scenery/index.js').then(m => { scenery = m.createScenery(THREE, { scene, renderer, camera, sun, hemi, fog: scene.fog, plainSky, court: () => court, side: () => localSide }); })
+    .catch(e => { if (!/Failed to fetch|Cannot find module|404/i.test(String(e && e.message))) console.error('scenery:', e); });
 
   // ---------- court (rebuilt by setCourt) ----------
   let courtGroup = null;
@@ -560,7 +566,7 @@ export function createScene(containerEl) {
       b.vel.y -= G * dt; b.pos.addScaledVector(b.vel, dt);
       if (b.pos.y < BALL_R) { b.pos.y = BALL_R; b.vel.y = Math.abs(b.vel.y) * 0.6; b.vel.x *= 0.75; b.vel.z *= 0.75; if (b.vel.y < 0.6) b.vel.y = 0; }
     }
-    ballMesh.visible = blob.visible = true; ballMesh.position.copy(b.pos);
+    ballMesh.visible = blob.visible = trailMesh.visible = true; ballMesh.position.copy(b.pos);
     if (b.pulse > 0) { b.pulse = Math.max(0, b.pulse - dt / 0.16); ballMesh.scale.setScalar(1 + 0.9 * b.pulse * b.pulse); } else ballMesh.scale.setScalar(1);
     updateFlash(dt);
     const sp2 = Math.hypot(b.vel.x, b.vel.z);
@@ -771,6 +777,8 @@ export function createScene(containerEl) {
     if (live) ball.seen = true;
   }
 
+  function hideBall() { ball.seen = ball.live = false; ballMesh.visible = blob.visible = trailMesh.visible = spinFx.visible = marker.visible = false; trail.pts.length = 0; }   // the match it belonged to is over (opponent left, back to the lobby)
+
   function resize() {
     const w = containerEl.clientWidth || window.innerWidth, h = containerEl.clientHeight || window.innerHeight;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(w, h);
@@ -781,7 +789,7 @@ export function createScene(containerEl) {
   function render(nowMs) {
     const now = nowMs == null ? performance.now() : nowMs;
     const dt = lastMs ? clamp((now - lastMs) / 1000, 0, 0.05) : 1 / 60; lastMs = now; timeS += dt;
-    updateBallVis(now, dt); updatePads(dt); updateFx(dt); updateCamera(dt);
+    updateBallVis(now, dt); updatePads(dt); updateFx(dt); updateCamera(dt); if (scenery) scenery.update(dt, timeS, camera);
     renderer.render(scene, camera);
   }
 
@@ -792,7 +800,7 @@ export function createScene(containerEl) {
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y)) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
-    updatePaddle, updateBall, onEvent, unlockAudio, render, resize,
+    updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize,
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam },                    // test harness only
   };
 }

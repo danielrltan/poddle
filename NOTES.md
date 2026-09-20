@@ -191,3 +191,39 @@ Build log for Hack the North 2026. What we tried, what broke, and how each probl
   and the new client logic. On a link like the one measured (4 % loss, 100-350 ms stalls), for the ball coming at the
   player: p95 error 223 cm -> 15 cm (6 cm at 30 Hz), frames frozen 2649 -> 0, backward jumps 322 -> 0. What is left is a
   hit by the other player that has not been heard about yet; nothing can predict that.
+
+## 15. Rooms, a main menu, and a copy pass
+- **Rooms** (`docs/ROOMS.md`). One process now hosts many matches. Everything that was one global game (players, ball,
+  score, bot, serve state, ball history) lives in a `createRoom()` closure; a thin lobby layer seats sockets (quick play,
+  create public or private, join by 4-character code, shareable `?room=CODE`), one 60 Hz loop steps every room, empty
+  rooms close after 30 s, 40 rooms at most. A socket without `lobby=1` still lands in the old single game (`LOCAL`), so
+  every older test runs unchanged.
+- **Menu.** Title with one Play button (a swing still starts it), then the lobby: Quick play, Create room, Enter code and
+  the list of open rooms, over the live court blurred behind glass.
+- **Attacked before it shipped.** A second agent was told to break the server and found three ways for ONE client to kill
+  the process, and with it every room: a deeply nested array as a join code, a deeply nested `ping` value (both blow the
+  stack in JSON), and `GET /%00`. Two of those were already live in the single-game server. Fixed: strings only, numbers
+  only, a 4 KB message cap, the whole message handler in a try/catch, 400 for a bad path, an error handler on the file
+  stream. `test/rooms.test.mjs` has a hostile-input section.
+- **Points scored against someone still calibrating.** A match started the moment the second human was seated. The serve
+  now waits until every human has sent a paddle; the other player sees "Setting up".
+- **Copy.** One pass over everything a player reads: no em dashes, one word per thing (AirPod, never bud or pod), nothing
+  said twice, online players are told to start the bridge, the server-down card gives hosted and LAN players different advice.
+- **Tests.** `test/rooms.test.mjs` (protocol, isolation between rooms, 60 packets/s in each of 10 rooms), `test/menu.mjs`
+  (91 UI checks against a fake lobby), `test/rooms-e2e.mjs` (two real browsers, create, join by code, calibrate, rally, leave).
+
+## 16. Scenery: everything beyond the fences (`web/scenery/`, `docs/SCENERY.md`)
+- **Brief:** "a more authentic LA scene, palm trees, some wind breeze lines, nice sky". Westside rec park at 3:30 pm: hills and
+  downtown north, a palm-lined stucco street east, lawn, sand, Pacific and a pier wheel west. All geometry and canvas, no assets.
+- **Gotcha:** the play camera's top of frame is 8.8 degrees up, so a 16 m palm crown only enters the shot beyond ~120 m. Near
+  rows read as trunks. What the player sees is a hazed skyline row 150-185 m out and the corner date palms; near crowns are
+  for the menu.
+- The ball shows a different face to each end: lit looking north, shaded looking south. One sky colour measured 1.04 : 1
+  against it. Fix: deep blue low sky everywhere except within 40 degrees of due south, which is milky. Now 1.3-1.4 north, 2.1-2.2 south.
+- Clouds lift 86 m over the play axis; a 40 m lift left cream cloud bases in the ball band 31-41 % of the time. Now 0 %.
+- Breeze lines may not enter 22 degrees either side of the play axis, so they fly 55-105 m out, across the view,
+  streak-curl-streak; the loop drifts downwind or it reads as a loading spinner.
+- Ground overlay z-fought with itself (layers 1.5 cm apart in one mesh). Fix: write no depth, order the index buffer by layer.
+- Arrival hitched 125 ms. Fix: one module per task, hidden, `compileAsync`, then swap old look for new in a single frame.
+- Budget: 21 draws / 62k triangles / 1 MB (low: 14 / 32k / 0.5 MB), +0.3 ms GPU at 2560x1440 on an M4. `?q=low|high` overrides.
+- Still open: the play view shows ~6 degrees of sky. A menu camera (eye 3.4 m, level gaze, fov 60) is where this pays off.

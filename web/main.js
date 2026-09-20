@@ -12,6 +12,7 @@ const BRIDGE = `ws://localhost:${qs.get('bridge') || 8787}`;
 const HOSTED = HOST === 'localhost' && !['localhost', '127.0.0.1', ''].includes(location.hostname);      // page came from the game server itself (fly.io)
 const GAME = HOSTED ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` : `ws://${HOST}:${qs.get('game') || 8080}`;
 const AUTOBOT = qs.get('autobot') === '1';
+const LOBBY = qs.get('skiptitle') !== '1';                       // ?skiptitle=1 is the legacy path: no lobby, the server seats the socket in room LOCAL at once (docs/ROOMS.md)
 // One id per tab, kept across reloads and reconnects: the server gives a returning tab its seat back instead of seating
 // it against its own half-dead socket (bad wifi drops connections without telling the server).
 let CID = ''; try { CID = sessionStorage.getItem('cid') || ''; if (!CID) sessionStorage.setItem('cid', CID = Math.random().toString(36).slice(2, 12)); } catch { CID = Math.random().toString(36).slice(2, 12); }
@@ -20,16 +21,18 @@ const model = new MotionModel();
 const scene = createScene($('stage'));
 const pod = createPodView($('pod'));
 ui.setServerAddress(GAME);
+if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
 const stats = window.__stats = { get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, state = null, players = 0, calibrating = true;
-// Flow: title -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
+// Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
+let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('room')) : '', pending = null, leaveAt = 0;   // room: seated here. wantRoom: from a shared link (or a reload). pending: the lobby request still waiting for its answer
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 if (qs.get('uitest') === '1') window.__ui = ui;                 // test hook: lets test/e2e.mjs force UI states for screenshots
 // body: webcam tracks where you actually stand. auto: server runs you to the ball. aim: wrist angle moves you.
-const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'Body Move — step to move, tilt the AirPod to walk', auto: 'Auto Move — the game runs for you, just swing', aim: 'Aim Move — turn your wrist to move' }, MODE_NAME = { body: 'Body', auto: 'Auto', aim: 'Aim' };
+const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'Body: step to move, tilt the AirPod to walk', auto: 'Auto: the game runs, you swing', aim: 'Aim: turn your wrist to move' }, MODE_NAME = { body: 'Body', auto: 'Auto', aim: 'Aim' };
 let sideDeg = 75, bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
 // critically damped follow (frame-rate independent): smooth, no overshoot
 function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
@@ -47,6 +50,8 @@ const s = () => (side === 0 ? 1 : -1);
 const say = (text, _color, ms = 1200) => ui.toast(text, ms);   // small pill toast
 let rally = 0;
 let oppName = 'Opponent';
+const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'B adds a bot', meSub: '' });      // the far side of the scoreboard with nobody on it. In a room the bot walks in by itself
+const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 
 // My serve: the ball hangs and follows late. One quiet nudge per serve, from the server's reach hint, never in reply to a swing.
 let svT = 0, svFar = 0, svSaid = true;
@@ -72,22 +77,47 @@ function logSwing(e) {
   ui.setStat('sw', peaks.length); ui.setStat('pkmax', sessionPeak.toFixed(1));
   ui.setStat('pkavg', (peaks.reduce((a, b) => a + b, 0) / peaks.length).toFixed(1));
 }
-function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw', 0); ui.setStat('pkmax', '0.0'); ui.setStat('pkavg', '–'); ui.setStat('pklist', '–'); }
+function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw', 0); ui.setStat('pkmax', '0.0'); ui.setStat('pkavg', '-'); ui.setStat('pklist', '-'); }
 
 // ---------- screens: title -> connect -> calibrate -> play ----------
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
 function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); ui.showScreen('calibrate'); }
-function begin() {                                 // leave the title: straight to calibration if the AirPod is already streaming
+function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once.
   if (phase !== 'title') return;
-  phase = 'connect'; if (airpodLive()) startCal(); else ui.showScreen('connect');
+  phase = 'lobby'; ui.showScreen('lobby');
+  if (wantRoom.length === 4) { ui.lobbyView('code', { code: wantRoom }); request({ type: 'join', code: wantRoom }); } else ui.lobbyView('home');
+}
+function begin() {                                 // seated: straight to calibration if the AirPod is already streaming, straight to the court if that is done too
+  phase = 'connect';
+  if (stats.calibrated && airpodLive()) { phase = 'play'; ui.showScreen(null); } else if (airpodLive()) startCal(); else ui.showScreen('connect');
+}
+let pendT = 0;
+function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
+function request(m) {                               // one lobby request at a time. Not connected right now: it goes out when the socket opens
+  if (pending) return; pending = m; ui.lobbyBusy(true); game.send(m);
+  pendT = setTimeout(() => { if (pending !== m) return; settle(); if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // an old server never answers: do not leave the lobby dimmed for good
+}
+function setUrl(code) { const u = new URL(location.href); if (code) u.searchParams.set('room', code); else u.searchParams.delete('room'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room
+const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?room=${code}`;      // a localhost link is no use to a friend
+function toLobby(msg) {                            // out of a room, back to the three choices. Calibration is kept.
+  room = null; wantRoom = ''; state = null; clearFar(); phase = 'lobby'; setUrl(null); settle();
+  ui.setRoom(null); ui.showOverlay(null); ui.showScreen('lobby'); ui.lobbyView('home');
+  ui.setScore(0, 0); ui.setServe(null); ui.setNames(alone());
+  if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
+}
+function back() {                                  // Back button / Esc, wherever it is
+  if (!LOBBY) return;
+  if (phase === 'lobby') { const v = ui.lobbyView(); if (room) { game.send({ type: 'leave' }); toLobby(); } else if (v !== 'home') ui.lobbyView('home'); else { phase = 'title'; ui.showScreen('title'); } }
+  else if (phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }
 }
 function refreshStatus() {
-  const setup = phase === 'title' || phase === 'connect';
+  const setup = phase === 'title' || phase === 'lobby' || phase === 'connect';
   ui.setStatus({ airpod: airpodLive() ? 'ok' : setup ? 'wait' : 'bad', game: link.g ? 'ok' : setup && !gameEver ? 'wait' : 'bad',
     camera: qs.get('cam') === '0' ? 'off' : !body ? 'wait' : body.ready ? 'ok' : 'off' });
   if (phase === 'calibrate' && !airpodLive()) ui.calibrationReset();      // stream dropped mid-calibration: say so
+  if (LOBBY) ui.lobbyLink(link.g || !gameEver && performance.now() < 2500);       // the lobby sits above the 'server down' card, so it says so itself (not in the first moments of a page load)
 }
-if (qs.get('skiptitle') === '1') { phase = 'connect'; ui.showScreen('connect'); } else ui.showScreen('title');
+if (!LOBBY) { phase = 'connect'; ui.showScreen('connect'); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : ''); ui.showScreen('title'); }
 refreshStatus(); setInterval(refreshStatus, 250);
 
 // ---------- sockets (auto-reconnect) ----------
@@ -97,10 +127,10 @@ function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
     const url = urls[i % urls.length]; let opened = false;
-    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID : url);
+    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (LOBBY ? '&lobby=1' + (room ? '&room=' + room : '') : '') : url);      // room: a reconnect asks for its seat back
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
-      if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Couldn’t reach the saved address — connected to this Mac instead', null, 2800); } }
+      if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Saved address didn’t answer. Using this Mac.', null, 2800); } }
       onopen && onopen(); };
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
     ws.onclose = () => { link[el] = false; ui.setLink(el, false);
@@ -117,14 +147,15 @@ const bridge = connect(BRIDGE, 'm', sample => {
   const power = Math.hypot(sample.r[0], sample.r[1], sample.r[2]);
   lastSample = performance.now();
   ui.setStat('pw', power.toFixed(1));
-  if (phase === 'title') { if (power > 12) begin(); return; }        // "Swing to start". The model is not fed until calibration
+  if (phase === 'title') { if (power > 12) play(); return; }         // a swing presses Play. The model is not fed until calibration
+  if (phase === 'lobby') return;
   if (phase === 'connect') startCal();                              //  begins, so a bud lying on the desk cannot calibrate itself.
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
     else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center();
-      // 'All set!' arrives in this same batch: hold the green card long enough to be read, then open the court
+      // 'All set' arrives in this same batch: hold the green card long enough to be read, then open the court
       setTimeout(() => { if (phase !== 'play') return; ui.showScreen(null);
-        setTimeout(() => { if (inPlay()) say(state && state.serving === side ? 'Your serve — swing to hit it!' : 'Calibrated — let’s play!', null, 2600); }, 380); }, 900); }     // after the fade
+        setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve. Swing to hit it.', null, 2600); }, 380); }, 900); }     // after the fade
     else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
       if (!calibrating) {
                 // Spin comes from any of three things, whichever is strongest: the paddle held level (a slice), the wrist
@@ -144,6 +175,22 @@ const bridge = connect(BRIDGE, 'm', sample => {
 
 const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
+  if (!LOBBY && ['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return;          // legacy path: no room UI, whatever the server says
+  if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online); return; }
+  if (m.type === 'room') {                                       // seated (the normal 'welcome' follows). Also the answer to a reconnect with room=CODE.
+    const made = pending && pending.type === 'create', again = room === m.code; settle(); room = m.code; wantRoom = '';
+    ui.setRoom(room, shareLink(room)); setUrl(room);
+    if (phase === 'lobby' && !again) { if (made) ui.lobbyView('share'); else begin(); }        // again: a reconnect got the seat back, the player stays where they were
+    return;
+  }
+  if (m.type === 'joinfail') {
+    const was = pending; settle(); wantRoom = '';
+    if (room) { toLobby('Room closed'); return; }                                            // a reconnect found the room gone
+    const text = { notfound: 'Room not found', full: 'Room is full', busy: 'No free rooms. Try again soon.' }[m.reason] || 'Couldn’t join';
+    setUrl(null); if (was && was.type === 'join' && ui.lobbyView() === 'code') ui.codeError(text); else say(text, null, 2600);
+    return;
+  }
+  if (m.type === 'left') { clearFar(); ui.setServe(null); if (inPlay()) say('Opponent left', null, 2200); return; }
   if (m.type === 'welcome') {
     side = m.side; if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(side);
@@ -156,29 +203,29 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     serveCoach(m);
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side];
-    players = o ? 2 : 1; if (!o) ui.setNames({ them: 'Waiting…', themSub: 'Press B to add a bot', meSub: '' }); else if (!o.bot) { oppName = side === 0 ? 'Player 2' : 'Player 1'; ui.setNames({ them: oppName, themSub: side === 0 ? 'Far side' : 'Near side', meSub: side === 0 ? 'Near side' : 'Far side' }); }
-    if (o) scene.updatePaddle(1 - side, { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot });
+    players = o ? 2 : 1; if (!o) ui.setNames(alone()); else if (!o.bot) { oppName = side === 0 ? 'Player 2' : 'Player 1'; ui.setNames({ them: oppName, themSub: o.wait ? 'Setting up' : side === 0 ? 'Far side' : 'Near side', meSub: side === 0 ? 'Near side' : 'Far side' }); }   // wait: they are still calibrating, the server holds the serve
+    scene.updatePaddle(1 - side, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot } : null);
     return;
   }
   if (m.type === 'botinfo') {
     if (m.active) { oppName = m.name + ' Bot'; ui.setNames({ them: oppName, themSub: '', meSub: '' }); }
-    if (m.reason) say('Can’t add a bot — two players are connected', null, 1800); else if (m.active && inPlay()) say(`Opponent: ${m.name} Bot`, null, 1400);
+    if (m.reason) say('Can’t add a bot with two players in', null, 1800); else if (m.active && inPlay()) say(`${m.name} Bot`, null, 1400);
     return;
   }
   if (m.type === 'pong') { net.pong(m); return; }
   if (m.type === 'full') { ui.showOverlay('game-full'); return; }
   if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === side ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
-    if (m.wait && m.by === side && inPlay()) say('Your serve — swing to hit it!', null, 2600); }
+    if (m.wait && m.by === side && inPlay()) say('Your serve. Swing to hit it.', null, 2600); }
   if (m.type === 'match') { const won = m.winner === side; ui.matchResult(won, m.score[side], m.score[1 - side], oppName); ui.setServe(null);
     setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s
     if (won) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); setTimeout(() => ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80), 900); } return; }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && !m.final) { const won = m.winner === side;
-    ui.pointBanner(won);                                         // exactly "Your point!" / "Enemy’s point!", nothing else
+    ui.pointBanner(won);                                         // exactly "Your point!" / "Their point", nothing else
     if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); }
   scene.onEvent(m);
-});
+}, () => { if (pending && !room) game.send(pending); });       // the request made while the socket was down
 
 // ---------- link quality ----------
 // The ball already rides out gaps by itself (scene.js coast()). This watches the connection so that (1) a swing can be
@@ -191,9 +238,9 @@ const net = (() => {
   setInterval(() => {                                                   // judged every 2 s
     const lateShare = gaps ? late / gaps : 0, rtt = rtts.length ? rtts[rtts.length - 1] : 0, poor = link.g && gaps > 10 && (lateShare > 0.04 || worst > 250 || floor() > 140);
     stats.net = { rtt: Math.round(rtt), floor: Math.round(floor()), late: +lateShare.toFixed(3), worst: Math.round(worst), hz };
-    ui.setStat('ping', link.g && rtts.length ? Math.round(rtt) + ' ms' : '–'); ui.setStat('netq', !link.g ? 'offline' : poor ? `weak (worst gap ${Math.round(worst)} ms)` : 'good'); ui.setStat('nethz', hz);
+    ui.setStat('ping', link.g && rtts.length ? Math.round(rtt) + ' ms' : '-'); ui.setStat('netq', !link.g ? 'offline' : poor ? `weak (worst gap ${Math.round(worst)} ms)` : 'good'); ui.setStat('nethz', hz);
     if (poor) { bad++; good = 0; } else { good++; bad = 0; }
-    if (bad >= 2 && hz === 60) { hz = 30; game.send({ type: 'net', hz }); if (!told && inPlay()) { told = true; say('Weak connection — smoothing it out', null, 2600); } }
+    if (bad >= 2 && hz === 60) { hz = 30; game.send({ type: 'net', hz }); if (!told && inPlay()) { told = true; say('Weak connection. Smoothing it out.', null, 2600); } }
     if (good >= 8 && hz === 30) { hz = 60; game.send({ type: 'net', hz }); }
     gaps = late = worst = 0;
   }, 2000);
@@ -206,7 +253,7 @@ const net = (() => {
 })();
 
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
-  if (calibrating) return;
+  if (calibrating || (LOBBY && !room)) return;
   const p = model.pose(performance.now());
   if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.Pd });
 }, 50);
@@ -214,15 +261,21 @@ setInterval(() => {                               // 20Hz: tell the server where
 // ---------- input ----------
 let unlocked = false;
 const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); } };
-addEventListener('pointerdown', () => { unlock(); begin(); });
-ui.onStart(() => { unlock(); ui.fullscreen(true); begin(); });          // the big title button (a click is a user gesture: go full screen)
+addEventListener('pointerdown', () => { unlock(); play(); });
+ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
+ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: pub }), join: code => request({ type: 'join', code }),
+  start: () => { if (room && phase === 'lobby') begin(); }, back, copied: () => say('Link copied', null, 1600) });
 ui.onRetry(() => location.reload());
 addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Tab'].includes(e.key)) return;   // browser shortcuts are not ours
   unlock();
   const k = e.key.toLowerCase();
+  if (e.target.tagName === 'INPUT') { if (k === 'escape') back(); return; }     // typing a room code: F, C, B, M are letters there
   if (k === 'f') { ui.fullscreen(); return; }
-  if (phase === 'title') { if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } begin(); if (k !== 'c') return; }   // first gesture: any key starts
+  if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
+  if (k === 'escape') { back(); return; }
+  if (phase === 'lobby') return;                                 // the lobby's keys live in ui.js; game keys wait for a room
+  if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say('Press Q again to leave', null, 2500); } return; }
   if (k === 'c') startCal();
   if (k === 'r') { model.recenter(); if (body) body.center(); say('Re-centered'); }
   if (k === 'p') resetPeaks();
@@ -230,7 +283,7 @@ addEventListener('keydown', e => {
   if (k === 'h') ui.toggle('dev');
   if (k === 'm') { let i = MODES.indexOf(mode); do { i = (i + 1) % 3; } while (MODES[i] === 'body' && !(body && body.ready)); setMode(MODES[i]); }
   if (k === '[' || k === ']') {                                  // [ = less sensitive, ] = more, for whichever move mode is on
-    if (usingBody()) { body.reach = Math.max(0.08, Math.min(0.42, body.reach + (k === ']' ? -0.03 : 0.03))); say(`Range: move ${(body.reach * 100).toFixed(0)}% of the camera view to reach the sideline`); }
+    if (usingBody()) { body.reach = Math.max(0.08, Math.min(0.42, body.reach + (k === ']' ? -0.03 : 0.03))); say(`Range: step ${(body.reach * 100).toFixed(0)}% of the view to reach the sideline`); }
     else { sideDeg = Math.max(25, Math.min(90, sideDeg + (k === ']' ? -5 : 5))); model.setSidelineDeg(sideDeg); say(`Range: turn ${sideDeg}° to reach the sideline`); }
   }
   if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty
@@ -268,7 +321,8 @@ let lastPos = null;
     if (lastPos && p.swinging) stats.paddlePath += Math.hypot(pos[0] - lastPos[0], pos[1] - lastPos[1], pos[2] - lastPos[2]);
     lastPos = pos;
   }
-  if (phase !== 'title' && ui.isVisible('podwrap')) pod.update(p.Pd);
+  if ((phase === 'title' || phase === 'lobby') && !matchMedia('(prefers-reduced-motion: reduce)').matches) scene.setViewer({ x: Math.sin(now / 5200) * 0.9, y: 0.35 + Math.sin(now / 7300) * 0.45 });   // glass menus: the court drifts slowly behind them
+  if (phase !== 'title' && phase !== 'lobby' && ui.isVisible('podwrap')) pod.update(p.Pd);
   scene.render(now);
 })(performance.now());
 

@@ -40,7 +40,7 @@ for (let i = 0; i < 600; i++) {
   await sleep(100);
   const st = await a.evaluate(() => window.__stats), u = await ui(a);
   if (!seen.tilt && u.screen === 'calibrate' && u.calh === 'Tip it up') { seen.tilt = true; await shot(a, '2-cal-tilt.png'); await shot(a, 'ui-4-calibrate2.png'); }
-  if (!seen.done && u.screen === 'calibrate' && u.calh === 'All set!') { seen.done = true; await shot(a, 'ui-4b-cal-done.png'); }     // the success beat must be held long enough to see
+  if (!seen.done && u.screen === 'calibrate' && u.calh === 'All set') { seen.done = true; await shot(a, 'ui-4b-cal-done.png'); }     // the success beat must be held long enough to see
   if (u.screen === 'hud' && u.toastOn && seen.toastTop == null) { seen.toastTop = u.toastTop; await shot(a, 'ui-5a-serve-toast.png'); }
   if (st.calibrated && !ok) { ok = true; console.log('calibrated at', (i / 10 + 3).toFixed(1), 's'); }
   if (u.banner && !seen.banner) { seen.banner = u.banner; seen.keysOnBanner = u.keys; await shot(a, 'ui-6-point-banner.png'); }
@@ -50,12 +50,12 @@ for (let i = 0; i < 600; i++) {
 }
 await a.screenshot({ path: root + 'test/shots/3-rally.png' });
 { const u = await ui(a);
-  check(seen.tilt, 'never saw calibration step 2 ("Tip it up")'); check(seen.done, 'never saw the "All set!" beat at the end of calibration');
+  check(seen.tilt, 'never saw calibration step 2 ("Tip it up")'); check(seen.done, 'never saw the "All set" beat at the end of calibration');
   check(u.pod.w > 0 && u.pod.bottom < 0.55, `AirPod inset reaches into the near court (bottom at ${(u.pod.bottom * 100).toFixed(0)}% of the height)`); check(!u.meter, 'stats panel still has a meter bar');
   check(seen.toastTop == null || seen.toastTop > 0.88, `HUD toast sits over the court (top at ${(seen.toastTop * 100).toFixed(0)}% of the height)`); check(u.screen === 'hud' && u.hud, `HUD not showing after calibration (screen=${u.screen})`);
   check(u.g === 'live', `#g is "${u.g}", expected "live"`); check(!u.dev, 'stats panel visible by default'); check(u.camCaption === '', 'webcam inset has a caption');
   check(/Poddle Rounded/.test(u.font) && !/mono/i.test(u.font), 'body font is ' + u.font); check(/Poddle Rounded/.test(u.fontsLoaded), 'vendored font did not load: ' + u.fontsLoaded);
-  check(!seen.banner || ['Your point!', 'Enemy’s point!'].includes(seen.banner), 'banner text was "' + seen.banner + '"');
+  check(!seen.banner || ['Your point!', 'Their point'].includes(seen.banner), 'banner text was "' + seen.banner + '"');
   check(!seen.callout || SHOT_NAMES.includes(seen.callout), 'callout text was "' + seen.callout + '"');
   await sleep(500); check((await ui(a)).calHidden, '#cal not hidden once calibrated');
   console.log('ui seen:', JSON.stringify(seen), '| fonts:', u.fontsLoaded); }
@@ -71,7 +71,7 @@ for (let k = 0; k < 6 && !matchShown; k++) { await a.evaluate(() => { window.__u
 check(matchShown, 'match result overlay did not open'); await a.evaluate(() => window.__ui.showOverlay(null));
 const st = await a.evaluate(() => window.__stats), st1 = b ? await b.evaluate(() => window.__stats) : null;
 console.log('p0', JSON.stringify(st)); console.log('camera', JSON.stringify(await a.evaluate(() => window.__stats.cam))); if (st1) console.log('p1', JSON.stringify(st1));
-// title -> connect, driven like a player would (after the match pages are done, so it cannot take a seat from them). No AirPod on this one.
+// title -> lobby -> connect, driven like a player would (after the match pages are done, so it cannot take a seat from them). No AirPod on this one.
 { await a.close(); if (b) await b.close();
   const pg = await browser.newPage();
   pg.on('console', m => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|WebSocket connection/.test(m.text())) errs.push(`[title] ${m.text()}`); });
@@ -79,7 +79,9 @@ console.log('p0', JSON.stringify(st)); console.log('camera', JSON.stringify(awai
   await pg.goto(`http://localhost:${W}/?bridge=${DEAD}&game=${G}`); await sleep(1500);
   check((await ui(pg)).screen === 'title', 'title screen not showing on a plain load'); await shot(pg, 'ui-1-title.png');
   await pg.keyboard.press('Space'); await sleep(900);
-  check((await ui(pg)).screen === 'connect', 'Space on the title did not open the connect screen'); await shot(pg, 'ui-2-connect.png');
+  check((await ui(pg)).screen === 'lobby', 'Space on the title did not open the lobby');
+  await pg.keyboard.press('Enter'); await sleep(1200);        // Quick play is focused
+  check((await ui(pg)).screen === 'connect', 'Quick play did not reach the connect screen'); await shot(pg, 'ui-2-connect.png');
   await pg.keyboard.press('KeyC'); await sleep(700); check((await ui(pg)).screen === 'calibrate', 'C did not open calibration'); await pg.close(); }
 console.log(errs.length ? 'CONSOLE ERRORS:\n' + errs.join('\n') : 'no console errors');
 console.log(uiFails.length ? 'UI CHECKS FAILED:\n' + uiFails.join('\n') : 'ui checks ok');

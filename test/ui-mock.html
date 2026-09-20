@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <link rel="icon" href="data:,">
-<title>Poddle — UI mock</title>
+<title>Poddle UI mock</title>
 <link rel="stylesheet" href="../web/ui.css">
 <style>
   /* mock-only: placeholder court, frozen animation frames for screenshots, and the contact sheet */
@@ -73,17 +73,17 @@
     const R = {
       'title': () => ui.showScreen('title'),
       'connect': () => { ui.setStatus({ airpod: 'wait', game: 'ok', camera: 'wait' }); ui.showScreen('connect'); },
-      'calibrate1': () => cal({ stage: 'hold', progress: .62, ok: true, msg: 'Hold it like a paddle, pointed at the screen. Keep still…' }),
+      'calibrate1': () => cal({ stage: 'hold', progress: .62, ok: true, msg: 'Hold it like a paddle, pointed at the screen. Keep still.' }),
       'calibrate2': () => cal({ stage: 'tilt', progress: .4, ok: true, msg: 'Now tip the front of the AirPod up.' }),
-      'calibrate-error': () => qs.get('err') === 'twist' ? cal({ stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' }) : cal({ stage: 'hold', progress: 0, ok: false, msg: 'You moved — hold still and we’ll start again.' }),
-      'calibrate-done': () => cal({ stage: 'tilt', progress: 1, ok: true, msg: 'All set!' }),
-      'calibrate-settle': () => cal({ stage: 'tilt', progress: .5, ok: true, msg: 'Good — now hold it how you’ll play.' }),
+      'calibrate-error': () => qs.get('err') === 'twist' ? cal({ stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist. Level out, then tip it straight up.' }) : cal({ stage: 'hold', progress: 0, ok: false, msg: 'You moved. Hold still.' }),
+      'calibrate-done': () => cal({ stage: 'tilt', progress: 1, ok: true, msg: 'All set' }),
+      'calibrate-settle': () => cal({ stage: 'tilt', progress: .5, ok: true, msg: 'Good. Now hold it how you’ll play.' }),
       'hud': () => hud(),
       'hud-stats': () => { hud(); ui.toggle('dev'); ui.setStat('pw', '12.4'); ui.setStat('px', '0.8'); ui.setStat('py', '1.1'); ui.setStat('pkmax', '31.2'); ui.setStat('sw', 14); ui.setStat('pkavg', '19.6'); ui.setStat('pklist', '22 (96°) · × (31°) · 30 (128°) · 17 (74°) · 26 (110°)'); },
       'hud-callout': () => { hud(7, 5, 5); ui.callout(qs.get('kind') || 'smash', qs.get('them') === '1'); },
       'hud-point-you': () => { hud(8, 5, 0); ui.pointBanner(true); },
       'hud-point-enemy': () => { hud(7, 6, 0); ui.pointBanner(false); },
-      'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve — swing to hit it!', 1e6); },
+      'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve. Swing to hit it.', 1e6); },
       'hud-airpod-lost': () => { hud(); ui.setStatus({ airpod: 'bad' }); ui.toast('AirPod signal lost', 1e6); },
       'match-win': () => { hud(11, 8, 0); ui.setServe(null); ui.matchResult(true, 11, 8, 'Club Bot'); },
       'match-lose': () => { hud(9, 11, 0); ui.setServe(null); ui.matchResult(false, 9, 11, 'Club Bot'); },
