@@ -153,7 +153,7 @@ export function createScene(containerEl) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(new THREE.Color(COL.horizon), 38, 160);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.3, 500);
-  const cam = { x: 0, shake: 0, fovBase: 50 };
+  const cam = { x: 0, shake: 0, fovBase: 58 };
 
   // lights: hemisphere fill + ONE shadow-casting sun, frustum fitted to court + player run-off
   scene.add(new THREE.HemisphereLight(0xd6e9ff, 0x4f7a4a, 1.35));
@@ -244,7 +244,7 @@ export function createScene(containerEl) {
       c.fillStyle = '#0f3a29'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 10, w, 10);
       c.font = '800 96px "Avenir Next", "Helvetica Neue", Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.fillStyle = 'rgba(255,255,255,0.86)';
-      for (const x of [w * 0.2, w * 0.5, w * 0.8]) c.fillText('AIRPOD  PICKLEBALL', x, h / 2 + 4, w * 0.27);
+      for (const x of [w * 0.2, w * 0.5, w * 0.8]) c.fillText('PODDLE', x, h / 2 + 4, w * 0.27);
       c.fillStyle = '#f5d53a'; for (const x of [w * 0.35, w * 0.65]) { c.beginPath(); c.arc(x, h / 2, 26, 0, 7); c.fill(); }
     });
     const screenM = new THREE.MeshStandardMaterial({ map: banner, roughness: 0.95 });
@@ -479,8 +479,8 @@ export function createScene(containerEl) {
     cam.x = lerp(cam.x, me.has ? me.pos.x * 0.35 : 0, damp(dt, 0.25));
     cam.shake = Math.max(0, cam.shake - dt * (0.35 + cam.shake * 6));
     const k = cam.shake, t = timeS * 1000;
-    camera.position.set(cam.x + Math.sin(t * 0.093) * k, 2.7 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 4.8) + Math.sin(t * 0.071 + 2) * k * 0.5);
-    camera.lookAt(cam.x * 0.45, 0.85, 0);
+    camera.position.set(cam.x + Math.sin(t * 0.093) * k, 3.5 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 4.3) + Math.sin(t * 0.071 + 2) * k * 0.5);
+    camera.lookAt(cam.x * 0.45, 0.0, s * 1.4);
   }
 
   // ---------- WebAudio, no assets ----------

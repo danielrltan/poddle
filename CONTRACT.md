@@ -1,4 +1,4 @@
-# AirPod Pickleball — architecture contract (read fully before writing code)
+# Poddle — architecture contract (read fully before writing code)
 
 Two-player Wii-Sports-style pickleball. Each player holds ONE AirPod in their hand as the paddle.
 The only sensor is the AirPod IMU at ~50Hz: attitude quaternion, rotation rate, user acceleration.

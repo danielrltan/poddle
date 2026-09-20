@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <link rel="icon" href="data:,">
-<title>Poddle — AirPod Pickleball</title>
+<title>Poddle</title>
 <style>
   [hidden]{display:none!important}
   html,body{margin:0;height:100%;background:#0b0f14;color:#e6edf3;font:13px ui-monospace,Menlo,monospace;overflow:hidden}
@@ -33,7 +33,7 @@
   airpod <span id="m" class="bad">off</span> · game <span id="g" class="bad">off</span> · side <span id="side">?</span><br>
   power <span id="pw">0.0</span> rad/s
   <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
-  paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m
+  paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m · move <span id="mode" class="warn">auto</span>
 </div>
 <div id="score" class="panel">0 : 0</div>
 <div id="peaks" class="panel">
@@ -42,7 +42,7 @@
 </div>
 <div id="hint" class="panel dim">
   <span id="bothint" class="warn" hidden>alone? press <b>B</b> to play the bot<br></span>
-  <b>C</b> calibrate · <b>R</b> re-center · <b>B</b> bot · <b>P</b> reset peaks
+  <b>M</b> move mode · <b>C</b> calibrate · <b>R</b> re-center · <b>B</b> bot · <b>P</b> reset peaks
 </div>
 <div id="msg"></div>
 

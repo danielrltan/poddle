@@ -21,8 +21,9 @@ browser ◀──────────────── ws :8080 ───�
   about a second), so Poddle is built on what the sensor is good at: *orientation* and *rotation rate*.
 - **Two-step calibration** makes it grip-independent: hold still for 5 s, then tip the bud up. The tilt axis tells the
   game which way is "right" and "up" for however you're holding it and whichever way you're facing.
-- **Aim = position.** Turning the bud left/right moves the paddle across the court, tipping it up/down sets height.
-  Forward/back footwork is automatic, like Wii Sports.
+- **Footwork is automatic, like Wii Sports tennis** (which never tracked where you stood either). The game runs you
+  to the ball at a finite speed; you own the timing, direction, power and lob of the swing. Press **M** for the
+  experimental aim-move mode, where turning the bud left/right moves the paddle across the court instead.
 - **Swings** fire when rotation rate passes 9 rad/s (real swings peak around 35). Sweep direction aims the shot, an
   upward scoop lobs it, peak speed sets power. The aim is locked from just before the wind-up until your hand comes
   back, so a follow-through doesn't drag you across the court.
@@ -50,7 +51,7 @@ python3 -m http.server 3000 -d web         # every player's Mac
 - Player 2 opens `http://localhost:3000/#<host-LAN-IP>`
 - Alone? Press **B** for a bot.
 
-Keys: **C** calibrate · **R** re-center (yaw drifts over minutes) · **B** bot · **P** reset the swing-peak logger.
+Keys: **M** move mode · **C** calibrate · **R** re-center (yaw drifts over minutes) · **B** bot · **P** reset the swing-peak logger.
 
 ## Tests
 

@@ -7,6 +7,7 @@ const G = 9.81, R = 0.11;                 // gravity, ball radius
 const HIT_LINE = 6.5;                     // where you stand by default (distance from net)
 const X_LIMIT = 3.8, Y_MIN = 0.3, Y_MAX = 2.3;
 const Z_NEAR = 2.6, Z_FAR = 8.4;          // footwork range (distance from net)
+const AUTO_SPEED = 5.5;                   // sideways run speed in auto-move mode, m/s
 const FOOT_SPEED = 7;                     // auto-footwork forward/back, m/s
 const STANCE = 0.3;                       // stand this far behind the predicted contact: you meet the ball out in front
 const SWING_WINDOW = 0.32;                // s a swing stays "live" waiting for the ball
@@ -118,6 +119,16 @@ function addBot() {
   startMatch(players[0].side);
 }
 // Beatable on purpose: slow to react, limited foot speed, misjudges x a little, only swings at a ball close to its paddle.
+// Auto-footwork for humans: run to where the ball will be, drift home between shots. Foot speed is finite,
+// so a wide enough shot still beats you.
+function runAuto(pl, dt) {
+  const incoming = ball.live && ball.lastHit !== pl.side;
+  const tgt = incoming ? (pl.contact || [ball.p[0], 1.0]) : [0, 1.0];
+  const vx = incoming ? AUTO_SPEED : 2.5;
+  pl.x = clamp(pl.x + clamp(tgt[0] - pl.x, -vx * dt, vx * dt), -X_LIMIT, X_LIMIT);
+  pl.y += clamp(clamp(tgt[1], Y_MIN, Y_MAX) - pl.y, -4 * dt, 4 * dt);
+}
+
 function runBot(pl, dt) {
   if (!ball.live || ball.lastHit === pl.side) { pl.x += (0 - pl.x) * 2 * dt; pl.y += (1.0 - pl.y) * 2 * dt; return; }
   if (now < pl.react) return;
@@ -148,8 +159,11 @@ wss.on('connection', ws => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m !== 'object') return;
     if (m.type === 'paddle') {
-      me.x = clamp(num(m.x, me.x), -X_LIMIT, X_LIMIT);
-      me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
+      me.auto = !!m.auto;                                        // auto: the server runs you to the ball, you just swing
+      if (!me.auto) {
+        me.x = clamp(num(m.x, me.x), -X_LIMIT, X_LIMIT);
+        me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
+      }
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
     } else if (m.type === 'swing') {
       me.swing = { until: now + SWING_WINDOW, n: clamp((num(m.power, 9) - 9) / 26, 0, 1), dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
@@ -172,7 +186,7 @@ function step() {
   if (!ball.live && now >= serveAt) { serveAt = Infinity; if (players.length === 2) reset(server); }
 
   for (const pl of players) {
-    if (pl.bot) runBot(pl, DT);
+    if (pl.bot) runBot(pl, DT); else if (pl.auto) runAuto(pl, DT);
     if (pl.lunge && now < pl.lunge.until) {                     // just hit: step into the ball so it leaves from the paddle
       pl.z += clamp(pl.lunge.z - pl.z, -3 * FOOT_SPEED * DT, 3 * FOOT_SPEED * DT);
       continue;

@@ -14,6 +14,7 @@ const scene = createScene($('stage'));
 const stats = window.__stats = { hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, state = null, players = 0, calibrating = true;
+let autoMove = qs.get('move') !== 'aim';                 // auto: server runs you to the ball. aim: wrist angle moves you.
 const s = () => (side === 0 ? 1 : -1);
 
 // ---------- messages ----------
@@ -102,7 +103,7 @@ const game = connect(GAME, 'g', m => {
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', x: p.x * s(), y: p.y, q: p.P });
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoMove, x: p.x * s(), y: p.y, q: p.P });
 }, 50);
 
 // ---------- input ----------
@@ -115,6 +116,7 @@ addEventListener('keydown', e => {
   if (k === 'c') startCal();
   if (k === 'r') { model.recenter(); say('re-centered', '#ffe066'); }
   if (k === 'p') resetPeaks();
+  if (k === 'm') { autoMove = !autoMove; $('mode').textContent = autoMove ? 'auto' : 'aim'; say(autoMove ? 'auto-move: you just swing' : 'aim-move: turn your wrist to move', '#ffe066', 1600); }
   if (k === 'b') { game.send({ type: 'bot' }); say('bot requested', '#ffe066'); }
 });
 addEventListener('resize', () => scene.resize());
@@ -127,8 +129,9 @@ let lastPos = null;
   if (p.calibrated) {
     const mine = state && state.paddles[side];
     const z = mine ? mine.z : s() * 6.5;
-    scene.updatePaddle(side, { x: p.x * s(), y: p.y, z, q: p.P, offset: p.offset, bot: false });
-    $('px').textContent = p.x.toFixed(1); $('py').textContent = p.y.toFixed(1);
+    const wx = autoMove && mine ? mine.x : p.x * s(), wy = autoMove && mine ? mine.y : p.y;
+    scene.updatePaddle(side, { x: wx, y: wy, z, q: p.P, offset: p.offset, bot: false });
+    $('px').textContent = (wx * s()).toFixed(1); $('py').textContent = wy.toFixed(1);
     const pos = [p.x + p.offset[0], p.y + p.offset[1], p.offset[2]];
     if (lastPos && p.swinging) stats.paddlePath += Math.hypot(pos[0] - lastPos[0], pos[1] - lastPos[1], pos[2] - lastPos[2]);
     lastPos = pos;
