@@ -135,3 +135,27 @@ Build log for Hack the North 2026. What we tried, what broke, and how each probl
   were changed on purpose (`test/motion.test.mjs`, `test/latency.mjs`, `test/rom.mjs`, parts of
   `test/server.test.mjs`). The tests that reflect the current game are: real, serve, kitchen, deep, slice, lagcomp,
   feel, hitblend, bot, parallax, strokes and e2e.
+
+## 13. Balancing the shot types
+- **"Everything is a slice or a lob."** Spin had been allowed from three sources, one of them "the paddle is held level".
+  This player rests the AirPod flat in the hand, so the paddle read level nearly all the time and 55 % of real swings
+  came out as slices. The level-paddle input was removed; spin now comes only from a rolling wrist or a curved "C"
+  shaped swing, with thresholds set above what ordinary swings do (the rotation axis of a plain swing wanders about
+  0.4 rad, p75 about 1.1; roll about 0.2, p75 about 0.5).
+- **Lobs from normal swings.** A low-to-high forehand has a real upward component, so a loose underhand rule turned
+  drives into lobs. A lob now needs more than half the stroke to be going up.
+- **Smashes labelled as slices.** A hard hit that also carried spin was called a slice. Power now wins the label: a hard
+  hit is a smash, and it keeps its spin (drawn purple).
+- **How it was measured.** `node test/kinds.mjs` replays the three real recordings (140 swings) through the client's and
+  server's own classification code and prints the mix. Slices went from 55 % to about 17-20 %, drives from 6 % to over
+  20 %, smashes from 4 % to 16 %. Caveat: a replay cannot know the player's real calibration, so the underhand and
+  overhead shares are only roughly right; the curve ("turn") measure is calibration-independent.
+- **The on-screen shot names were removed.** Even when right they were more confusing than helpful. Classification still
+  runs underneath and drives the ball trail and the impact effects.
+- **Smash effects.** The trail fattens and flickers like a flame, sheds embers, and the impact adds a large ring, a
+  bigger flash and a harder shake; with spin the whole thing turns purple.
+- **Calibration nagged too early.** The hold step flagged movement the instant the screen appeared and at only 10 degrees
+  of wobble. It now allows 17 degrees and stays quiet for the first 2.5 s while the player gets into position.
+- **A blur that never switched off.** The paddle's motion blur was first triggered by how fast the paddle tip moved
+  through the court, which also happens when the camera-tracked body moves or the footwork carries the player. It is
+  now tied to the swing event itself and its brightness follows how hard the swing is.
