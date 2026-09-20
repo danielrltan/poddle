@@ -18,7 +18,7 @@ export const DEFAULTS = {
   WINDUP_MAX: 0, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
-  TRIGGER: 11, PEAK_WINDOW: 0.16, REARM: 3,
+  TRIGGER: 9, PEAK_WINDOW: 0.16, REARM: 3, TAP: 6,
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
   ROM_IDLE: 4, ROM_MIN: 25, ROM_FULL: 45, ROM_T_MIN: 0.04, ROM_T_FULL: 0.07,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
   LOB_GAIN: 0.8,
@@ -233,10 +233,13 @@ export class MotionModel {
         const n = len(sw.sum) || 1, rom = sw.sweep / DEG;
         sw.sent = true;
         sw.eff = sw.peak * Math.min(clamp((rom - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1), clamp((this.romT - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1));
-        if (sw.eff >= c.TRIGGER) ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom, dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN });
+        // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
+        // never a smash, however fast it was.
+        sw.eff = Math.max(c.TAP, sw.eff);
+        if (true) ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom, dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN });
         else ev.push({ type: 'flick', raw: sw.peak, rom });           // fast but tiny: tell the player to use their arm
       }
-      if (done) { ev.push({ type: 'swingEnd', peak: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, counted: sw.eff >= c.TRIGGER }); this.sw = null; }
+      if (done) { ev.push({ type: 'swingEnd', peak: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, counted: true }); this.sw = null; }
     }
     this.prevRate = rate;
 

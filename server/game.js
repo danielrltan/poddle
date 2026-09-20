@@ -41,9 +41,10 @@ function newPlayer(ws, side) {
 function solve(p, side, n, dir, lob) {
   const s = sgn(side);
   let tx = s * clamp(dir * 2.4, -2.5, 2.5);
-  const tz = -s * (lerp(4.7, 3.4, n) + lob * 1.2);
+  // power decides the shot: a tap is a slow dink that drops in the kitchen, a full swing is a fast drive to the baseline
+  const tz = -s * Math.min(6.2, lerp(2.0, 5.9, n) + lob * 0.8);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
-  let T = lerp(1.15, 0.78, n) + lob * 0.55, v;
+  let T = lerp(1.3, 0.58, Math.pow(n, 0.85)) + lob * 0.6, v;
   for (let i = 0; i < 80; i++) {
     v = [(tx - px) / T, (R - py) / T + 0.5 * G * T, (tz - pz) / T];
     const tn = -pz / v[2];                                  // time the ball crosses the net plane (always > 0)
@@ -218,7 +219,8 @@ wss.on('connection', ws => {
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
     } else if (m.type === 'swing') {
-      me.swing = { until: now + SWING_WINDOW, n: clamp((num(m.power, 9) - 9) / 26, 0, 1), dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
+      me.swing = { until: now + SWING_WINDOW, n: clamp((num(m.power, 6) - 6) / 28, 0, 1),                  // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
+         dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
       broadcast({ type: 'swung', side: me.side });
     } else if (m.type === 'bot') botRequest(me, m.level);
   });
