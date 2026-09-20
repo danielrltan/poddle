@@ -23,7 +23,9 @@ browser ◀──────────────── ws :8080 ───�
   ~65 ms in the past and only ever interpolates between real samples (roughness 565% -> 9% of a frame step).
 - **Two-step calibration** makes it grip-independent: hold still for 5 s, then tip the bud up. The tilt axis tells the
   game which way is "right" and "up" for however you're holding it and whichever way you're facing.
-- **Footwork is automatic, like Wii Sports tennis** (which never tracked where you stood either). The game runs you
+- **Real sideways movement comes from the webcam** (`web/bodytrack.js`): a face detector, with a body-pose fallback,
+  tracks where you stand and maps the camera's view onto the court, at any distance. No camera? It falls back.
+- **Or footwork can be automatic, like Wii Sports tennis** (which never tracked where you stood either). The game runs you
   to the ball at a finite speed; you own the timing, direction, power and lob of the swing. Press **M** for the
   experimental aim-move mode, where turning the bud left/right moves the paddle across the court instead.
 - **Swings need range of motion, not a wrist flick.** Power = peak rotation rate x credit for the angle swept and how
@@ -54,7 +56,7 @@ python3 -m http.server 3000 -d web         # every player's Mac
 - Player 2 opens `http://localhost:3000/#<host-LAN-IP>`
 - Alone? A bot joins by itself after 2.5 s. **B** cycles Rookie / Club / Pro, or press **1 2 3**.
 
-Keys: **M** move mode · **C** calibrate · **R** re-center (yaw drifts over minutes) · **B** bot · **P** reset the swing-peak logger.
+Keys: **M** move mode (body / auto / aim) · **[ ]** sensitivity · **V** AirPod inset · **C** calibrate · **R** re-center (yaw drifts over minutes) · **B** bot · **P** reset the swing-peak logger.
 
 ## Tests
 

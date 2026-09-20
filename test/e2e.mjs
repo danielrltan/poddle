@@ -13,7 +13,7 @@ const done = code => { for (const p of procs) p.kill(); process.exit(code); };
 await new Promise(r => setTimeout(r, 1500));
 fs.mkdirSync(root + 'test/shots', { recursive: true });
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new',
-  args: ['--window-size=1440,900', '--use-gl=angle', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'], defaultViewport: { width: 1440, height: 900 } });
+  args: ['--window-size=1440,900', '--use-gl=angle', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'], defaultViewport: { width: 1440, height: 900 } });
 const errs = [];
 async function open(name, query) {
   const page = await browser.newPage();
@@ -37,7 +37,7 @@ await a.screenshot({ path: root + 'test/shots/3-rally.png' });
 for (let i = 0; i < 25; i++) { await new Promise(r => setTimeout(r, 120)); const sw = await a.evaluate(() => document.getElementById('pw').textContent); if (+sw > 12) { await a.screenshot({ path: root + 'test/shots/4-midswing.png' }); break; } }
 if (b) await b.screenshot({ path: root + 'test/shots/5-side1.png' });
 const st = await a.evaluate(() => window.__stats), st1 = b ? await b.evaluate(() => window.__stats) : null;
-console.log('p0', JSON.stringify(st)); if (st1) console.log('p1', JSON.stringify(st1));
+console.log('p0', JSON.stringify(st)); console.log('camera', JSON.stringify(await a.evaluate(() => window.__stats.cam))); if (st1) console.log('p1', JSON.stringify(st1));
 console.log(errs.length ? 'CONSOLE ERRORS:\n' + errs.join('\n') : 'no console errors');
 await browser.close();
 // two-player mode uses blind scripted players in a throttled background tab, so only require a clean session there

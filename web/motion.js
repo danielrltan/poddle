@@ -7,18 +7,19 @@ export const DEFAULTS = {
   HOLD_MS: 5000, HOLD_DEG: 10,              // step 1: still within HOLD_DEG for HOLD_MS
   TILT_DEG: 25, TILT_MIN_HORIZ: 0.75,       // step 2: tip up; axis must be mostly horizontal
   TILT_REARM_DEG: 12,                       // after a rejected twist, come back inside this before retrying
-  X_SIN: 3.0 / Math.sin(58 * DEG), X_MAX: 3.5,   // lateral metres = X_SIN * sin(yaw): follows the sideways travel of a hand on an arm; sideline at ~58 deg
+  X_SIN: 3.0 / Math.sin(75 * DEG), X_MAX: 3.5,   // lateral metres = X_SIN * sin(yaw): follows the sideways travel of a hand on an arm; sideline at ~75 deg (setSidelineDeg changes it live)
   Y_MID: 1.0, Y_PER_RAD: 0.9 / (45 * DEG), Y_MIN: 0.3, Y_MAX: 2.3,
   BASE_TAU: 0.03,                           // base smoothing, s
   GATE_LO: 9.0,                             // base follows fully below this rate, not at all at FREEZE_RATE
   FREEZE_RATE: 12.0, RELEASE_RATE: 3.0, RELEASE_HOLD: 0.06,
   ROLLBACK: 0.13,                           // on lock, base + arm reference go back this far
-  RELEASE_DEG: 20, RELEASE_TIMEOUT: 1.2,    // a swing's lock lets go when the pointer is back near the locked aim, or this long after the hand settled
-  BASE_SPEED: 14.0,                         // m/s, hard limit on rendered base x and y: never a jump
-  WINDUP_MAX: 0.6, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
+  RELEASE_DEG: 20, RELEASE_TIMEOUT: 0.15,    // a swing's lock lets go when the pointer is back near the locked aim, or this long after the hand settled
+  BASE_SPEED: 8.0,                         // m/s, hard limit on rendered base x and y: never a jump
+  WINDUP_MAX: 0, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
   TRIGGER: 13, PEAK_WINDOW: 0.16, REARM: 3,
+  ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
   ROM_IDLE: 4, ROM_MIN: 30, ROM_FULL: 55, ROM_T_MIN: 0.06, ROM_T_FULL: 0.1,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
@@ -86,6 +87,8 @@ export class MotionModel {
     this.snap = []; this.jmax = 0; this.D = 0.04;   // jitter buffer: per-sample snapshots, worst recent lateness, render delay
     this.startCalibration();
   }
+
+  setSidelineDeg(deg) { this.c.X_SIN = 3.0 / Math.sin(clamp(deg, 25, 90) * DEG); }
 
   startCalibration() {
     this.calibrated = false;
@@ -180,7 +183,7 @@ export class MotionModel {
     this.xy = { from: { x, y }, to: { x, y }, t0: t, dur: 0.02 };
     this.refSeg = { from: P, to: P, t0: t, dur: 0.02, ease: false };
     this.lock = null; this.refFrozen = false; this.tRamp = -1e9;
-    this.hist = []; this.snap = [];
+    this.hist = []; this.snap = []; this.hpRef = null; this.armW = 0;
   }
   _start(s) {
     const P = this._P(s.q), tg = this._target(s.q);
@@ -297,11 +300,15 @@ export class MotionModel {
 
     this.hist.push({ t, bx: this.bx, by: this.by, ux: tg.ux, uy: tg.uy, p: tg.p, P, rate, frozen: !!lk });
     while (this.hist.length && this.hist[0].t < t - 1.0) this.hist.shift();
-    { const on = (this.sw && this.rom > c.ROM_MIN * DEG) || (this.lock && this.lock.swung) ? 1 : 0;
-      this.armW = (this.armW || 0) + (on - (this.armW || 0)) * (1 - Math.exp(-dt / (on ? 0.05 : 0.2))); }
+    // Swing arc, kept deliberately simple: the arm reference is a slow low-pass of the hand (a high-pass on the motion),
+    // so a fast swing or wind-up sweeps an arc and ANY held pose relaxes back to centre in ~0.5 s. No locks, nothing to
+    // get stuck, nothing to jump. The arc fades in with rotation speed so slowly turning the bud just pivots the paddle.
+    this.hpRef = this.hpRef ? qslerp(this.hpRef, P, 1 - Math.exp(-dt / c.ARC_TAU)) : P;
+    { const u = clamp((rate - c.ARC_LO) / (c.ARC_HI - c.ARC_LO), 0, 1), on = u * u * (3 - 2 * u), w0 = this.armW || 0;
+      this.armW = w0 + (on - w0) * (1 - Math.exp(-dt / (on > w0 ? 0.04 : 0.3))); }
     // Jitter buffer. Real AirPods deliver samples in PAIRS every ~40 ms (gaps up to ~80 ms), so rendering "now" means
     // extrapolate-stall-snap. Instead pose() replays these snapshots a little in the past and only ever interpolates.
-    this.snap.push({ t, P, ref: this.refFrozen ? this._refAt(t) : this.ref2, x: this.xy.to.x, y: this.xy.to.y, pu, w: this.armW });
+    this.snap.push({ t, P, ref: this.hpRef, x: this.xy.to.x, y: this.xy.to.y, pu, w: this.armW });
     while (this.snap.length > 2 && this.snap[1].t < t - 0.4) this.snap.shift();
     this.prev = L; this.last = cur;
   }

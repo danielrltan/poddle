@@ -2,6 +2,7 @@
 import { MotionModel } from './motion.js';
 import { createScene } from './scene.js';
 import { createPodView } from './podview.js';
+import { createBodyTracker } from './bodytrack.js';
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
@@ -14,10 +15,20 @@ const model = new MotionModel();
 const scene = createScene($('stage'));
 const pod = createPodView($('pod'));
 $('downurl').textContent = GAME;
-const stats = window.__stats = { hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
+const stats = window.__stats = { get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, state = null, players = 0, calibrating = true;
-let autoMove = qs.get('move') !== 'aim';                 // auto: server runs you to the ball. aim: wrist angle moves you.
+// body: webcam tracks where you actually stand. auto: server runs you to the ball. aim: wrist angle moves you.
+const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'body-move: step left and right, the camera follows you', auto: 'auto-move: you just swing', aim: 'aim-move: turn your wrist to move' };
+let sideDeg = 75;
+let mode = MODES.includes(qs.get('move')) ? qs.get('move') : 'body', body = null, bodyX = 0;
+if (qs.get('cam') !== '0') createBodyTracker($('camv'), $('camc')).then(t => {
+  body = t; $('camwrap').hidden = !t.ready;
+  if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('aim'); }
+});
+function setMode(m) { mode = m; $('mode').textContent = m; say(MODE_TEXT[m], '#ffe066', 1800); }
+const usingBody = () => mode === 'body' && body && body.ready;
+const autoNow = () => mode === 'auto' || (mode === 'body' && !(body && body.seen()));   // lost your face: the game runs for you until it's back
 const s = () => (side === 0 ? 1 : -1);
 
 // ---------- messages ----------
@@ -51,7 +62,7 @@ function showCal(e) {
   $('calh').textContent = tilt ? 'Step 2 of 2 — tip it up' : 'Step 1 of 2 — hold your grip';
   $('calp').textContent = tilt
     ? 'Now tip the front of the AirPod UP toward the ceiling, like raising a paddle. This tells the game which way is up and which way is right for your grip.'
-    : "Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.";
+    : "Stand centred in the camera view (any distance, as long as it can see you). Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.";
   $('arc').style.strokeDashoffset = 534 * (1 - e.progress);
   $('arc').style.stroke = e.ok ? '#4ade80' : '#ff6b6b';
   $('calmsg').textContent = e.msg; $('calmsg').className = e.ok ? 'good' : 'bad';
@@ -78,7 +89,7 @@ const bridge = connect(BRIDGE, 'm', sample => {
   $('barf').style.width = Math.min(100, power / 40 * 100) + '%';
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
-    else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; $('cal').hidden = true; say('calibrated', '#4ade80'); }
+    else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; $('cal').hidden = true; if (body) body.center(); say('calibrated', '#4ade80'); }
     else if (e.type === 'swing') { stats.swings++; if (!calibrating) game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob }); }
     else if (e.type === 'flick') { if (!calibrating) say(`too small (${e.rom.toFixed(0)}°) — swing your whole arm`, '#ffe066', 1200); }
     else if (e.type === 'swingEnd') logSwing(e);
@@ -116,7 +127,7 @@ const game = connect(GAME, 'g', m => {
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', auto: autoMove, x: p.x * s(), y: p.y, q: p.P });
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode !== 'aim', x: (usingBody() ? bodyX : p.x) * s(), y: p.y, q: p.P });
 }, 50);
 
 // ---------- input ----------
@@ -127,10 +138,14 @@ addEventListener('keydown', e => {
   unlock();
   const k = e.key.toLowerCase();
   if (k === 'c') startCal();
-  if (k === 'r') { model.recenter(); say('re-centered', '#ffe066'); }
+  if (k === 'r') { model.recenter(); if (body) body.center(); say('re-centered', '#ffe066'); }
   if (k === 'p') resetPeaks();
   if (k === 'v') $('podwrap').hidden = !$('podwrap').hidden;
-  if (k === 'm') { autoMove = !autoMove; $('mode').textContent = autoMove ? 'auto' : 'aim'; say(autoMove ? 'auto-move: you just swing' : 'aim-move: turn your wrist to move', '#ffe066', 1600); }
+  if (k === 'm') { let i = MODES.indexOf(mode); do { i = (i + 1) % 3; } while (MODES[i] === 'body' && !(body && body.ready)); setMode(MODES[i]); }
+  if (k === '[' || k === ']') {                                  // [ = less sensitive, ] = more, for whichever move mode is on
+    if (usingBody()) { body.reach = Math.max(0.08, Math.min(0.42, body.reach + (k === ']' ? -0.03 : 0.03))); say(`move ${(body.reach * 100).toFixed(0)}% of the camera view to reach the sideline`, '#ffe066'); }
+    else { sideDeg = Math.max(25, Math.min(90, sideDeg + (k === ']' ? -5 : 5))); model.setSidelineDeg(sideDeg); say(`turn ${sideDeg}° to reach the sideline`, '#ffe066'); }
+  }
   if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty
   if ('123'.includes(k)) game.send({ type: 'bot', level: +k - 1 });
 });
@@ -144,7 +159,10 @@ let lastPos = null;
   if (p.calibrated) {
     const mine = state && state.paddles[side];
     const z = mine ? mine.z : s() * 6.5;
-    const wx = autoMove && mine ? mine.x : p.x * s(), wy = autoMove && mine ? mine.y : p.y;
+    if (usingBody() && body.seen()) bodyX += (Math.max(-3.5, Math.min(3.5, body.x())) - bodyX) * 0.5;
+    const auto = autoNow() && mine;
+    const wx = auto ? mine.x : (usingBody() ? bodyX : p.x) * s(), wy = mine && mode !== 'aim' ? mine.y : p.y;
+    if (auto && usingBody()) bodyX = mine.x * s();                 // hand back smoothly when the camera finds you again
     scene.updatePaddle(side, { x: wx, y: wy, z, q: p.P, offset: p.offset, bot: false });
     $('px').textContent = (wx * s()).toFixed(1); $('py').textContent = wy.toFixed(1);
     const pos = [p.x + p.offset[0], p.y + p.offset[1], p.offset[2]];
