@@ -3,6 +3,7 @@
 const DEG = Math.PI / 180;
 
 export const DEFAULTS = {
+  SETTLE_MS: 800, SETTLE_DEG: 7,             // after the tilt: rest this long within this wobble and that pose becomes neutral
   BUFFER_PAD: 0.008, BUFFER_MIN: 0.025, BUFFER_MAX: 0.12,   // jitter buffer: render this far behind the newest sample (s)
   HOLD_MS: 5000, HOLD_DEG: 10,              // step 1: still within HOLD_DEG for HOLD_MS
   TILT_DEG: 25, TILT_MIN_HORIZ: 0.75,       // step 2: tip up; axis must be mostly horizontal
@@ -136,6 +137,7 @@ export class MotionModel {
   // ---------- calibration ----------
   _calibrate(s, ev) {
     const c = this.c, cal = this.cal;
+    if (cal.stage === 'settle') return this._settle(s, ev);
     if (cal.stage === 'hold') {
       let ok = true;
       if (!cal.anchor || qangle(qmul(s.q, qconj(cal.anchor))) > c.HOLD_DEG * DEG) {
@@ -164,6 +166,20 @@ export class MotionModel {
     }
     const R = [ax[0] / h, ax[1] / h, 0], U = [0, 0, 1];
     this.B = { R, U, F: cross(U, R) };
+    // The tilt only teaches the axes. Neutral is wherever the hand comes to rest AFTER it: people keep the bud tipped
+    // up because that is how a paddle is held, and the on-screen paddle must stand upright in exactly that pose.
+    cal.stage = 'settle'; cal.anchor = null;
+    ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: true, msg: 'Good — now hold it how you’ll play.' });
+  }
+
+  _settle(s, ev) {
+    const c = this.c, cal = this.cal;
+    if (!cal.anchor || qangle(qmul(s.q, qconj(cal.anchor))) > c.SETTLE_DEG * DEG) { cal.anchor = s.q; cal.sum = [0, 0, 0, 0]; cal.t0 = s.t; }
+    const sg = dot4(s.q, cal.anchor) < 0 ? -1 : 1;
+    for (let i = 0; i < 4; i++) cal.sum[i] += sg * s.q[i];
+    const progress = clamp((s.t - cal.t0) * 1000 / c.SETTLE_MS, 0, 1);
+    if (progress < 1) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Good — now hold it how you’ll play.' }); return; }
+    this.calib = qnorm(cal.sum);                               // axes R,U,F are world vectors, so they stay valid
     this.yawFix = IDENT;
     this.calibrated = true;
     this._start(s);
