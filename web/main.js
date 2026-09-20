@@ -45,7 +45,7 @@ const WHIFF = { early: 'too early', late: 'too late', left: 'ball was to your le
 let peaks = [], sessionPeak = 0, log10 = [];
 function logSwing(e) {
   const pk = e.peak, tag = `${e.counted ? pk.toFixed(0) : '×'}(${e.rom.toFixed(0)}°)`;
-  log10.push(tag); if (log10.length > 8) log10.shift();
+  log10.push(tag); if (log10.length > 5) log10.shift();
   $('pklist').textContent = log10.join('  ');
   console.log(`swing power=${pk.toFixed(1)} raw=${e.raw.toFixed(1)} rad/s rom=${e.rom.toFixed(0)}deg counted=${e.counted}`);
   if (!e.counted) return;

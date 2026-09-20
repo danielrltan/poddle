@@ -477,10 +477,13 @@ export function createScene(containerEl) {
   function updateCamera(dt) {
     const s = sgn(localSide), me = pads[localSide];
     cam.x = lerp(cam.x, me.has ? me.pos.x * 0.35 : 0, damp(dt, 0.25));
+    // the server runs you back for deep balls (up to ~2 m behind the baseline). The camera goes with you, or the
+    // paddle drops off the bottom of the screen exactly when the ball arrives.
+    { const back = me.has ? me.pos.z * s - 6.5 : 0; cam.z = lerp(cam.z || 0, back > 0 ? back : back * 0.5, damp(dt, 0.18)); }
     cam.shake = Math.max(0, cam.shake - dt * (0.35 + cam.shake * 6));
     const k = cam.shake, t = timeS * 1000;
-    camera.position.set(cam.x + Math.sin(t * 0.093) * k, 3.1 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 4.4) + Math.sin(t * 0.071 + 2) * k * 0.5);
-    camera.lookAt(cam.x * 0.45, 0.35, s * 0.4);
+    camera.position.set(cam.x + Math.sin(t * 0.093) * k, 3.1 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 5.4 + (cam.z || 0)) + Math.sin(t * 0.071 + 2) * k * 0.5);
+    camera.lookAt(cam.x * 0.45, 0.35, s * (0.4 + (cam.z || 0) * 0.6));
   }
 
   // ---------- WebAudio, no assets ----------

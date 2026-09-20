@@ -16,7 +16,7 @@
   #bar{width:220px;height:8px;background:rgba(30,39,51,.8);border-radius:4px;overflow:hidden;margin:3px 0;position:relative}
   #barf{height:100%;width:0;background:#4ade80}
   #barpk{position:absolute;top:0;width:2px;height:100%;background:#ffe066;left:0}
-  #camwrap{position:fixed;right:14px;top:58px;z-index:10;text-align:center;font-size:11px;background:rgba(11,15,20,.55);border-radius:12px;padding:6px 6px 8px;text-shadow:0 1px 3px #000}
+  #camwrap{max-width:252px;position:fixed;right:14px;top:58px;z-index:10;text-align:center;font-size:11px;background:rgba(11,15,20,.55);border-radius:12px;padding:6px 6px 8px;text-shadow:0 1px 3px #000}
   #camc{border-radius:8px;display:block;margin:0 auto 4px}
   #podwrap{position:fixed;right:14px;bottom:58px;z-index:10;text-align:center;font-size:11px;background:rgba(11,15,20,.55);border-radius:12px;padding:4px 8px 8px;text-shadow:0 1px 3px #000}
   #msg{position:fixed;top:54%;width:100%;text-align:center;font-size:34px;font-weight:600;z-index:9;opacity:0;
@@ -48,7 +48,7 @@
   opponent bot: <span id="bot" class="warn">none</span> · <b>B</b> / <b>1 2 3</b> difficulty<br>
   <b>M</b> move mode · <b>[ ]</b> sensitivity · <b>C</b> calibrate · <b>R</b> re-center · <b>P</b> reset peaks
 </div>
-<div id="camwrap" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas><div class="dim">any distance, stay in frame · dashed = centre · yellow = sidelines · <b>[ ]</b> sensitivity</div></div>
+<div id="camwrap" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas><div class="dim">stay in frame · yellow = sidelines · <b>[ ]</b> range</div></div>
 <div id="podwrap"><div id="pod"></div><div class="dim">your AirPod · <b>V</b> hide</div></div>
 <div id="msg"></div>
 <div id="down" hidden>can't reach the game server at <span id="downurl"></span> — retrying…<br><span class="dim">is <b>node server/game.js</b> running? if you are player 2, check the host IP after the # in the URL</span></div>
