@@ -174,16 +174,22 @@ function buildAvatar(side) {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.42, 6, 20), shirt); body.position.y = 0.74;
   const shorts = new THREE.Mesh(new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), dark); shorts.position.y = 0.55;
   const head = new THREE.Group(); head.position.y = 1.47;
-  const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [];
+  const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [], eyes = [], mattFace = [];      // whites: kept (empty) for callers that loop over it
+  const halfEye = new THREE.SphereGeometry(0.036, 16, 10, 0, Math.PI * 2, Math.PI * 0.44, Math.PI * 0.56);      // an eye with its top cut off flat
   head.add(new THREE.Mesh(new THREE.SphereGeometry(0.27, 28, 20), skin));
   const hairM = new THREE.MeshStandardMaterial({ color: COL.hair[side], roughness: 0.9 });
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.283, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.48), hairM);
   hair.rotation.x = 0.42; head.add(hair);
   for (const sx of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), dark);
-    eye.scale.set(1, 1.55, 0.5); eye.position.set(sx * 0.095, 0.0, -0.25); head.add(eye);
-    const white = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), whiteM);                  // dark eyes vanish on dark skin: Matt gets whites behind them
-    white.scale.set(1, 1.5, 0.4); white.position.set(sx * 0.095, 0.0, -0.236); white.visible = false; head.add(white); whites.push(white);
+    eye.scale.set(1, 1.55, 0.5); eye.position.set(sx * 0.095, 0.0, -0.25); head.add(eye); eyes.push(eye);
+    // Matt's own face (after the Wii Sports champion): calm and a little pensive, never angry. The eyes are the lower part
+    // of an oval with a flat lid line across the top, so they read half-closed; the brows are heavy, low and almost level.
+    const mEye = new THREE.Mesh(halfEye, dark); mEye.scale.set(1.35, 1.45, 0.5); mEye.position.set(sx * 0.095, 0.004, -0.25);
+    const mWhite = new THREE.Mesh(halfEye, whiteM); mWhite.scale.set(1.62, 1.7, 0.36); mWhite.position.set(sx * 0.095, 0.005, -0.2455);
+    const lidLine = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.013, 0.024), dark); lidLine.position.set(sx * 0.096, 0.014, -0.2475); lidLine.rotation.set(0, sx * -0.36, sx * -0.05);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.112, 0.03, 0.03), dark); brow.position.set(sx * 0.098, 0.068, -0.244); brow.rotation.set(0.26, sx * -0.36, sx * 0.07);
+    for (const o of [mEye, mWhite, lidLine, brow]) { o.visible = false; head.add(o); mattFace.push(o); }
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), dark);
     foot.scale.set(1, 0.6, 1.5); foot.position.set(sx * 0.15, 0.065, -0.04); g.add(foot);
   }
@@ -191,7 +197,7 @@ function buildAvatar(side) {
   g.add(body, shorts, head, offHand);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.scale.setScalar(1.3);
-  g.userData = { head, body, offHand, skin, shirt, hairM, whites, hair };
+  g.userData = { head, body, offHand, skin, shirt, hairM, whites, hair, eyes, mattFace };
   return g;
 }
 
@@ -769,7 +775,7 @@ export function createScene(containerEl) {
     if (!d) { pd.has = pd.init = false; return; }
     const t = pd.tgt; pd.has = true;
     if (pd.bot !== !!d.bot) { pd.bot = !!d.bot; const u = pd.avatar.userData, m = pd.bot ? COL.matt : null;      // a seat changes hands between a person and Matt: repaint, don't rebuild
-      u.skin.color.setHex(m ? m.skin : COL.skin); u.shirt.color.setHex(m ? m.shirt : COL.shirt[pd.side]); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); pd.handM.color.setHex(m ? m.skin : COL.skin); for (const w of u.whites) w.visible = pd.bot; u.hair.visible = !pd.bot; }      // Matt is bald
+      u.skin.color.setHex(m ? m.skin : COL.skin); u.shirt.color.setHex(m ? m.shirt : COL.shirt[pd.side]); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); pd.handM.color.setHex(m ? m.skin : COL.skin); for (const w of u.whites) w.visible = pd.bot; u.hair.visible = !pd.bot; for (const e of u.eyes) e.visible = !pd.bot; for (const o of u.mattFace) o.visible = pd.bot; }      // Matt is bald, with his own eyes
     if (isFinite(d.x)) t.x = d.x; if (isFinite(d.y)) t.y = d.y; if (isFinite(d.z)) t.z = d.z;
     if (d.q && d.q.length === 4 && isFinite(d.q[0] + d.q[1] + d.q[2] + d.q[3])) { t.q.set(d.q[0], d.q[1], d.q[2], d.q[3]); if (t.q.lengthSq() > 1e-6) t.q.normalize(); else t.q.identity(); }
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;
