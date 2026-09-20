@@ -142,21 +142,21 @@ export class MotionModel {
       for (let i = 0; i < 4; i++) cal.sum[i] += sg * s.q[i];
       const progress = clamp((s.t - cal.t0) * 1000 / c.HOLD_MS, 0, 1);
       if (progress >= 1) { this.calib = qnorm(cal.sum); cal.stage = 'tilt'; }
-      ev.push({ type: 'cal', stage: 'hold', progress, ok, msg: ok ? 'Hold it like a paddle, pointed at the screen. Keep still.' : 'Wobbled. Hold still.' });
+      ev.push({ type: 'cal', stage: 'hold', progress, ok, msg: ok ? 'Hold it like a paddle, pointed at the screen. Keep still…' : 'You moved — hold still and we’ll start again.' });
       return;
     }
     let d = qmul(s.q, qconj(this.calib)); if (d[3] < 0) d = d.map(v => -v);
     const ang = qangle(d), progress = clamp(ang / (c.TILT_DEG * DEG), 0, 1);
     if (cal.blocked) {
       if (ang < c.TILT_REARM_DEG * DEG) cal.blocked = false;
-      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist. Level out, then tip the front UP.' });
+      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' });
       return;
     }
-    if (ang < c.TILT_DEG * DEG) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Now tip the front UP.' }); return; }
+    if (ang < c.TILT_DEG * DEG) { ev.push({ type: 'cal', stage: 'tilt', progress, ok: true, msg: 'Now tip the front of the AirPod up.' }); return; }
     const ax = mul([d[0], d[1], d[2]], 1 / len([d[0], d[1], d[2]])), h = Math.hypot(ax[0], ax[1]);
     if (h < c.TILT_MIN_HORIZ) {
       cal.blocked = true;
-      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist. Level out, then tip the front UP.' });
+      ev.push({ type: 'cal', stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' });
       return;
     }
     const R = [ax[0] / h, ax[1] / h, 0], U = [0, 0, 1];
@@ -164,7 +164,7 @@ export class MotionModel {
     this.yawFix = IDENT;
     this.calibrated = true;
     this._start(s);
-    ev.push({ type: 'cal', stage: 'tilt', progress: 1, ok: true, msg: 'Calibrated.' });
+    ev.push({ type: 'cal', stage: 'tilt', progress: 1, ok: true, msg: 'All set!' });
     ev.push({ type: 'calibrated' });
   }
 
@@ -204,7 +204,7 @@ export class MotionModel {
     const P = this._P(s.q);
     const rP = this._vecP(qrot(this.calib, s.r));                     // body-frame rate of P (P' = P * exp(rP dt / 2))
     const wP = this._vecP(qrot(qmul(this.yawFix, s.q), s.r));         // world angular velocity, player axes
-    const tg = this._target(s.q);
+    const tg = this._target(s.q); this.tilt = tg.pitch;
 
     // Hand over from the old prediction to this sample's curve, starting from exactly what pose() shows right now.
     const aPar = rate > 1e-6 ? dot(mul(sub(rP, L.rP), 1 / dt), mul(rP, 1 / rate)) : 0;
@@ -380,7 +380,7 @@ export class MotionModel {
     const relC = ang > 1e-6 ? qslerp([0, 0, 0, 1], rel[3] < 0 ? mul4(rel, -1) : rel, lim * Math.tanh(ang / lim) / ang) : rel;
     const o = mul(add(sub(qrot(qmul(relC, ref), c.ARM), qrot(ref, c.ARM)), punch), w);
     const offset = [clamp(o[0], -0.75, 0.75), clamp(o[1], -0.5, 0.6), clamp(o[2], -0.6, 0.2)];                        // +z is toward the camera
-    return { calibrated: true, x: S.x, y: S.y, P, offset, power: this.sw ? this.sw.peak : 0, swinging: !!this.sw, rate: this.last.rate, punch, locked: !!this.lock };
+    return { calibrated: true, x: S.x, y: S.y, P, offset, power: this.sw ? this.sw.peak : 0, swinging: !!this.sw, rate: this.last.rate, tilt: this.tilt || 0, punch, locked: !!this.lock };
   }
 }
 

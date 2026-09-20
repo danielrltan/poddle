@@ -27,15 +27,15 @@
   @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.55) rotate(-4deg)}100%{transform:scale(1)}}
   @keyframes pulse{50%{transform:scale(1.35)}}
 
-  /* ---------- banner (point / match) ---------- */
-  #banner{position:fixed;left:0;right:0;top:30%;z-index:14;display:flex;justify-content:center;pointer-events:none}
-  #banner .rib{min-width:46%;text-align:center;padding:18px 60px 20px;color:#fff;border-radius:26px;transform:translateX(-120vw) skewX(-8deg);
-      box-shadow:0 8px 0 rgba(0,0,0,.2),0 20px 40px rgba(0,0,0,.35);border:4px solid rgba(255,255,255,.9)}
-  #banner.show .rib{animation:ribbon 1.7s cubic-bezier(.2,.9,.2,1) forwards}
+  /* ---------- banner (point / match): a small tag that drops out from under the scoreboard ---------- */
+  #banner{position:fixed;left:0;right:0;top:92px;z-index:11;display:flex;justify-content:center;pointer-events:none}
+  #banner .rib{text-align:center;padding:7px 26px 8px;color:#fff;border-radius:0 0 18px 18px;transform:translateY(-70px);opacity:0;
+      box-shadow:0 5px 0 rgba(0,0,0,.18),0 10px 22px rgba(0,0,0,.28);border:3px solid rgba(255,255,255,.9);border-top:0}
+  #banner.show .rib{animation:drop 1.9s cubic-bezier(.2,.9,.2,1) forwards}
   #banner.long.show .rib{animation-duration:4.6s}
-  #banner h1{margin:0;font-size:58px;font-weight:800;letter-spacing:.02em;text-shadow:0 4px 0 rgba(0,0,0,.2);transform:skewX(8deg)}
-  #banner p{margin:2px 0 0;font-size:18px;opacity:.95;transform:skewX(8deg);letter-spacing:.06em;text-transform:uppercase}
-  @keyframes ribbon{0%{transform:translateX(-120vw) skewX(-8deg)}14%{transform:translateX(2vw) skewX(-8deg)}20%,80%{transform:translateX(0) skewX(-8deg)}100%{transform:translateX(120vw) skewX(-8deg)}}
+  #banner h1{margin:0;font-size:24px;font-weight:800;letter-spacing:.04em;text-shadow:0 2px 0 rgba(0,0,0,.2)}
+  #banner p{margin:0;font-size:12.5px;opacity:.95;letter-spacing:.04em}
+  @keyframes drop{0%{transform:translateY(-70px);opacity:0}12%{transform:translateY(4px);opacity:1}18%,82%{transform:translateY(0);opacity:1}100%{transform:translateY(-70px);opacity:0}}
 
   /* ---------- hit confirmation ---------- */
   #hitfx{position:fixed;left:50%;top:62%;z-index:13;pointer-events:none;transform:translate(-50%,-50%);text-align:center}
@@ -92,37 +92,37 @@
 <div id="stage"></div>
 <div id="flash"></div>
 
-<div class="dots"><span class="dot" id="dm"><i></i>AirPod</span><span class="dot" id="dg"><i></i>Game</span><span class="dot good" id="dmode"><i></i><span id="mode">body</span> move</span></div>
+<div class="dots"><span class="dot" id="dm"><i></i>AirPod</span><span class="dot" id="dg"><i></i>Game</span><span class="dot good" id="dmode"><i></i>Move: <span id="mode">Body</span></span></div>
 
 <div id="board" class="card">
-  <div class="side me"><span class="serve" id="sv-me"></span><span class="who">You<small id="sidelbl">near side</small></span><span class="num" id="sc-me">0</span></div>
+  <div class="side me"><span class="serve" id="sv-me"></span><span class="who">You<small id="sidelbl">Near side</small></span><span class="num" id="sc-me">0</span></div>
   <div id="mid"><b>RALLY</b><span id="rally">0</span></div>
-  <div class="side them"><span class="serve" id="sv-them"></span><span class="who"><span id="themname">Waiting…</span><small id="bot">press B for a bot</small></span><span class="num" id="sc-them">0</span></div>
+  <div class="side them"><span class="serve" id="sv-them"></span><span class="who"><span id="themname">Waiting…</span><small id="bot">Press B to add a bot</small></span><span class="num" id="sc-them">0</span></div>
 </div>
 
 <div id="banner"><div class="rib" id="rib"><h1 id="bh">POINT!</h1><p id="bp"></p></div></div>
 <div id="hitfx"><div id="hitword">NICE!</div><div id="meter"><i id="meterf"></i></div></div>
 <div id="msg"></div>
-<div id="down" hidden>Can't reach the game server at <span id="downurl"></span> — retrying…<br><small>is <b>node server/game.js</b> running? Player 2: check the host IP after the # in the URL</small></div>
+<div id="down" hidden>Can’t reach the game server at <span id="downurl"></span> — retrying…<br><small>Is <b>node server/game.js</b> running? If you’re Player 2, check the host address after the # in the URL.</small></div>
 
 <div id="dev" class="card" hidden>
   <span id="m" hidden></span><span id="g" hidden></span><span id="side" hidden></span>
-  swing speed <span id="pw">0.0</span> rad/s
+  Swing speed <span id="pw">0.0</span> rad/s
   <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
-  paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m<br>
-  session peak <b class="big" id="pkmax">0.0</b> · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
-  last swings, power (range of motion):<br><span id="pklist">–</span>
+  Paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m<br>
+  Session peak <b class="big" id="pkmax">0.0</b> · Swings <span id="sw">0</span> · Average <span id="pkavg">–</span><br>
+  Last swings — power (range of motion):<br><span id="pklist">–</span>
 </div>
 
-<div id="camwrap" class="inset card" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas>stay in frame · yellow = sidelines</div>
-<div id="podwrap" class="inset card"><div id="pod"></div>your AirPod</div>
-<div id="keys"><b>M</b>move mode <b>B</b>bot <b>1 2 3</b>level <b>C</b>calibrate <b>R</b>re-center <b>[ ]</b>range <b>V</b>AirPod <b>H</b>stats</div>
+<div id="camwrap" class="inset card" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas>Stay in frame · Yellow lines are the sidelines</div>
+<div id="podwrap" class="inset card"><div id="pod"></div>Your AirPod</div>
+<div id="keys"><b>M</b>Move mode <b>B</b>Bot <b>1 2 3</b>Level <b>C</b>Calibrate <b>R</b>Re-center <b>[ ]</b>Range <b>V</b>AirPod <b>H</b>Stats<br>Tilt the AirPod forward or back to walk toward or away from the net</div>
 
 <div id="cal">
   <div id="calcard" class="card">
     <div id="steps"><span id="st1" class="on">1 · HOLD</span><span id="st2">2 · TIP UP</span></div>
     <h1 id="calh">Hold your grip</h1>
-    <p id="calp">Stand centred in the camera view. Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.</p>
+    <p id="calp">Stand where the camera can see you. Hold the AirPod the way you’d hold a paddle, point it at the screen, and keep it still.</p>
     <svg id="ring" viewBox="0 0 200 200">
       <circle cx="100" cy="100" r="82" stroke="#dfe7f1"/>
       <circle id="arc" cx="100" cy="100" r="82" stroke="#22c55e" stroke-linecap="round" stroke-dasharray="515" stroke-dashoffset="515"/>
