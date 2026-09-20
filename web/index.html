@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Poddle — AirPod Pickleball</title>
+<style>
+  [hidden]{display:none!important}
+  html,body{margin:0;height:100%;background:#0b0f14;color:#e6edf3;font:13px ui-monospace,Menlo,monospace;overflow:hidden}
+  #stage{position:fixed;inset:0}
+  .panel{position:fixed;z-index:10;line-height:1.7;text-shadow:0 1px 3px #000;pointer-events:none}
+  #hud{top:12px;left:14px}
+  #score{top:8px;right:18px;font-size:34px;letter-spacing:3px;font-weight:600}
+  #peaks{bottom:12px;left:14px}
+  #peaks b{font-size:20px}
+  #hint{bottom:14px;right:18px;text-align:right}
+  .bad{color:#ff6b6b}.good{color:#4ade80}.dim{color:#9fb0c0}.warn{color:#ffe066}
+  #bar{width:220px;height:8px;background:rgba(30,39,51,.8);border-radius:4px;overflow:hidden;margin:3px 0;position:relative}
+  #barf{height:100%;width:0;background:#4ade80}
+  #barpk{position:absolute;top:0;width:2px;height:100%;background:#ffe066;left:0}
+  #msg{position:fixed;top:54%;width:100%;text-align:center;font-size:34px;font-weight:600;z-index:9;opacity:0;
+       transition:opacity .25s;text-shadow:0 2px 10px #000;pointer-events:none}
+  #cal{position:fixed;inset:0;z-index:20;background:rgba(11,15,20,.86);display:flex;flex-direction:column;
+       align-items:center;justify-content:center;text-align:center;gap:16px}
+  #cal h1{font-size:24px;margin:0;font-weight:600}
+  #cal p{margin:0;max-width:460px;line-height:1.6;color:#b6c2cf;font-size:14px}
+  #ring{width:180px;height:180px;transform:rotate(-90deg)}
+  #ring circle{fill:none;stroke-width:10}
+  #calmsg{font-size:16px;min-height:24px}
+</style>
+
+<div id="stage"></div>
+
+<div id="hud" class="panel">
+  airpod <span id="m" class="bad">off</span> · game <span id="g" class="bad">off</span> · side <span id="side">?</span><br>
+  power <span id="pw">0.0</span> rad/s
+  <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
+  paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m
+</div>
+<div id="score" class="panel">0 : 0</div>
+<div id="peaks" class="panel">
+  session peak <b id="pkmax">0.0</b> rad/s · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
+  <span class="dim">last swings:</span> <span id="pklist">–</span>
+</div>
+<div id="hint" class="panel dim">
+  <span id="bothint" class="warn" hidden>alone? press <b>B</b> to play the bot<br></span>
+  <b>C</b> calibrate · <b>R</b> re-center · <b>B</b> bot · <b>P</b> reset peaks
+</div>
+<div id="msg"></div>
+
+<div id="cal">
+  <h1 id="calh">Step 1 of 2 — hold your grip</h1>
+  <p id="calp">Hold the AirPod the way you'd hold a paddle, pointed at the screen, and keep it still.</p>
+  <svg id="ring" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="85" stroke="#1e2733"/>
+    <circle id="arc" cx="100" cy="100" r="85" stroke="#4ade80" stroke-linecap="round" stroke-dasharray="534" stroke-dashoffset="534"/>
+  </svg>
+  <div id="calmsg">waiting for the AirPod…</div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>window.THREE || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"><\/script>')</script>
+<script type="module" src="main.js"></script>

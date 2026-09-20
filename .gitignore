@@ -1,0 +1,5 @@
+node_modules/
+motion/motion
+test/shots/
+data/live-capture.jsonl
+.DS_Store

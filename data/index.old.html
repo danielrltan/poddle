@@ -1,0 +1,266 @@
+<!doctype html>
+<title>AirPod Pickleball</title>
+<style>
+  [hidden]{display:none!important}
+  body{margin:0;background:#0b0f14;color:#e6edf3;font:13px ui-monospace,Menlo,monospace;overflow:hidden}
+  #hud{position:fixed;top:12px;left:12px;z-index:10;line-height:1.7;text-shadow:0 1px 3px #000}
+  #score{position:fixed;top:12px;right:16px;z-index:10;font-size:28px;letter-spacing:2px}
+  #peaks{position:fixed;bottom:12px;left:12px;z-index:10;line-height:1.6;text-shadow:0 1px 3px #000}
+  #peaks b{font-size:20px}
+  .bad{color:#ff6b6b}.good{color:#4ade80}.dim{color:#8b98a5}
+  #bar{width:220px;height:8px;background:#1e2733;border-radius:4px;overflow:hidden;margin-top:4px;position:relative}
+  #barf{height:100%;width:0;background:#4ade80}
+  #barpk{position:absolute;top:0;width:2px;height:100%;background:#ffe066;left:0}
+  #cal{position:fixed;inset:0;z-index:20;background:rgba(11,15,20,.88);display:flex;flex-direction:column;
+       align-items:center;justify-content:center;text-align:center;gap:18px}
+  #cal h1{font-size:22px;margin:0;font-weight:600}
+  #cal p{margin:0;max-width:440px;line-height:1.6;color:#b6c2cf}
+  #ring{width:180px;height:180px;transform:rotate(-90deg)}
+  #ring circle{fill:none;stroke-width:10}
+  #calmsg{font-size:15px;min-height:22px}
+  #msg{position:fixed;top:42%;width:100%;text-align:center;font-size:30px;z-index:9;opacity:0;transition:opacity .25s;
+       text-shadow:0 2px 8px #000;pointer-events:none}
+</style>
+
+<div id="hud">
+  motion <span id="m" class="bad">off</span> · game <span id="g" class="bad">off</span> · side <span id="side">?</span><br>
+  power <span id="pw">0.0</span> rad/s
+  <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
+  paddle x <span id="px">0.0</span> m<br>
+  <span class="dim"><b>C</b> recalibrate · <b>R</b> re-center · <b>X</b> flip left/right · <b>P</b> reset peaks</span>
+</div>
+<div id="score">0 : 0</div>
+<div id="peaks">
+  session peak <b id="pkmax">0.0</b> rad/s · swings <span id="sw">0</span> · avg <span id="pkavg">–</span><br>
+  <span class="dim">last swings:</span> <span id="pklist">–</span>
+</div>
+<div id="msg"></div>
+
+<div id="cal">
+  <h1>Calibrate your grip</h1>
+  <p>Hold the AirPod the way you want to hold your paddle, pointed at the screen, and keep it still.
+     This becomes your neutral position — turn left and right from here to move.</p>
+  <svg id="ring" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="85" stroke="#1e2733"/>
+    <circle id="arc" cx="100" cy="100" r="85" stroke="#4ade80" stroke-linecap="round"
+            stroke-dasharray="534" stroke-dashoffset="534"/>
+  </svg>
+  <div id="calmsg">waiting for motion…</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const GAME_HOST = location.hash.slice(1) || 'localhost';   // player 2:  index.html#<server-ip>
+
+// ---------- tuning ----------
+const SWING_ON = 9.0, SWING_OFF = 3.0;   // rad/s. real swings measured ~35 peak
+const PEAK_WINDOW_MS = 70;               // after trigger, watch this long for the true peak
+const CAL_SECONDS = 5;                   // hold-still time
+const CAL_TOLERANCE = THREE.MathUtils.degToRad(10);   // wobble allowed while holding
+const YAW_FULL = THREE.MathUtils.degToRad(35);        // turn this far = paddle at sideline
+const X_LIMIT = 3.4;
+
+// ---------- scene ----------
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0b0f14, 18, 40);
+const cam = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 200);
+const rnd = new THREE.WebGLRenderer({antialias:true});
+rnd.setSize(innerWidth, innerHeight); rnd.setPixelRatio(devicePixelRatio);
+document.body.appendChild(rnd.domElement);
+addEventListener('resize', ()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rnd.setSize(innerWidth,innerHeight)});
+
+scene.add(new THREE.HemisphereLight(0x99bbff, 0x223344, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(4,12,6); scene.add(key);
+
+const court = new THREE.Mesh(new THREE.PlaneGeometry(6,20),
+  new THREE.MeshStandardMaterial({color:0x1b4d5a, roughness:.9}));
+court.rotation.x = -Math.PI/2; scene.add(court);
+const net = new THREE.Mesh(new THREE.BoxGeometry(6,0.9,0.05),
+  new THREE.MeshStandardMaterial({color:0xe6edf3, transparent:true, opacity:.35}));
+net.position.y = 0.45; scene.add(net);
+const lineMat = new THREE.MeshBasicMaterial({color:0xe6edf3});
+for (const z of [-10,10]) { const l = new THREE.Mesh(new THREE.BoxGeometry(6,0.02,0.1), lineMat); l.position.set(0,0.01,z); scene.add(l); }
+for (const x of [-3,3])   { const l = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.02,20), lineMat); l.position.set(x,0.01,0); scene.add(l); }
+
+const ball = new THREE.Mesh(new THREE.SphereGeometry(0.18,20,20),
+  new THREE.MeshStandardMaterial({color:0xffe066, emissive:0x554400}));
+scene.add(ball);
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.2,20),
+  new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.35}));
+shadow.rotation.x = -Math.PI/2; scene.add(shadow);
+
+function makePaddle(color){
+  const g = new THREE.Group();
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.06,28),
+    new THREE.MeshStandardMaterial({color, metalness:.3, roughness:.4}));
+  face.rotation.x = Math.PI/2; g.add(face);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.42,0.09),
+    new THREE.MeshStandardMaterial({color:0x2c3540}));
+  grip.position.y = -0.42; g.add(grip);
+  scene.add(g); return g;
+}
+const paddle = makePaddle(0x4ade80);      // you
+const other  = makePaddle(0xff6b6b);      // opponent
+other.visible = false;
+
+// ---------- state ----------
+let q = new THREE.Quaternion();           // raw attitude (CoreMotion frame, Z is up)
+let calib = new THREE.Quaternion(), calibrated = false;
+let power = 0, mySide = 0, flip = 1;
+let paddleX = 0, targetX = 0;
+let rel = new THREE.Quaternion();
+
+// how far you've turned left/right since calibration, measured around gravity.
+// uses the world-frame delta so it doesn't matter how the bud sits in your hand.
+function yawSinceCalib(){
+  const d = q.clone().multiply(calib.clone().invert());
+  const y = Math.atan2(2*(d.w*d.z + d.x*d.y), 1 - 2*(d.y*d.y + d.z*d.z)) - yawZero;   // + = turned left
+  return Math.atan2(Math.sin(y), Math.cos(y));                                          // wrap to ±180°
+}
+let yawZero = 0;
+
+// ---------- calibration ----------
+let cal = { active:true, anchor:null, start:0 };
+function startCalibration(){ cal = { active:true, anchor:null, start:0 }; calibrated = false; $('cal').hidden = false; }
+$('cal').hidden = false;
+function stepCalibration(now){
+  if (!cal.active) return;
+  const wobbling = power > 0.8;
+  if (!cal.anchor || q.angleTo(cal.anchor) > CAL_TOLERANCE || wobbling) {
+    const was = cal.anchor && (now - cal.start) > 600;
+    cal.anchor = q.clone(); cal.start = now;
+    $('calmsg').textContent = was ? 'moved — hold still, starting over' : 'hold still…';
+    $('calmsg').className = was ? 'bad' : '';
+  }
+  const f = Math.min(1, (now - cal.start) / (CAL_SECONDS*1000));
+  $('arc').style.strokeDashoffset = 534 * (1 - f);
+  if (f > 0.08) { $('calmsg').textContent = `holding… ${Math.ceil(CAL_SECONDS*(1-f))}s`; $('calmsg').className='good'; }
+  if (f >= 1) {
+    calib.copy(cal.anchor).slerp(q, 0.5);      // middle of the hold
+    yawZero = 0; calibrated = true; cal.active = false; $('cal').hidden = true;
+    paddleX = targetX = 0; say('calibrated', '#4ade80');
+  }
+}
+
+// ---------- peak logger ----------
+let sessionPeak = 0, swingPeaks = [];
+function logSwing(pk){
+  swingPeaks.push(pk); sessionPeak = Math.max(sessionPeak, pk);
+  $('sw').textContent = swingPeaks.length;
+  $('pkmax').textContent = sessionPeak.toFixed(1);
+  $('pkavg').textContent = (swingPeaks.reduce((a,b)=>a+b,0)/swingPeaks.length).toFixed(1);
+  $('pklist').textContent = swingPeaks.slice(-10).map(v=>v.toFixed(0)).join('  ');
+  $('barpk').style.left = Math.min(100, sessionPeak/40*100) + '%';
+  console.log(`swing #${swingPeaks.length} peak=${pk.toFixed(1)} rad/s`);
+}
+function resetPeaks(){ sessionPeak=0; swingPeaks=[]; $('sw').textContent='0'; $('pkmax').textContent='0.0';
+  $('pkavg').textContent='–'; $('pklist').textContent='–'; $('barpk').style.left='0'; }
+
+// ---------- motion ----------
+let swing = null;      // {t0, peak, aim} while we watch for the true peak
+let armed = true;
+
+const ms = new WebSocket('ws://localhost:8787');
+ms.onopen = () => { $('m').textContent='live'; $('m').className='good'; };
+ms.onclose = () => { $('m').textContent='off'; $('m').className='bad'; };
+ms.onmessage = e => {
+  const d = JSON.parse(e.data), now = performance.now();
+  q.set(d.q[0], d.q[1], d.q[2], d.q[3]);
+  power = Math.hypot(d.r[0], d.r[1], d.r[2]);
+  $('pw').textContent = power.toFixed(1);
+  $('barf').style.width = Math.min(100, power/40*100) + '%';
+
+  if (cal.active) { stepCalibration(now); return; }
+
+  const yaw = yawSinceCalib();
+  // freeze sideways motion mid-swing so the swing itself doesn't drag the paddle off the ball
+  if (!swing && power < SWING_ON * 0.6)
+    targetX = THREE.MathUtils.clamp(-yaw / YAW_FULL * 3 * flip, -X_LIMIT, X_LIMIT);
+
+  if (armed && !swing && power > SWING_ON) { armed = false; swing = { t0: now, peak: power, aim: -yaw * flip }; }
+  if (swing) {
+    swing.peak = Math.max(swing.peak, power);
+    if (now - swing.t0 >= PEAK_WINDOW_MS) {
+      if (gs.readyState === 1) gs.send(JSON.stringify({ type:'swing', power: swing.peak, aim: swing.aim * 0.4, x: worldX() }));
+      const s = swing; swing = null;
+      // keep tracking the real peak for the logger even after the hit is sent
+      tail = { peak: s.peak };
+    }
+  }
+  if (tail) tail.peak = Math.max(tail.peak, power);
+  if (!armed && !swing && power < SWING_OFF) { armed = true; if (tail) { logSwing(tail.peak); tail = null; } }
+};
+let tail = null;
+
+const worldX = () => paddleX * (mySide === 0 ? 1 : -1);   // "my right" is +x for side 0, -x for side 1
+
+// ---------- game ----------
+const gs = new WebSocket(`ws://${GAME_HOST}:8080`);
+gs.onopen = () => { $('g').textContent='live'; $('g').className='good'; };
+gs.onclose = () => { $('g').textContent='off'; $('g').className='bad'; };
+gs.onmessage = e => {
+  const m = JSON.parse(e.data);
+  if (m.type === 'welcome') { mySide = m.side; $('side').textContent = m.side; placeCamera(); }
+  if (m.type === 'state') {
+    ball.position.set(...m.p); ball.visible = shadow.visible = m.live;
+    shadow.position.set(m.p[0], 0.02, m.p[2]);
+    $('score').textContent = `${m.score[mySide]} : ${m.score[1-mySide]}`;
+    const o = m.paddles && m.paddles[1-mySide];
+    other.visible = !!o;
+    if (o) { other.position.x += (o.x - other.position.x) * 0.4;
+             otherQ.set(o.q[0], o.q[1], o.q[2], o.q[3]).premultiply(TURN); other.quaternion.slerp(otherQ, 0.5); }
+  }
+  if (m.type === 'hit')   flash(m.side === mySide ? 0x4ade80 : 0xff6b6b);
+  if (m.type === 'whiff') say(m.miss * (mySide===0?1:-1) > 0 ? 'missed — ball was to your right' : 'missed — ball was to your left', '#ff6b6b');
+  if (m.type === 'point') say(`${m.score[mySide]} : ${m.score[1-mySide]}`, '#e6edf3');
+};
+const otherQ = new THREE.Quaternion();
+const TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI);  // they face you
+
+setInterval(() => {            // tell the server where my paddle is, 20Hz
+  if (gs.readyState === 1 && calibrated)
+    gs.send(JSON.stringify({ type:'paddle', x: worldX(), q: [rel.x, rel.y, rel.z, rel.w] }));
+}, 50);
+
+function placeCamera(){
+  const s = mySide === 0 ? 1 : -1;
+  cam.position.set(0, 2.6, s * 13.5);
+  cam.lookAt(0, 0.8, 0);
+  paddle.position.set(0, 1.5, s * 11);
+  other.position.set(0, 1.5, -s * 11);
+}
+placeCamera();
+
+let flashT = 0, flashC = 0x4ade80;
+function flash(c){ flashT = 1; flashC = c; }
+let sayT;
+function say(t, c){ const el=$('msg'); el.textContent=t; el.style.color=c; el.style.opacity=1;
+  clearTimeout(sayT); sayT=setTimeout(()=>el.style.opacity=0, 1100); }
+
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'c') startCalibration();
+  if (k === 'p') resetPeaks();
+  if (k === 'x') { flip *= -1; say(flip===1?'left/right: normal':'left/right: flipped', '#ffe066'); }
+  if (k === 'r' && calibrated) {             // yaw drifts over minutes: re-zero heading only, keep the grip
+    yawZero += yawSinceCalib();
+    say('re-centered', '#ffe066');
+  }
+});
+
+(function loop(){
+  requestAnimationFrame(loop);
+  if (calibrated) {
+    rel.copy(q).premultiply(calib.clone().invert());
+    paddle.quaternion.slerp(rel, 0.55);
+    paddleX += (targetX - paddleX) * 0.25;
+    paddle.position.x = worldX();
+    cam.position.x = worldX() * 0.35;
+    $('px').textContent = paddleX.toFixed(1);
+  }
+  if (flashT > 0) { flashT -= 0.05; key.color.setHex(flashC); key.intensity = 1.4 + flashT*2.5; }
+  else { key.color.setHex(0xffffff); key.intensity = 1.4; }
+  rnd.render(scene, cam);
+})();
+</script>

@@ -1,0 +1,122 @@
+<!doctype html>
+<!-- Standalone scene.js harness: fake rally, no servers. Params: ?side=0|1  &opp=bot|human  &t=<s> (deterministic freeze-frame)  &look=px,py,pz,tx,ty,tz[,fov] (debug camera, with t) -->
+<html><head><meta charset="utf-8"><title>scene preview</title><link rel="icon" href="data:,">
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;font:12px/1.4 ui-monospace,Menlo,monospace}
+  #view{position:fixed;inset:0}
+  #info{position:fixed;left:10px;top:10px;color:#fff;background:rgba(0,0,0,.45);padding:6px 9px;border-radius:6px;white-space:pre}
+  #err{position:fixed;left:10px;bottom:10px;right:10px;color:#ff8080;background:rgba(0,0,0,.7);padding:6px 9px;white-space:pre-wrap;display:none}
+</style></head><body>
+<div id="view"></div><div id="info">loading…</div><div id="err"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+  window.__errors = [];
+  function showErr(m) { window.__errors.push(String(m)); const e = document.getElementById('err'); e.style.display = 'block'; e.textContent = window.__errors.join('\n'); console.error('HARNESS-ERROR ' + m); }
+  addEventListener('error', e => showErr(e.message + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno));
+  addEventListener('unhandledrejection', e => showErr('rejection: ' + (e.reason && e.reason.stack || e.reason)));
+</script>
+<script type="module">
+import { createScene } from '../web/scene.js';
+const Q = new URLSearchParams(location.search), SIDE = Q.get('side') === '1' ? 1 : 0, OPP_BOT = Q.get('opp') !== 'human', FREEZE = Q.has('t') ? +Q.get('t') : null;
+
+// armOffset: the real one if motion.js exists yet, else a stub of the contract's kinematic arm
+let armOffset = P => { const [x, y, z, w] = P, v = [0.18, -0.22, -0.68];
+  const tx = 2 * (y * v[2] - z * v[1]), ty = 2 * (z * v[0] - x * v[2]), tz = 2 * (x * v[1] - y * v[0]);
+  return [w * tx + y * tz - z * ty, w * ty + z * tx - x * tz, w * tz + x * ty - y * tx]; };
+let armSrc = 'stub';
+try { const m = await import('../web/motion.js'); if (typeof m.armOffset === 'function') { armOffset = m.armOffset; armSrc = 'motion.js'; } } catch (e) {}
+
+// ---- fake server: same ballistic launch/footwork as server/game.js, both players scripted ----
+const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 }, G = 9.81, R = 0.11, HIT_LINE = 6.5;
+const sgn = s => (s === 0 ? 1 : -1), clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a) * t;
+let seed = 12345; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+const scene = createScene(document.getElementById('view'));
+scene.setCourt(COURT); scene.setSide(SIDE);
+const players = [0, 1].map(side => ({ side, bot: side !== SIDE && OPP_BOT, x: 0, y: 1, z: sgn(side) * HIT_LINE, zT: sgn(side) * HIT_LINE, contact: null, q: [0, 0, 0, 1], swingT: -1, hitAt: -1, sentQ: [0, 0, 0, 1] }));
+const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
+let now = 0, tick = 0, hits = 0, resetAt = 0.5, score = [0, 0], events = 0;
+const timeline = [], emit = m => { events++; timeline.push(now.toFixed(2) + ' ' + m.type + (m.side != null ? m.side : m.by != null ? m.by : m.winner != null ? m.winner : '')); scene.onEvent(m); };
+
+function launch(side, n, dir, lob) {
+  const s = sgn(side), tx = s * clamp(dir * 2.4, -2.5, 2.5), tz = -s * (lerp(4.7, 3.4, n) + lob * 1.2);
+  let T = lerp(1.15, 0.78, n) + lob * 0.55, v; const [px, py, pz] = ball.p;
+  for (let i = 0; i < 25; i++) { v = [(tx - px) / T, (R - py) / T + 0.5 * G * T, (tz - pz) / T]; const tn = -pz / v[2], yn = py + v[1] * tn - 0.5 * G * tn * tn; if (tn <= 0 || yn >= COURT.net + 0.25) break; T += 0.05; }
+  ball.v = v; ball.lastHit = side; ball.bounces = 0; plan(1 - side); players.forEach(p => p.missed = false);
+  emit({ type: 'launch', by: side, land: [tx, tz] });
+}
+function plan(side) {
+  const pl = players[side], s = sgn(side), p = [...ball.p], v = [...ball.v]; let b = false; pl.zT = s * HIT_LINE; pl.contact = null;
+  for (let t = 0; t < 4; t += 1 / 120) { v[1] -= G / 120; for (let i = 0; i < 3; i++) p[i] += v[i] / 120;
+    if (p[1] < R) { if (b) break; p[1] = R; v[1] *= -0.7; v[0] *= 0.78; v[2] *= 0.78; b = true; }
+    if (b && v[1] <= 0) { pl.zT = s * clamp(p[2] * s, 2.6, 8.4); pl.contact = [p[0], p[1]]; break; } }
+}
+function serve(by) { ball.p = [(rnd() - 0.5) * 2, 1.1, sgn(by) * HIT_LINE]; ball.live = true; launch(by, 0.15, (rnd() - 0.5) * 1.2, 0.25); emit({ type: 'serve', by }); }
+function point(winner, why) { score[winner]++; ball.live = false; emit({ type: 'point', winner, why, score }); resetAt = now + 1.5; nextServer = 1 - winner; }
+let nextServer = 0;
+
+// scripted human swing, player frame: yaw about +y (CCW from above = sweeping left), a little pitch/roll
+function qEuler(yaw, pitch, roll) { const e = new THREE.Euler(pitch, yaw, roll, 'YXZ'), q = new THREE.Quaternion().setFromEuler(e); return [q.x, q.y, q.z, q.w]; }
+function humanQ(pl) {
+  const t = pl.swingT, D = Math.PI / 180, sm = k => k * k * (3 - 2 * k), idle = [8, -8 + Math.sin(now * 1.7) * 3, 6 + Math.sin(now * 2.3) * 4];
+  let a = idle;
+  if (t >= 0) { const K = [[0, idle], [0.14, [-58, 10, -26]], [0.30, [88, 26, 36]], [0.42, [74, 20, 30]], [0.75, idle]];
+    let i = 0; while (i < K.length - 2 && t > K[i + 1][0]) i++; const k = sm(clamp((t - K[i][0]) / (K[i + 1][0] - K[i][0]), 0, 1)); a = K[i][1].map((v, j) => lerp(v, K[i + 1][1][j], k)); }
+  return qEuler(a[0] * D, a[1] * D, a[2] * D);
+}
+
+function step(dt) {
+  now += dt; tick++;
+  if (!ball.live && resetAt && now >= resetAt) { resetAt = 0; serve(nextServer); }
+  for (const pl of players) {
+    const s = sgn(pl.side), home = !ball.live || ball.lastHit === pl.side;
+    pl.z += clamp((home ? s * HIT_LINE : pl.zT) - pl.z, -7 * dt, 7 * dt);
+    const tgt = home ? [0, 1.0] : (pl.contact || [ball.p[0], 1.0]);
+    pl.x += clamp(tgt[0] - pl.x, -5 * dt, 5 * dt); pl.y += clamp(clamp(tgt[1], 0.3, 2.3) - pl.y, -4 * dt, 4 * dt);
+    if (pl.swingT >= 0) { pl.swingT += dt; if (pl.swingT > 0.75) pl.swingT = -1; }
+    if (ball.live && ball.lastHit !== pl.side) {
+      const dx = ball.p[0] - pl.x, dy = ball.p[1] - pl.y, ahead = -(ball.p[2] - pl.z) * s, vz = Math.abs(ball.v[2]);
+      const skip = !pl.bot && hits % 9 === 8;                                  // the "human" whiffs now and then -> point events
+      if (!pl.bot && !skip && pl.swingT < 0 && ahead > 0 && (ahead - 0.7) / vz < 0.2 && Math.abs(dx) < 1.5) { pl.swingT = 0; emit({ type: 'swung', side: pl.side }); }
+      if (Math.abs(dx) < 1.15 && Math.abs(dy) < 0.95 && ahead > -0.9 && ahead < 0.7) {
+        if (skip || pl.missed) { if (ahead < -0.6 && !pl.missed) { pl.missed = true; hits++; if (pl.side === SIDE) emit({ type: 'whiff', why: 'late' }); } }
+        else { hits++; const n = 0.2 + rnd() * 0.8; ball.p[2] = pl.z - s * 0.25; emit({ type: 'hit', side: pl.side, n, p: [...ball.p] }); launch(pl.side, n, (rnd() - 0.5) * 1.8, rnd() < 0.2 ? 0.6 : 0); }
+      }
+    }
+    if (!pl.bot) pl.q = humanQ(pl);
+  }
+  if (ball.live) {
+    ball.v[1] -= G * dt; for (let i = 0; i < 3; i++) ball.p[i] += ball.v[i] * dt;
+    if (ball.p[1] < R) { ball.p[1] = R; ball.v[1] *= -0.7; ball.v[0] *= 0.78; ball.v[2] *= 0.78; ball.bounces++; emit({ type: 'bounce', p: [...ball.p] });
+      const land = ball.p[2] > 0 ? 0 : 1, inb = Math.abs(ball.p[0]) <= COURT.halfW + 0.1 && Math.abs(ball.p[2]) <= COURT.halfL + 0.1 && land !== ball.lastHit;
+      if (ball.bounces === 1 && !inb) point(1 - ball.lastHit, 'out'); else if (ball.bounces === 2) point(ball.lastHit, 'double bounce'); }
+    if (ball.live && Math.abs(ball.p[2]) > COURT.halfL + 8) point(ball.bounces ? ball.lastHit : 1 - ball.lastHit, 'passed');
+  }
+}
+// what main.js would do each frame: local paddle 1:1 with pose offset, remote from "state" (its q only refreshes at 20Hz)
+function push(ms) {
+  for (const pl of players) {
+    if (pl.side === SIDE) scene.updatePaddle(pl.side, { x: pl.x, y: pl.y, z: pl.z, q: pl.q, offset: armOffset(pl.q), bot: false });
+    else { if (tick % 3 === 0) pl.sentQ = pl.q; scene.updatePaddle(pl.side, { x: pl.x, y: pl.y, z: pl.z, q: pl.bot ? [0, 0, 0, 1] : pl.sentQ, offset: null, bot: pl.bot }); }
+  }
+  scene.updateBall([...ball.p], [...ball.v], ball.live, ms);
+}
+
+const info = document.getElementById('info');
+if (FREEZE != null) {                                    // deterministic: fixed 60Hz steps to t, render each, leave the last frame up
+  const N = Math.round(FREEZE * 60); for (let i = 1; i <= N; i++) { step(1 / 60); push(i * 1000 / 60); scene.render(i * 1000 / 60); }
+  if (Q.has('look')) { const L = Q.get('look').split(',').map(Number), d = scene._dbg; d.camera.position.set(L[0], L[1], L[2]); d.camera.lookAt(L[3], L[4], L[5]); if (L[6]) { d.camera.fov = L[6]; d.camera.updateProjectionMatrix(); } d.renderer.render(d.scene, d.camera); }
+  info.textContent = `side ${SIDE} · opp ${OPP_BOT ? 'bot' : 'human'} · t=${FREEZE}s · hits ${hits} · events ${events} · score ${score.join(':')} · arm ${armSrc}`;
+  document.title = 'ready errors=' + window.__errors.length; console.log('HARNESS-TIMELINE ' + timeline.join(' | ')); console.log('HARNESS-READY errors=' + window.__errors.length + ' hits=' + hits + ' events=' + events);
+} else {
+  let last = performance.now(), acc = 0, frames = 0, fpsT = last, fps = 0, worst = 0;
+  addEventListener('pointerdown', () => scene.unlockAudio()); addEventListener('keydown', () => scene.unlockAudio());
+  addEventListener('resize', () => scene.resize());
+  const loop = ms => { requestAnimationFrame(loop);
+    const d = Math.min(0.1, (ms - last) / 1000); worst = Math.max(worst, ms - last); last = ms; acc += d; while (acc >= 1 / 60) { step(1 / 60); acc -= 1 / 60; }
+    push(performance.now()); scene.render(ms);
+    if (++frames && ms - fpsT >= 1000) { fps = frames * 1000 / (ms - fpsT); frames = 0; fpsT = ms;
+      info.textContent = `side ${SIDE} · opp ${OPP_BOT ? 'bot' : 'human'} · ${fps.toFixed(0)} fps · worst frame ${worst.toFixed(1)} ms · hits ${hits} · score ${score.join(':')} · arm ${armSrc}\nclick = audio on · ?side=1 · ?opp=human · ?t=3.2`;
+      document.title = 'fps=' + fps.toFixed(0) + ' worst=' + worst.toFixed(1) + ' errors=' + window.__errors.length; worst = 0; } };
+  requestAnimationFrame(loop);
+}
+</script></body></html>
