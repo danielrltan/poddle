@@ -4,3 +4,4 @@ test/shots/
 data/live-capture.jsonl
 .DS_Store
 data/live2.jsonl
+test/ui-shots/*.png

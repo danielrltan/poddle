@@ -1,0 +1,36 @@
+import http from 'http'; import fs from 'fs'; import path from 'path'; import puppeteer from 'puppeteer-core';
+const root = new URL('../..', import.meta.url).pathname, PORT = 8245;
+const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.woff2': 'font/woff2' };
+const srv = http.createServer((q, r) => { const f = path.join(root, decodeURIComponent(new URL(q.url, 'http://x').pathname)); fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); }).listen(PORT, '127.0.0.1');
+const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new' });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const open = async (q, reduce) => { const p = await browser.newPage(); await p.setViewport({ width: 1440, height: 900 }); if (reduce) await p.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]); await p.goto(`http://127.0.0.1:${PORT}/test/ui-mock.html?${q}`); await p.waitForFunction(() => document.title.startsWith('ready')); await p.evaluate(() => document.fonts.ready); return p; };
+try {
+  let p = await open('screen=hud'); await sleep(600);
+  console.log('running animations on hud:', await p.evaluate(() => document.getAnimations().map(a => (a.animationName || a.transitionProperty) + '@' + (a.effect.target.id || a.effect.target.className)).join(', ') || 'none'));
+  console.log('backdrop-filter users:', await p.evaluate(() => [...document.querySelectorAll('*')].filter(e => { const c = getComputedStyle(e); return (c.backdropFilter && c.backdropFilter !== 'none'); }).length));
+  console.log('monospace users:', await p.evaluate(() => [...document.querySelectorAll('body *')].filter(e => /mono|courier|menlo|consolas/i.test(getComputedStyle(e).fontFamily)).length));
+  const tl = await p.evaluate(async () => { const out = [], c = document.getElementById('callout'); window.__ui.callout('drive'); const t0 = performance.now();
+    while (performance.now() - t0 < 1400) { await new Promise(r => requestAnimationFrame(r)); const s = getComputedStyle(c), m = new DOMMatrix(s.transform); out.push([Math.round(performance.now() - t0), +(+s.opacity).toFixed(2), +Math.hypot(m.a, m.b).toFixed(3)]); } return out; });
+  const at = ms => tl.reduce((b, x) => Math.abs(x[0] - ms) < Math.abs(b[0] - ms) ? x : b);
+  console.log('callout [ms, opacity, scale]:', [100, 180, 250, 300, 400, 600, 900, 1000, 1100, 1200, 1300].map(at).map(x => x.join('/')).join('  '));
+  console.log('callout text + rect:', await p.evaluate(() => { window.__ui.callout('smash'); const r = document.getElementById('callout').getBoundingClientRect(); return document.getElementById('callout').textContent + ' y ' + Math.round(r.top) + '-' + Math.round(r.bottom); }));
+  console.log('unknown kind ->', await p.evaluate(() => { window.__ui.callout('around_the_post'); return document.getElementById('callout').textContent; }), '| empty kind keeps:', await p.evaluate(() => { window.__ui.callout(undefined); return document.getElementById('callout').textContent; }));
+  await sleep(1500); console.log('callout .go removed after end:', await p.evaluate(() => !document.getElementById('callout').classList.contains('go')));
+  console.log('score pop "10" inside tab:', await p.evaluate(async () => { window.__ui.setScore(10, 5); const n = document.getElementById('sc-me'), tab = n.closest('.score-tab'); let worst = 0; const t0 = performance.now();
+    while (performance.now() - t0 < 500) { await new Promise(r => requestAnimationFrame(r)); const a = n.getBoundingClientRect(), b = tab.getBoundingClientRect(); worst = Math.max(worst, b.top - a.top, a.bottom - b.bottom); } return 'max overflow px = ' + worst.toFixed(1); }));
+  console.log('keys idle now:', await p.evaluate(() => document.getElementById('keys').classList.contains('is-idle')));
+  await sleep(5200); console.log('keys idle after ~7.5 s:', await p.evaluate(() => document.getElementById('keys').classList.contains('is-idle') + ' opacity ' + getComputedStyle(document.getElementById('keys')).opacity));
+  await p.keyboard.press('KeyH'); console.log('keys after keydown:', await p.evaluate(() => document.getElementById('keys').classList.contains('is-idle')));
+  await p.screenshot({ path: root + 'test/ui-shots/hud-idle-1440x900.png' });
+  await p.close();
+  p = await open('screen=match-win'); await p.evaluate(() => window.__ui.toast('Re-centered', 5000)); await sleep(500);
+  console.log('toast over veil: z', await p.evaluate(() => getComputedStyle(document.getElementById('toast')).zIndex + ' vs screen ' + getComputedStyle(document.getElementById('screen-match')).zIndex)); await p.close();
+  p = await open('screen=title', true); await sleep(300);
+  console.log('reduced motion: start button glow opacity =', await p.evaluate(() => getComputedStyle(document.getElementById('btn-start'), '::after').opacity)); await p.close();
+  p = await open('screen=calibrate-error'); await sleep(200);
+  console.log('second error replays nudge:', await p.evaluate(async () => { const c = document.getElementById('calcard'); let n = 0; c.addEventListener('animationstart', e => { if (e.animationName === 'nudge') n++; });
+    window.__ui.calibration({ stage: 'hold', progress: .1, ok: true, msg: 'x' }); await new Promise(r => setTimeout(r, 1500)); window.__ui.calibration({ stage: 'hold', progress: 0, ok: false, msg: 'You moved — hold still and we’ll start again.' });
+    await new Promise(r => setTimeout(r, 100)); const head1 = document.getElementById('calh').textContent; window.__ui.calibration({ stage: 'hold', progress: .02, ok: true, msg: 'x' }); const latched = document.getElementById('calh').textContent;
+    window.__ui.calibration({ stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' }); await new Promise(r => setTimeout(r, 100)); return `nudges=${n} headline="${head1}" latched="${latched}" then="${document.getElementById('calh').textContent}"`; })); await p.close();
+} finally { await browser.close(); srv.close(); }
