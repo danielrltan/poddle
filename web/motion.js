@@ -18,7 +18,7 @@ export const DEFAULTS = {
   WINDUP_MAX: 0, WINDUP_SPEED: 5, STILL_RATE: 1.2, STILL_MAX: 0.3,   // ...or further, to before a slow backswing
   FREEZE_BLEND: 0.08,                       // ease the arm reference into the rolled-back state, s
   RECOVER_TAU: 0.3, RECOVER_RAMP: 0.5,      // after a lock, let the base go softly
-  TRIGGER: 9, PEAK_WINDOW: 0.16, REARM: 3, TAP: 6,
+  TRIGGER: 9, PEAK_WINDOW: 0.12, REARM: 3, TAP: 6,
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
   ROM_IDLE: 4, ROM_MIN: 25, ROM_FULL: 45, ROM_T_MIN: 0.04, ROM_T_FULL: 0.07,   // deg swept before the peak: below MIN a swing scores nothing, at FULL it scores its whole peak rate  // swing detection, rad/s and s
   LOB_GAIN: 0.8,

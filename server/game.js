@@ -219,7 +219,9 @@ wss.on('connection', ws => {
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
     } else if (m.type === 'swing') {
-      me.swing = { until: now + SWING_WINDOW, n: clamp((num(m.power, 6) - 6) / 28, 0, 1),                  // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
+      const pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
+      me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
+        n: clamp((num(m.power, 6) - 6) / 28, 0, 1),                  // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
          dir: clamp(num(m.dir, 0), -1, 1), lob: clamp(num(m.lob, 0), 0, 1), why: null, best: Infinity };
       broadcast({ type: 'swung', side: me.side });
     } else if (m.type === 'bot') botRequest(me, m.level);
