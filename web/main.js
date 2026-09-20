@@ -125,9 +125,11 @@ const bridge = connect(BRIDGE, 'm', sample => {
       if (!calibrating) {
                 // Spin comes from any of three things, whichever is strongest: the paddle held level (a slice), the wrist
         // rolling through the ball, or a curved "C" shaped swing. Its sign says which way the ball breaks off the bounce.
-        const top = qrot(model.pose(performance.now()).Pd, [0, 1, 0]);
-        const level = Math.max(0, 1 - Math.abs(top[1]) / 0.75), roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.4) / 0.4)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 0.7) / 1.0));   // measured on real play: a plain swing wanders ~0.4 rad and rolls ~0.2, so spin starts above that
-        const amount = Math.max(level, roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
+        // (How level the paddle is held is NOT used: this player rests the bud flat in the hand, so it read "level"
+        // nearly all the time and made every shot a slice.) Thresholds sit above what plain swings do in real play:
+        // the rotation axis of an ordinary swing wanders ~0.4 rad (p75 ~1.1) and rolls ~0.2 (p75 ~0.5).
+        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.6) / 0.3)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 1.2) / 1.0));
+        const amount = Math.max(roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
         const slice = amount * (way || 1);
         game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, chop: e.chop, age: e.age, slice, fix });
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated

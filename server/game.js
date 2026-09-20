@@ -57,11 +57,11 @@ function newPlayer(ws, side) {
 // Ballistic solve: pick where the ball should land, find the velocity that gets it there
 // and clears the net. Every shot is "in" by construction; the skill is reaching and timing it.
 // how underhand was the swing? lob is the upward-scoop share of the stroke, 0..0.8 from the client
-const underhand = lob => { const t = clamp((lob / 0.8 - 0.18) / 0.3, 0, 1); return t * t * (3 - 2 * t); };   // upward share of the stroke: 0.18 starts to count, 0.48 is fully underhand
+const underhand = lob => { const t = clamp((lob / 0.8 - 0.4) / 0.3, 0, 1); return t * t * (3 - 2 * t); };   // upward share of the stroke: 0.18 starts to count, 0.48 is fully underhand
 // how sliced? slice = how flat / open the paddle face was through the swing, 0..1 from the client. A scoop is never a slice.
 // spin is easy to put on: it starts at 0.25 and is full by 0.6. |slice| = how much, its sign = which way it breaks.
-const sliced = (slice, lob) => { const t = clamp((Math.abs(slice || 0) - 0.25) / 0.35, 0, 1); return t * t * (3 - 2 * t) * (1 - 0.6 * underhand(lob)); };
-const shotKind = (n, lob, slice) => (sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.62 ? 'smash' : n < 0.2 ? 'tap' : 'drive');
+const sliced = (slice, lob) => { const t = clamp((Math.abs(slice || 0) - 0.3) / 0.4, 0, 1); return t * t * (3 - 2 * t) * (1 - 0.6 * underhand(lob)); };
+const shotKind = (n, lob, slice) => (sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.62 ? 'smash' : n < 0.1 ? 'tap' : 'drive');
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
