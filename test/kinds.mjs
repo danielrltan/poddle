@@ -4,7 +4,7 @@ import { MotionModel, qaxis, qmul, qrot } from '../web/motion.js';
 import fs from 'fs';
 const src = fs.readFileSync(new URL('../server/game.js', import.meta.url), 'utf8');
 const grab = name => { const i = src.indexOf('const ' + name + ' = '); return src.slice(i, src.indexOf('\n', i)); };
-const { underhand, sliced, shotKind } = new Function('const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));' + grab('underhand') + '\n' + grab('sliced') + '\n' + grab('shotKind') + '\nreturn { underhand, sliced, shotKind };')();
+const { underhand, sliced, shotKind } = new Function('const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));' + grab('underhand') + '\n' + grab('sliced') + '\n' + grab('hard') + '\n' + grab('shotKind') + '\nreturn { underhand, sliced, shotKind };')();
 const main = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8');
 const spinSrc = main.slice(main.indexOf('const roll = Math.max('), main.indexOf('const slice = amount'));           // the client's own spin maths
 const spinOf = new Function('e', 'top', spinSrc + '; return { level: 0, roll, curve, amount, way };');

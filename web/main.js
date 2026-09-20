@@ -161,7 +161,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'full') { ui.showOverlay('game-full'); return; }
-  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; ui.setRally(rally); if (m.side === side) ui.callout(m.kind); }   // the shot's name only, and only for my own hits
+  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === side ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
     if (m.wait && m.by === side && inPlay()) say('Your serve — swing to hit it!', null, 2600); }
   if (m.type === 'match') { const won = m.winner === side; ui.matchResult(won, m.score[side], m.score[1 - side], oppName); ui.setServe(null);
