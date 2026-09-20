@@ -1,0 +1,97 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Poddle — UI mock</title>
+<link rel="stylesheet" href="../web/ui.css">
+<style>
+  /* mock-only: placeholder court, frozen animation frames for screenshots, and the contact sheet */
+  #stage svg{width:100%;height:100%;display:block}
+  .freeze *, .freeze *::before, .freeze *::after{animation-play-state:paused!important;animation-delay:var(--freeze-at,-700ms)!important}
+  .freeze .callout{--freeze-at:-600ms} .freeze .light{--freeze-at:0ms} .freeze .medal{--freeze-at:-1200ms} .freeze .next-bar i{--freeze-at:-1800ms} .freeze .medal-disc::after{--freeze-at:-1150ms}
+  .fake-cam{aspect-ratio:16/9;background:radial-gradient(circle at 50% 38%,#f1c9a5 0 9%,transparent 9.5%),radial-gradient(ellipse 22% 34% at 50% 92%,#4f7fb3 0 98%,transparent 100%),linear-gradient(180deg,#cfd8de,#aab6bf)}
+  .fake-pod{aspect-ratio:1;display:grid;place-items:center} .fake-pod svg{width:62%}
+  body.sheet{overflow:auto;height:auto;background:#e8f1f6}
+  html.sheet-root{overflow:auto;height:auto;font-size:16px}
+  #sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:24px}
+  #sheet figure{margin:0} #sheet figcaption{font:800 13px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px 4px}
+  #sheet .thumb{position:relative;width:100%;aspect-ratio:1440/900;overflow:hidden;border-radius:12px;box-shadow:var(--sh-2);background:#fff}
+  #sheet iframe{position:absolute;left:0;top:0;width:1440px;height:900px;border:0;transform-origin:0 0}
+</style>
+
+<!-- ======================= placeholder 3D scene (the real page has the three.js canvas here) ======================= -->
+<div id="stage" hidden>
+  <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ec5ee"/><stop offset="1" stop-color="#e8f5fb"/></linearGradient>
+      <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8d5c"/><stop offset="1" stop-color="#4b9a66"/></linearGradient>
+      <pattern id="net" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M0 0H7M0 0V7" stroke="#1d2a33" stroke-width="1" opacity=".55"/></pattern>
+    </defs>
+    <rect width="1440" height="250" fill="url(#sky)"/>
+    <g fill="#3d8a4c"><circle cx="110" cy="170" r="52"/><circle cx="160" cy="150" r="40"/><circle cx="300" cy="185" r="58"/><circle cx="500" cy="170" r="56"/><circle cx="690" cy="160" r="70"/><circle cx="845" cy="150" r="78"/><circle cx="940" cy="165" r="40"/><circle cx="1300" cy="170" r="70"/><circle cx="1400" cy="160" r="80"/></g>
+    <g fill="#6b3f26"><rect x="112" y="205" width="12" height="70"/><rect x="300" y="225" width="14" height="60"/><rect x="1290" y="215" width="16" height="80"/><rect x="1385" y="220" width="20" height="90"/></g>
+    <rect y="240" width="1440" height="660" fill="url(#grass)"/>
+    <path d="M0 350 355 268V325L0 470Z" fill="#12352a"/><path d="M1440 350 1070 268V325L1440 460Z" fill="#1d4434"/>
+    <rect x="355" y="218" width="718" height="107" fill="#1f4a39"/>
+    <g font-family="Poddle Rounded, sans-serif" font-weight="900" font-size="40" fill="#d9ddd4" text-anchor="middle"><text x="500" y="284">PODDLE</text><text x="715" y="284">PODDLE</text><text x="928" y="284">PODDLE</text></g>
+    <circle cx="608" cy="272" r="9" fill="#e3c534"/><circle cx="822" cy="272" r="9" fill="#e3c534"/>
+    <path d="M545 374H905L1235 775H208Z" fill="#fff"/>
+    <path d="M550 378H722L735 428 510 428Z M728 378H900L941 428 741 428Z" fill="#2f66b3"/>
+    <path d="M507 432H944L1062 522H426Z" fill="#ee8a4a"/>
+    <path d="M423 528H744L775 768 222 768Z M752 528H1066L1222 768 788 768Z" fill="#3569b8"/>
+    <rect x="436" y="392" width="600" height="76" fill="url(#net)"/><rect x="436" y="390" width="600" height="5" fill="#f4f4f4"/><rect x="432" y="384" width="7" height="88" fill="#1b1f24"/><rect x="1033" y="382" width="7" height="90" fill="#1b1f24"/>
+    <g><ellipse cx="750" cy="362" rx="34" ry="6" fill="#0003"/><rect x="728" y="280" width="40" height="64" rx="18" fill="#e6b52c"/><circle cx="748" cy="262" r="21" fill="#f0c9a0"/><path d="M727 258a21 21 0 0 1 42 0q-21-12-42 0Z" fill="#3b2a20"/></g>
+    <circle cx="534" cy="386" r="11" fill="#e6f03c"/>
+    <g transform="rotate(14 600 560)"><rect x="584" y="488" width="38" height="96" rx="16" fill="#8c1f2c" stroke="#1b1f24" stroke-width="4"/><rect x="596" y="582" width="14" height="40" rx="6" fill="#23272c"/></g>
+    <ellipse cx="700" cy="715" rx="46" ry="12" fill="#0003"/>
+  </svg>
+</div>
+
+<!-- The UI markup is NOT copied here: it is loaded from web/index.html (between UI:BEGIN and UI:END) and driven by the real web/ui.js,
+     so this mock can never drift from the game. Serve the repo root over http (node test/ui-shots/shoot.mjs does). -->
+<div id="ui-root"></div>
+
+<div id="sheet" hidden></div>
+
+<script type="module">
+  // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
+  const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
+  const SCREENS = ['title', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-airpod-lost', 'match-win', 'match-lose', 'server-down', 'game-full', 'hud-stats'];
+  if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
+  if (screen === 'all') {
+    document.documentElement.classList.add('sheet-root'); document.body.classList.add('sheet'); const sheet = $('sheet'); sheet.hidden = false;
+    for (const s of SCREENS) { const f = document.createElement('figure'); f.innerHTML = `<figcaption>${s}</figcaption><div class="thumb"><iframe src="?screen=${s}&freeze=1" loading="eager"></iframe></div>`; sheet.appendChild(f); }
+    const fit = () => document.querySelectorAll('#sheet .thumb').forEach(t => t.firstChild.style.transform = `scale(${t.clientWidth / 1440})`); fit(); addEventListener('resize', fit);
+  } else {
+    const html = await (await fetch('../web/index.html')).text();
+    $('ui-root').innerHTML = html.slice(html.indexOf('<!-- UI:BEGIN -->'), html.indexOf('<!-- UI:END -->'));
+    // stand-ins for the two live canvases
+    $('camc').outerHTML = '<div class="inset-fill fake-cam"></div>'; $('camwrap').hidden = false;
+    $('pod').outerHTML = '<div class="inset-fill fake-pod"><svg viewBox="0 0 100 160"><rect x="40" y="52" width="20" height="98" rx="10" fill="#f4f6f8" stroke="#c4ced6" stroke-width="3"/><ellipse cx="46" cy="38" rx="30" ry="32" fill="#fbfcfd" stroke="#c4ced6" stroke-width="3"/><circle cx="34" cy="34" r="7" fill="#59636c"/></svg></div>';
+    const ui = await import('../web/ui.js'); window.__ui = ui;
+    const hud = (me = 7, them = 5, rally = 4) => { $('stage').hidden = false; ui.showScreen(null); ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.setNames({ them: qs.get('opp') || 'Club Bot', themSub: '' }); ui.setScore(me, them); ui.setServe('me'); ui.setRally(rally); };
+    const cal = (e, o) => { ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.showScreen('calibrate'); ui.calibration(e, o); };
+    const R = {
+      'title': () => ui.showScreen('title'),
+      'connect': () => { ui.setStatus({ airpod: 'wait', game: 'ok', camera: 'wait' }); ui.showScreen('connect'); },
+      'calibrate1': () => cal({ stage: 'hold', progress: .62, ok: true, msg: 'Hold it like a paddle, pointed at the screen. Keep still…' }),
+      'calibrate2': () => cal({ stage: 'tilt', progress: .4, ok: true, msg: 'Now tip the front of the AirPod up.' }),
+      'calibrate-error': () => qs.get('err') === 'twist' ? cal({ stage: 'tilt', progress: 0, ok: false, msg: 'That was a twist — level out, then tip it straight up.' }) : cal({ stage: 'hold', progress: 0, ok: false, msg: 'You moved — hold still and we’ll start again.' }),
+      'calibrate-done': () => cal({ stage: 'tilt', progress: 1, ok: true, msg: 'All set!' }),
+      'calibrate-settle': () => cal({ stage: 'tilt', progress: .5, ok: true, msg: 'Good — now hold it how you’ll play.' }),
+      'hud': () => hud(),
+      'hud-stats': () => { hud(); ui.toggle('dev'); ui.setStat('pw', '12.4'); ui.setStat('px', '0.8'); ui.setStat('py', '1.1'); ui.setStat('pkmax', '31.2'); ui.setStat('sw', 14); ui.setStat('pkavg', '19.6'); ui.setStat('pklist', '22 (96°) · × (31°) · 30 (128°) · 17 (74°) · 26 (110°)'); },
+      'hud-callout': () => { hud(7, 5, 5); ui.callout(qs.get('kind') || 'smash', qs.get('them') === '1'); },
+      'hud-point-you': () => { hud(8, 5, 0); ui.pointBanner(true); },
+      'hud-point-enemy': () => { hud(7, 6, 0); ui.pointBanner(false); },
+      'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve — swing to hit it!', 1e6); },
+      'hud-airpod-lost': () => { hud(); ui.setStatus({ airpod: 'bad' }); ui.toast('AirPod signal lost', 1e6); },
+      'match-win': () => { hud(11, 8, 0); ui.setServe(null); ui.matchResult(true, 11, 8, 'Club Bot'); },
+      'match-lose': () => { hud(9, 11, 0); ui.setServe(null); ui.matchResult(false, 9, 11, 'Club Bot'); },
+      'server-down': () => { hud(); ui.setStatus({ game: 'bad' }); ui.setServerAddress('ws://localhost:8080'); ui.showOverlay('server-down'); },
+      'game-full': () => { hud(); ui.showOverlay('game-full'); },
+    };
+    (R[screen] || R.title)();
+    if (qs.get('idle') === '1') $('keys').classList.add('is-idle');
+    document.title = 'ready ' + screen;
+  }
+</script>

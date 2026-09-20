@@ -1,136 +1,192 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:,">
 <title>Poddle</title>
-<style>
-  :root{--me:#2f8cff;--me2:#1463d8;--them:#ff7a3d;--them2:#e4521b;--ink:#1d2b3a;--card:#ffffff;--good:#22c55e;--bad:#ef4444;--gold:#ffc83d;
-        --font:ui-rounded,"SF Pro Rounded","Arial Rounded MT Bold","Nunito","Helvetica Neue",Arial,sans-serif}
-  [hidden]{display:none!important}
-  html,body{margin:0;height:100%;background:#0b0f14;color:var(--ink);font:600 14px var(--font);overflow:hidden;-webkit-font-smoothing:antialiased}
-  #stage{position:fixed;inset:0}
-  .card{background:linear-gradient(#fff,#eef3f9);border-radius:22px;box-shadow:0 6px 0 rgba(20,40,70,.18),0 14px 30px rgba(10,25,50,.28);border:3px solid #fff}
-
-  /* ---------- scoreboard ---------- */
-  #board{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:12;display:flex;align-items:stretch;gap:0;padding:6px;border-radius:28px}
-  .side{display:flex;align-items:center;gap:12px;padding:6px 18px;border-radius:20px;color:#fff;min-width:170px}
-  .side.me{background:linear-gradient(var(--me),var(--me2));flex-direction:row}
-  .side.them{background:linear-gradient(var(--them),var(--them2));flex-direction:row-reverse;text-align:right}
-  .side .who{font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.92;line-height:1.15;flex:1}
-  .side .who small{display:block;font-size:10.5px;opacity:.8;letter-spacing:.05em;font-weight:600}
-  .side .num{font-size:44px;font-weight:800;line-height:1;min-width:52px;text-align:center;text-shadow:0 3px 0 rgba(0,0,0,.18);display:inline-block}
-  .serve{width:12px;height:12px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(255,255,255,.55);visibility:hidden}
-  .serve.on{visibility:visible;animation:pulse 1s infinite}
-  #mid{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px;color:var(--ink)}
-  #mid b{font-size:11px;letter-spacing:.14em;opacity:.55}
-  #rally{font-size:22px;font-weight:800;line-height:1}
-  .pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
-  @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.55) rotate(-4deg)}100%{transform:scale(1)}}
-  @keyframes pulse{50%{transform:scale(1.35)}}
-
-  /* ---------- banner (point / match): a small tag that drops out from under the scoreboard ---------- */
-  #banner{position:fixed;left:0;right:0;top:92px;z-index:11;display:flex;justify-content:center;pointer-events:none}
-  #banner .rib{text-align:center;padding:7px 26px 8px;color:#fff;border-radius:0 0 18px 18px;transform:translateY(-70px);opacity:0;
-      box-shadow:0 5px 0 rgba(0,0,0,.18),0 10px 22px rgba(0,0,0,.28);border:3px solid rgba(255,255,255,.9);border-top:0}
-  #banner.show .rib{animation:drop 1.9s cubic-bezier(.2,.9,.2,1) forwards}
-  #banner.long.show .rib{animation-duration:4.6s}
-  #banner h1{margin:0;font-size:24px;font-weight:800;letter-spacing:.04em;text-shadow:0 2px 0 rgba(0,0,0,.2)}
-  #banner p{margin:0;font-size:12.5px;opacity:.95;letter-spacing:.04em}
-  @keyframes drop{0%{transform:translateY(-70px);opacity:0}12%{transform:translateY(4px);opacity:1}18%,82%{transform:translateY(0);opacity:1}100%{transform:translateY(-70px);opacity:0}}
-
-  /* ---------- hit confirmation ---------- */
-  #hitfx{position:fixed;left:50%;top:62%;z-index:13;pointer-events:none;transform:translate(-50%,-50%);text-align:center}
-  #hitword{font-size:40px;font-weight:800;color:#fff;-webkit-text-stroke:2px rgba(0,0,0,.25);text-shadow:0 4px 0 rgba(0,0,0,.25);opacity:0}
-  #hitword.go{animation:word .7s ease-out}
-  @keyframes word{0%{opacity:0;transform:scale(.4) translateY(10px)}25%{opacity:1;transform:scale(1.15)}60%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1) translateY(-26px)}}
-  #flash{position:fixed;inset:0;z-index:11;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 65%,rgba(255,255,255,.55),rgba(255,255,255,0) 45%)}
-  #flash.go{animation:flash .28s ease-out}
-  @keyframes flash{0%{opacity:1}100%{opacity:0}}
-  #meter{display:none!important;width:230px;height:16px;border-radius:10px;background:rgba(255,255,255,.35);border:3px solid #fff;overflow:hidden;margin:8px auto 0;opacity:0;transition:opacity .2s;box-shadow:0 4px 12px rgba(0,0,0,.25)}
-  #meter.on{opacity:1}
-  #meter i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#4ade80,#ffe066 60%,#ff5a3d)}
-
-  /* ---------- toasts ---------- */
-  #msg{position:fixed;bottom:96px;left:50%;transform:translate(-50%,12px);z-index:13;padding:10px 22px;border-radius:999px;background:rgba(20,32,48,.86);color:#fff;
-       font-size:17px;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;border:2px solid rgba(255,255,255,.25)}
-  #msg.on{opacity:1;transform:translate(-50%,0)}
-  .confetti{position:fixed;top:-20px;width:11px;height:16px;z-index:13;pointer-events:none;border-radius:3px;animation:fall linear forwards}
-  @keyframes fall{to{transform:translate(var(--dx),105vh) rotate(var(--rot));opacity:.9}}
-
-  /* ---------- insets ---------- */
-  .inset{position:fixed;z-index:10;padding:6px 6px 7px;text-align:center;font-size:11px;color:#51647a;border-radius:18px}
-  #camwrap{right:14px;top:14px;max-width:252px}
-  #camc{border-radius:13px;display:block;margin:0 auto}
-  #podwrap{right:14px;bottom:14px}
-  #keys{position:fixed;left:14px;bottom:14px;z-index:10;color:#fff;font-size:12px;opacity:.75;text-shadow:0 1px 3px rgba(0,0,0,.6);line-height:1.6}
-  #keys b{background:rgba(255,255,255,.22);padding:1px 6px;border-radius:6px;margin-right:2px}
-  .dots{position:fixed;left:14px;top:14px;z-index:10;display:flex;gap:8px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
-  .dot{display:flex;align-items:center;gap:5px;background:rgba(20,32,48,.55);padding:4px 10px;border-radius:999px}
-  .dot i{width:8px;height:8px;border-radius:50%;background:var(--bad)} .dot.good i{background:var(--good)}
-
-  /* ---------- dev panel (H) ---------- */
-  #dev{position:fixed;left:14px;top:48px;z-index:10;padding:10px 14px;font-size:12px;line-height:1.7;color:#33475b;border-radius:16px;font-weight:600;max-width:330px}
-  #bar{width:220px;height:8px;background:#d5deea;border-radius:4px;overflow:hidden;margin:3px 0;position:relative}
-  #barf{height:100%;width:0;background:var(--good)} #barpk{position:absolute;top:0;width:2px;height:100%;background:#f59e0b;left:0}
-  #dev b.big{font-size:18px}
-
-  #down{position:fixed;top:100px;left:50%;transform:translateX(-50%);z-index:15;background:var(--bad);color:#fff;padding:12px 22px;border-radius:16px;text-align:center;line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.3)}
-
-  /* ---------- calibration ---------- */
-  #cal{position:fixed;inset:0;z-index:20;background:rgba(8,20,40,.62);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
-  #calcard{width:min(520px,88vw);padding:26px 34px 30px;text-align:center}
-  #steps{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
-  #steps span{padding:4px 14px;border-radius:999px;background:#dfe7f1;color:#6b7f95;font-size:12px;letter-spacing:.08em}
-  #steps span.on{background:var(--me);color:#fff}
-  #cal h1{font-size:30px;margin:0 0 8px;font-weight:800;color:var(--ink)}
-  #cal p{margin:0 auto 14px;max-width:420px;line-height:1.55;color:#51647a;font-size:15px;font-weight:600}
-  #ring{width:170px;height:170px;transform:rotate(-90deg)}
-  #ring circle{fill:none;stroke-width:14}
-  #calmsg{font-size:17px;min-height:24px;margin-top:8px;font-weight:700}
-  .good{color:var(--good)}.bad{color:var(--bad)}.warn{color:#f59e0b}
-</style>
+<link rel="preload" href="vendor/fonts/mplus-rounded-1c-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="ui.css">
+<!-- Design system: ui.css · behaviour: ui.js · spec and copy: docs/ui-spec.md · static mock of every state: test/ui-mock.html
+     (the mock loads the markup between UI:BEGIN and UI:END from this file, so there is only one copy of the DOM). -->
 
 <div id="stage"></div>
-<div id="flash"></div>
 
-<div class="dots"><span class="dot" id="dm"><i></i>AirPod</span><span class="dot" id="dg"><i></i>Game</span><span class="dot good" id="dmode"><i></i>Move: <span id="mode">Body</span></span></div>
+<!-- UI:BEGIN -->
+<!-- ============================================== HUD ============================================== -->
+<div id="hud" hidden>
+  <div class="status-lights" id="lights" data-fit>
+    <span class="status-pill is-wait" id="st-airpod"><span class="light"></span>AirPod</span>
+    <span class="status-pill is-wait" id="st-game"><span class="light"></span>Game</span>
+    <span class="status-pill is-wait" id="st-camera"><span class="light"></span>Camera</span>
+  </div>
 
-<div id="board" class="card">
-  <div class="side me"><span class="serve" id="sv-me"></span><span class="who">You<small id="sidelbl">Near side</small></span><span class="num" id="sc-me">0</span></div>
-  <div id="mid"><b>RALLY</b><span id="rally">0</span></div>
-  <div class="side them"><span class="serve" id="sv-them"></span><span class="who"><span id="themname">Waiting…</span><small id="bot">Press B to add a bot</small></span><span class="num" id="sc-them">0</span></div>
-</div>
+  <div class="scoreboard" id="board" data-fit>
+    <div class="score-tab is-me">
+      <span class="chip chip-me"></span>
+      <span class="score-who"><b id="name-me">You</b><small id="sub-me"></small></span>
+      <span class="serve-ind" id="sv-me"></span>
+      <span class="score-num" id="sc-me">0</span>
+    </div>
+    <div class="rally"><small>Rally</small><b id="rally">0</b></div>
+    <div class="score-tab is-them">
+      <span class="chip chip-them"></span>
+      <span class="score-who"><b id="name-them">Waiting…</b><small id="sub-them">Press B to add a bot</small></span>
+      <span class="serve-ind" id="sv-them"></span>
+      <span class="score-num" id="sc-them">0</span>
+    </div>
+  </div>
 
-<div id="banner"><div class="rib" id="rib"><h1 id="bh">POINT!</h1><p id="bp"></p></div></div>
-<div id="hitfx"><div id="hitword">NICE!</div><div id="meter"><i id="meterf"></i></div></div>
-<div id="msg"></div>
-<div id="down" hidden>Can’t reach the game server at <span id="downurl"></span> — retrying…<br><small>Is <b>node server/game.js</b> running? If you’re Player 2, check the host address after the # in the URL.</small></div>
+  <div class="banner-tag" id="banner"><span id="banner-text" data-fit></span></div>
+  <div class="callout-layer"><div class="callout" id="callout" data-text="" data-fit></div></div>
 
-<div id="dev" class="card" hidden>
-  <span id="m" hidden></span><span id="g" hidden></span><span id="side" hidden></span>
-  Swing speed <span id="pw">0.0</span> rad/s
-  <div id="bar"><div id="barf"></div><div id="barpk"></div></div>
-  Paddle x <span id="px">0.0</span> · y <span id="py">1.0</span> m<br>
-  Session peak <b class="big" id="pkmax">0.0</b> · Swings <span id="sw">0</span> · Average <span id="pkavg">–</span><br>
-  Last swings — power (range of motion):<br><span id="pklist">–</span>
-</div>
+  <div class="dev-panel" id="dev" hidden>
+    <span id="m" hidden>off</span><span id="g" hidden>off</span>
+    Swing speed <b id="pw">0.0</b> rad/s<br>
+    Paddle x <b id="px">0.0</b> · y <b id="py">1.0</b> m<br>
+    Session peak <b class="big" id="pkmax">0.0</b><br>
+    Swings <b id="sw">0</b> · Average <b id="pkavg">–</b><br>
+    Last swings — power (range of motion)<br><span id="pklist">–</span>
+  </div>
 
-<div id="camwrap" class="inset card" hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas></div>
-<div id="podwrap" class="inset card"><div id="pod"></div>Your AirPod</div>
-<div id="keys"><b>M</b>Move mode <b>B</b>Bot <b>1 2 3</b>Level <b>C</b>Calibrate <b>R</b>Re-center <b>[ ]</b>Range <b>V</b>AirPod <b>H</b>Stats<br>Tilt the AirPod forward or back to walk toward or away from the net</div>
-
-<div id="cal">
-  <div id="calcard" class="card">
-    <div id="steps"><span id="st1" class="on">1 · HOLD</span><span id="st2">2 · TIP UP</span></div>
-    <h1 id="calh">Hold your grip</h1>
-    <p id="calp">Stand where the camera can see you. Hold the AirPod the way you’d hold a paddle, point it at the screen, and keep it still.</p>
-    <svg id="ring" viewBox="0 0 200 200">
-      <circle cx="100" cy="100" r="82" stroke="#dfe7f1"/>
-      <circle id="arc" cx="100" cy="100" r="82" stroke="#22c55e" stroke-linecap="round" stroke-dasharray="515" stroke-dashoffset="515"/>
-    </svg>
-    <div id="calmsg">Waiting for the AirPod…</div>
+  <div class="keyhints" id="keys" data-fit>
+    <ul>
+      <li><span class="keycap">M</span>Move: <span id="mode">Body</span></li><li><span class="keycap">B</span>Bot</li><li><span class="keycap">1 2 3</span>Level</li>
+      <li><span class="keycap">C</span>Calibrate</li><li><span class="keycap">R</span>Re-center</li><li><span class="keycap">[ ]</span>Range</li>
+      <li><span class="keycap">V</span>AirPod</li><li><span class="keycap">H</span>Stats</li><li><span class="keycap">F</span>Full screen</li>
+    </ul>
   </div>
 </div>
+
+<!-- live insets: outside #hud because they also show on the connect / calibrate screens. No captions. -->
+<div class="inset inset-cam" id="camwrap" data-fit hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas></div>
+<div class="inset inset-pod" id="podwrap" data-fit><div id="pod"></div></div>
+<div class="toast" id="toast" data-fit role="status"></div>
+
+<!-- ============================================== TITLE ============================================== -->
+<section class="screen menu-bg" id="screen-title" data-screen="title" hidden>
+  <div class="menu-body" style="gap:var(--s-7)">
+    <div class="logo" data-fit>
+      <div class="logo-mark" aria-label="Poddle"><span class="lg-a">P</span><span class="logo-ball"></span><span class="lg-a">d</span><span class="lg-b">dle</span></div>
+    </div>
+    <p class="logo-tag" style="margin-top:-1rem">AirPod Pickleball</p>
+    <div class="title-prompt" data-fit>
+      <button class="btn btn-lg is-focus" id="btn-start">Swing to start</button>
+      <p class="t-note">or press <span class="keycap">Space</span></p>
+    </div>
+    <div class="panel panel-sm safety" id="safety" data-fit>
+      <svg class="safety-icon" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="33" fill="#eaf6fc" stroke="#a9e0f6" stroke-width="2.5"/><g class="art-line" style="stroke-width:3.6"><circle cx="36" cy="21" r="5.5"/><path d="M36 28v17M36 45l-7 13M36 45l7 13M24 31l12 4 12-4"/></g><g class="art-accent" style="stroke-width:3.2"><path d="M13 30a24 24 0 0 0 0 16M59 30a24 24 0 0 1 0 16"/></g></svg>
+      <div>
+        <h3>Make some room first</h3>
+        <p>Clear the space around you and check behind you before you swing. Hold the AirPod firmly in your hand — it has no strap — and leave the other one in its case.</p>
+      </div>
+    </div>
+  </div>
+  <footer class="menu-foot"><span class="caps">Hack the North 2026</span><span>One AirPod · one webcam · first to 11, win by 2</span></footer>
+</section>
+
+<!-- ============================================== CONNECT ============================================== -->
+<section class="screen menu-bg" id="screen-connect" data-screen="connect" hidden>
+  <header class="menu-head"><span class="menu-title">Getting ready</span></header>
+  <div class="menu-body">
+    <div class="panel panel-mid" data-fit>
+      <h1 class="t-title">Connecting your gear</h1>
+      <p class="t-lead" style="margin:.5rem 0 1.5rem">This only takes a moment. We’ll begin as soon as your AirPod is connected.</p>
+      <ul class="status-list">
+        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name">AirPod</b><span class="status-text" id="row-airpod-text">Waiting for motion data. Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game server</b><span class="status-text" id="row-game-text">Looking for the game server…</span><em class="status-state" id="row-game-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Choose “Allow” when the browser asks to use the camera.</span><em class="status-state" id="row-camera-state">Waiting</em></li>
+      </ul>
+    </div>
+  </div>
+  <footer class="menu-foot"><span>No camera? Press M later to let the game move you instead.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+</section>
+
+<!-- ============================================== CALIBRATE ============================================== -->
+<section class="screen menu-bg" id="cal" data-screen="calibrate" hidden>
+  <header class="menu-head"><span class="menu-title">Calibration</span></header>
+  <div class="menu-body">
+    <ol class="steps" id="steps"><li id="st1" class="is-on"><i>1</i>Hold still</li><li id="st2"><i>2</i>Tip up</li></ol>
+    <div class="panel panel-cal" id="calcard" data-fit>
+      <h1 class="t-title" id="calh">Hold still</h1>
+      <p class="t-lead" id="calp">Hold the AirPod like a paddle handle, pointing at the screen.</p>
+      <div class="well cal-art" id="calart">
+        <!-- one drawing, two poses: #art-hold (level) and #art-tilt (tipped up about the wrist) -->
+        <svg viewBox="0 -4 470 240" aria-hidden="true">
+          <defs>
+            <g id="grip-face"><path class="art-ghost" d="M186 150c0-16 8-28 22-37 20-13 44-21 68-21 34 0 54 24 54 58s-20 58-54 58c-24 0-48-8-68-21-14-9-22-21-22-37Z"/></g>
+            <g id="grip-hand">
+              <rect class="art-fill" x="116" y="141" width="40" height="18" rx="9"/>
+              <ellipse class="art-fill" cx="166" cy="146" rx="21" ry="25"/><circle cx="175" cy="140" r="5" fill="#5b6670"/>
+              <rect class="art-skin" x="58" y="112" width="74" height="80" rx="26"/>
+              <rect class="art-skin" x="66" y="126" width="17" height="56" rx="8.5"/><rect class="art-skin" x="83" y="124" width="17" height="60" rx="8.5"/><rect class="art-skin" x="100" y="124" width="17" height="58" rx="8.5"/><rect class="art-skin" x="117" y="127" width="16" height="52" rx="8"/>
+              <rect class="art-skin" x="74" y="104" width="70" height="22" rx="11" transform="rotate(-6 74 115)"/>
+            </g>
+          </defs>
+          <g id="art-screen"><path class="art-fill" d="M374 206h72a5 5 0 0 1 0 10h-72a5 5 0 0 1 0-10Z"/><path class="art-line" style="stroke-width:9" d="M444 203 460 116"/><text x="412" y="233">Screen</text></g>
+          <path class="art-skin" d="M-14 126H66V184H-14"/>
+          <g id="art-hold">
+            <use href="#grip-face"/><use href="#grip-hand"/>
+            <path class="art-faint" d="M342 150H436"/>
+          </g>
+          <g id="art-tilt" hidden>
+            <g opacity=".28"><use href="#grip-hand"/></g>
+            <g transform="rotate(-30 95 152)"><use href="#grip-face"/><use href="#grip-hand"/></g>
+            <g id="art-arrow" class="art-nudge"><path class="art-accent" d="M359.6 138A265 265 0 0 0 329 27.6"/><path class="art-accent-fill" d="M320.5 11.7 338.7 22.4 319.3 32.8Z"/></g>
+          </g>
+        </svg>
+      </div>
+      <div class="cal-progress">
+        <div class="cal-bar" id="cal-bar"><i></i></div>
+        <span class="cal-count" id="cal-count"><b id="cal-num">5</b>
+          <svg id="cal-up" viewBox="0 0 24 24" hidden><path d="M12 20V5M5 12l7-7 7 7"/></svg>
+          <svg id="cal-check" viewBox="0 0 24 24" hidden><path d="M5 13l5 5 9-11"/></svg></span>
+      </div>
+      <p class="cal-msg" id="calmsg">Waiting for the AirPod…</p>
+    </div>
+  </div>
+  <footer class="menu-foot"><span>Any grip works — the game learns yours.</span><ul class="keyhints-inline"><li><span class="keycap">C</span>Start over</li></ul></footer>
+</section>
+
+<!-- ============================================== MATCH RESULT ============================================== -->
+<section class="screen veil is-result" id="screen-match" data-screen="match" hidden>
+  <div class="result-card" id="result" data-fit>
+    <div class="medal is-gold" id="medal"><div class="medal-disc"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div></div>
+    <h1 id="result-title">You win!</h1>
+    <div class="tally well">
+      <div class="tally-side is-winner" id="tally-me"><span class="chip chip-me chip-lg"></span><b id="tally-name-me">You</b></div>
+      <span class="tally-num" id="tally-sc-me">11</span><span class="tally-dash"></span><span class="tally-num is-them" id="tally-sc-them">0</span>
+      <div class="tally-side" id="tally-them"><span class="chip chip-them chip-lg"></span><b id="tally-name-them">Opponent</b></div>
+    </div>
+    <div class="next-up"><span>New game starting…</span><div class="next-bar"><i></i></div></div>
+  </div>
+</section>
+
+<!-- ============================================== NOTICES ============================================== -->
+<section class="screen veil" id="screen-server-down" data-screen="server-down" hidden>
+  <div class="panel notice" id="down" data-fit>
+    <div class="notice-icon well"><svg viewBox="0 0 68 68" aria-hidden="true"><g class="art-line" style="stroke-width:4.5"><rect x="9" y="12" width="50" height="18" rx="7"/><rect x="9" y="38" width="50" height="18" rx="7"/></g><circle cx="20" cy="21" r="3.5" fill="#ffb534"/><circle cx="20" cy="47" r="3.5" fill="#ffb534"/><path class="art-line" style="stroke-width:4.5" d="M34 21h16M34 47h16"/></svg></div>
+    <div>
+      <h2>Can’t reach the game server</h2>
+      <p>Looking for it at <span class="addr" id="downurl"></span>. Start the game server on this computer and this message will close by itself.</p>
+      <p class="t-note" style="display:block;font-weight:500">Joining as Player 2? Check the host address after the # in the page address.</p>
+      <p class="t-note is-wait"><span class="light"></span>Trying again<span class="dots-wait"><i></i><i></i><i></i></span></p>
+    </div>
+  </div>
+</section>
+
+<section class="screen veil" id="screen-game-full" data-screen="game-full" hidden>
+  <div class="panel notice" id="full" data-fit>
+    <div class="notice-icon well"><svg viewBox="0 0 68 68" aria-hidden="true"><g class="art-line" style="stroke-width:4.5"><circle cx="23" cy="24" r="8"/><path d="M8 52c1-11 8-15 15-15s14 4 15 15"/><circle cx="47" cy="24" r="8" style="stroke:#34beed"/><path d="M44 37c9-1 15 4 16 15" style="stroke:#34beed"/></g></svg></div>
+    <div>
+      <h2>This game is full</h2>
+      <p>Two players are already connected. When one of them leaves, choose Try again to take their place.</p>
+      <p class="t-note" style="margin-top:1rem"><button class="btn btn-sm is-focus" id="btn-retry">Try again</button></p>
+    </div>
+  </div>
+</section>
+<!-- UI:END -->
 
 <script src="vendor/three.min.js"></script>
 <script>window.THREE || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"><\/script>')</script>
 <script type="module" src="main.js"></script>
+</html>

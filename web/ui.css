@@ -1,0 +1,413 @@
+/* ==========================================================================================================
+   Poddle UI — design system.  Bright, airy, glossy-white "living-room sports" look, built from original CSS.
+   Spec, DOM contracts and copy: docs/ui-spec.md.   Static mock of every state: test/ui-mock.html?screen=all
+   Everything is sized in rem and the root font-size tracks the window (17px at 1440x900, 13.6px at 1280x720),
+   so the whole interface scales like a console game rendered at a fixed resolution.
+   ========================================================================================================== */
+
+/* ---------- typeface (vendored, SIL OFL — see vendor/fonts/README.txt) ---------- */
+@font-face{font-family:"Poddle Rounded";font-weight:400;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-400.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:500;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-500.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:700;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-700.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:800;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-800.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:900;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-900.woff2) format("woff2")}
+/* the M PLUS ellipsis floats at mid-height; borrow a baseline one for that single character */
+/* (same weight descriptors as above on purpose: faces only merge into one composite family when their descriptors match) */
+@font-face{font-family:"Poddle Rounded";font-weight:400;font-style:normal;font-display:swap;unicode-range:U+2026;src:url(vendor/fonts/nunito-600.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:500;font-style:normal;font-display:swap;unicode-range:U+2026;src:url(vendor/fonts/nunito-600.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:700;font-style:normal;font-display:swap;unicode-range:U+2026;src:url(vendor/fonts/nunito-800.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:800;font-style:normal;font-display:swap;unicode-range:U+2026;src:url(vendor/fonts/nunito-800.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:900;font-style:normal;font-display:swap;unicode-range:U+2026;src:url(vendor/fonts/nunito-800.woff2) format("woff2")}
+
+/* ---------- tokens ---------- */
+:root{
+  /* ink: never pure black */
+  --ink:#555e67; --ink-strong:#4b535b; --ink-soft:#65717b; --ink-faint:#a7b2bb;
+  /* whites and pale blue-greys */
+  --white:#fff; --sky-1:#f6fafd; --sky-2:#eaf3f8; --sky-3:#d9e9f2; --sky-4:#c3dbe8;
+  /* the signature outline blue */
+  --line:#34beed; --line-deep:#1a9fd0; --line-soft:#a9e0f6; --line-faint:#d6f0fa;
+  /* players */
+  --me:#3aa0ff; --me-deep:#1670d8; --me-ink:#1b63b8; --me-navy:#0e3f8c; --me-tint:#e3f1ff;
+  --them:#ff9440; --them-deep:#e6561a; --them-ink:#c4490f; --them-navy:#8a2f06; --them-tint:#fff0e2;
+  /* signals */
+  --good:#3ecf72; --good-deep:#13803f; --good-lamp:#1fa353; --warn:#ffb534; --warn-deep:#a86400; --warn-lamp:#e08d00; --bad:#ff6464; --bad-deep:#d23232;
+  --gold-1:#fff1a6; --gold-2:#ffd34a; --gold-3:#f2a81d; --gold-4:#c97f08;
+  --silver-1:#fbfdff; --silver-2:#d8e2ea; --silver-3:#a9b8c4; --silver-4:#8093a1;
+  --ball:#e6f03c; --ball-deep:#b9c916;
+
+  /* radii */
+  --r-xs:.375rem; --r-sm:.625rem; --r-md:1rem; --r-lg:1.5rem; --r-xl:2.25rem; --r-pill:999px;
+
+  /* shadows (all static — nothing animates a shadow) */
+  --sh-1:0 .0625rem .125rem rgba(40,80,110,.12), 0 .125rem .5rem rgba(40,80,110,.10);
+  --sh-2:0 .125rem 0 rgba(90,150,185,.22), 0 .25rem .625rem rgba(40,80,110,.12);
+  --sh-3:0 .1875rem 0 rgba(90,150,185,.25), 0 .5rem 1rem rgba(40,80,110,.13);
+  --sh-hud:0 .125rem 0 rgba(20,60,90,.18), 0 .25rem .625rem rgba(20,60,90,.16);
+  --glow:0 0 0 .25rem rgba(52,190,237,.28), 0 0 1.5rem .25rem rgba(52,190,237,.55);
+  --inner-hi:inset 0 .125rem 0 rgba(255,255,255,.95), inset 0 -.125rem .375rem rgba(120,170,200,.14);
+
+  /* textures — in device pixels on purpose: rem-sized lines fall off the pixel grid and band */
+  --tex-scan:repeating-linear-gradient(0deg, rgba(95,155,195,.14) 0 1px, transparent 1px 4px);
+  --tex-diag:repeating-linear-gradient(135deg, rgba(52,190,237,.09) 0 6px, transparent 6px 14px);
+  --tex-vignette:radial-gradient(ellipse 120% 90% at 50% 45%, rgba(255,255,255,0) 55%, rgba(150,190,215,.30) 100%);
+  --gloss:linear-gradient(180deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 46%, rgba(255,255,255,0) 50%);
+
+  /* spacing */
+  --s-1:.25rem; --s-2:.5rem; --s-3:.75rem; --s-4:1rem; --s-5:1.5rem; --s-6:2rem; --s-7:3rem; --s-8:4rem;
+  --edge:1rem;                                /* HUD distance from the window edge */
+
+  /* type */
+  --font:"Poddle Rounded", ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Helvetica Neue", Arial, sans-serif;
+  --t-xs:.8125rem; --t-sm:.9375rem; --t-md:1.0625rem; --t-lg:1.4375rem; --t-xl:1.875rem; --t-2xl:3rem; --t-3xl:3.5rem; --t-score:3.25rem; --t-callout:4.5rem;
+  --track-caps:.16em; --track-title:.01em;
+
+  /* motion */
+  --ease-out:cubic-bezier(.22,1,.36,1); --ease-soft:cubic-bezier(.45,0,.25,1); --ease-bounce:cubic-bezier(.34,1.56,.64,1);
+  --d-fast:160ms; --d-med:320ms; --d-slow:600ms;
+  --d-pulse:1600ms; --d-callout:1200ms; --d-banner:1900ms; --d-newgame:5000ms;
+
+  /* layers */
+  --z-hud:10; --z-banner:11; --z-callout:13; --z-toast:24; --z-veil:18; --z-screen:20; --z-confetti:22;
+}
+
+/* ---------- base ---------- */
+html{font-size:clamp(10px, min(1.1806vw, 1.8889vh), 26px)}
+html,body{margin:0;height:100%;overflow:hidden;background:#dfeef6}
+body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-feature-settings:"palt" 0}
+[hidden]{display:none!important}
+*,*::before,*::after{box-sizing:border-box}
+#stage{position:fixed;inset:0}
+.caps{font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft)}
+.t-title{font-size:var(--t-2xl);font-weight:700;line-height:1.15;letter-spacing:.02em;color:var(--ink-strong);margin:0}
+.t-lead{font-size:var(--t-lg);font-weight:500;line-height:1.5;letter-spacing:.01em;color:var(--ink);margin:0}
+.t-title.is-bad{color:var(--bad-deep)} .t-title.is-good{color:var(--good-deep)}
+.t-title.is-bad::before{content:"!";display:inline-grid;place-items:center;width:1.1em;height:1.1em;margin-right:.35em;border-radius:50%;background:var(--bad-deep);color:#fff;font-size:.7em;font-weight:900;vertical-align:.12em}
+.t-note{font-size:var(--t-sm);font-weight:500;color:var(--ink-soft);margin:0}
+.is-good{color:var(--good-deep)} .is-bad{color:var(--bad-deep)} .is-warn{color:var(--warn-deep)}
+
+/* ==========================================================================================================
+   SCREENS
+   ========================================================================================================== */
+.screen{position:fixed;inset:0;z-index:var(--z-screen);display:flex;flex-direction:column;opacity:0;visibility:hidden;
+  transition:opacity var(--d-med) var(--ease-soft), visibility 0s linear var(--d-med)}
+.screen.is-active{opacity:1;visibility:visible;transition-delay:0s}
+.screen.is-active .panel, .screen.is-active .result-card{animation:panel-in var(--d-slow) var(--ease-out) both}
+/* visibility:hidden does not stop CSS animations: a hidden screen must not tick over the live game */
+.screen:not(.is-active) *,.screen:not(.is-active) *::before,.screen:not(.is-active) *::after{animation:none!important}
+
+/* full-screen menu ground: pale blue-white, faint scan lines, soft vignette */
+.menu-bg{background:var(--tex-vignette), var(--tex-scan), linear-gradient(180deg,#f7fbfd 0%,#eaf3f8 45%,#dcebf3 100%)}
+.menu-head,.menu-foot{flex:none;display:flex;align-items:center;gap:var(--s-5);padding:0 var(--s-7);position:relative}
+.menu-head{height:5rem;justify-content:center;background:var(--tex-diag), linear-gradient(180deg, #fff, var(--sky-2));border-bottom:.125rem solid var(--line-soft);box-shadow:0 .125rem .75rem rgba(80,140,175,.12)}
+.menu-foot{height:4.5rem;background:var(--tex-diag), linear-gradient(180deg, var(--sky-2), var(--sky-3));border-top:.125rem solid var(--line-soft);justify-content:space-between;color:var(--ink-soft);font-size:var(--t-sm)}
+.menu-title{display:flex;align-items:center;gap:var(--s-3);font-size:var(--t-xl);font-weight:700;color:var(--ink-strong);letter-spacing:.04em}
+.menu-body{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-5);padding:var(--s-5) var(--s-7)}
+
+/* veil: sits over the live court for result / error cards */
+/* no backdrop blur anywhere: it is a full-screen two-pass filter re-run on every WebGL frame, and not part of this look */
+.veil{background:var(--tex-scan), linear-gradient(180deg,rgba(255,255,255,.92),rgba(226,240,248,.88));align-items:center;justify-content:center;z-index:var(--z-veil)}
+.veil.is-result{background:repeating-linear-gradient(135deg, rgba(52,190,237,.075) 0 14px, transparent 14px 32px), linear-gradient(180deg,#fff,var(--sky-2))}          /* a results ground, fully opaque */
+
+/* ==========================================================================================================
+   PANEL (glossy card)
+   ========================================================================================================== */
+.panel{position:relative;background:linear-gradient(180deg,#f6fafc 0%,#f3f8fb 45%,#e7f1f6 100%);border:.1875rem solid var(--line);border-radius:var(--r-xl);
+  box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;padding:var(--s-6) var(--s-7);text-align:center}
+.panel::before{content:"";position:absolute;inset:.1875rem .1875rem auto;height:42%;border-radius:calc(var(--r-xl) - .375rem) calc(var(--r-xl) - .375rem) 50% 50% / calc(var(--r-xl) - .375rem) calc(var(--r-xl) - .375rem) 1.5rem 1.5rem;
+  background:linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0));pointer-events:none}
+.panel > *{position:relative}
+.panel-sm{border-radius:var(--r-lg);padding:var(--s-4) var(--s-5);border:.125rem solid var(--line-soft)} .panel-sm::before{display:none}
+.panel-wide{width:min(64rem, 92vw)} .panel-mid{width:min(50rem, 92vw)} .panel-narrow{width:min(34rem, 92vw)}
+.panel.is-error{border-color:var(--bad)}
+.screen.is-active .panel.is-error{animation:panel-in var(--d-slow) var(--ease-out) both, nudge 420ms var(--ease-soft) 1}     /* same specificity as the panel-in rule above it, or the nudge never plays */
+.well{background:var(--tex-diag), linear-gradient(180deg,var(--sky-1),var(--sky-2));border:.125rem solid var(--line-faint);border-radius:var(--r-lg);box-shadow:inset 0 .125rem .5rem rgba(120,170,200,.16)}
+
+/* ==========================================================================================================
+   PILL BUTTON     .btn  (+ .is-focus  pulse,  :active/.is-pressed)
+   ========================================================================================================== */
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:var(--s-3);height:3.75rem;padding:0 2.75rem;border-radius:var(--r-pill);
+  border:.1875rem solid var(--line);background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:700 var(--t-lg)/1 var(--font);letter-spacing:.02em;
+  box-shadow:var(--sh-2), var(--inner-hi);cursor:pointer;transition:transform var(--d-fast) var(--ease-bounce);-webkit-tap-highlight-color:transparent;outline:0;isolation:isolate}
+.btn::before{content:"";position:absolute;left:.5rem;right:.5rem;top:.125rem;height:48%;border-radius:var(--r-pill);background:linear-gradient(180deg,#fff,rgba(255,255,255,.55));opacity:1;pointer-events:none;z-index:-1}
+.btn::after{content:"";position:absolute;inset:-.1875rem;border-radius:inherit;box-shadow:var(--glow);opacity:0;pointer-events:none;transition:opacity var(--d-fast) linear}
+.btn:hover::after,.btn:focus-visible::after{opacity:.7}
+.btn.is-focus::after{opacity:.8;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+.btn.is-focus{animation:btn-breathe var(--d-pulse) var(--ease-soft) infinite}
+.btn:active,.btn.is-pressed{transform:scale(.955);animation:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6)}
+.btn-lg{height:4.5rem;padding:0 3.5rem;font-size:var(--t-xl)}
+.btn-sm{height:2.75rem;padding:0 1.5rem;font-size:var(--t-md)}
+
+/* key-cap hint chip */
+.keycap{display:inline-flex;align-items:center;justify-content:center;min-width:1.625rem;height:1.625rem;white-space:nowrap;padding:0 .4375rem;border-radius:.4375rem;border:.09375rem solid var(--sky-4);border-bottom-width:.1875rem;
+  background:linear-gradient(180deg,#fff,var(--sky-2));color:var(--ink-strong);font:800 var(--t-xs)/1 var(--font);letter-spacing:.04em;box-shadow:0 .0625rem .125rem rgba(40,80,110,.18)}
+/* the key strip is help, not HUD: it shows on a key press / pointer move and when the HUD first appears, then gets out of the way.
+   It also yields the bottom band to a toast (body.has-toast). */
+.keyhints{position:fixed;left:var(--edge);bottom:var(--edge);z-index:var(--z-hud);max-width:min(46vw, calc(100vw - 11.25rem - 3 * var(--edge)));padding:.375rem .625rem;border-radius:var(--r-md);
+  background:rgba(255,255,255,.90);border:.09375rem solid rgba(255,255,255,.95);box-shadow:var(--sh-hud);
+  color:var(--ink);font-size:max(var(--t-xs),11px);font-weight:700;line-height:1;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
+.keyhints.is-idle,body.has-toast .keyhints{opacity:0;transform:translateY(.5rem)}
+body.has-toast .keyhints{transition-duration:140ms}                 /* out of the toast's way before it has faded in */
+.keyhints .keycap{min-width:1.375rem;height:1.375rem;font-size:max(var(--t-xs),11px)}
+.keyhints ul{display:flex;flex-wrap:wrap;gap:.375rem .875rem;list-style:none;margin:0;padding:0}
+.keyhints li{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap}
+.keyhints p{display:none}
+.menu-foot .keyhints-inline{display:flex;gap:var(--s-5);list-style:none;margin:0;padding:0;font-weight:700;font-size:var(--t-sm);color:var(--ink)}
+.menu-foot .keyhints-inline li{display:inline-flex;align-items:center;gap:.5rem}
+
+/* ==========================================================================================================
+   HUD
+   ========================================================================================================== */
+/* scoreboard: two slim translucent tabs around a rally lozenge */
+.scoreboard{position:fixed;top:var(--edge);left:50%;transform:translateX(-50%);z-index:calc(var(--z-hud) + 2);display:flex;align-items:stretch;gap:.375rem}
+.score-tab{position:relative;display:flex;align-items:center;gap:.625rem;width:17.5rem;height:4.25rem;padding:0 1.125rem 0 .625rem;border-radius:var(--r-pill) var(--r-md) var(--r-md) var(--r-pill);
+  background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(238,246,250,.93));border:.125rem solid #fff;box-shadow:var(--sh-hud);overflow:hidden}
+.score-tab::after{content:"";position:absolute;left:0;right:0;bottom:0;height:.3125rem;background:var(--me)}
+.score-tab.is-them{flex-direction:row-reverse;padding:0 .625rem 0 1.125rem;border-radius:var(--r-md) var(--r-pill) var(--r-pill) var(--r-md);text-align:right}
+.score-tab.is-them::after{background:var(--them-deep)}
+.score-who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
+.score-who b{font-size:1.3125rem;font-weight:700;color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score-who small{font-size:max(.75rem,11px);font-weight:700;letter-spacing:.06em;color:var(--ink-soft);white-space:nowrap} .score-who small:empty{display:none}
+.score-num{min-width:3.5rem;text-align:center;font-size:var(--t-score);font-weight:900;line-height:1;transform-origin:50% 55%;color:var(--ink-strong);font-variant-numeric:tabular-nums;display:inline-block}
+.is-me .score-num{color:var(--me-ink)} .is-them .score-num{color:var(--them-ink)}
+.score-num.pop{animation:num-pop 450ms var(--ease-bounce)} .rally b.pop{animation:rally-pop 450ms var(--ease-bounce)}
+.rally{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:3.75rem;padding:0 .625rem;border-radius:var(--r-md);
+  background:rgba(255,255,255,.78);border:.125rem solid #fff;box-shadow:var(--sh-hud);line-height:1}
+.rally small{font-size:max(.75rem,11px);font-weight:800;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft);margin-bottom:.1875rem}
+.rally b{font-size:1.375rem;font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums;display:inline-block}
+
+/* player colour chip: glossy token with a plain head-and-shoulders mark */
+.chip{flex:none;position:relative;width:2.25rem;height:2.25rem;border-radius:50%;border:.1875rem solid #fff;box-shadow:0 .0625rem .25rem rgba(10,30,50,.30);overflow:hidden;
+  background:radial-gradient(circle at 50% 38%, #fff 0 22%, transparent 23%), radial-gradient(ellipse 60% 46% at 50% 100%, #fff 0 98%, transparent 100%), linear-gradient(180deg,var(--me),var(--me-deep))}
+.chip::after{content:"";position:absolute;inset:0;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0) 48%)}
+.chip-them{background:radial-gradient(circle at 50% 38%, #fff 0 22%, transparent 23%), radial-gradient(ellipse 60% 46% at 50% 100%, #fff 0 98%, transparent 100%), linear-gradient(180deg,var(--them),var(--them-deep))}
+.chip-sm{width:1.75rem;height:1.75rem;border-width:.125rem} .chip-lg{width:4.5rem;height:4.5rem;border-width:.25rem}
+
+/* serve indicator: a little pickleball that bobs beside the server's score */
+.serve-ind{flex:none;width:1.125rem;height:1.125rem;border-radius:50%;visibility:hidden;
+  background:radial-gradient(circle at 32% 34%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 66% 30%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 50% 62%, var(--ball-deep) 0 11%, transparent 12%),
+    radial-gradient(circle at 24% 66%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 76% 64%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 35% 30%, #f6fb8a, var(--ball) 60%, #cdd82a);
+  box-shadow:0 0 0 .125rem #fff, 0 .0625rem .25rem rgba(10,30,50,.35)}
+.serve-ind.on{visibility:visible;animation:serve-bob 900ms var(--ease-soft) infinite}
+
+/* small banner tag that drops out from under the scoreboard */
+.banner-tag{position:fixed;top:calc(var(--edge) + 4.25rem + .5rem);left:0;right:0;z-index:var(--z-banner);display:flex;justify-content:center;pointer-events:none}
+.banner-tag > span{position:relative;display:inline-flex;align-items:center;height:2.375rem;padding:0 1.5rem .0625rem;border-radius:var(--r-pill);border:.15625rem solid #fff;color:#fff;
+  font-size:max(1.1875rem,17px);font-weight:800;letter-spacing:.03em;text-shadow:0 .0625rem .125rem rgba(0,20,50,.55);box-shadow:var(--sh-hud);opacity:0;transform:translateY(-2.5rem) scale(.8);overflow:hidden;
+  background:linear-gradient(180deg,#2a86ea,#0f5cc0)}
+.banner-tag > span::before{content:"";position:absolute;left:.5rem;right:.5rem;top:.0625rem;height:45%;border-radius:var(--r-pill);background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,0))}
+.banner-tag.is-them > span{background:linear-gradient(180deg,#ee6c25,#c0400a);text-shadow:0 .0625rem .125rem rgba(70,20,0,.55)}
+.banner-tag.show > span{animation:banner-drop var(--d-banner) linear both}
+
+/* shot-type callout: glossy colour-filled rounded letters, ONE clean white outline, a soft shadow.
+   <div class="callout" data-text="Smash">Smash</div>  (data-text must mirror the text: both layers are pseudo-elements)
+   It lives in the sky band under the banner tag — never over the paddle, the ball's landing zone or the net. */
+.callout-layer{position:fixed;left:0;right:0;top:16%;z-index:var(--z-callout);display:flex;justify-content:center;pointer-events:none}
+.callout{position:relative;isolation:isolate;display:inline-block;font-size:var(--t-callout);font-weight:900;line-height:1;letter-spacing:.03em;white-space:nowrap;opacity:0;color:var(--me);padding:.12em .25em;will-change:transform,opacity}
+.callout::before,.callout::after{content:attr(data-text);position:absolute;inset:0;padding:inherit}
+.callout::before{z-index:-1;color:#fff;-webkit-text-stroke:.3em #fff;filter:drop-shadow(0 .06em .04em rgba(14,63,140,.38))}
+.callout::after{z-index:1;color:transparent;background:linear-gradient(180deg,#7cc6ff 0%,var(--me) 47%,var(--me-deep) 53%,#2a86ea 100%);-webkit-background-clip:text;background-clip:text}
+.callout.is-them{color:var(--them-deep)}
+.callout.is-them::before{filter:drop-shadow(0 .06em .04em rgba(138,47,6,.38))}
+.callout.is-them::after{background-image:linear-gradient(180deg,#ffc08a 0%,var(--them) 47%,var(--them-deep) 53%,#ee6c25 100%)}
+.callout.go{animation:callout-pop var(--d-callout) linear both}
+
+/* toast: a calm white pill. Over the court it sits in the apron under the near baseline (never on the court or the paddle);
+   on a menu screen it floats above the footer. Hidden while an overlay card is up. */
+.toast{position:fixed;left:50%;bottom:7.5rem;max-width:calc(100vw - 4 * var(--edge));z-index:var(--z-toast);transform:translate(-50%,.75rem) scale(.96);opacity:0;pointer-events:none;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:.75rem;height:3.25rem;padding:0 1.75rem;border-radius:var(--r-pill);border:.15625rem solid var(--line);
+  background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;box-shadow:var(--sh-hud), var(--inner-hi);
+  transition:opacity var(--d-med) var(--ease-soft), transform var(--d-med) var(--ease-bounce)}
+.toast.on{opacity:1;transform:translate(-50%,0) scale(1)}
+body[data-screen="hud"] .toast{bottom:var(--edge)}
+body[data-overlay] .toast.on{opacity:0}
+
+/* connection status lights */
+.light{flex:none;display:inline-block;width:.75rem;height:.75rem;border-radius:50%;position:relative;background:radial-gradient(circle at 35% 30%,#ffb0b0,var(--bad) 55%,var(--bad-deep));box-shadow:0 0 0 .125rem #fff, 0 0 .5rem rgba(255,100,100,.7)}
+.is-ok > .light,.light.is-ok{background:radial-gradient(circle at 35% 30%,#c4ffd9,var(--good) 55%,var(--good-lamp));box-shadow:0 0 0 .125rem #fff, 0 0 .5rem rgba(62,207,114,.8)}
+.is-wait > .light,.light.is-wait{background:radial-gradient(circle at 35% 30%,#fff0c4,var(--warn) 55%,var(--warn-lamp));box-shadow:0 0 0 .125rem #fff, 0 0 .5rem rgba(255,181,52,.8);animation:light-blink 1200ms var(--ease-soft) infinite}
+.is-off > .light,.light.is-off{background:radial-gradient(circle at 35% 30%,#fff,var(--sky-4) 55%,var(--ink-faint));box-shadow:0 0 0 .125rem #fff}
+.light-lg{width:1.125rem;height:1.125rem}
+.status-lights{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;gap:.375rem}
+.status-lights{align-items:center}
+.status-pill{display:inline-flex;align-items:center;gap:.5rem;height:1.875rem;padding:0 .75rem 0 .625rem;border-radius:var(--r-pill);background:rgba(255,255,255,.92);border:.09375rem solid rgba(255,255,255,.95);
+  box-shadow:var(--sh-hud);font-size:max(var(--t-xs),11px);font-weight:800;letter-spacing:.04em;color:var(--ink)}
+/* everything fine = three quiet dots; a problem changes SHAPE and FILL, not just hue (colour-blind safe, readable from the play position) */
+.status-lights.all-ok .status-pill{font-size:0;gap:0;padding:0 .5rem;background:rgba(255,255,255,.6);opacity:.85}
+.status-pill.is-wait{background:#fff6e0}
+.status-pill.is-bad{background:var(--bad-deep);border-color:#fff;color:#fff;height:2.25rem;font-size:max(var(--t-sm),12px)}
+.status-pill.is-bad .light{background:#fff;box-shadow:none}
+.status-pill.is-bad .light::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;font:900 .625rem/1 var(--font);color:var(--bad-deep)}
+.status-pill i{font-style:normal;font-weight:500;color:var(--ink-soft)}
+/* big status rows for the connect screen */
+.status-list{display:flex;flex-direction:column;gap:.75rem;margin:0;padding:0;list-style:none;text-align:left}
+.status-row{display:flex;align-items:center;gap:1.125rem;min-height:4.5rem;padding:.75rem 1.5rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
+.status-name{font-size:var(--t-lg);font-weight:700;color:var(--ink-strong);min-width:9rem}
+.status-text{flex:1;font-size:var(--t-md);color:var(--ink);line-height:1.35}
+.status-state{font-style:normal;font-size:var(--t-sm);font-weight:800;letter-spacing:.06em;color:var(--ink-faint);white-space:nowrap}
+.status-row.is-ok .status-state{color:var(--good-deep)} .status-row.is-wait .status-state{color:var(--warn-deep)} .status-row.is-bad .status-state{color:var(--bad-deep)}
+.status-row.is-ok{border-color:#9fdcb6} .status-row.is-bad{border-color:var(--bad)}
+
+/* inset frame: wraps a canvas that other code supplies (webcam preview, 3D AirPod) */
+.inset{position:fixed;z-index:var(--z-hud);padding:.3125rem;border-radius:1.25rem;background:linear-gradient(180deg,#fff,#eef5f9);border:.09375rem solid var(--line-soft);box-shadow:var(--sh-hud);line-height:0}
+.inset canvas,.inset .inset-fill{display:block;width:100%!important;height:auto!important;border-radius:.9375rem}
+.inset::after{content:"";position:absolute;inset:.3125rem;border-radius:.9375rem;box-shadow:inset 0 0 0 .0625rem rgba(20,60,90,.18), inset 0 .125rem .375rem rgba(20,60,90,.18);pointer-events:none}
+.inset-cam{right:var(--edge);top:var(--edge);width:15.625rem}
+/* AirPod view: stacked under the webcam on the right wall (side fence and trees, never in play). 9.25rem = the webcam frame's height. */
+.inset-pod{right:var(--edge);top:calc(var(--edge) + 9.25rem + .5rem);width:9rem;background:var(--tex-diag), linear-gradient(180deg,#fff,#e6f1f7)}
+.inset-pod::after{box-shadow:inset 0 0 0 .0625rem rgba(52,190,237,.25)}
+
+/* the insets are live feedback, so they stay up during set-up: camera on the connect + calibrate screens ("can it see me?"),
+   the 3D AirPod on calibrate ("is it tipping up?").  Parked in the bottom corners above the footer, clear of the card. */
+.inset{transition:opacity var(--d-med) var(--ease-soft)}
+body[data-screen="calibrate"] .inset,body[data-screen="connect"] .inset-cam{z-index:calc(var(--z-screen) + 1);top:auto;bottom:calc(4.5rem + var(--edge));width:11rem}
+body[data-screen="calibrate"] .inset-pod{left:var(--edge);right:auto;width:9rem}
+body[data-screen="hud"] #camwrap[hidden] ~ .inset-pod{top:var(--edge)}
+body[data-screen="title"] .inset,body[data-screen="connect"] .inset-pod,body[data-overlay] .inset,body[data-overlay] .keyhints,body[data-overlay] .status-lights,body[data-overlay] .scoreboard,body[data-overlay] .dev-panel,body[data-overlay] .banner-tag,body[data-overlay] .callout-layer{opacity:0;pointer-events:none}
+/* 'This game is full' must not wait behind the whole set-up routine: it is the one overlay that also covers the menu screens */
+body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 2);background:var(--tex-scan), linear-gradient(180deg,#fff,var(--sky-2))}
+
+/* stats panel (H) — hidden by default */
+.dev-panel{position:fixed;left:var(--edge);top:calc(var(--edge) + 2.5rem);z-index:var(--z-hud);width:21rem;padding:.875rem 1.125rem;border-radius:var(--r-lg);text-align:left;
+  background:rgba(255,255,255,.92);border:.09375rem solid #fff;box-shadow:var(--sh-hud);font-size:max(var(--t-sm),12px);font-weight:500;line-height:1.7;color:var(--ink);font-variant-numeric:tabular-nums}
+.dev-panel b{font-weight:800;color:var(--ink-strong)} .dev-panel b.big{font-size:var(--t-lg)}
+
+/* ==========================================================================================================
+   CALIBRATION
+   ========================================================================================================== */
+.steps{display:flex;align-items:center;gap:.625rem;list-style:none;margin:0;padding:0}
+.steps li{display:inline-flex;align-items:center;gap:.5rem;height:2.25rem;padding:0 1rem 0 .375rem;border-radius:var(--r-pill);background:rgba(255,255,255,.7);border:.125rem solid var(--sky-3);color:var(--ink-faint);font-size:var(--t-sm);font-weight:800;letter-spacing:.04em;
+  transition:transform var(--d-med) var(--ease-bounce)}
+.steps li > i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--sky-3);color:#fff;font-size:var(--t-xs)}
+.steps li.is-on{background:#fff;border-color:var(--line);color:var(--ink-strong);box-shadow:var(--sh-1);transform:scale(1.04)}
+.steps li.is-on > i{background:linear-gradient(180deg,var(--line),var(--line-deep))}
+.steps li.is-done{color:var(--ink-soft);border-color:#c9f0d8} .steps li.is-done > i{background:var(--good)}
+
+.menu-body > .steps{flex:none}
+.panel-cal{width:min(56rem,92vw);display:flex;flex-direction:column;align-items:center;gap:var(--s-3);padding:var(--s-5) var(--s-7) var(--s-5)}
+.panel-cal .t-lead{max-width:48rem;min-height:1.5em}
+.cal-art{width:min(35rem,100%);aspect-ratio:47/24;padding:0;margin-top:var(--s-2);overflow:hidden}
+.cal-art svg{display:block;width:100%;height:100%}
+.cal-art text{font:800 13px var(--font);letter-spacing:.14em;text-transform:uppercase;fill:var(--ink-soft);text-anchor:middle}
+/* one calm progress pill + a countdown badge (seconds while holding, an arrow while tipping, a tick when done) */
+.cal-progress{display:flex;align-items:center;justify-content:center;gap:var(--s-3);width:100%;margin-top:var(--s-2)}
+.cal-bar{--p:0;width:min(26rem,70%);height:1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);background:#fff;box-shadow:inset 0 .125rem .25rem rgba(120,170,200,.25);overflow:hidden}
+.cal-bar i{display:block;height:100%;border-radius:inherit;transform-origin:0 50%;transform:scaleX(var(--p));transition:transform 140ms linear;background:linear-gradient(180deg,#8fdcf7 0%,var(--line) 50%,var(--line-deep) 100%)}
+.cal-bar.is-bad{border-color:var(--bad)} .cal-bar.is-bad i{background:var(--bad)}
+.cal-bar.is-done{border-color:var(--good-lamp)} .cal-bar.is-done i{background:linear-gradient(180deg,#9af0bb,var(--good) 50%,var(--good-lamp))}
+.cal-count{flex:none;display:grid;place-items:center;width:2.75rem;height:2.75rem;border-radius:50%;border:.1875rem solid var(--line);background:linear-gradient(180deg,#fff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);
+  box-shadow:var(--sh-1);font-size:var(--t-lg);font-weight:800;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums}
+.cal-count svg{width:1.5rem;height:1.5rem;fill:none;stroke:var(--line-deep);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.cal-count.is-bad{border-color:var(--bad);color:var(--bad-deep)} .cal-count.is-done{border-color:var(--good-lamp);animation:num-pop 450ms var(--ease-bounce)} .cal-count.is-done svg{stroke:var(--good-deep)}
+.cal-msg{min-height:1.4em;max-width:30rem;font-size:var(--t-md);font-weight:700;line-height:1.35;color:var(--ink-soft);margin:0}
+.cal-msg.is-bad{color:var(--bad-deep)} .cal-msg.is-good{color:var(--good-deep)}
+
+/* line illustrations share these */
+.art-line{fill:none;stroke:#5b6670;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.art-fill{fill:#fff;stroke:#5b6670;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.art-skin{fill:#fdf3ea;stroke:#5b6670;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.art-ghost{fill:rgba(52,190,237,.10);stroke:var(--line);stroke-width:4;stroke-linecap:round;stroke-dasharray:3 11}
+.art-faint{fill:none;stroke:var(--sky-4);stroke-width:4;stroke-linecap:round;stroke-dasharray:2 10}
+.art-accent{fill:none;stroke:var(--line);stroke-width:8;stroke-linecap:round;stroke-linejoin:round}
+.art-accent-fill{fill:var(--line);stroke:var(--line);stroke-width:4;stroke-linejoin:round}
+.art-nudge{animation:art-nudge 1400ms var(--ease-soft) infinite}
+.art-still{animation:art-still 2200ms var(--ease-soft) infinite}
+
+/* ==========================================================================================================
+   TITLE
+   ========================================================================================================== */
+.logo{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+.logo-mark{display:flex;align-items:center;font-size:8.5rem;font-weight:900;line-height:1;letter-spacing:-.01em;filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
+.logo-mark .lg-a{color:#8d979f} .logo-mark .lg-b{color:var(--line)}
+.logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
+  background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
+    radial-gradient(circle at 22% 62%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 78% 54%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 48% 82%, var(--ball-deep) 0 7%, transparent 8%),
+    radial-gradient(circle at 34% 28%, #fbffa8, var(--ball) 58%, #c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35), 0 .03em .06em rgba(40,80,110,.25)}
+.logo-tag{font-size:var(--t-md);font-weight:800;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-soft);margin:0 -.42em 0 0}
+.title-prompt{display:flex;flex-direction:column;align-items:center;gap:var(--s-3)}
+.safety{display:flex;align-items:center;gap:var(--s-5);text-align:left;width:min(46rem,92vw)}
+.safety-icon{flex:none;width:4.5rem;height:4.5rem}
+.safety h3{margin:0 0 .125rem;font-size:var(--t-lg);font-weight:700;color:var(--ink-strong)}
+.safety p{margin:0;font-size:var(--t-md);line-height:1.45;color:var(--ink)}
+
+/* ==========================================================================================================
+   RESULT / NOTICE CARDS
+   ========================================================================================================== */
+.result-card{position:relative;z-index:1;width:min(50rem,92vw);padding:8rem var(--s-8) var(--s-7);margin-top:6rem;text-align:center;border-radius:var(--r-xl);border:.1875rem solid var(--line);
+  background:linear-gradient(180deg,#fff 0%,#fbfdfe 45%,#e9f2f7 100%);box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
+.result-card h1{margin:0 0 var(--s-4);font-size:4.25rem;font-weight:900;line-height:1.1;color:var(--me-ink);letter-spacing:.01em}
+.result-card.is-lose h1{color:var(--ink-strong);font-size:3.5rem}
+.tally{display:flex;align-items:center;justify-content:center;gap:var(--s-4);padding:var(--s-4) var(--s-5);margin:0 auto var(--s-5);border-radius:var(--r-lg)}
+.tally-side{display:flex;flex-direction:column;align-items:center;gap:.375rem;min-width:8rem}
+.tally-side b{font-size:var(--t-md);font-weight:800;color:var(--ink);white-space:nowrap}
+.tally-num{font-size:6rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--me-ink);min-width:7rem}
+.tally-num.is-them{color:var(--them-ink)} .tally-dash{flex:none;width:1.5rem;height:.375rem;border-radius:var(--r-pill);background:var(--ink-faint)}
+.tally-side.is-winner .chip{box-shadow:0 0 0 .1875rem var(--gold-2), 0 .125rem .5rem rgba(120,80,0,.35)}
+.next-up{display:flex;flex-direction:column;align-items:center;gap:.625rem;font-size:var(--t-md);font-weight:700;color:var(--ink-soft)}
+.next-bar{width:14rem;height:.5rem;border-radius:var(--r-pill);background:var(--sky-3);overflow:hidden}
+.next-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--line-soft),var(--line));transform-origin:0 50%;transform:scaleX(0)}
+.screen.is-active .next-bar i{animation:bar-fill var(--d-newgame) linear both}
+
+/* medal: ribbon tails + disc.  .medal.is-gold / .is-silver  */
+.medal{position:absolute;left:50%;top:-4.75rem;width:9rem;height:10.5rem;margin-left:-4.5rem;transform-origin:50% 100%;scale:1.2}
+.screen.is-active .medal{animation:medal-drop 900ms var(--ease-bounce) 200ms both}
+.medal::before,.medal::after{content:"";position:absolute;top:0;width:2.5rem;height:5.75rem;background:linear-gradient(90deg,var(--me-deep) 0 22%,#fff 22% 34%,var(--me) 34% 66%,#fff 66% 78%,var(--me-deep) 78%);
+  box-shadow:var(--sh-1)}
+.medal::before{left:2.125rem;transform:rotate(-22deg);transform-origin:50% 100%} .medal::after{right:2.125rem;transform:rotate(22deg);transform-origin:50% 100%}
+.medal-disc{position:absolute;left:50%;bottom:0;width:7rem;height:7rem;margin-left:-3.5rem;border-radius:50%;z-index:1;display:grid;place-items:center;overflow:hidden;
+  background:radial-gradient(circle at 50% 50%, var(--gold-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--gold-1), var(--gold-3), var(--gold-1), var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-1));
+  border:.1875rem solid #fff;box-shadow:0 .25rem .75rem rgba(120,80,0,.35), inset 0 0 0 .0625rem rgba(140,90,0,.35)}
+.medal-disc svg{width:3.5rem;height:3.5rem;fill:#fff7c9;stroke:var(--gold-4);stroke-width:2.5;stroke-linejoin:round;filter:drop-shadow(0 .0625rem 0 rgba(255,255,255,.6))}
+.medal-disc::after{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.75),rgba(255,255,255,0));transform:translateX(-160%) skewX(-20deg)}
+.screen.is-active .medal-disc::after{animation:shine 2600ms var(--ease-soft) 900ms infinite}
+.medal.is-silver .medal-disc{background:radial-gradient(circle at 50% 50%, var(--silver-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--silver-1), var(--silver-3), var(--silver-1), var(--silver-4), var(--silver-1), var(--silver-3), var(--silver-1));
+  box-shadow:0 .25rem .75rem rgba(40,70,90,.30), inset 0 0 0 .0625rem rgba(70,100,120,.35)}
+.medal.is-silver .medal-disc svg{fill:#fff;stroke:var(--silver-4)}
+
+/* notice card (server down, game full): an icon well on the left, words on the right */
+.notice{display:flex;align-items:center;gap:var(--s-6);text-align:left;width:min(46rem,92vw)}
+.notice-icon{flex:none;width:7rem;height:7rem;display:grid;place-items:center;border-radius:50%}
+.notice-icon svg{width:4.25rem;height:4.25rem}
+.notice h2{margin:0 0 .375rem;font-size:var(--t-xl);font-weight:700;line-height:1.2;color:var(--ink-strong)}
+.notice p{margin:0 0 .5rem;font-size:var(--t-md);line-height:1.5;color:var(--ink)}
+.notice .t-note{display:flex;align-items:center;gap:.625rem;margin-top:.875rem;font-weight:700}
+.addr{display:inline-block;padding:.0625rem .625rem;border-radius:var(--r-pill);background:var(--sky-2);border:.0625rem solid var(--sky-3);font-weight:700;color:var(--ink-strong);font-variant-numeric:tabular-nums}
+.dots-wait i{display:inline-block;width:.4375rem;height:.4375rem;margin-left:.25rem;border-radius:50%;background:var(--line);animation:dot-wait 1200ms var(--ease-soft) infinite}
+.dots-wait i:nth-child(2){animation-delay:150ms} .dots-wait i:nth-child(3){animation-delay:300ms}
+
+/* confetti (spawned by script on a won point / match):  style="left:…;background:…;--dx:…;--rot:…;animation-duration:…" */
+/* on the result screen it is spawned inside the .screen, behind the card (.result-card z-index:1) */
+.screen .confetti{z-index:0}
+.confetti{position:fixed;top:-1.25rem;width:.6875rem;height:1rem;border-radius:.1875rem;z-index:var(--z-confetti);pointer-events:none;animation:confetti-fall 1.8s linear forwards}
+
+/* ==========================================================================================================
+   KEYFRAMES — transform and opacity only
+   ========================================================================================================== */
+@keyframes panel-in{0%{opacity:0;transform:translateY(1rem) scale(.965)}60%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes nudge{0%,100%{translate:0 0}25%{translate:-.375rem 0}55%{translate:.3125rem 0}80%{translate:-.125rem 0}}
+@keyframes glow-pulse{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:1;transform:scale(1.015,1.06)}}
+@keyframes btn-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+@keyframes num-pop{0%{transform:scale(1)}35%{transform:scale(1.18) rotate(-3deg)}100%{transform:scale(1)}}          /* stays inside the tab (overflow:hidden) even at two digits */
+@keyframes rally-pop{0%{transform:scale(1)}35%{transform:scale(1.4) rotate(-4deg)}100%{transform:scale(1)}}
+@keyframes serve-bob{0%,100%{transform:translateY(.125rem) scale(1,.94)}50%{transform:translateY(-.3125rem) scale(1)}}
+/* per-keyframe easing: ease-out INTO an extreme, ease-in-out between extremes, a soft ease for the exit (the animation itself is linear) */
+@keyframes banner-drop{0%{opacity:0;transform:translateY(-2.5rem) scale(.8);animation-timing-function:cubic-bezier(.2,.8,.3,1)}11%{opacity:1;transform:translateY(.25rem) scale(1.06);animation-timing-function:cubic-bezier(.45,0,.55,1)}17%{transform:translateY(0) scale(1)}84%{opacity:1;transform:translateY(0) scale(1);animation-timing-function:cubic-bezier(.4,0,.7,.9)}100%{opacity:0;transform:translateY(-1.5rem) scale(.92)}}
+@keyframes callout-pop{0%{opacity:0;transform:scale(.3) rotate(-5deg);animation-timing-function:cubic-bezier(.2,.8,.3,1)}15%{opacity:1;transform:scale(1.12) rotate(2deg);animation-timing-function:cubic-bezier(.45,0,.55,1)}25%{transform:scale(.96) rotate(-1deg);animation-timing-function:cubic-bezier(.45,0,.55,1)}33%{transform:scale(1) rotate(0)}78%{opacity:1;transform:scale(1) translateY(0);animation-timing-function:cubic-bezier(.4,0,.7,.9)}100%{opacity:0;transform:scale(1.04) translateY(-1rem)}}
+@keyframes light-blink{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes art-nudge{0%,100%{transform:translate(0,0)}50%{transform:translate(-3px,-9px)}}
+@keyframes art-still{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes medal-drop{0%{opacity:0;transform:translateY(-4rem) scale(.6) rotate(-14deg)}100%{opacity:1;transform:none}}
+@keyframes shine{0%{transform:translateX(-160%) skewX(-20deg)}45%,100%{transform:translateX(420%) skewX(-20deg)}}
+@keyframes bar-fill{to{transform:scaleX(1)}}
+@keyframes dot-wait{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-.25rem);opacity:1}}
+@keyframes confetti-fall{to{transform:translate(var(--dx,0),105vh) rotate(var(--rot,540deg));opacity:.9}}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;animation-delay:0ms!important;transition-duration:1ms!important}
+  .banner-tag.show > span{animation:banner-hold var(--d-banner) linear both!important}
+  .callout.go{animation:banner-hold var(--d-callout) linear both!important}
+  .screen.is-active .next-bar i{animation:bar-fill var(--d-newgame) linear both!important}
+  .confetti{display:none}
+}
+@keyframes banner-hold{0%,85%{opacity:1;transform:none}100%{opacity:0;transform:none}}

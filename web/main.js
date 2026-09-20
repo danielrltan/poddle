@@ -1,8 +1,9 @@
 // Glue: AirPod bridge -> MotionModel -> scene + game server.
-import { MotionModel } from './motion.js';
+import { MotionModel, qrot } from './motion.js';
 import { createScene } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
+import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
@@ -14,52 +15,33 @@ const AUTOBOT = qs.get('autobot') === '1';
 const model = new MotionModel();
 const scene = createScene($('stage'));
 const pod = createPodView($('pod'));
-$('downurl').textContent = GAME;
+ui.setServerAddress(GAME);
 const stats = window.__stats = { get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, state = null, players = 0, calibrating = true;
+// Flow: title -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
+let phase = 'title', lastSample = -1e9, gameEver = false;
+const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
+const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
+if (qs.get('uitest') === '1') window.__ui = ui;                 // test hook: lets test/e2e.mjs force UI states for screenshots
 // body: webcam tracks where you actually stand. auto: server runs you to the ball. aim: wrist angle moves you.
-const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'Body Move — step left and right, the camera follows you', auto: 'Auto Move — the game runs for you, just swing', aim: 'Aim Move — turn your wrist to move' }, MODE_NAME = { body: 'Body', auto: 'Auto', aim: 'Aim' };
+const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'Body Move — step to move, tilt the AirPod to walk', auto: 'Auto Move — the game runs for you, just swing', aim: 'Aim Move — turn your wrist to move' }, MODE_NAME = { body: 'Body', auto: 'Auto', aim: 'Aim' };
 let sideDeg = 75, bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
 // critically damped follow (frame-rate independent): smooth, no overshoot
 function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
 let mode = MODES.includes(qs.get('move')) ? qs.get('move') : 'body', body = null, bodyX = 0;
 if (qs.get('cam') !== '0') createBodyTracker($('camv'), $('camc')).then(t => {
-  body = t; $('camwrap').hidden = !t.ready;
-  if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('aim'); }
+  body = t; ui.setCamera(t.ready);
+  if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('aim', !inPlay()); }       // quiet on the set-up screens: nobody asked yet
 });
-function setMode(m) { mode = m; $('mode').textContent = MODE_NAME[m]; say(MODE_TEXT[m], '#ffe066', 1800); }
+function setMode(m, quiet) { mode = m; ui.setMode(MODE_NAME[m]); if (!quiet) say(MODE_TEXT[m], null, 2400); }
 const usingBody = () => mode === 'body' && body && body.ready;
 const autoNow = () => mode === 'auto' || (mode === 'body' && !(body && body.seen()));   // lost your face: the game runs for you until it's back
 const s = () => (side === 0 ? 1 : -1);
 
 // ---------- messages ----------
-let sayT;
-function say(text, _color, ms = 1200) {                       // small pill toast
-  const el = $('msg'); el.textContent = text; el.classList.add('on');
-  clearTimeout(sayT); sayT = setTimeout(() => el.classList.remove('on'), ms);
-}
-const pop = el => { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); };
-function banner(title, sub, color, long) {
-  const b = $('banner'); $('bh').textContent = title; $('bp').textContent = sub || '';
-  $('rib').style.background = color; b.classList.remove('show', 'long'); void b.offsetWidth; b.classList.add('show'); if (long) b.classList.add('long');
-}
-function confetti(colors, n = 46) {
-  for (let i = 0; i < n; i++) { const c = document.createElement('div'); c.className = 'confetti';
-    c.style.left = Math.random() * 100 + 'vw'; c.style.background = colors[i % colors.length];
-    c.style.setProperty('--dx', (Math.random() * 30 - 15) + 'vw'); c.style.setProperty('--rot', (Math.random() * 1400 - 700) + 'deg');
-    c.style.animationDuration = 1.4 + Math.random() * 1.2 + 's'; c.style.animationDelay = Math.random() * 0.25 + 's';
-    document.body.appendChild(c); setTimeout(() => c.remove(), 3200); }
-}
-let rally = 0, meterT;
-function hitFx(mine, n, kind) {
-  if (!mine) return;
-  const w = $('hitword'); w.textContent = kind === 'dink' ? 'DINK!' : kind === 'lob' ? 'LOB!' : kind === 'smash' ? 'SMASH!' : n > 0.55 ? 'GREAT!' : n > 0.3 ? 'NICE!' : 'GOT IT';
-  w.style.color = n > 0.8 ? '#ff5a3d' : n > 0.55 ? '#ffe066' : '#ffffff';
-  w.classList.remove('go'); $('flash').classList.remove('go'); void w.offsetWidth; w.classList.add('go'); $('flash').classList.add('go');
-  $('meterf').style.width = Math.round(12 + n * 88) + '%'; $('meter').classList.add('on');
-  clearTimeout(meterT); meterT = setTimeout(() => $('meter').classList.remove('on'), 900);
-}
+const say = (text, _color, ms = 1200) => ui.toast(text, ms);   // small pill toast
+let rally = 0;
 let oppName = 'Opponent';
 
 // My serve: the ball hangs and follows late. One quiet nudge per serve, from the server's reach hint, never in reply to a swing.
@@ -77,33 +59,32 @@ function serveCoach(m) {
 // ---------- peak logger ----------
 let peaks = [], sessionPeak = 0, log10 = [];
 function logSwing(e) {
-  const pk = e.peak, tag = `${e.counted ? pk.toFixed(0) : '×'}(${e.rom.toFixed(0)}°)`;
+  const pk = e.peak, tag = `${e.counted ? pk.toFixed(0) : '×'} (${e.rom.toFixed(0)}°)`;
   log10.push(tag); if (log10.length > 5) log10.shift();
-  $('pklist').textContent = log10.join('  ');
+  ui.setStat('pklist', log10.join(' · '));
   console.log(`swing power=${pk.toFixed(1)} raw=${e.raw.toFixed(1)} rad/s rom=${e.rom.toFixed(0)}deg counted=${e.counted}`);
   if (!e.counted) return;
   peaks.push(pk); sessionPeak = Math.max(sessionPeak, pk);
-  $('sw').textContent = peaks.length;
-  $('pkmax').textContent = sessionPeak.toFixed(1);
-  $('pkavg').textContent = (peaks.reduce((a, b) => a + b, 0) / peaks.length).toFixed(1);
-  $('barpk').style.left = Math.min(100, sessionPeak / 40 * 100) + '%';
+  ui.setStat('sw', peaks.length); ui.setStat('pkmax', sessionPeak.toFixed(1));
+  ui.setStat('pkavg', (peaks.reduce((a, b) => a + b, 0) / peaks.length).toFixed(1));
 }
-function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; $('sw').textContent = '0'; $('pkmax').textContent = '0.0'; $('pkavg').textContent = '–'; $('pklist').textContent = '–'; $('barpk').style.left = '0'; }
+function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw', 0); ui.setStat('pkmax', '0.0'); ui.setStat('pkavg', '–'); ui.setStat('pklist', '–'); }
 
-// ---------- calibration overlay ----------
-function showCal(e) {
-  $('cal').hidden = false;
-  const tilt = e.stage === 'tilt';
-  $('calh').textContent = tilt ? 'Tip it up' : 'Hold your grip';
-  $('st1').className = tilt ? '' : 'on'; $('st2').className = tilt ? 'on' : '';
-  $('calp').textContent = tilt
-    ? 'Tip the front of the AirPod up toward the ceiling, like raising a paddle. This teaches the game which way is up for your grip.'
-    : 'Stand where the camera can see you. Hold the AirPod the way you’d hold a paddle, point it at the screen, and keep it still.';
-  $('arc').style.strokeDashoffset = 515 * (1 - e.progress);
-  $('arc').style.stroke = e.ok ? '#22c55e' : '#ef4444';
-  $('calmsg').textContent = e.msg; $('calmsg').className = e.ok ? 'good' : 'bad';
+// ---------- screens: title -> connect -> calibrate -> play ----------
+function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
+function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); ui.showScreen('calibrate'); }
+function begin() {                                 // leave the title: straight to calibration if the AirPod is already streaming
+  if (phase !== 'title') return;
+  phase = 'connect'; if (airpodLive()) startCal(); else ui.showScreen('connect');
 }
-function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); $('cal').hidden = false; }
+function refreshStatus() {
+  const setup = phase === 'title' || phase === 'connect';
+  ui.setStatus({ airpod: airpodLive() ? 'ok' : setup ? 'wait' : 'bad', game: link.g ? 'ok' : setup && !gameEver ? 'wait' : 'bad',
+    camera: qs.get('cam') === '0' ? 'off' : !body ? 'wait' : body.ready ? 'ok' : 'off' });
+  if (phase === 'calibrate' && !airpodLive()) ui.calibrationReset();      // stream dropped mid-calibration: say so
+}
+if (qs.get('skiptitle') === '1') { phase = 'connect'; ui.showScreen('connect'); } else ui.showScreen('title');
+refreshStatus(); setInterval(refreshStatus, 250);
 
 // ---------- sockets (auto-reconnect) ----------
 // urls: tried in turn until one opens. A stale '#<old-ip>' in the address bar must never strand you: this machine's
@@ -114,13 +95,13 @@ function connect(urls, el, onmsg, onopen) {
     const url = urls[i % urls.length]; let opened = false;
     ws = new WebSocket(url);
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
-    ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; $(el).textContent = 'live'; $('d' + el).classList.add('good');
-      if (el === 'g') { $('down').hidden = true; if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Couldn’t reach the saved address — connected to this Mac instead', null, 2800); } }
+    ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
+      if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Couldn’t reach the saved address — connected to this Mac instead', null, 2800); } }
       onopen && onopen(); };
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
-    ws.onclose = () => { $(el).textContent = 'off'; $('d' + el).classList.remove('good');
+    ws.onclose = () => { link[el] = false; ui.setLink(el, false);
       if (!opened) { i++; fails++; }                                   // never connected: try the next candidate
-      if (el === 'g' && fails >= urls.length) { $('downurl').textContent = urls.join('  or  '); $('down').hidden = false; }
+      if (el === 'g' && fails >= urls.length) { ui.setServerAddress(urls.join('  or  ')); if (ui.currentOverlay() !== 'game-full') ui.showOverlay('server-down'); }
       setTimeout(open, opened ? 300 : delay); delay = Math.min(delay * 1.5, 3000); };
     ws.onerror = () => {};
   };
@@ -130,13 +111,23 @@ function connect(urls, el, onmsg, onopen) {
 
 const bridge = connect(BRIDGE, 'm', sample => {
   const power = Math.hypot(sample.r[0], sample.r[1], sample.r[2]);
-  $('pw').textContent = power.toFixed(1);
-  $('barf').style.width = Math.min(100, power / 40 * 100) + '%';
+  lastSample = performance.now();
+  ui.setStat('pw', power.toFixed(1));
+  if (phase === 'title') { if (power > 12) begin(); return; }        // "Swing to start". The model is not fed until calibration
+  if (phase === 'connect') startCal();                              //  begins, so a bud lying on the desk cannot calibrate itself.
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
-    else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; $('cal').hidden = true; if (body) body.center(); say('Calibrated — let’s play!'); }
+    else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center();
+      // 'All set!' arrives in this same batch: hold the green card long enough to be read, then open the court
+      setTimeout(() => { if (phase !== 'play') return; ui.showScreen(null);
+        setTimeout(() => { if (inPlay()) say(state && state.serving === side ? 'Your serve — swing to hit it!' : 'Calibrated — let’s play!', null, 2600); }, 380); }, 900); }     // after the fade
     else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
-      if (!calibrating) game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, age: e.age, fix }); }
+      if (!calibrating) {
+                // "point it horizontally": 1 when the paddle's long axis lies level, 0 when it stands upright
+        const top = qrot(model.pose(performance.now()).Pd, [0, 1, 0]), slice = Math.max(0, 1 - Math.abs(top[1]) / 0.6);
+        game.send({ type: 'swing', power: e.power, dir: e.dir, lob: e.lob, age: e.age, slice, fix });
+        if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
+      } }
     else if (e.type === 'swingEnd') logSwing(e);
   }
 });
@@ -144,7 +135,7 @@ const bridge = connect(BRIDGE, 'm', sample => {
 const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'welcome') {
-    side = m.side; $('sidelbl').textContent = side === 0 ? 'Near side' : 'Far side';
+    side = m.side; if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(side);
     if (AUTOBOT) game.send({ type: 'bot' });
     return;
@@ -152,46 +143,54 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'state') {
     state = m; scene.updateBall(m.p, m.v, m.live);
     serveCoach(m);
-    for (const [id, v] of [['sc-me', m.score[side]], ['sc-them', m.score[1 - side]]]) if ($(id).textContent !== String(v)) { $(id).textContent = v; pop($(id)); }
+    ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side];
-    players = o ? 2 : 1; if (!o) { $('themname').textContent = 'Waiting…'; } else if (!o.bot) { oppName = 'Player 2'; $('themname').textContent = oppName; $('bot').textContent = 'Far side'; }
+    players = o ? 2 : 1; if (!o) ui.setNames({ them: 'Waiting…', themSub: 'Press B to add a bot', meSub: '' }); else if (!o.bot) { oppName = side === 0 ? 'Player 2' : 'Player 1'; ui.setNames({ them: oppName, themSub: side === 0 ? 'Far side' : 'Near side', meSub: side === 0 ? 'Near side' : 'Far side' }); }
     if (o) scene.updatePaddle(1 - side, { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot });
     return;
   }
   if (m.type === 'botinfo') {
-    if (m.active) { oppName = m.name + ' Bot'; $('themname').textContent = oppName; $('bot').textContent = 'Press B to change level'; } else $('bot').textContent = 'Press B to add a bot';
-    if (m.reason) say('Can’t add a bot — two players are connected', null, 1800); else if (m.active) say(`Opponent: ${m.name} Bot`, null, 1400);
+    if (m.active) { oppName = m.name + ' Bot'; ui.setNames({ them: oppName, themSub: '', meSub: '' }); }
+    if (m.reason) say('Can’t add a bot — two players are connected', null, 1800); else if (m.active && inPlay()) say(`Opponent: ${m.name} Bot`, null, 1400);
     return;
   }
-  if (m.type === 'full') { say('This game is full — two players are already connected', null, 4000); return; }
-  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; $('rally').textContent = rally; pop($('rally')); hitFx(m.side === side, m.n, m.kind); }
-  if (m.type === 'serve') { bodyZ = 6.5; walkV = 0; if (m.wait) if (m.by === side) say('Your serve — swing to hit it!', null, 2600); rally = 0; $('rally').textContent = 0; $('sv-me').classList.toggle('on', m.by === side); $('sv-them').classList.toggle('on', m.by !== side); }
-  if (m.type === 'match') { const won = m.winner === side; banner(won ? 'YOU WIN!' : `${oppName.toUpperCase()} WINS`, `${m.score[side]} – ${m.score[1 - side]} · New game starting…`, won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)', true); if (won) { confetti(['#2f8cff', '#ffc83d', '#22c55e', '#ffffff'], 120); setTimeout(() => confetti(['#2f8cff', '#ffc83d', '#ffffff'], 80), 900); } return; }
+  if (m.type === 'full') { ui.showOverlay('game-full'); return; }
+  if (m.type === 'hit') { stats.hits++; if (m.side === side) stats.myHits++; rally++; ui.setRally(rally); if (m.side === side) ui.callout(m.kind); }   // the shot's name only, and only for my own hits
+  if (m.type === 'serve') { bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === side ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
+    if (m.wait && m.by === side && inPlay()) say('Your serve — swing to hit it!', null, 2600); }
+  if (m.type === 'match') { const won = m.winner === side; ui.matchResult(won, m.score[side], m.score[1 - side], oppName); ui.setServe(null);
+    setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s
+    if (won) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); setTimeout(() => ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80), 900); } return; }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && !m.final) { const won = m.winner === side;
-    banner(won ? 'Your point!' : 'Enemy’s point!', '', won ? 'linear-gradient(#2f8cff,#1463d8)' : 'linear-gradient(#ff7a3d,#e4521b)');
-    if (won) confetti(['#2f8cff', '#ffc83d', '#ffffff']); }
+    ui.pointBanner(won);                                         // exactly "Your point!" / "Enemy’s point!", nothing else
+    if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); }
   scene.onEvent(m);
 });
 
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.P });
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.Pd });
 }, 50);
 
 // ---------- input ----------
 let unlocked = false;
 const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); } };
-addEventListener('pointerdown', unlock);
+addEventListener('pointerdown', () => { unlock(); begin(); });
+ui.onStart(() => { unlock(); ui.fullscreen(true); begin(); });          // the big title button (a click is a user gesture: go full screen)
+ui.onRetry(() => location.reload());
 addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Tab'].includes(e.key)) return;   // browser shortcuts are not ours
   unlock();
   const k = e.key.toLowerCase();
+  if (k === 'f') { ui.fullscreen(); return; }
+  if (phase === 'title') { if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } begin(); if (k !== 'c') return; }   // first gesture: any key starts
   if (k === 'c') startCal();
   if (k === 'r') { model.recenter(); if (body) body.center(); say('Re-centered'); }
   if (k === 'p') resetPeaks();
-  if (k === 'v') $('podwrap').hidden = !$('podwrap').hidden;
-  if (k === 'h') $('dev').hidden = !$('dev').hidden;
+  if (k === 'v') ui.toggle('podwrap');
+  if (k === 'h') ui.toggle('dev');
   if (k === 'm') { let i = MODES.indexOf(mode); do { i = (i + 1) % 3; } while (MODES[i] === 'body' && !(body && body.ready)); setMode(MODES[i]); }
   if (k === '[' || k === ']') {                                  // [ = less sensitive, ] = more, for whichever move mode is on
     if (usingBody()) { body.reach = Math.max(0.08, Math.min(0.42, body.reach + (k === ']' ? -0.03 : 0.03))); say(`Range: move ${(body.reach * 100).toFixed(0)}% of the camera view to reach the sideline`); }
@@ -226,13 +225,13 @@ let lastPos = null;
     const auto = autoNow() && mine;
     const wx = auto ? mine.x : (usingBody() ? bodyX : p.x) * s(), wy = auto || (mine && mode === 'auto') ? mine.y : usingBody() ? bodyY : p.y;
     if (auto && usingBody()) { bodyX = mine.x * s(); bodyY = mine.y; vX = vY = 0; }                 // hand back smoothly when the camera finds you again
-    scene.updatePaddle(side, { x: wx, y: wy, z, q: p.P, offset: p.offset, bot: false });
-    $('px').textContent = (wx * s()).toFixed(1); $('py').textContent = wy.toFixed(1);
+    scene.updatePaddle(side, { x: wx, y: wy, z, q: p.Pd, offset: p.offset, bot: false });   // Pd: the bud's real attitude
+    if (ui.isVisible('dev')) { ui.setStat('px', (wx * s()).toFixed(1)); ui.setStat('py', wy.toFixed(1)); }
     const pos = [p.x + p.offset[0], p.y + p.offset[1], p.offset[2]];
     if (lastPos && p.swinging) stats.paddlePath += Math.hypot(pos[0] - lastPos[0], pos[1] - lastPos[1], pos[2] - lastPos[2]);
     lastPos = pos;
   }
-  if (!$('podwrap').hidden) pod.update(p.P);
+  if (phase !== 'title' && ui.isVisible('podwrap')) pod.update(p.Pd);
   scene.render(now);
 })(performance.now());
 

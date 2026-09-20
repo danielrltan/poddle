@@ -291,6 +291,11 @@ export function createScene(containerEl) {
     [[0, 8, 0], [0.62, 6, 0.5], [-0.62, 6, 0.5], [1.15, 4, 0], [-1.15, 4, 0]].forEach(([lat, n, ph]) => { for (let i = 0; i < n; i++) hole((i + ph) / n, lat); });
     hole(0.5, 1.5); hole(0.5, -1.5);
   });
+  // spin streaks: three short arcs in a plane whose normal (local z) is the spin axis
+  const spinMat = new THREE.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0, depthWrite: false });
+  const spinFx = new THREE.Group(); let spinRoll = 0; const vC = new THREE.Vector3();
+  for (let i = 0; i < 3; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(BALL_R * 1.9, BALL_R * 0.13, 6, 14, 1.1), spinMat); arc.rotation.z = i * Math.PI * 2 / 3; spinFx.add(arc); }
+  spinFx.visible = false; scene.add(spinFx);
   const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0x6a7400, emissiveIntensity: 0.35 }));
   ballMesh.visible = false; scene.add(ballMesh);       // no real shadow: the blob below is the depth cue
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, color: 0x000000, map: glowTex(), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
@@ -455,7 +460,13 @@ export function createScene(containerEl) {
     ballMesh.visible = blob.visible = true; ballMesh.position.copy(b.pos);
     const sp2 = Math.hypot(b.vel.x, b.vel.z);
     // rolls the way it flies; a sliced ball visibly spins BACKWARDS, and fast
-    if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -60, b.spin) * dt); }
+    // 60 rad/s at 60 fps is ~1 rad a frame on a ball with a regular hole pattern: it strobes and reads as NOT spinning.
+    // So backspin is drawn slower than life (~3 turns a second), and three bright streaks whip around the ball with it.
+    if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -19, b.spin) * dt);
+      spinFx.position.copy(b.pos); spinFx.visible = b.cool > 0.08;
+      if (spinFx.visible) { qA.setFromUnitVectors(vC.set(0, 0, 1), vB); spinFx.quaternion.copy(qA); spinRoll -= 15 * dt; spinFx.rotateZ(spinRoll);
+        spinFx.scale.setScalar(1 + 0.25 * Math.sin(spinRoll * 0.5)); spinMat.opacity = 0.85 * Math.min(1, b.cool * 1.4); } }
+    else spinFx.visible = false;
     const h = b.pos.y - BALL_R, k = 1 / (1 + h * 0.55);
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
