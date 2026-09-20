@@ -1,6 +1,7 @@
 // Glue: AirPod bridge -> MotionModel -> scene + game server.
 import { MotionModel } from './motion.js';
 import { createScene } from './scene.js';
+import { createPodView } from './podview.js';
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
@@ -11,6 +12,7 @@ const AUTOBOT = qs.get('autobot') === '1';
 
 const model = new MotionModel();
 const scene = createScene($('stage'));
+const pod = createPodView($('pod'));
 $('downurl').textContent = GAME;
 const stats = window.__stats = { hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
@@ -127,6 +129,7 @@ addEventListener('keydown', e => {
   if (k === 'c') startCal();
   if (k === 'r') { model.recenter(); say('re-centered', '#ffe066'); }
   if (k === 'p') resetPeaks();
+  if (k === 'v') $('podwrap').hidden = !$('podwrap').hidden;
   if (k === 'm') { autoMove = !autoMove; $('mode').textContent = autoMove ? 'auto' : 'aim'; say(autoMove ? 'auto-move: you just swing' : 'aim-move: turn your wrist to move', '#ffe066', 1600); }
   if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty
   if ('123'.includes(k)) game.send({ type: 'bot', level: +k - 1 });
@@ -148,6 +151,7 @@ let lastPos = null;
     if (lastPos && p.swinging) stats.paddlePath += Math.hypot(pos[0] - lastPos[0], pos[1] - lastPos[1], pos[2] - lastPos[2]);
     lastPos = pos;
   }
+  if (!$('podwrap').hidden) pod.update(p.P);
   scene.render(now);
 })(performance.now());
 
