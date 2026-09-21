@@ -164,12 +164,13 @@ body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}       
 /* ==========================================================================================================
    HUD
    ========================================================================================================== */
-/* scoreboard: two slim translucent tabs around a rally lozenge */
+/* scoreboard: two slim translucent tabs around a rally lozenge. The round ends are half the tab's height (2.125rem), not --r-pill:
+   a 999px corner makes the browser scale every radius on that edge down to fit, and the inner corners by the rally came out square */
 .scoreboard{position:fixed;top:var(--edge);left:50%;transform:translateX(-50%);z-index:calc(var(--z-hud) + 2);display:flex;align-items:stretch;gap:.375rem}
-.score-tab{position:relative;display:flex;align-items:center;gap:.625rem;width:17.5rem;height:4.25rem;padding:0 1.125rem 0 .625rem;border-radius:var(--r-pill) var(--r-md) var(--r-md) var(--r-pill);
+.score-tab{position:relative;display:flex;align-items:center;gap:.625rem;width:17.5rem;height:4.25rem;padding:0 1.125rem 0 .625rem;border-radius:2.125rem var(--r-md) var(--r-md) 2.125rem;
   background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(238,246,250,.93));border:.125rem solid #fff;box-shadow:var(--sh-hud);overflow:hidden}
 .score-tab::after{content:"";position:absolute;left:0;right:0;bottom:0;height:.3125rem;background:var(--me)}
-.score-tab.is-them{flex-direction:row-reverse;padding:0 .625rem 0 1.125rem;border-radius:var(--r-md) var(--r-pill) var(--r-pill) var(--r-md);text-align:right}
+.score-tab.is-them{flex-direction:row-reverse;padding:0 .625rem 0 1.125rem;border-radius:var(--r-md) 2.125rem 2.125rem var(--r-md);text-align:right}
 .score-tab.is-them::after{background:var(--them-deep)}
 .score-who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
 .score-who b{font-size:1.3125rem;font-weight:700;color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

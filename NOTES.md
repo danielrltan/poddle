@@ -319,3 +319,9 @@ Build log. What we tried, what broke, and how each problem was solved.
   plane of flight: from behind the baseline, where every player stands, it was edge-on and read as a thin line or nothing.
 - Turned 90 degrees: the ring's normal is now the line of flight, so it faces the player the ball is coming to (and the one
   it left). Same streaks, same speed and colour. Checked with a before/after render of a full-spin ball from the player's camera.
+
+## 22. "The score card's inner corners are sharp; make it hug the rally box"
+- The tabs asked for 1rem corners beside the rally, but their round ends were `--r-pill` (999px). When two radii on one edge
+  add up to more than the box, CSS shrinks every radius on it by the same factor, so the 1rem corners came out at ~1px: square.
+- The ends are now half the tab's height (2.125rem, the same semicircle), so the inner corners keep their full 1rem and follow
+  the rally lozenge's own curve across the .375rem gap. Checked by rendering the board at 1440 and 800 px wide.
