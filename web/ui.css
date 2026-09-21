@@ -246,7 +246,7 @@ body[data-settings] .corner{z-index:var(--z-screen)}                /* paused + 
 .hud-pill svg{width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .hud-pill svg circle{fill:var(--ink-soft);stroke:none}
 .hud-pill.is-tag{display:none;background:linear-gradient(180deg,#2a86ea,#0f5cc0);border-color:#fff;color:#fff;letter-spacing:.08em;text-transform:uppercase}
 .hud-pill.is-paused{background:linear-gradient(180deg,#ffc04d,#e08d00);color:#4a2c00}
-body[data-role="spectator"] #watch-tag,body[data-paused]:not([data-settings]) #paused-tag{display:inline-flex}
+body[data-paused]:not([data-settings]) #paused-tag{display:inline-flex}
 /* big status rows for the connect screen */
 .status-list{display:flex;flex-direction:column;gap:.75rem;margin:0;padding:0;list-style:none;text-align:left}
 .status-row{display:flex;align-items:center;gap:1.125rem;min-height:4.5rem;padding:.75rem 1.5rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
