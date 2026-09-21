@@ -126,7 +126,7 @@ export function hold(name, left) {
 const ROW = {
   airpod: { ok: '', wait: 'Take one AirPod out and hold it in your hand.', bad: 'Signal lost. Check the AirPod is still connected to this Mac.' },
   game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
-  camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera when the browser asks.', bad: 'No camera. Turn your wrist to move.', off: 'No camera. Turn your wrist to move.' },
+  camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera when the browser asks.', bad: 'No camera. The game moves you.', off: 'No camera. The game moves you.' },
 };
 const STATE_WORD = { ok: 'Ready', wait: 'Waiting', bad: 'Problem', off: 'Off' };
 const LOST = { airpod: 'AirPod signal lost', game: 'Reconnecting to the game' };

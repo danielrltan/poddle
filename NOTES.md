@@ -390,3 +390,11 @@ Build log. What we tried, what broke, and how each problem was solved.
   out 1.2 times a second (radius 3.1 to 2.2 ball radii, brightest when closest); the vertices move along the spokes, so the
   chevrons keep their size. Coral pink (#ff5c8a) instead of gold: no court colour, the yellow ball or the icy spin streaks
   share it. Checked with renders of my serve, their serve and a close-up.
+
+## 33. Aim is gone: Body or Auto
+- "Completely remove the move-wrist-to-aim system, it's broken and useless; we only use Body and Auto."
+- The Move row is Body / Auto. No camera (or `?cam=0`, or the camera failing) now falls back to Auto, not Aim, and the
+  camera card says "No camera. The game moves you." The paddle's position only ever comes from Body (the camera) or the
+  server running you (Auto); the wrist's yaw never moves you. Range ([ ] and the panel's - / +) is Body's step reach
+  only; the old sideline-angle range (`sideDeg`) is dropped from the saved settings. motion.js still works out its yaw
+  point internally: the swing's base lock needs it.

@@ -81,8 +81,8 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.click('#set-name-input', { clickCount: 3 }); await pg.keyboard.press('Backspace'); await pg.keyboard.press('Tab'); r = await ev(pg, () => [T.$('set-name-input').value, T.calls('name').length]); ok(r[0] === 'Ann Lee' && r[1] === 1, `${tag} an emptied Name row puts the old name back (${r[0]})`);
   // keyboard: Tab / arrows reach every control, focus is visible
   r = await ev(pg, async () => { const s = T.$('settings'); s.focus(); const seen = []; for (let i = 0; i < 9; i++) { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); } return null; });
-  await ev(pg, () => T.$('settings').focus()); const walked = []; for (let i = 0; i < 11; i++) { await pg.keyboard.press('Tab'); walked.push(await ev(pg, () => document.activeElement.id)); }
-  ok(walked.join() === 'set-name-input,btn-sens-less,btn-sens-more,tog-airpod,tog-stats,,,,btn-recenter,tog-full,btn-leave-room',      // (the three Move choices have no id)
+  await ev(pg, () => T.$('settings').focus()); const walked = []; for (let i = 0; i < 10; i++) { await pg.keyboard.press('Tab'); walked.push(await ev(pg, () => document.activeElement.id)); }
+  ok(walked.join() === 'set-name-input,btn-sens-less,btn-sens-more,tog-airpod,tog-stats,,,btn-recenter,tog-full,btn-leave-room',      // (the two Move choices, Body and Auto, have no id)
      `${tag} Tab reaches every control in order (${walked})`);
   r = await ev(pg, () => { const b = T.$('tog-full'); b.focus(); return getComputedStyle(b).boxShadow !== 'none' || getComputedStyle(b).borderColor; }); ok(!!r, `${tag} a focused row shows it`);
   // outside click closes, once; settings(true/false) fire once per real change

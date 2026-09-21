@@ -41,19 +41,19 @@ const ls = { get(k) { try { return localStorage.getItem(k); } catch { return nul
 const cleanName = t => { const n = [...String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
 const myName = () => cleanName(ui.playerName()) || cleanName(ls.get('poddle.name'));      // the lobby field; what was kept last time when the field is not there
 const nameOf = i => names[i] || (state && state.paddles[i] && state.paddles[i].bot ? 'Matt' : i ? 'Player 2' : 'Player 1');
-const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, sideDeg, reach }
-// body: webcam tracks where you actually stand. auto: server runs you to the ball. aim: wrist angle moves you.
-const MODES = ['body', 'auto', 'aim'], MODE_TEXT = { body: 'Body: step to move, tilt the AirPod to walk', auto: 'Auto: the game runs, you swing', aim: 'Aim: turn your wrist to move' }, MODE_NAME = { body: 'Body', auto: 'Auto', aim: 'Aim' };
-let sideDeg = Number.isFinite(prefs.sideDeg) ? Math.max(25, Math.min(90, Math.round(prefs.sideDeg / 5) * 5)) : 75, bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
+const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, reach }
+// body: webcam tracks where you actually stand. auto: server runs you to the ball. (Aim, the wrist's angle moving you, is gone: NOTES 33.)
+const MODES = ['body', 'auto'], MODE_TEXT = { body: 'Body: step to move, tilt the AirPod to walk', auto: 'Auto: the game runs, you swing' }, MODE_NAME = { body: 'Body', auto: 'Auto' };
+let bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
 // critically damped follow (frame-rate independent): smooth, no overshoot
 function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
-let mode = MODES.includes(qs.get('move')) ? qs.get('move') : qs.get('cam') === '0' ? 'aim' : 'body', body = null, bodyX = 0;      // ?cam=0: there will be no camera, so not Body
+let mode = MODES.includes(qs.get('move')) ? qs.get('move') : qs.get('cam') === '0' ? 'auto' : 'body', body = null, bodyX = 0;      // ?cam=0: there will be no camera, so not Body
 let camOn = false;
 function startCam() {                              // the webcam is asked for when a seat is taken, never on the way to watching (docs/SPECTATE.md: spectators get no camera prompt)
   if (camOn || qs.get('cam') === '0') return; camOn = true;
   createBodyTracker($('camv'), $('camc')).then(t => {
     body = t; ui.setCamera(t.ready); if (Number.isFinite(prefs.reach)) t.reach = Math.max(0.08, Math.min(0.42, prefs.reach)); syncSettings();
-    if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('aim', !inPlay()); return; }       // quiet on the set-up screens: nobody asked yet
+    if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('auto', !inPlay()); return; }       // quiet on the set-up screens: nobody asked yet
     if (stats.calibrated) { const c = setInterval(() => { if (t.seen()) { clearInterval(c); t.center(); } }, 100); }      // calibration finished before the camera was up: centre on the first sight of the player instead
   });
 }
@@ -108,12 +108,13 @@ function setView(name, flip) {                     // flip: asked for by the vie
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
 let showPod = prefs.airpod !== false, showStats = prefs.stats === true;
-const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, sideDeg, reach: body ? body.reach : prefs.reach }));
-const sensOf = () => usingBody() ? { sens: Math.round((0.42 - body.reach) / 0.03) + 1, sensMin: body.reach > 0.419, sensMax: body.reach < 0.081 } : { sens: (90 - sideDeg) / 5 + 1, sensMin: sideDeg >= 90, sensMax: sideDeg <= 25 };      // 1 = least sensitive
+const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach }));
+const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
+const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
 function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready) }); }
-function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less, for whichever move mode is on. The panel shows the number, the keys say it
-  if (usingBody()) { body.reach = Math.max(0.08, Math.min(0.42, body.reach - dir * 0.03)); if (!quiet) say(`Range: step ${(body.reach * 100).toFixed(0)}% of the view to reach the sideline`); }
-  else { sideDeg = Math.max(25, Math.min(90, sideDeg - dir * 5)); model.setSidelineDeg(sideDeg); if (!quiet) say(`Range: turn ${sideDeg}° to reach the sideline`); }
+function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
+  if (!body) return;
+  body.reach = Math.max(0.08, Math.min(0.42, body.reach - dir * 0.03)); if (!quiet) say(`Range: step ${(body.reach * 100).toFixed(0)}% of the view to reach the sideline`);
   savePrefs(); syncSettings();
 }
 const show = ui.show;
@@ -208,7 +209,7 @@ function refreshStatus() {
   if (LOBBY) ui.lobbyLink(link.g || !gameEver && performance.now() < 2500);       // the lobby sits above the 'server down' card, so it says so itself (not in the first moments of a page load)
   const n = myName(); if (n !== polledName) { polledName = n; if (room) rename(n); }      // the name was changed in the settings panel while in a room
 }
-if (sideDeg !== 75) model.setSidelineDeg(sideDeg);
+
 show('podwrap', showPod); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
 if (LOBBY && qs.get('room')) setUrl(wantRoom.length === 4 ? wantRoom : null, wantWatch);      // an old ?room= link: same court, the address bar now says ?court=
 if (!LOBBY) { phase = 'connect'; screen('connect'); startCam(); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
@@ -389,7 +390,7 @@ const net = (() => {
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating || !seated() || spec()) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: (usingBody() ? bodyX : p.x) * s(), y: usingBody() ? bodyY : p.y, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.Pd });
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: bodyX * s(), y: bodyY, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.Pd });
 }, 50);
 
 // ---------- input ----------
@@ -455,7 +456,7 @@ let lastPos = null;
       bodyZ = Math.max(2.6, Math.min(7.2, bodyZ + walkV * dt));          // tilt back (up) = further from the net
     }
     const auto = autoNow() && mine;
-    const wx = auto ? mine.x : (usingBody() ? bodyX : p.x) * s(), wy = auto || (mine && mode === 'auto') ? mine.y : usingBody() ? bodyY : p.y;
+    const wx = auto ? mine.x : bodyX * s(), wy = auto || (mine && mode === 'auto') ? mine.y : bodyY;      // not auto means Body sees you: the wrist never moves you
     if (auto && usingBody()) { bodyX = mine.x * s(); bodyY = mine.y; vX = vY = 0; }                 // hand back smoothly when the camera finds you again
     scene.updatePaddle(side, { x: wx, y: wy, z, q: p.Pd, offset: p.offset, bot: false });   // Pd: the bud's real attitude
     if (ui.isVisible('dev')) { ui.setStat('px', (wx * s()).toFixed(1)); ui.setStat('py', wy.toFixed(1)); }
