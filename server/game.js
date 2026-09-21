@@ -116,6 +116,7 @@ const ROOM_TTL = (process.env.ROOM_TTL != null ? +process.env.ROOM_TTL : 30) * 1
 const ROOM_CAP = +process.env.ROOM_CAP || 40;                  // rooms at once: one small machine hosts them all (tests lower it)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';          // no I, L, O, 0, 1: a code gets read out across a room
 const SPEC_CAP = 8;                                            // spectators per room (docs/SPECTATE.md)
+const EMOTES = 8, EMOTE_GAP = 4800;                             // spectator emotes: an index into web/ui.js EMOTES, one per socket per 5 s (the client waits 5000; 200 ms of slack for the wire)
 const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one address may have made and still standing: 40 idle sockets from one machine took every court (busy beyond that)
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
@@ -535,6 +536,11 @@ function createRoom(code, pub) {
     }
   }
   function watch(ws) { spectators.add(ws); ws.room = room; ws.pl = null; ws.spec = true; greet(ws, null); if (pub) lobbyChanged(); }
+  function emote(ws, e) {                                         // a spectator's reaction: everyone in the room sees it pop in from the side, with the sender's name
+    if (!spectators.has(ws) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
+    const ms = Date.now(); if (ms - (ws.emoteAt || 0) < EMOTE_GAP) return; ws.emoteAt = ms;
+    broadcast({ type: 'emote', e, name: ws.name || '' });
+  }
   function unwatch(ws) { if (spectators.delete(ws)) { ws.room = null; ws.spec = false; if (pub) lobbyChanged(); } }
   // A human goes. again: their seat is wanted by their own arrival from the same machine (legacy LOCAL only: the new
   // socket sits down on this same call, nothing is torn down, nobody is told). dropped: the socket closed by itself.
@@ -732,7 +738,7 @@ function createRoom(code, pub) {
   // what the lobby list says about this room (public rooms only get asked). open: a human seat is free. watch: spectator places left
   const free = () => humans().length < 2 && !hold && !(over && over.forfeit);   // a seat to sit down in. Not after a forfeit: that room only waits to close. Not while a seat is held (a bot court's too)
   const info = () => ({ code, players: humans().length, open: free(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over });
-  const room = { code, pub, revive: sc => { revived = sc; }, join, leave, retake, heldBy, watch, unwatch, canWatch: () => spectators.size < SPEC_CAP, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
+  const room = { code, pub, revive: sc => { revived = sc; }, join, leave, retake, heldBy, watch, unwatch, emote, canWatch: () => spectators.size < SPEC_CAP, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
   return room;
 }
 
@@ -844,7 +850,8 @@ wss.on('connection', (ws, req) => {
     if (typeof m.name === 'string') ws.name = cleanName(m.name);   // rides on quick / create / join / watch / name. Strings only, like every other field
     if (ws.room) {
       if (m.type === 'leave' && ws.viaLobby) { quit(ws); enterLobby(ws); }
-      else if (ws.pl) ws.room.onMessage(ws.pl, m);               // a spectator is heard saying ping, net, leave (and its name, shown nowhere): nothing else
+      else if (ws.pl) ws.room.onMessage(ws.pl, m);               // a spectator is heard saying ping, net, leave, emote (and its name, shown on its emotes): nothing else
+      else if (m.type === 'emote') ws.room.emote(ws, m.e);
     } else if (lobby.has(ws)) {
       if (m.type === 'quick') quick(ws); else if (m.type === 'create') create(ws, m.public === true); else if (m.type === 'join') joinCode(ws, m.code); else if (m.type === 'watch') watchCode(ws, m.code);
     }

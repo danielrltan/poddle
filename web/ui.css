@@ -642,6 +642,31 @@ body[data-role="spectator"] .keyhints,body[data-role="spectator"] #podwrap,body[
 body[data-role="spectator"][data-view="split"] #split-line{display:block}
 @media (max-aspect-ratio: 1/1){ #split-line{left:0;right:0;top:50%;bottom:auto;width:auto;height:2px;margin:-1px 0 0} }       /* taller than wide: scene.js stacks the two views (same test, w <= h), so the line lies across */
 body[data-role="spectator"] #ping-pill{display:none}                           /* the ping is shown while seated only (docs/NEXT.md 14g) */
+/* emotes: spectators get a row of Apple emoji bottom-right (where a player's key hints sit); a pick waits 5 s, the bar underneath runs it down.
+   Everyone in the court sees each one pop in from the right edge, drift up and fade, with the sender's name. */
+.emotes{display:none;position:fixed;right:var(--edge);bottom:var(--edge);z-index:var(--z-hud);gap:.125rem;padding:.25rem;border-radius:var(--r-pill);background:rgba(255,255,255,.9);border:.09375rem solid #fff;box-shadow:var(--sh-hud);transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
+body[data-role="spectator"] .emotes{display:flex}
+.emote-btn{display:grid;place-items:center;width:2.75rem;height:2.75rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce), opacity var(--d-fast)}
+.emote-btn img{width:2.125rem;height:2.125rem;pointer-events:none;user-select:none}
+.emote-btn:hover{transform:scale(1.18);background:var(--sky-2)} .emote-btn:active{transform:scale(.9)} .emote-btn:focus-visible{box-shadow:var(--glow)}
+.emote-btn:disabled{cursor:default;opacity:.4;transform:none;background:none}
+.emotes::after{content:"";position:absolute;left:1.25rem;right:1.25rem;bottom:.1875rem;height:.1875rem;border-radius:var(--r-pill);background:var(--line);transform-origin:left;transform:scaleX(0)}
+.emotes.is-cool::after{animation:emote-cool 5s linear forwards}
+@keyframes emote-cool{from{transform:scaleX(1)} to{transform:scaleX(0)}}
+body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none;transition-duration:140ms}
+.emote-layer{position:fixed;inset:0;z-index:var(--z-hud);pointer-events:none;overflow:hidden}
+.emote-pop{position:absolute;right:var(--edge);display:flex;flex-direction:column;align-items:center;gap:.125rem;animation:emote-pop 3.2s var(--ease-out) forwards}
+.emote-pop img{width:4rem;height:4rem;filter:drop-shadow(0 .25rem .5rem rgba(10,30,45,.35))}
+.emote-pop span{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:max(var(--t-sm),12px);font-weight:800;line-height:1.2;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.8), 0 0 .5rem rgba(10,30,45,.5)}
+@keyframes emote-pop{
+  0%{transform:translate(calc(100% + var(--edge)),0) scale(.6);opacity:0}
+  14%{transform:translate(0,0) scale(1.12);opacity:1}
+  22%{transform:translate(0,-.5rem) scale(1)}
+  78%{opacity:1}
+  100%{transform:translate(0,-6rem) scale(.95);opacity:0}}
+@media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade 3.2s linear forwards} @keyframes emote-fade{0%,80%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} }
+@media (max-width: 700px){ .emotes{bottom:calc(var(--edge) + 5.25rem)} .emote-btn{width:2.5rem;height:2.5rem} .emote-btn img{width:1.875rem;height:1.875rem} }      /* the view chips wrap to two rows here: the emotes sit above them */
+body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-events:none}
 .hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:var(--sh-3), var(--inner-hi);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;max-width:calc(100vw - 2 * var(--edge))}
 .hold-card .dots-wait{margin-right:.125rem} .hold-card .dots-wait i{margin-left:0;margin-right:.25rem}

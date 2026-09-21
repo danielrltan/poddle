@@ -335,3 +335,14 @@ Build log. What we tried, what broke, and how each problem was solved.
 ## 24. "Your serve!"
 - The serve prompt was "Your serve. Swing to hit it." Everyone knows how to serve. The hints after a missed serve
   ("Line up with the ball, then swing", "Swing through the ball to serve") stay: they only show when it went wrong.
+
+## 25. Spectator emotes
+- "Can we add a spectator emote system? Apple emojis 🤣🥵😡🤯💀🥀😢🫡, happy to sad, pop up from the side, 5 s cooldown."
+- Spectators get a row of eight bottom-right (where a player's key hints sit; above the view chips on a phone), ordered
+  🤣 🫡 🥵 🤯 😡 💀 🥀 😢. The images are Apple's, 160 px PNGs from iamcal/emoji-data in `web/emoji/`, so a Windows or
+  Android spectator sees the same faces. The list is `EMOTES` in ui.js; its index is the wire value.
+- `{type:'emote', e}` from a spectator only; the server checks the index and a 5 s gap per socket (4.8 s, slack for the
+  wire) and broadcasts `{type:'emote', e, name}` to the whole court, sender included. Players can't send one.
+- Each one slides in from the right edge at a random height in the middle band with the sender's name, drifts up and
+  fades (3.2 s, six on screen at most). After a pick the row greys out and a bar under it runs down the 5 s.
+- `node test/emote.test.mjs`: relay, names, cooldown per spectator, bad indexes, players ignored, courts kept apart.

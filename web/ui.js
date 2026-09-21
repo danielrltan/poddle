@@ -300,6 +300,32 @@ export function setView(name, who = '') {
 }
 on2('views', 'click', e => { const c = e.target.closest('.view-chip'); if (c && onViewFn) onViewFn(c.dataset.view); });
 on2('views', 'keydown', e => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; const cs = [...$('views').children], i = cs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault(); cs[(i + d + 4) % 4].focus(); });
+// ---------- spectator emotes: a row of Apple emoji bottom-right (web/emoji/, from iamcal/emoji-data img-apple-160), happy to sad.
+// A pick goes to the server; it comes back to everyone in the court (the sender too) and pops in from the right edge. One per 5 s.
+export const EMOTES = [['1f923', '🤣', 'Rolling on the floor laughing'], ['1fae1', '🫡', 'Salute'], ['1f975', '🥵', 'Hot'], ['1f92f', '🤯', 'Mind blown'],
+  ['1f621', '😡', 'Angry'], ['1f480', '💀', 'Skull'], ['1f940', '🥀', 'Wilted flower'], ['1f622', '😢', 'Crying']];     // the index is the wire value (server EMOTES)
+export const EMOTE_WAIT = 5000;
+let onEmoteFn = null, emoteCoolT = 0;
+export function onEmote(fn) { onEmoteFn = fn; }
+const emoteImg = i => { const img = document.createElement('img'); img.src = `emoji/${EMOTES[i][0]}.png`; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
+function emoteCool(on) {
+  const box = $('emotes'); if (!box) return; clearTimeout(emoteCoolT);
+  if (on) { restart(box, 'is-cool'); emoteCoolT = setTimeout(() => emoteCool(false), EMOTE_WAIT); } else box.classList.remove('is-cool');
+  for (const b of box.querySelectorAll('button')) b.disabled = on;
+}
+{ const box = $('emotes');
+  if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.title = em[2]; b.append(emoteImg(i)); box.append(b); });
+  on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (!b || b.disabled || !onEmoteFn) return; emoteCool(true); onEmoteFn(+b.dataset.e); }); }
+// one reaction arriving: slides in from the right edge at a random height in the middle band, drifts up, fades. Six on screen at most
+export function emote(i, name) {
+  const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
+  while (layer.childElementCount >= 6) layer.firstElementChild.remove();
+  const el = document.createElement('div'); el.className = 'emote-pop'; el.style.top = `${34 + Math.random() * 26}%`;
+  el.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; el.append(n); }      // names: textContent only
+  el.addEventListener('animationend', () => el.remove()); setTimeout(() => el.remove(), 4000); layer.append(el);
+}
+export function emotesOff() { const layer = $('emote-layer'); if (layer) layer.replaceChildren(); emoteCool(false); }     // out of the room: nothing carries over
+
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });
 on2('btn-leave', 'click', () => { if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
 on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const b = $(e.key === 'ArrowLeft' ? 'btn-rematch' : 'btn-leave'); if (b && !b.disabled) { e.preventDefault(); b.focus(); } });

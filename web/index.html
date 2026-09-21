@@ -121,7 +121,7 @@
     <ul><li><span class="keycap">C</span>Calibrate</li><li id="key-bot" hidden><span class="keycap">1</span><span class="keycap">2</span><span class="keycap">3</span>Difficulty: <span id="bot-level">Club</span></li></ul>
   </div>
 
-  <!-- spectators: view chips bottom-left (keys 1-4), the split-screen divider, and for everyone the seat-hold card -->
+  <!-- spectators: view chips bottom-left (keys 1-4), the split-screen divider, emotes bottom-right (ui.js builds the buttons); for everyone the emote pops and the seat-hold card -->
   <div class="views" id="views" role="group" aria-label="View" data-fit>
     <button class="view-chip" data-view="broadcast" aria-pressed="true"><span class="keycap">1</span><span>Broadcast</span></button>
     <button class="view-chip" data-view="split" aria-pressed="false"><span class="keycap">2</span><span>Split</span></button>
@@ -129,6 +129,8 @@
     <button class="view-chip" data-view="free" aria-pressed="false"><span class="keycap">4</span><span>Free</span></button>
   </div>
   <div id="split-line" aria-hidden="true"></div>
+  <div class="emotes" id="emotes" role="group" aria-label="React"></div>
+  <div class="emote-layer" id="emote-layer" aria-hidden="true"></div>
   <div class="hold-card" id="hold" role="status" data-fit hidden><span class="dots-wait"><i></i><i></i><i></i></span><span id="hold-text"></span><b id="hold-left"></b></div>
 </div>
 
