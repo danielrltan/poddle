@@ -116,7 +116,7 @@ const ROOM_TTL = (process.env.ROOM_TTL != null ? +process.env.ROOM_TTL : 30) * 1
 const ROOM_CAP = +process.env.ROOM_CAP || 40;                  // rooms at once: one small machine hosts them all (tests lower it)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';          // no I, L, O, 0, 1: a code gets read out across a room
 const SPEC_CAP = 8;                                            // spectators per room (docs/SPECTATE.md)
-const EMOTES = 8, EMOTE_GAP = 4800;                             // spectator emotes: an index into web/ui.js EMOTES, one per socket per 5 s (the client waits 5000; 200 ms of slack for the wire)
+const EMOTES = 7, EMOTE_GAP = 4800;                             // spectator emotes: an index into web/ui.js EMOTES, one per socket per 5 s (the client waits 5000; 200 ms of slack for the wire)
 const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one address may have made and still standing: 40 idle sockets from one machine took every court (busy beyond that)
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine

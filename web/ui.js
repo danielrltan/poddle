@@ -302,7 +302,7 @@ on2('views', 'click', e => { const c = e.target.closest('.view-chip'); if (c && 
 on2('views', 'keydown', e => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; const cs = [...$('views').children], i = cs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault(); cs[(i + d + 4) % 4].focus(); });
 // ---------- spectator emotes: a row of Apple emoji bottom-right (web/emoji/, from iamcal/emoji-data img-apple-160), happy to sad.
 // A pick goes to the server; it comes back to everyone in the court (the sender too) and pops in from the right edge. One per 5 s.
-export const EMOTES = [['1f923', '🤣', 'Rolling on the floor laughing'], ['1fae1', '🫡', 'Salute'], ['1f975', '🥵', 'Hot'], ['1f92f', '🤯', 'Mind blown'],
+export const EMOTES = [['1f923', '🤣', 'Rolling on the floor laughing'], ['1f975', '🥵', 'Hot'], ['1f92f', '🤯', 'Mind blown'],
   ['1f621', '😡', 'Angry'], ['1f480', '💀', 'Skull'], ['1f940', '🥀', 'Wilted flower'], ['1f622', '😢', 'Crying']];     // the index is the wire value (server EMOTES)
 export const EMOTE_WAIT = 5000;
 let onEmoteFn = null, emoteCoolT = 0;
@@ -412,11 +412,14 @@ export function setRoom(code, link = '') {
   $('share-row').hidden = !link; setText($('share-link'), link.replace(/^https?:\/\//, '')); $('share-link').dataset.href = link;
 }
 export function titleRoom(code, watch) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); setText($('title-room-spec'), watch ? '\u00a0as spectator' : ''); }     // opened from a shared link (&watch=1: 'as spectator')
-async function copyLink(btn) {
-  const href = $('share-link').dataset.href; if (!href) return;
-  try { await navigator.clipboard.writeText(href); } catch { const r = document.createRange(); r.selectNodeContents($('share-link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); try { document.execCommand('copy'); } catch { /* still selected: Cmd+C works */ } }
-  if (btn.id === 'btn-copy') { setText(btn, 'Copied'); setTimeout(() => setText(btn, 'Copy link'), 1500); } else on.copied && on.copied();
+async function copyLink(btn, watch) {      // watch: the viewer link (&watch=1), which opens the court as a spectator
+  let href = $('share-link').dataset.href; if (!href) return;
+  if (watch) { const u = new URL(href); u.searchParams.set('watch', '1'); href = u.href; }
+  try { await navigator.clipboard.writeText(href); } catch { const t = document.createElement('textarea'); t.value = href; t.style.cssText = 'position:fixed;opacity:0'; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch { /* nothing more to try */ } t.remove(); }
+  if (btn.id === 'btn-copy') { const l = $('copy-label'); setText(l, 'Copied'); clearTimeout(copyT); copyT = setTimeout(() => setText(l, 'Copy link'), 1500); } else on.copied && on.copied();
 }
+let copyT = 0;
+const copyOpen = open => { $('copy-menu').classList.toggle('is-open', open); $('btn-copy').setAttribute('aria-expanded', open); };
 {
   // no name, no seat: every choice on the home view waits for it (the field shakes and takes focus), and so does the last button of each view
   $('btn-quick').addEventListener('click', () => { if (!needName() && on.quick) on.quick(); });
@@ -433,7 +436,12 @@ async function copyLink(btn) {
   on2('btn-watch-no', 'click', () => askWatch(null));
   on2('ask-watch', 'keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); $(e.key === 'ArrowLeft' ? 'btn-watch-yes' : 'btn-watch-no').focus(); } });
   $('btn-share-go').addEventListener('click', () => on.start && on.start());
-  $('btn-copy').addEventListener('click', e => copyLink(e.currentTarget)); $('room-pill').addEventListener('click', e => copyLink(e.currentTarget));
+  $('btn-copy').addEventListener('click', () => copyOpen(!$('copy-menu').classList.contains('is-open')));      // a touch screen has no hover: a tap opens the choices
+  $('copy-menu').addEventListener('click', e => { const o = e.target.closest('[data-copy]'); if (!o) return; copyLink($('btn-copy'), o.dataset.copy === 'watch'); copyOpen(false); if (o.matches(':focus-visible')) $('btn-copy').focus(); else o.blur(); });
+  $('copy-menu').addEventListener('keydown', e => { const os = [...document.querySelectorAll('.copy-opt')], i = os.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); os[i < 0 ? (e.key === 'ArrowDown' ? 0 : 1) : (i + 1) % 2].focus(); } else if (e.key === 'Escape') { copyOpen(false); $('btn-copy').blur(); } });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('#copy-menu')) copyOpen(false); });
+  $('room-pill').addEventListener('click', e => copyLink(e.currentTarget));
   for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => on.back && on.back());
   $('room-list').addEventListener('click', e => { const w = e.target.closest('.room-watch'), b = e.target.closest('button.room-row'); if (!w && !b || needName()) return;
     if (w) { if (on.watch) on.watch(w.dataset.watch); } else if (on.join) on.join(b.dataset.code); });

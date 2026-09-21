@@ -232,7 +232,8 @@
     <div class="panel panel-narrow lobby-view" id="lobby-share" data-view="share" data-fit hidden>
       <p class="caps">Court code</p>
       <div class="code-boxes is-static" id="share-code" aria-live="polite"><span class="code-box"></span><span class="code-box"></span><span class="code-box"></span><span class="code-box"></span></div>
-      <div class="share-link well" id="share-row"><span class="addr" id="share-link"></span><button class="btn btn-sm" id="btn-copy">Copy link</button></div>
+      <div class="share-link well" id="share-row"><span class="addr" id="share-link"></span><div class="copy-menu" id="copy-menu"><button class="btn btn-sm" id="btn-copy" aria-haspopup="menu" aria-expanded="false"><span id="copy-label">Copy link</span><span class="copy-caret" aria-hidden="true"></span></button>
+        <div class="copy-drop" role="menu"><button class="copy-opt" role="menuitem" data-copy="play"><b>Player link</b><span>Joins the court to play</span></button><button class="copy-opt" role="menuitem" data-copy="watch"><b>Viewer link</b><span>Watches as a spectator</span></button></div></div></div>
       <button class="btn btn-lg" id="btn-share-go">Start</button>
     </div>
 

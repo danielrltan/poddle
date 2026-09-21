@@ -545,6 +545,18 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 .code-err{min-height:1.5em;margin:calc(var(--s-3) * -1) 0;font-size:var(--t-md);font-weight:700;color:var(--bad-deep)}
 .share-link{display:flex;align-items:center;gap:var(--s-3);max-width:100%;padding:.5rem .5rem .5rem 1.25rem;border-radius:var(--r-pill)}
 .share-link .addr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-md);font-weight:700;color:var(--ink);user-select:all}
+/* Copy link: hover (or click, or keyboard focus) drops two choices, the player link and the viewer link (&watch=1) */
+#share-row{z-index:3}
+.copy-menu{position:relative;flex:none}
+.copy-caret{width:.5rem;height:.5rem;margin:-.25rem -.25rem 0 0;border:solid currentColor;border-width:0 .15625rem .15625rem 0;transform:rotate(45deg);transition:transform var(--d-fast) var(--ease-soft)}
+.copy-drop{position:absolute;right:0;top:calc(100% + .5rem);z-index:5;display:flex;flex-direction:column;gap:.125rem;min-width:15rem;padding:.375rem;border-radius:var(--r-lg);
+  background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-2);opacity:0;visibility:hidden;transform:translateY(-.375rem);transition:opacity var(--d-fast) linear, transform var(--d-fast) var(--ease-soft), visibility 0s linear var(--d-fast)}
+.copy-drop::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:.625rem}      /* the gap under the button still counts as hovering */
+.copy-menu:hover .copy-drop,.copy-menu.is-open .copy-drop,.copy-menu:has(:focus-visible) .copy-drop{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.copy-menu:hover .copy-caret,.copy-menu.is-open .copy-caret,.copy-menu:has(:focus-visible) .copy-caret{transform:translateY(.1875rem) rotate(225deg)}
+.copy-opt{display:flex;flex-direction:column;align-items:flex-start;gap:.0625rem;padding:.5rem .875rem;border:0;border-radius:calc(var(--r-lg) - .375rem);background:none;font-family:var(--font);text-align:left;cursor:pointer;outline:0}
+.copy-opt b{font-size:var(--t-md);font-weight:700;color:var(--ink-strong)} .copy-opt span{font-size:var(--t-sm);font-weight:500;color:var(--ink-soft)}
+.copy-opt:hover,.copy-opt:focus-visible{background:var(--sky-2)} .copy-opt:focus-visible{box-shadow:inset 0 0 0 .125rem var(--line)}
 
 /* HUD: the room code, small, next to the hamburger. A click copies the link. */
 .room-pill{cursor:pointer;font-family:var(--font);gap:.375rem;padding:0 .75rem}

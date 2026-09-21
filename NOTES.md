@@ -368,3 +368,14 @@ Build log. What we tried, what broke, and how each problem was solved.
 - The hanging ball now gets eight gold chevrons chasing round it, billboarded like the streaks, fading in over 0.25 s and
   out almost at once when it is struck. They grow up to 1.8x with distance so the opponent's serve reads from the far
   baseline. Checked by rendering my serve, their serve and a close-up.
+
+## 29. Copy link drops down: player link or viewer link
+- "Make the copy link button have two options when you hover over it and it drops down: copy the player link / viewer link"
+- On the court-code screen, hovering Copy link (or tapping it, or tabbing to it) drops a small card: **Player link**
+  (`?court=CODE`, joins to play) and **Viewer link** (`&watch=1`, opens as a spectator, see 27). Picking one copies it
+  and the button says Copied for 1.5 s. Arrow keys move between the two, Esc closes. The HUD room pill still copies the
+  player link. Checked by rendering at 1280 and 600 px wide and reading the clipboard after each pick.
+
+## 30. No salute emote
+- "Get rid of the salute emoji in the spectators." Seven now: 🤣 🥵 🤯 😡 💀 🥀 😢. The wire index shifts down by one
+  after 🤣 (server EMOTES = 7); `web/emoji/1fae1.png` is gone.

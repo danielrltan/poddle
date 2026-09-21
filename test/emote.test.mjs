@@ -27,9 +27,9 @@ await until(() => ann.emotes().length && dan.emotes().length && cat.emotes().len
 ok([ann, cat, dan].every(c => c.emotes().length === 1 && c.emotes()[0].e === 0 && c.emotes()[0].name === 'Cat'), 'the player, the other spectator and the sender all get {e:0, name:Cat}');
 cat.send({ type: 'emote', e: 3 }); await wait(400);
 ok(ann.emotes().length === 1, 'a second emote inside 5 s is dropped');
-dan.send({ type: 'emote', e: 7 }); await until(() => ann.emotes().length === 2);
-ok(ann.emotes()[1]?.e === 7 && ann.emotes()[1]?.name === 'Dan', 'the cooldown is per spectator: Dan still gets through');
-for (const e of [8, -1, 1.5, '2', null]) far.send({ type: 'emote', e });
+dan.send({ type: 'emote', e: 6 }); await until(() => ann.emotes().length === 2);
+ok(ann.emotes()[1]?.e === 6 && ann.emotes()[1]?.name === 'Dan', 'the cooldown is per spectator: Dan still gets through');
+for (const e of [7, -1, 1.5, '2', null]) far.send({ type: 'emote', e });
 ann.send({ type: 'emote', e: 1 }); await wait(400);
 ok(far.emotes().length === 0 && eve.emotes().length === 0, 'bad indexes are dropped');
 ok(ann.emotes().length === 2 && cat.emotes().length === 2, 'a player cannot emote');
