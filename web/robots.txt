@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://poddle.fly.dev/sitemap.xml
+Sitemap: https://poddleball.com/sitemap.xml

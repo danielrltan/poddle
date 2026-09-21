@@ -18,9 +18,12 @@ function notFound(req, res) {                                                   
   res.writeHead(404, { 'Content-Type': PAGE_404 ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex' });
   res.end(req.method === 'HEAD' ? undefined : body);
 }
+const SITE = 'poddleball.com', OLD_HOSTS = new Set(['poddle.fly.dev', 'www.poddleball.com']);      // the site's one name, and the names that forward to it
 const httpServer = http.createServer((req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD', 'Content-Length': 0 }); return res.end(); }   // a WebSocket upgrade never comes through here
+  const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
+  if (OLD_HOSTS.has(host)) { res.writeHead(301, { Location: 'https://' + SITE + req.url, 'Cache-Control': 'public, max-age=3600', 'Content-Length': 0 }); return res.end(); }   // one address for people, crawlers and share cards. Sockets still connect on any host: an open tab from the old address keeps playing
   const [rawPath, ...query] = req.url.split('?');
   let rel; try { rel = decodeURIComponent(rawPath); } catch { rel = '/'; }
   if (rel.includes('\0')) { res.writeHead(400); return res.end(); }                                     // fs.stat THROWS on a null byte (GET /%00), and a throw in here ends the process and every room in it

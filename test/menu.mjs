@@ -98,7 +98,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.keyboard.press('Enter'); await sleep(500); s = await st(pg);
   ok(J(sent('join').at(-1)) === J({ type: 'join', code: 'AB2K', name: NAME }), `${tag} join sent upper case, with the name: ${J(sent('join').at(-1))}`);
   ok(s.err === 'Court not found' && s.screen === 'lobby' && s.view === 'code' && s.typed === 'AB2K' && !s.busy && !/(court|room)=/.test(s.search), `${tag} joinfail notfound: inline "${s.err}", stays on the code view`); await shot('5-code-error');
-  await pg.evaluate(() => { const dt = new DataTransfer(); dt.setData('text', 'https://poddle.fly.dev/?room=fvvv'); document.querySelector('#code-boxes input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
+  await pg.evaluate(() => { const dt = new DataTransfer(); dt.setData('text', 'https://poddleball.com/?room=fvvv'); document.querySelector('#code-boxes input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
   await sleep(100); s = await st(pg); ok(s.typed === 'FVVV' && s.err === '', `${tag} pasting a link fills the code and clears the error (${s.typed})`);
   await pg.keyboard.press('Enter'); await sleep(450); ok((await st(pg)).err === 'Court is full', `${tag} joinfail full, nowhere to watch: inline "${(await st(pg)).err}"`);
   await pg.click('#screen-lobby [data-back]'); await sleep(350); s = await st(pg); ok(s.view === 'home' && s.screen === 'lobby', `${tag} Back button -> lobby home`);

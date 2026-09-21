@@ -25,36 +25,17 @@ body{position:relative;font-family:"Poddle Rounded",sans-serif;-webkit-font-smoo
   background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
     radial-gradient(circle at 22% 62%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 78% 54%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 48% 82%, var(--ball-deep) 0 7%, transparent 8%),
     radial-gradient(circle at 34% 28%, #fbffa8, var(--ball) 58%, #c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35), 0 .03em .06em rgba(40,80,110,.25)}
-.tag{position:absolute;left:297px;top:442px;margin:0;text-align:left;color:#fff;font-weight:900;font-size:33px;line-height:1.27;letter-spacing:.005em;
+.tag{position:absolute;left:0;right:0;top:486px;margin:0;text-align:center;white-space:nowrap;color:#fff;font-weight:900;font-size:40px;line-height:1.2;letter-spacing:.005em;
   text-shadow:0 2px 0 rgba(8,32,58,.6), 0 0 16px rgba(8,32,58,.6)}
 .tag span{display:block;white-space:nowrap}
 .tag .hi{color:var(--ball)}
-/* web/ui.css .inset + .inset-pod, in px */
-.pod{position:absolute;left:752px;top:424px;width:150px;height:150px;box-sizing:border-box;padding:5px;border-radius:22px;border:1.5px solid #a9e0f6;line-height:0;
-  background:repeating-linear-gradient(135deg, rgba(52,190,237,.09) 0 6px, transparent 6px 14px), linear-gradient(180deg,#fff,#e6f1f7);box-shadow:0 2px 0 rgba(8,32,58,.3), 0 6px 18px rgba(8,32,58,.4)}
-.pod::after{content:"";position:absolute;inset:5px;border-radius:17px;box-shadow:inset 0 0 0 1px rgba(52,190,237,.25), inset 0 2px 6px rgba(20,60,90,.18);pointer-events:none}
-.pod canvas{display:block;width:100%;height:100%;border-radius:17px}
-#podgl{position:absolute;left:-9999px;top:0}
 </style></head><body>
 <img id="scene" src="ui-shots/seo/og-scene.png" alt="">
 <div id="haze"></div>
 <div class="logo"><div class="logo-mark" aria-label="Poddle"><span class="lg-a">P</span><span class="logo-ball"></span><span class="lg-a">d</span><span class="lg-b">dle</span></div></div>
-<p class="tag"><span>Pickleball with friends.</span><span class="hi">Your AirPod is the paddle.</span></p>
-<div class="pod"><canvas id="podc" width="440" height="440"></canvas></div><div id="podgl"></div>
-<script src="../web/vendor/three.min.js"></script>
+<p class="tag">Play pickleball using an AirPod!</p>
 <script type="module">
-  // the game's AirPod, drawn once at 2x and copied into the tile (a WebGL canvas may be blank by the time the screenshot is taken; a 2D one is not)
-  Object.defineProperty(window, 'devicePixelRatio', { get: () => 2 });
-  const { createPodView } = await import('../web/podview.js');
-  try {
-    const gl = document.getElementById('podgl'), view = createPodView(gl), T = window.THREE;
-    const q = new T.Quaternion().setFromEuler(new T.Euler(-0.2, -0.5, -0.5));           // tipped over like a paddle in the hand, its face to the camera
-    for (let i = 0; i < 40; i++) view.update([q.x, q.y, q.z, q.w]);                          // update() eases towards the pose: run it until it is there
-    const src = gl.querySelector('canvas'), c = document.getElementById('podc');
-    const S = src.width, k = .82;                                                            // the middle of the view: the AirPod fills the tile, most of the floor ring stays out
-    c.getContext('2d').drawImage(src, S * (1 - k) / 2, S * .02, S * k, S * k, 0, 0, c.width, c.height);
-    await Promise.all([document.fonts.load('900 150px "Poddle Rounded"'), document.fonts.load('800 40px "Poddle Rounded"'), document.getElementById('scene').decode()]);
-    await document.fonts.ready; document.title = 'ready';
-  } catch (e) { document.title = 'error ' + e; }
+  try { await Promise.all([document.fonts.load('900 150px "Poddle Rounded"'), document.fonts.load('900 40px "Poddle Rounded"'), document.getElementById('scene').decode()]);
+    await document.fonts.ready; document.title = 'ready'; } catch (e) { document.title = 'error ' + e; }
 </script>
 </body></html>

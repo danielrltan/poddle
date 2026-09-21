@@ -2,7 +2,7 @@
 // Pictures that are not rendered yet (og.jpg, the icons) and a help page that is not written yet are WAITING lines, not failures.
 // Usage: node test/seo.test.mjs      SEO_PORT=<port> moves it (default 9025). STRICT=1 turns every WAITING into a FAIL (run it this way before a deploy).
 import { spawn } from 'child_process'; import http from 'http'; import fs from 'fs'; import path from 'path';
-const PORT = +process.env.SEO_PORT || 9025, STRICT = process.env.STRICT === '1', root = new URL('..', import.meta.url).pathname, WEB = path.join(root, 'web'), ORIGIN = 'https://poddle.fly.dev';
+const PORT = +process.env.SEO_PORT || 9025, STRICT = process.env.STRICT === '1', root = new URL('..', import.meta.url).pathname, WEB = path.join(root, 'web'), ORIGIN = 'https://poddleball.com';
 const proc = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT }, stdio: ['ignore', 'ignore', 'inherit'] });
 const wait = ms => new Promise(r => setTimeout(r, ms));
 let fails = 0, waiting = 0;
@@ -17,7 +17,7 @@ try {
   const NOCACHE = 'no-cache', WEEK = 'public, max-age=604800';
   for (const [p, type, cache, file] of [['/', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/index.html', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/robots.txt', 'text/plain; charset=utf-8', NOCACHE, 'robots.txt'],
     ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'],
-    ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=2', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
+    ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=3', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
     ['/apple-touch-icon.png', 'image/png', WEEK, 'apple-touch-icon.png'], ['/icon-192.png', 'image/png', WEEK, 'icon-192.png'], ['/icon-512.png', 'image/png', WEEK, 'icon-512.png'],
     ['/main.js', 'text/javascript; charset=utf-8', NOCACHE, 'main.js'], ['/ui.css', 'text/css; charset=utf-8', NOCACHE, 'ui.css'], ['/vendor/three.min.js', 'text/javascript; charset=utf-8', 'public, max-age=86400', 'vendor/three.min.js']]) {
     if (!has(file)) { pending(`${p}: web/${file} is not yet rendered`); continue; }
@@ -46,6 +46,8 @@ try {
     for (const [p, to] of [['/how-to-play', '/how-to-play.html'], ['/how-to-play/', '/how-to-play.html'], ['/how-to-play?court=ABCD', '/how-to-play.html?court=ABCD']]) { const r = await req(p); ok(r.status === 301 && r.h.location === to && r.h['cache-control'] === 'no-cache', `${p}: ${r.status} -> ${r.h.location}`); }
     const bad = await req('/%00'), bad2 = await req('/a%00b.js'), up = await req('/../server/game.js'), esc = await req('/%E0%A4%A');
     ok(bad.status === 400 && bad2.status === 400, `/%00 and /a%00b.js: ${bad.status}, ${bad2.status}`);
+    const oldHost = await req('/how-to-play.html?x=1', { headers: { host: 'poddle.fly.dev' } }), www = await req('/', { headers: { host: 'www.poddleball.com' } }), own = await req('/', { headers: { host: 'poddleball.com' } });
+    ok(oldHost.status === 301 && oldHost.h.location === 'https://poddleball.com/how-to-play.html?x=1' && www.status === 301 && www.h.location === 'https://poddleball.com/' && own.status === 200, `old names forward to the one name, path and query kept (${oldHost.status} ${oldHost.h.location}; ${www.status}; own host ${own.status})`);
     ok(up.status === 404 && !up.body.includes('WebSocketServer'), `/../server/game.js: ${up.status}, not the server's source`);
     ok([200, 404].includes(esc.status), `a bad escape: ${esc.status}`);
     for (const m of ['POST', 'PUT', 'DELETE']) { const r = await req('/', { method: m }); ok(r.status === 405 && r.h.allow === 'GET, HEAD' && r.body.length === 0, `${m} /: ${r.status}, Allow: ${r.h.allow}`); }
@@ -64,7 +66,7 @@ try {
     const tw = {}; for (const k of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image', 'twitter:image:alt']) tw[k] = one('meta', 'name', k);
     const missing = [...Object.entries(og), ...Object.entries(tw)].filter(([, v]) => !v).map(([k]) => k); ok(!missing.length, `the Open Graph and Twitter set, each tag once${missing.length ? ': missing or doubled ' + missing : ''}`);
     ok(og['og:type'] === 'website' && og['og:url'] === ORIGIN + '/' && tw['twitter:card'] === 'summary_large_image', `og:type ${og['og:type']}, og:url ${og['og:url']}, twitter:card ${tw['twitter:card']}`);
-    const img = /^https:\/\/poddle\.fly\.dev\/og\.jpg\?v=\d+$/; ok(img.test(og['og:image']) && og['og:image:secure_url'] === og['og:image'] && tw['twitter:image'] === og['og:image'], `share image is one absolute https URL with ?v=: ${og['og:image']}`);
+    const img = /^https:\/\/poddleball\.com\/og\.jpg\?v=\d+$/; ok(img.test(og['og:image']) && og['og:image:secure_url'] === og['og:image'] && tw['twitter:image'] === og['og:image'], `share image is one absolute https URL with ?v=: ${og['og:image']}`);
     ok(og['og:image:width'] === '1200' && og['og:image:height'] === '630' && og['og:image:type'] === 'image/jpeg', 'og:image is declared 1200x630 image/jpeg');
     ok((og['og:title'] || '').length <= 60 && (og['og:description'] || '').length <= 110 && og['og:title'] === tw['twitter:title'] && og['og:description'] === tw['twitter:description'], `og:title ${(og['og:title'] || '').length} chars, og:description ${(og['og:description'] || '').length} chars, Twitter says the same`);
     ok(/\bMac\b/.test(og['og:description'] || '') && /AirPod/.test(og['og:description'] || '') && /friends/.test(og['og:description'] || '') && og['og:title'] !== 'Poddle: your AirPod is the paddle', 'the card says AirPod, friends and Mac, and its title does not repeat the line in the picture');
@@ -73,7 +75,7 @@ try {
     ok(!/twitter:site|twitter:creator/.test(home), 'no invented Twitter handle');
     const at = h => h == null ? null : new URL(h, ORIGIN + '/').pathname;      // relative on purpose, like ui.css and main.js: test/ui-next.mjs serves this page from /web/, and the live page is only ever at /
     ok(at(one('link', 'rel', 'manifest', 'href')) === '/site.webmanifest' && at(one('link', 'rel', 'apple-touch-icon', 'href')) === '/apple-touch-icon.png' && attr('link', 'rel', 'icon', 'href').map(at).join() === '/favicon.svg,/favicon-32.png', `icons and manifest resolve to the site root: ${attr('link', 'rel', 'icon', 'href').map(at)}`);
-    const readable = [titles[0], d, ...Object.values(og), ...Object.values(tw)].join(' '); ok(!/[–—…!]|\b(simply|just|please|seamless|room)\b/i.test(readable), 'voice: no long dash, ellipsis, exclamation mark, filler or "room" in the head copy'); }
+    const readable = [titles[0], d, ...Object.values(og), ...Object.values(tw)].join(' ').replaceAll('Play pickleball using an AirPod!', '');      // the share card's line is the owner's own wording, quoted in the alt text ok(!/[–—…!]|\b(simply|just|please|seamless|room)\b/i.test(readable), 'voice: no long dash, ellipsis, exclamation mark, filler or "room" in the head copy'); }
 
   console.log('structured data');
   { const blocks = [...home.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(m => m[1]); let parsed = []; try { parsed = blocks.map(b => JSON.parse(b)); } catch (e) { ok(false, 'JSON-LD does not parse: ' + e.message); }
@@ -81,7 +83,7 @@ try {
     ok(g['@context'] === 'https://schema.org' && [].concat(g['@type']).includes('VideoGame') && g.name === 'Poddle' && g.url === ORIGIN + '/' && typeof g.description === 'string' && g.description.length > 40 && g.image === ORIGIN + '/og.jpg', `@type ${g['@type']}, name, url, description, image`);
     ok(g.operatingSystem === 'macOS 14 or later' && g.applicationCategory === 'GameApplication' && g.isAccessibleForFree === true && g.offers && g.offers.price === '0' && g.offers.priceCurrency === 'USD', 'operatingSystem, applicationCategory, free offer');
     ok(g.softwareHelp && g.softwareHelp.url === ORIGIN + '/how-to-play.html' && !g.aggregateRating && !g.review && !g.author, 'softwareHelp points at the help page. No rating, review or author is claimed');
-    const urls = JSON.stringify(g).match(/"https?:[^"]+"/g) || []; ok(urls.every(u => /^"https:\/\/(poddle\.fly\.dev|schema\.org)/.test(u)), `every URL in it is https on poddle.fly.dev or schema.org (${urls.length})`); }
+    const urls = JSON.stringify(g).match(/"https?:[^"]+"/g) || []; ok(urls.every(u => /^"https:\/\/(poddleball\.com|schema\.org)/.test(u)), `every URL in it is https on poddleball.com or schema.org (${urls.length})`); }
 
   console.log('text a crawler reads without JavaScript');
   { const ns = [...home.matchAll(/<noscript>([\s\S]*?)<\/noscript>/g)].map(m => m[1]), text = (ns[0] || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -126,7 +128,7 @@ try {
 
   console.log('help page');
   if (!has('how-to-play.html')) pending('how-to-play.html is not yet written'); else { const t = (await req('/how-to-play.html')).body.toString();
-    ok((t.match(/<title>/g) || []).length === 1 && (t.match(/<h1\b/g) || []).length === 1 && /<link rel="canonical" href="https:\/\/poddle\.fly\.dev\/how-to-play\.html">/.test(t) && /href="\/"/.test(t), 'one title, one h1, its own canonical, a link home');
+    ok((t.match(/<title>/g) || []).length === 1 && (t.match(/<h1\b/g) || []).length === 1 && /<link rel="canonical" href="https:\/\/poddleball\.com\/how-to-play\.html">/.test(t) && /href="\/"/.test(t), 'one title, one h1, its own canonical, a link home');
     let bad = null; for (const m of t.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) try { JSON.parse(m[1]); } catch (e) { bad = e.message; } ok(!bad, 'its JSON-LD parses' + (bad ? ': ' + bad : ''));
     for (const m of new Set([...t.matchAll(/(?:href|src)="(\/[^"#?]*)/g)].map(m => m[1]))) { if (m === '/') continue; const r = await req(m, { method: 'HEAD' }); if (r.status === 200) ok(true, `it links ${m}: ${r.status}`); else if (/\.(png|jpg|svg)$/.test(m)) pending(`it links ${m}, which is not yet rendered`); else ok(false, `it links ${m}: ${r.status}`); } }
 } catch (e) { ok(false, 'the test threw: ' + (e && e.stack || e)); }

@@ -46,7 +46,7 @@ Leave the other AirPod in its case.
 
 ## Play online
 
-Open https://poddle.fly.dev in Chrome. The game runs there, but your AirPod talks to your own Mac, so each player
+Open https://poddleball.com in Chrome. The game runs there, but your AirPod talks to your own Mac, so each player
 clones this repo and starts the AirPod bridge first:
 
 ```bash

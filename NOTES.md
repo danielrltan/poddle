@@ -161,7 +161,7 @@ Build log. What we tried, what broke, and how each problem was solved.
   now tied to the swing event itself and its brightness follows how hard the swing is.
 
 ## 14. Hosting, and playing over a bad connection
-- **Hosted on fly.io** at `https://poddle.fly.dev` (`fly deploy --ha=false`). `server/game.js` now also serves `web/` on
+- **Hosted on fly.io** at `https://poddleball.com` (the fly app is `poddle`; `poddle.fly.dev` and `www.` redirect to it; `fly deploy --ha=false`). `server/game.js` now also serves `web/` on
   its own port, so the hosted game is one process behind one address; a page that did not come from localhost takes its
   game socket from the address it was loaded from. `bridge/` and `motion/` still run on each player's Mac. There must be
   exactly one machine: the match lives in that process's memory.
