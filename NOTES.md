@@ -379,3 +379,7 @@ Build log. What we tried, what broke, and how each problem was solved.
 ## 30. No salute emote
 - "Get rid of the salute emoji in the spectators." Seven now: 🤣 🥵 🤯 😡 💀 🥀 😢. The wire index shifts down by one
   after 🤣 (server EMOTES = 7); `web/emoji/1fae1.png` is gone.
+
+## 31. The logo is all one dark
+- "Change the Poddle logo to not be light blue, it doesn't work on the sky blue background; make it all the dark blue
+  of 'Pod'." The "dle" is now #39434d like "P" and "d", on the title and on how-to-play. Checked with a render of the title.

@@ -28,7 +28,7 @@ a:focus-visible,.btn:focus-visible{outline:.1875rem solid var(--line);outline-of
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:4.25rem}
 .logo-mark{display:inline-flex;align-items:center;font-size:2.5rem;font-weight:900;line-height:1;letter-spacing:-.01em;text-decoration:none;
   filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
-.lg-a{color:#39434d} .lg-b{color:var(--line)}
+.lg-a,.lg-b{color:#39434d}
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
   background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
     radial-gradient(circle at 22% 62%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 78% 54%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 48% 82%, var(--ball-deep) 0 7%, transparent 8%),
