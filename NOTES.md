@@ -325,3 +325,13 @@ Build log. What we tried, what broke, and how each problem was solved.
   add up to more than the box, CSS shrinks every radius on it by the same factor, so the 1rem corners came out at ~1px: square.
 - The ends are now half the tab's height (2.125rem, the same semicircle), so the inner corners keep their full 1rem and follow
   the rally lozenge's own curve across the .375rem gap. Checked by rendering the board at 1440 and 800 px wide.
+
+## 23. Spin streaks are a billboard (supersedes 21)
+- Facing the line of flight (21) only worked for a camera looking down that line: side-on (broadcast, free cam, a cross-court
+  ball) the ring went thin again. Each arc now faces whichever camera is drawing it, set in its `onBeforeRender` (split view
+  draws the frame from two cameras, so one shared rotation would be wrong for one of them). Checked from the player's view,
+  broadcast and both halves of split.
+
+## 24. "Your serve!"
+- The serve prompt was "Your serve. Swing to hit it." Everyone knows how to serve. The hints after a missed serve
+  ("Line up with the ball, then swing", "Swing through the ball to serve") stay: they only show when it went wrong.

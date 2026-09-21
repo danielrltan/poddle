@@ -333,7 +333,7 @@ while `!live()` (mid-calibration) is kept and shown on entering play, unless `re
 | `names {names}` | seated | keep; redraw the scoreboard; if `live()` and a human name appeared in the other seat -> toast "<name> joined" |
 | `state` | seated | `frozen = !!m.paused`; `scene.setFrozen(frozen \|\| holding)`; `scene.updateBall(...)`; `net.packet()` unless frozen; `ui.setWatchers(m.watchers \| 0)`. Player: score mine / theirs, opponent paddle -> `scene.updatePaddle(1 - me, {..., bot})`, `wait` -> "Setting up", `serveCoach` when `live()`; self-heal: `m.paused && !ui.settings()` -> send `pause` off. Spectator: `ui.setScore(score[0], score[1])`, BOTH paddles to the scene, `bot` from the packet |
 | `botinfo {active, level, name, reason}` | seated | `botLevel = name`; Matt's sub line; `live()`: toast "Matt · <level>" when it changed, or the two-players refusal as today |
-| `serve {by, wait}` | seated | rally 0; `ui.setServe`; `live()` + my serve + `wait` -> "Your serve. Swing to hit it."; `scene.onEvent` |
+| `serve {by, wait}` | seated | rally 0; `ui.setServe`; `live()` + my serve + `wait` -> "Your serve!"; `scene.onEvent` |
 | `hit` `swung` `bounce` `launch` `whiff` | seated | stats + rally as today; `scene.onEvent` |
 | `point {winner, final}` | seated | not `final` and `live()`: player -> `ui.pointBanner(winner === me, nameOf(winner))` + confetti when mine; spectator -> `ui.pointBanner(null, nameOf(winner), winner)`; `scene.onEvent` |
 | `matchover {winner, score, forfeit, rematchBy}` | seated; drawn when `live()` | `ui.setServe(null)`; `ui.hold(null)`; `ui.settings(false)`; `ui.matchResult({...})` then `ui.rematch({ mine:null, theirs:null, left: rematchBy, name })`; confetti for a player's win. Legacy page: `vote:false` |

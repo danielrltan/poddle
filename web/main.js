@@ -254,7 +254,7 @@ const bridge = connect(BRIDGE, 'm', sample => {
     else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(false);
       // 'All set' arrives in this same batch: hold the green card long enough to be read, then open the court
       setTimeout(() => { if (phase !== 'play') return; openCourt();
-        setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve. Swing to hit it.', null, 2600); }, 380); }, 900); }     // after the fade
+        setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve!', null, 2600); }, 380); }, 900); }     // after the fade
     else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
       if (!calibrating && !spec() && seated() && !frozen && !holding) {      // a paused or held room takes no swings
         // Spin comes from the wrist rolling through the ball or from a curved "C" shaped swing, whichever is stronger. Its
@@ -351,7 +351,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'waitoff') { if (!holding) ui.hold(null); return; }
   if (m.type === 'hit') { struck = true; stats.hits++; if (m.side === side && !spec()) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
-    if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve. Swing to hit it.', null, 2600); }
+    if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve!', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && !m.final && live()) {
     if (spec()) ui.pointBanner(null, nameOf(m.winner === 1 ? 1 : 0), m.winner === 1 ? 1 : 0);

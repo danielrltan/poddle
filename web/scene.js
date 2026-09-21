@@ -372,10 +372,15 @@ export function createScene(containerEl) {
     [[0, 8, 0], [0.62, 6, 0.5], [-0.62, 6, 0.5], [1.15, 4, 0], [-1.15, 4, 0]].forEach(([lat, n, ph]) => { for (let i = 0; i < n; i++) hole((i + ph) / n, lat); });
     hole(0.5, 1.5); hole(0.5, -1.5);
   });
-  // spin streaks: three short arcs in a plane whose normal (local z) is the line of flight: turned 90 deg off the true spin axis, to face the players
+  // spin streaks: three short arcs, billboarded. Each one faces the camera drawing it, just before it is drawn (split view draws the frame twice,
+  // from two cameras), so the ring always reads whole; around the true spin axis it was edge-on from behind the baseline.
   const spinMat = new THREE.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0, depthWrite: false });
-  const spinFx = new THREE.Group(); let spinRoll = 0; const vC = new THREE.Vector3();
-  for (let i = 0; i < 3; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(BALL_R * 1.9, BALL_R * 0.13, 6, 14, 1.1), spinMat); arc.rotation.z = i * Math.PI * 2 / 3; spinFx.add(arc); }
+  const spinFx = new THREE.Group(); let spinRoll = 0;
+  const qFx = new THREE.Quaternion(), qRoll = new THREE.Quaternion(), zFx = new THREE.Vector3(0, 0, 1), sFx = new THREE.Vector3();
+  for (let i = 0; i < 3; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(BALL_R * 1.9, BALL_R * 0.13, 6, 14, 1.1), spinMat); arc.frustumCulled = false;
+    arc.onBeforeRender = (r, sc, cam) => { qFx.copy(cam.quaternion).multiply(qRoll.setFromAxisAngle(zFx, spinRoll + i * Math.PI * 2 / 3));
+      arc.matrixWorld.compose(spinFx.position, qFx, sFx.setScalar(spinFx.scale.x)); };
+    spinFx.add(arc); }
   spinFx.visible = false; scene.add(spinFx);
   const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
   // The ball lights itself: from side 1 you see its shaded face (it measured 1.16 : 1 against the kitchen, 1.25 : 1 against the court), from side 0 the lit face
@@ -652,8 +657,7 @@ export function createScene(containerEl) {
     // So backspin is drawn slower than life (~3 turns a second), and three bright streaks whip around the ball with it.
     if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -19, b.spin) * dt);
       spinFx.position.copy(b.pos); spinFx.visible = b.cool > 0.08;
-      if (spinFx.visible) { qA.setFromUnitVectors(vC.set(0, 0, 1), vB.set(b.vel.x, 0, b.vel.z).normalize()); spinFx.quaternion.copy(qA);      // the ring faces down the flight, so the player behind the ball sees it whole (around the true axis it was edge-on to them)
-        spinRoll -= 15 * dt; spinFx.rotateZ(spinRoll);
+      if (spinFx.visible) { spinRoll -= 15 * dt;
         spinFx.scale.setScalar(1 + 0.25 * Math.sin(spinRoll * 0.5)); spinMat.opacity = 0.85 * Math.min(1, b.cool * 1.4); } }
     else spinFx.visible = false;
     const h = b.pos.y - BALL_R, k = 1 / (1 + h * 0.55);

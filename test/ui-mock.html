@@ -95,7 +95,7 @@
       'hud-callout': () => { hud(7, 5, 5); ui.callout(qs.get('kind') || 'smash', qs.get('them') === '1'); },
       'hud-point-you': () => { hud(8, 5, 0); ui.pointBanner(true); },
       'hud-point-enemy': () => { hud(7, 6, 0); ui.pointBanner(false); },
-      'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve. Swing to hit it.', 1e6); },
+      'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve!', 1e6); },
       'hud-airpod-lost': () => { hud(); ui.setStatus({ airpod: 'bad' }); ui.toast('AirPod signal lost', 1e6); },
       'settings': () => { hud(); ui.setSettings({ canPause: false }); ui.settings(true); },                                   // against a human: live behind it, the can't-pause note
       'settings-paused': () => { hud(); ui.setPaused(true); ui.settings(true); },                                              // against Matt: blurred, "Paused"
