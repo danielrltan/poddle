@@ -382,20 +382,24 @@ export function createScene(containerEl) {
       arc.matrixWorld.compose(spinFx.position, qFx, sFx.setScalar(spinFx.scale.x)); };
     spinFx.add(arc); }
   spinFx.visible = false; scene.add(spinFx);
-  // serve cue: eight warm chevrons chasing round the ball while it hangs for the serve. Pointed, gold and unhurried, so it never reads as the spin streaks.
-  // One mesh, billboarded per camera like the streaks.
-  const serveMat = new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide });
-  const serveFx = (() => { const N = 8, R = BALL_R * 2.5, S = BALL_R * 0.75, pos = [], idx = [];
-    const V = [[0.5, 0], [-0.05, 0.55], [-0.5, 0.55], [0.05, 0], [-0.5, -0.55], [-0.05, -0.55]];      // one chevron pointing +x: outer tip, top arm, inner tip, bottom arm
-    for (let i = 0; i < N; i++) { const th = i * Math.PI * 2 / N, d = th + Math.PI / 2, c = Math.cos(d), s = Math.sin(d), o = i * 6;
-      for (const [x, y] of V) pos.push(R * Math.cos(th) + S * (x * c - y * s), R * Math.sin(th) + S * (x * s + y * c), 0);
-      idx.push(o, o + 1, o + 2, o, o + 2, o + 3, o, o + 3, o + 4, o, o + 4, o + 5); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  // serve cue: eight chevrons around the ball while it hangs for the serve, all pointing in at it and breathing in and out (they do not turn).
+  // Coral pink, which no court colour, the yellow ball or the icy spin streaks share. One mesh, billboarded per camera like the streaks; the
+  // pulse moves the chevrons along their spokes (updateServeFx), so they keep their size.
+  const serveMat = new THREE.MeshBasicMaterial({ color: 0xff5c8a, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const SV_N = 8, SV_S = BALL_R * 0.75, SV_V = [[0.5, 0], [-0.05, 0.55], [-0.5, 0.55], [0.05, 0], [-0.5, -0.55], [-0.05, -0.55]];   // one chevron pointing +x: outer tip, top arm, inner tip, bottom arm
+  const serveFx = (() => { const idx = [];
+    for (let i = 0; i < SV_N; i++) { const o = i * 6; idx.push(o, o + 1, o + 2, o, o + 2, o + 3, o, o + 3, o + 4, o, o + 4, o + 5); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SV_N * 18), 3)); g.setIndex(idx);
     return new THREE.Mesh(g, serveMat); })();
-  let serveRoll = 0, serveA = 0;
+  function updateServeFx(R) {                              // every chevron on its spoke at radius R, tip toward the ball
+    const P = serveFx.geometry.attributes.position.array;
+    for (let i = 0, k = 0; i < SV_N; i++) { const th = (i + 0.5) * Math.PI * 2 / SV_N, c = -Math.cos(th), s = -Math.sin(th);
+      for (const [x, y] of SV_V) { P[k++] = -R * c + SV_S * (x * c - y * s); P[k++] = -R * s + SV_S * (x * s + y * c); P[k++] = 0; } }
+    serveFx.geometry.attributes.position.needsUpdate = true;
+  }
+  let serveA = 0;
   serveFx.frustumCulled = false; serveFx.renderOrder = 4; serveFx.visible = false; scene.add(serveFx);
-  serveFx.onBeforeRender = (r, sc, cam) => { qFx.copy(cam.quaternion).multiply(qRoll.setFromAxisAngle(zFx, serveRoll));
-    serveFx.matrixWorld.compose(serveFx.position, qFx, sFx.setScalar(serveFx.scale.x * clamp(cam.position.distanceTo(serveFx.position) / 6, 1, 1.8))); };   // a serve from the far baseline still reads
+  serveFx.onBeforeRender = (r, sc, cam) => serveFx.matrixWorld.compose(serveFx.position, cam.quaternion, sFx.setScalar(clamp(cam.position.distanceTo(serveFx.position) / 6, 1, 1.8)));   // a serve from the far baseline still reads
   const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
   // The ball lights itself: from side 1 you see its shaded face (it measured 1.16 : 1 against the kitchen, 1.25 : 1 against the court), from side 0 the lit face
   // was 1.31 : 1 on the low sky. Through its own texture, so the holes still read and the spin still shows. Now 1.5 : 1 at worst (the milky south sky), 2.2+ elsewhere.
@@ -676,7 +680,7 @@ export function createScene(containerEl) {
     else spinFx.visible = false;
     serveA = b.live && b.held && !at.on ? Math.min(1, serveA + dt / 0.25) : Math.max(0, serveA - dt / 0.12);     // gone almost at once when it is struck
     serveFx.visible = serveA > 0;
-    if (serveFx.visible) { serveRoll += 2.2 * dt; serveFx.position.copy(b.pos); serveFx.scale.setScalar(1 + 0.08 * Math.sin(timeS * 5)); serveMat.opacity = 0.9 * serveA; }
+    if (serveFx.visible) { const k = 0.5 - 0.5 * Math.cos(timeS * Math.PI * 2 * 1.2); serveFx.position.copy(b.pos); updateServeFx(BALL_R * (3.1 - 0.9 * k)); serveMat.opacity = serveA * (0.7 + 0.3 * k); }     // in toward the ball and out again, 1.2 times a second, brightest when closest
     const h = b.pos.y - BALL_R, k = 1 / (1 + h * 0.55);
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing

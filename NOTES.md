@@ -383,3 +383,10 @@ Build log. What we tried, what broke, and how each problem was solved.
 ## 31. The logo is all one dark
 - "Change the Poddle logo to not be light blue, it doesn't work on the sky blue background; make it all the dark blue
   of 'Pod'." The "dle" is now #39434d like "P" and "d", on the title and on how-to-play. Checked with a render of the title.
+
+## 32. Serve chevrons point in and breathe (supersedes the look in 28)
+- "Make the arrows pulse in and out, and they should be pointing in, not spinning in a circle. Also a nicer colour."
+- The eight chevrons now sit on spokes with their tips toward the ball and do not turn. They slide in toward it and back
+  out 1.2 times a second (radius 3.1 to 2.2 ball radii, brightest when closest); the vertices move along the spokes, so the
+  chevrons keep their size. Coral pink (#ff5c8a) instead of gold: no court colour, the yellow ball or the icy spin streaks
+  share it. Checked with renders of my serve, their serve and a close-up.
