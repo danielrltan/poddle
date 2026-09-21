@@ -358,3 +358,13 @@ Build log. What we tried, what broke, and how each problem was solved.
 - A `?court=CODE&watch=1` link: the title chip reads "Joining court CODE as spectator". With no name yet the link stops
   on the code screen, which is now titled "Joining as spectator" with a Watch button, and pressing it watches. Before,
   that button sent a plain join and could seat the spectator as a player.
+
+## 28. A serve cue of its own: gold chevrons round the hanging ball
+- "The serve indicator on the ball is the same as the spin indicator, which is confusing. Maybe an array of chevron arrows
+  pointing around the ball?"
+- There was no serve indicator: the server never cleared the last rally's spin when it reset for a serve, so the hanging
+  ball (which drifts after the server's hand) wore the spin streaks. reset() now zeroes `ball.spin`, and the client ignores
+  spin while the ball is held.
+- The hanging ball now gets eight gold chevrons chasing round it, billboarded like the streaks, fading in over 0.25 s and
+  out almost at once when it is struck. They grow up to 1.8x with distance so the opponent's serve reads from the far
+  baseline. Checked by rendering my serve, their serve and a close-up.

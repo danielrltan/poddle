@@ -271,7 +271,7 @@ function createRoom(code, pub) {
   function reset(by) {
     const s = sgn(by), pl = bySide(by);
     for (const p of players) p.swing = p.lunge = p.servePending = null;
-    ball.live = true; ball.bounces = 0;
+    ball.live = true; ball.bounces = 0; ball.spin = 0;          // the last rally's slice must not ride on the hanging ball (clients drew its spin streaks on the serve)
     if (SWING_SERVE && pl) {                                     // the ball floats in front of the server until they swing at it
       ball.serving = by; ball.lastHit = 1 - by;
       ball.hang = serveSpot(pl); ball.hv = [0, 0, 0]; ball.drag = [false, false, false]; hangBall(0);

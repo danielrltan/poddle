@@ -382,6 +382,20 @@ export function createScene(containerEl) {
       arc.matrixWorld.compose(spinFx.position, qFx, sFx.setScalar(spinFx.scale.x)); };
     spinFx.add(arc); }
   spinFx.visible = false; scene.add(spinFx);
+  // serve cue: eight warm chevrons chasing round the ball while it hangs for the serve. Pointed, gold and unhurried, so it never reads as the spin streaks.
+  // One mesh, billboarded per camera like the streaks.
+  const serveMat = new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const serveFx = (() => { const N = 8, R = BALL_R * 2.5, S = BALL_R * 0.75, pos = [], idx = [];
+    const V = [[0.5, 0], [-0.05, 0.55], [-0.5, 0.55], [0.05, 0], [-0.5, -0.55], [-0.05, -0.55]];      // one chevron pointing +x: outer tip, top arm, inner tip, bottom arm
+    for (let i = 0; i < N; i++) { const th = i * Math.PI * 2 / N, d = th + Math.PI / 2, c = Math.cos(d), s = Math.sin(d), o = i * 6;
+      for (const [x, y] of V) pos.push(R * Math.cos(th) + S * (x * c - y * s), R * Math.sin(th) + S * (x * s + y * c), 0);
+      idx.push(o, o + 1, o + 2, o, o + 2, o + 3, o, o + 3, o + 4, o, o + 4, o + 5); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+    return new THREE.Mesh(g, serveMat); })();
+  let serveRoll = 0, serveA = 0;
+  serveFx.frustumCulled = false; serveFx.renderOrder = 4; serveFx.visible = false; scene.add(serveFx);
+  serveFx.onBeforeRender = (r, sc, cam) => { qFx.copy(cam.quaternion).multiply(qRoll.setFromAxisAngle(zFx, serveRoll));
+    serveFx.matrixWorld.compose(serveFx.position, qFx, sFx.setScalar(serveFx.scale.x * clamp(cam.position.distanceTo(serveFx.position) / 6, 1, 1.8))); };   // a serve from the far baseline still reads
   const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
   // The ball lights itself: from side 1 you see its shaded face (it measured 1.16 : 1 against the kitchen, 1.25 : 1 against the court), from side 0 the lit face
   // was 1.31 : 1 on the low sky. Through its own texture, so the holes still read and the spin still shows. Now 1.5 : 1 at worst (the milky south sky), 2.2+ elsewhere.
@@ -656,14 +670,17 @@ export function createScene(containerEl) {
     // 60 rad/s at 60 fps is ~1 rad a frame on a ball with a regular hole pattern: it strobes and reads as NOT spinning.
     // So backspin is drawn slower than life (~3 turns a second), and three bright streaks whip around the ball with it.
     if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -19, b.spin) * dt);
-      spinFx.position.copy(b.pos); spinFx.visible = b.cool > 0.08;
+      spinFx.position.copy(b.pos); spinFx.visible = b.cool > 0.08 && !b.held;
       if (spinFx.visible) { spinRoll -= 15 * dt;
         spinFx.scale.setScalar(1 + 0.25 * Math.sin(spinRoll * 0.5)); spinMat.opacity = 0.85 * Math.min(1, b.cool * 1.4); } }
     else spinFx.visible = false;
+    serveA = b.live && b.held && !at.on ? Math.min(1, serveA + dt / 0.25) : Math.max(0, serveA - dt / 0.12);     // gone almost at once when it is struck
+    serveFx.visible = serveA > 0;
+    if (serveFx.visible) { serveRoll += 2.2 * dt; serveFx.position.copy(b.pos); serveFx.scale.setScalar(1 + 0.08 * Math.sin(timeS * 5)); serveMat.opacity = 0.9 * serveA; }
     const h = b.pos.y - BALL_R, k = 1 / (1 + h * 0.55);
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
-    b.cool += ((b.live ? b.spin : 0) - b.cool) * damp(dt, 0.08);
+    b.cool += ((b.live && !b.held ? b.spin : 0) - b.cool) * damp(dt, 0.08);
     b.hot = (b.hot || 0) + ((b.live ? b.power || 0 : 0) - (b.hot || 0)) * damp(dt, 0.05);
     if (b.live && b.hot > SMASH_N) { b.ember = (b.ember || 0) + dt;      // embers and the fat flame are the smash's own (they started at n 0.55-0.6, the OLD smash line: drives at 21-27 rad/s wore them too)
       if (b.ember > 0.028) { b.ember = 0; burst([b.pos.x, b.pos.y, b.pos.z], 0.2, 3, 1.6, b.cool > 0.3 ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0]); } }
@@ -926,7 +943,7 @@ export function createScene(containerEl) {
     if (live) ball.seen = true;
   }
 
-  function hideBall() { if (at.on) return; ball.seen = ball.live = false; ballMesh.visible = blob.visible = trailMesh.visible = spinFx.visible = marker.visible = false; trail.pts.length = 0; }   // the match it belonged to is over (opponent left, back to the lobby)
+  function hideBall() { if (at.on) return; ball.seen = ball.live = false; ballMesh.visible = blob.visible = trailMesh.visible = spinFx.visible = serveFx.visible = marker.visible = false; serveA = 0; trail.pts.length = 0; }   // the match it belonged to is over (opponent left, back to the lobby)
 
   // ---------- attract rally ----------
   // `by` strikes the ball at `from` at rally time t0. Pick a landing spot and an arc, solve the launch so it lands there and clears the
