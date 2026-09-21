@@ -655,16 +655,18 @@ body[data-role="spectator"] .emotes{display:flex}
 @keyframes emote-cool{from{transform:scaleX(1)} to{transform:scaleX(0)}}
 body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none;transition-duration:140ms}
 .emote-layer{position:fixed;inset:0;z-index:var(--z-hud);pointer-events:none;overflow:hidden}
-.emote-pop{position:absolute;right:var(--edge);display:flex;flex-direction:column;align-items:center;gap:.125rem;animation:emote-pop 3.2s var(--ease-out) forwards}
-.emote-pop img{width:4rem;height:4rem;filter:drop-shadow(0 .25rem .5rem rgba(10,30,45,.35))}
-.emote-pop span{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:max(var(--t-sm),12px);font-weight:800;line-height:1.2;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.8), 0 0 .5rem rgba(10,30,45,.5)}
-@keyframes emote-pop{
-  0%{transform:translate(calc(100% + var(--edge)),0) scale(.6);opacity:0}
-  14%{transform:translate(0,0) scale(1.12);opacity:1}
-  22%{transform:translate(0,-.5rem) scale(1)}
-  78%{opacity:1}
-  100%{transform:translate(0,-6rem) scale(.95);opacity:0}}
-@media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade 3.2s linear forwards} @keyframes emote-fade{0%,80%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} }
+/* a live-stream reaction: born just above the emote row in the bottom-right corner, it swells in, then floats up about half the
+   screen swaying side to side and fades. ui.js gives each its own --x (start offset), --sway and --dur so a burst spreads out */
+.emote-pop{position:absolute;right:calc(var(--edge) + var(--x, 0rem));bottom:calc(var(--edge) + 4rem);display:flex;flex-direction:column;align-items:center;gap:.125rem;
+  animation:emote-rise var(--dur, 3.6s) cubic-bezier(.3,.2,.6,1) forwards}
+.emote-pop > i{display:flex;flex-direction:column;align-items:center;gap:.125rem;font-style:normal;animation:emote-sway calc(var(--dur, 3.6s) / 2.4) ease-in-out infinite alternate}
+.emote-pop img{width:3.5rem;height:3.5rem;filter:drop-shadow(0 .25rem .5rem rgba(10,30,45,.35));animation:emote-in 420ms var(--ease-bounce) both}
+.emote-pop span{max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:max(var(--t-xs),11px);font-weight:800;line-height:1.2;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.8), 0 0 .5rem rgba(10,30,45,.5)}
+@keyframes emote-rise{0%{transform:translateY(0);opacity:1} 65%{opacity:1} 100%{transform:translateY(-52vh);opacity:0}}
+@keyframes emote-sway{from{transform:translateX(calc(var(--sway, 1rem) * -1))} to{transform:translateX(var(--sway, 1rem))}}
+@keyframes emote-in{from{transform:scale(.2);opacity:0} to{transform:scale(1);opacity:1}}
+@media (max-width: 700px){ .emote-pop{bottom:calc(var(--edge) + 9rem)} }      /* the row itself sits higher here (above the view chips) */
+@media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade 3.2s linear forwards} .emote-pop > i,.emote-pop img{animation:none} @keyframes emote-fade{0%,80%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} }
 @media (max-width: 700px){ .emotes{bottom:calc(var(--edge) + 5.25rem)} .emote-btn{width:2.5rem;height:2.5rem} .emote-btn img{width:1.875rem;height:1.875rem} }      /* the view chips wrap to two rows here: the emotes sit above them */
 body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-events:none}
 .hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;

@@ -316,13 +316,14 @@ function emoteCool(on) {
 { const box = $('emotes');
   if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.title = em[2]; b.append(emoteImg(i)); box.append(b); });
   on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (!b || b.disabled || !onEmoteFn) return; emoteCool(true); onEmoteFn(+b.dataset.e); }); }
-// one reaction arriving: slides in from the right edge at a random height in the middle band, drifts up, fades. Six on screen at most
+// one reaction arriving: floats up from the bottom-right corner like a live-stream reaction, swaying, and fades. Eight on screen at most
 export function emote(i, name) {
   const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
-  while (layer.childElementCount >= 6) layer.firstElementChild.remove();
-  const el = document.createElement('div'); el.className = 'emote-pop'; el.style.top = `${34 + Math.random() * 26}%`;
-  el.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; el.append(n); }      // names: textContent only
-  el.addEventListener('animationend', () => el.remove()); setTimeout(() => el.remove(), 4000); layer.append(el);
+  while (layer.childElementCount >= 8) layer.firstElementChild.remove();
+  const el = document.createElement('div'), body = document.createElement('i'), dur = 3.2 + Math.random() * 1.2; el.className = 'emote-pop';
+  el.style.setProperty('--x', `${(Math.random() * 3).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.5 + Math.random() * 1)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
+  body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only
+  el.append(body); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), dur * 1000 + 500); layer.append(el);
 }
 export function emotesOff() { const layer = $('emote-layer'); if (layer) layer.replaceChildren(); emoteCool(false); }     // out of the room: nothing carries over
 

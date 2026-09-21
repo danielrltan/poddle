@@ -346,3 +346,9 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Each one slides in from the right edge at a random height in the middle band with the sender's name, drifts up and
   fades (3.2 s, six on screen at most). After a pick the row greys out and a bar under it runs down the 5 s.
 - `node test/emote.test.mjs`: relay, names, cooldown per spectator, bad indexes, players ignored, courts kept apart.
+
+## 26. Emotes stream up like a live stream (supersedes the pop in 25)
+- "Make the emojis stream in from the bottom right corner and float up, like TikTok / Facebook / Instagram lives."
+- Each reaction is born just above the emote row, swells in, then floats up about half the screen height, swaying side to
+  side, and fades. ui.js gives each its own start offset, sway and duration (3.2-4.4 s) so a burst spreads into a stream
+  instead of a stack. Eight on screen at most. Reduced motion: no rise or sway, just a fade in the corner.
