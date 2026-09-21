@@ -14,10 +14,10 @@ room (`welcome`, `state`, `hit`, `swing`, `paddle`, `ping`, `net`, ...) do not c
 
 ## Lobby messages
 server -> client
-- `{ type:'lobby', rooms:[{ code, players, open }], online }` on entering the lobby, then whenever the list changes
-  (at most once a second). Only **public** rooms with one human waiting are listed (`players` = humans seated, always 1;
-  `open` = true). An empty room is not listed (nobody is coming to it), but `quick` still reuses it and its code still
-  joins. `online` = sockets connected in total.
+- `{ type:'lobby', rooms:[{ code, players, open, watch, watchers, score, live }], online }` on entering the lobby, then whenever
+  the list changes (at most once a second). Every **public** room with at least one human in it is listed: `open` = a seat is
+  free (joinable), otherwise it can be watched (docs/SPECTATE.md). An empty room is not listed (nobody is coming to it), but
+  `quick` still reuses it and its code still joins. `online` = sockets connected in total.
 - `{ type:'room', code, public }` you are now seated in this room. The normal `welcome` follows immediately.
 - `{ type:'joinfail', reason }` with reason `'notfound' | 'full' | 'busy'` (`busy`: the server is at its room cap).
   The socket stays in the lobby.
@@ -40,11 +40,13 @@ client -> server (only valid in the lobby, ignored otherwise, except `leave`)
   `wait: true`. Additive: nothing else in `state` changes. (Off with `AUTOBOT=0`, where scripted clients may never
   send one.)
 - Input is untrusted: `code` must be a string, `ping.c` is echoed only if it is a number, messages over 4 KB close the socket.
-- When the other human leaves, the one who stays gets `{ type:'left' }`, then the bot comes back as it does today.
+- When the other human leaves BEFORE a ball is struck, the one who stays gets `{ type:'left' }`, then the bot comes back as it
+  does today. Mid-match it is a seat hold or a forfeit: docs/SPECTATE.md.
 
 ## Client flow
 title (Play) -> lobby (Quick play / Create room / Enter code, plus the public room list) -> connect gear -> calibrate
 -> play. The game socket is opened with `lobby=1` when the page loads; nothing is seated until the player chooses.
-`?room=CODE` in the page URL joins straight away after Play (shareable link). `?skiptitle=1` keeps today's legacy path
+`?court=CODE` in the page URL joins straight away after Play (shareable link; `?room=CODE` is the old spelling and still
+works; players read "court" everywhere, the wire protocol keeps `room`). `?skiptitle=1` keeps today's legacy path
 (no lobby, room `LOCAL`), which is what `test/e2e.mjs` plays its match on; its title check walks title -> lobby ->
 Quick play -> connect. In a room, the code is shown on the HUD so it can be read out.

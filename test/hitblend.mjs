@@ -4,7 +4,7 @@ import puppeteer from 'puppeteer-core';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-const root = fileURLToPath(new URL('..', import.meta.url)), port = 8176, OLD = process.argv[2];
+const root = fileURLToPath(new URL('..', import.meta.url)), port = +process.env.PORT || 8176, OLD = process.argv[2];
 const http = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: root, stdio: 'ignore' });
 const bye = c => { http.kill(); process.exit(c); }; setTimeout(() => { console.log('TIMEOUT'); bye(2); }, 90000);
 await new Promise(r => setTimeout(r, 700));

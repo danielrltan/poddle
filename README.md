@@ -54,8 +54,11 @@ npm install && ./motion/build.sh
 node bridge/bridge.js
 ```
 
-Press Play, then Quick play, Create room, or Enter code. Rooms have a 4-character code to share. Alone in a room? A bot
-joins after 2.5 s. With two players the first serve waits until both have calibrated.
+Type your name once, press Play, then Quick play, Create court, Enter code, or Play a bot (Matt: Rookie, Club or Pro).
+Courts have a 4-character code and a link (`?court=CODE`) to share. Alone on a court? Matt walks in after 2.5 s. With two
+players the serve waits until both have calibrated. A full court can be watched (`?court=CODE&watch=1`, or Watch in the
+court list): broadcast, split screen, either player's view, or a free camera (keys 1 to 4). When a match ends both players
+vote on a rematch; if either says no, everyone goes back to the lobby. A player whose connection drops keeps the seat for 15 s.
 
 ## Run it locally
 
@@ -70,7 +73,7 @@ node bridge/bridge.js                      # every player's Mac
 - Second player on the same network: run `node server/game.js` and `node bridge/bridge.js` too, then open `http://localhost:8080/#<host-LAN-IP>`
   (opening `http://<host-LAN-IP>:8080` directly also works, but Chrome blocks the camera on a non-localhost http page, so you get aim-move)
 
-Keys: **M** move mode (body / auto / aim) · **[ ]** range · **C** calibrate · **R** re-center (aim drifts over minutes) · **B** bot (press again for Rookie / Club / Pro) · **1 2 3** bot level · **V** AirPod view · **H** stats · **F** full screen · **P** reset swing stats · **Q** twice leaves a room.
+Keys: **C** calibrate · **Esc** or the top-left button opens Settings (name, sensitivity, how you move: body / auto / aim, Matt's difficulty, leave court; against Matt it pauses the match) · **1 2 3** Matt's difficulty · **B** adds Matt or steps his level · **[ ]** range · **R** re-center (aim drifts over minutes) · **V** AirPod view · **H** stats · **F** full screen · **P** reset swing stats · **Q** twice leaves a court.
 
 ## Tests
 
@@ -83,6 +86,7 @@ node test/bot.test.mjs        # bot auto-join, levels, comes back when player 2 
 node test/server.test.mjs     # rallies, contact box, whiff reasons, scoring, bot, 26k launch solves
 node test/rooms.test.mjs      # rooms: quick play, codes, full, leave, reconnect, hostile input
 node test/menu.mjs            # title, lobby and room flow in headless Chrome   (needs Google Chrome)
-node test/rooms-e2e.mjs       # two players through the lobby into one room, one Chrome each   (needs Google Chrome)
+node test/rooms-e2e.mjs       # two players through the lobby into one court, one Chrome each   (needs Google Chrome)
+node test/spectate-e2e.mjs    # three Chromes: Play a bot + pause, a spectator and the four views, rematch, wifi drop, forfeit, status tags   (needs Google Chrome)
 node test/e2e.mjs             # headless Chrome + simulated AirPod + bot   (needs Google Chrome)
 ```

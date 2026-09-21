@@ -70,7 +70,7 @@ const COL = {
   skyTop: '#2f7fd6', skyMid: '#8cc4ee', horizon: '#d6ecf7',
   grass: 0x4f9a4a, apron: 0x2e7d56, court: 0x2a66b3, kitchen: 0xe0813f, line: 0xffffff,
   screen: 0x17513a, skin: 0xf2c9a0,
-  matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a bald Black man in an orange shirt, whichever end he plays
+  matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a Black man in an orange shirt, whichever end he plays
   shirt: [0xe5484d, 0xf5b324], hair: [0x3a2a1e, 0x1d1d26], face: ['#e5484d', '#f5b324'],
 };
 
@@ -216,8 +216,13 @@ function swingEuler(t, out) {
 
 export function createScene(containerEl) {
   let court = { ...DEFAULT_COURT }, localSide = 0, lastMs = 0, timeS = 0;
+  // Three switches (docs/API-NEXT.md 2.1). Camera: menu beats spectator (broadcast | split | pov | free) beats seated (today's play camera).
+  let spectator = false, vName = 'broadcast', vSide = 0, menu = false, frozen = false, drawn = 0, force = false, shadowHold = 0, easeT = 1;
+  const VIEWS = ['broadcast', 'split', 'pov', 'free'], free = { yaw: 20, pitch: 25, dist: 17 }, size = { w: 1, h: 1 };      // free: degrees off +x, degrees up, metres from (0, 0.9, 0); it outlives view changes. (Not 35 off: a floodlight head hangs exactly there)
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pixelRatio = () => Math.min(window.devicePixelRatio || 1, 2) / (menu ? 2 : 1);       // a menu is blurred glass over the court: half the pixels each way
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(pixelRatio());
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.domElement.style.display = 'block';
   containerEl.appendChild(renderer.domElement);
@@ -265,8 +270,7 @@ export function createScene(containerEl) {
 
   // ---------- court (rebuilt by setCourt) ----------
   let courtGroup = null;
-  const backFence = [[], []];                             // per side: the windscreen behind that baseline (hidden for the local side)
-  const showFences = () => backFence.forEach((a, side) => a.forEach(o => { o.visible = side !== localSide; }));
+  const backFence = [[], []], sideFence = [[], []];       // per side: the windscreen behind that baseline (hidden for whoever looks from there). sideFence: +x, -x (broadcast and free cam look over them)
   const speckle = canvasTex(256, 256, (g, w, h) => {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); const rnd = rng(3);
     for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.07})`; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); }
@@ -281,7 +285,7 @@ export function createScene(containerEl) {
   function buildCourt() {
     if (courtGroup) { scene.remove(courtGroup); courtGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     const g = courtGroup = new THREE.Group(), { halfW: W, halfL: L, kitchen: K, net: N } = court, LW = 0.07;
-    const fenceZ = L + 7.2, fenceX = W + 5.2; backFence[0].length = backFence[1].length = 0;
+    const fenceZ = L + 7.2, fenceX = W + 5.2; backFence[0].length = backFence[1].length = sideFence[0].length = sideFence[1].length = 0;
     g.add(slab(600, 600, COL.grass, -0.02));
     g.add(slab(fenceX * 2, fenceZ * 2, COL.apron, 0, 0, 0, 0.6));
     g.add(slab(W * 2, L * 2, COL.court, 0.004, 0, 0, 0.6));
@@ -336,7 +340,7 @@ export function createScene(containerEl) {
       const mine = backFence[s > 0 ? 0 : 1]; mine.push(back);      // the camera drifts back through its own fence when the player is deep or far offside
       const rail = new THREE.Mesh(new THREE.BoxGeometry(fenceX * 2, 0.07, 0.07), railM); rail.position.set(0, 2.43, s * fenceZ); g.add(rail); mine.push(rail);
       const sd = new THREE.Mesh(new THREE.PlaneGeometry(fenceZ * 2, 1.3), sideM); sd.position.set(s * fenceX, 0.65, 0); sd.rotation.y = -s * Math.PI / 2; g.add(sd);
-      const srail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, fenceZ * 2), railM); srail.position.set(s * fenceX, 1.33, 0); g.add(srail);
+      const srail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, fenceZ * 2), railM); srail.position.set(s * fenceX, 1.33, 0); g.add(srail); sideFence[s > 0 ? 0 : 1].push(sd, srail);
       for (let i = -3; i <= 3; i++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.5, 8), railM); p.position.set(i * fenceX / 3, 1.25, s * (fenceZ + 0.05)); g.add(p); mine.push(p); }
     }
     // trees outside the fence
@@ -354,7 +358,7 @@ export function createScene(containerEl) {
       M.compose(new THREE.Vector3(x + r * 0.5, h + r * 0.2, z + r * 0.3), Q, new THREE.Vector3(r * 0.65, r * 0.6, r * 0.65)); leaves[1 - k].setMatrixAt(cnt[1 - k]++, M);
     }
     leaves.forEach((l, k) => { l.count = cnt[k]; g.add(l); }); g.add(trunks);
-    scene.add(g); showFences();
+    scene.add(g); if (menu) shadowHold = 1;                // a frozen shadow map belongs to the old court
   }
   buildCourt();
 
@@ -372,7 +376,9 @@ export function createScene(containerEl) {
   const spinFx = new THREE.Group(); let spinRoll = 0; const vC = new THREE.Vector3();
   for (let i = 0; i < 3; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(BALL_R * 1.9, BALL_R * 0.13, 6, 14, 1.1), spinMat); arc.rotation.z = i * Math.PI * 2 / 3; spinFx.add(arc); }
   spinFx.visible = false; scene.add(spinFx);
-  const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0x6a7400, emissiveIntensity: 0.35 }));
+  const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
+  // The ball lights itself: from side 1 you see its shaded face (it measured 1.16 : 1 against the kitchen, 1.25 : 1 against the court), from side 0 the lit face
+  // was 1.31 : 1 on the low sky. Through its own texture, so the holes still read and the spin still shows. Now 1.5 : 1 at worst (the milky south sky), 2.2+ elsewhere.
   ballMesh.visible = false; scene.add(ballMesh);       // no real shadow: the blob below is the depth cue
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, color: 0x000000, map: glowTex(), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; blob.renderOrder = 3; blob.visible = false; scene.add(blob);
@@ -381,6 +387,9 @@ export function createScene(containerEl) {
     core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false,
     bounces: 0, kick: 0, held: false };                              // what coast() needs beyond p and v; they ride on the state packet
   const clock = serverClock(), madeAt = clock.madeAt;   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
+  // attract: the endless rally behind the menus (docs/NEXT.md 11). All of it lives here: no server, no score, no sound.
+  const at = { on: false, t: 0, rnd: null, by: 0, p: [0, 1, 0], v: [0, 0, 0], t0: 0, spin: 0, kick: 0, n: 0, hitAt: 0, hitP: [0, 1, 0], swung: false,
+    run: [0, 1].map(() => ({ from: [0, 1, 0], to: [0, 1, 0], t0: 0, t1: 1, bh: false })), stats: { shots: 0, late: 0, out: 0, net: 9, gap: 0 } };
 
   const TRAIL_N = 22, trail = { pts: [], acc: 0, glow: 0 };
   const trailGeo = new THREE.BufferGeometry();
@@ -402,10 +411,12 @@ export function createScene(containerEl) {
     g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,244,190,.75)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
     flashMat.map = new THREE.CanvasTexture(c); }
   const flash = new THREE.Sprite(flashMat); flash.visible = false; scene.add(flash); let flashT = 0, flashS = 1;
-  function flashAt(p, size) { flash.position.set(p[0], p[1], p[2]); flashT = 1; flashS = size; flash.visible = true; }
+  const quiet = () => menu || at.on;                      // fx pools idle: no rings, bursts, flash, shake or marker behind a menu
+  function flashAt(p, size) { if (quiet()) return; flash.position.set(p[0], p[1], p[2]); flashT = 1; flashS = size; flash.visible = true; }
   function updateFlash(dt) { if (flashT <= 0) return; flashT = Math.max(0, flashT - dt / 0.14); const k = 1 - flashT;
     flash.scale.setScalar(flashS * (0.6 + 2.4 * k)); flashMat.opacity = flashT * flashT; if (flashT === 0) flash.visible = false; }
   function ring(p, flat, r0, r1, dur, color, a = 1, additive = true) {
+    if (quiet()) return;
     const r = rings.reduce((b, c) => (c.t / c.dur > b.t / b.dur ? c : b));
     Object.assign(r, { t: 0, dur, r0, r1, a, flat }); r.m.visible = true; r.m.material.color.set(color);
     r.m.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
@@ -419,6 +430,7 @@ export function createScene(containerEl) {
   sparks.frustumCulled = false; scene.add(sparks);
   const rndFx = rng(99), tmpC = new THREE.Color();
   function burst(p, n, count, speed, colors, dirZ = 0) {
+    if (quiet()) return;
     for (let k = 0; k < count; k++) {
       const i = sp.next = (sp.next + 1) % SPARKS, a = rndFx() * Math.PI * 2, e = (rndFx() - 0.3) * 1.6, s = speed * (0.4 + rndFx() * 0.8);
       sp.p.set(p, i * 3); sp.v.set([Math.cos(a) * Math.cos(e) * s, Math.sin(e) * s + 1.2, Math.sin(a) * Math.cos(e) * s + dirZ], i * 3);
@@ -474,23 +486,71 @@ export function createScene(containerEl) {
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), skinM); hand.castShadow = true;
     const ghostM = new THREE.MeshStandardMaterial({ color: COL.skin, roughness: 0.7, transparent: true, opacity: 0.32, depthWrite: false });
     const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.062, 0.6, 14, 1, true).translate(0, -0.3, 0), ghostM);   // hangs from the hand along -y
-    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.075, 0.14, 14, 1, true).translate(0, -0.62, 0), new THREE.MeshStandardMaterial({ color: COL.shirt[side], transparent: true, opacity: 0.4, depthWrite: false }));
+    const sleeveM = new THREE.MeshStandardMaterial({ color: COL.shirt[side], transparent: true, opacity: 0.4, depthWrite: false });
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.075, 0.14, 14, 1, true).translate(0, -0.62, 0), sleeveM);
     forearm.add(sleeve); forearm.renderOrder = 5;
-    for (const o of [group, avatar, hand, forearm]) { o.visible = false; scene.add(o); }
-    return { side, group, avatar, hand, forearm, handM: skinM, has: false, init: false, bot: false,
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, toneMapped: false }));      // the status tag over the head: a billboard by nature (each split half faces its own camera), one size at any distance, over the scenery
+    tag.center.set(0.5, 0); tag.renderOrder = 50;
+    for (const o of [group, avatar, hand, forearm, tag]) { o.visible = false; scene.add(o); }
+    return { side, group, avatar, hand, forearm, tag, status: null, tagFor: null, ghost: 0, mats: [], handM: skinM, ghostM, sleeveM, has: false, init: false, bot: false, matt: false,      // bot: canned swing, no q. matt: Matt's look. Only the attract rally's side 0 has the first without the second
       tgt: { x: 0, y: 1, z: sgn(side) * 6.5, q: new THREE.Quaternion(), off: null },
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
       lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, cheer: 0, world: new THREE.Vector3() };
   });
+  const casters = []; for (const pd of pads) for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.castShadow) casters.push(m); });
+  // ---------- seat status (docs/NEXT.md 14a): calibrating / paused / away. The character and its paddle go pale and see-through, a tag floats over the head ----------
+  // One tween value per pad (pd.ghost, 0.25 s each way) drives the SAME materials toward white: nothing is swapped, nothing is allocated per frame.
+  const WHITE = new THREE.Color(0xffffff), TAG_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' }, tagTex = {};
+  for (const pd of pads) { const seen = new Set(); for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (!seen.has(mt)) { seen.add(mt); pd.mats.push(mt); } }); rebase(pd); }      // (the paddle's face is a mesh with several materials)
+  function rebase(pd) { for (const m of pd.mats) m.userData.base = { c: (m.userData.base ? m.userData.base.c : new THREE.Color()).copy(m.color), o: m.userData.base ? m.userData.base.o : m.opacity, t: m.userData.base ? m.userData.base.t : m.transparent }; }   // the colours to come back to (paint() changes them when Matt takes a seat)
+  function ghostify(pd) {
+    const k = ease(pd.ghost);
+    for (const m of pd.mats) { const b = m.userData.base, t = b.t || k > 0; m.color.copy(b.c).lerp(WHITE, 0.86 * k); if (m.emissive) m.emissive.setScalar(0.3 * k); m.opacity = b.o * (1 - 0.5 * k); if (m.transparent !== t) { m.transparent = t; m.needsUpdate = true; } }
+  }
+  function tagTexture(status) {                             // built once per status: a white pill, a small icon, ONE word
+    if (tagTex[status]) return tagTex[status];
+    const c = document.createElement('canvas'), W = c.width = 640, H = c.height = 160, g = c.getContext('2d'), tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    const draw = () => {
+      g.clearRect(0, 0, W, H); g.font = '800 72px "Poddle Rounded", system-ui, sans-serif'; const word = TAG_WORD[status], tw = g.measureText(word).width, w = Math.min(W - 8, tw + 190), x0 = (W - w) / 2, r = 68;
+      g.beginPath(); g.roundRect(x0, 12, w, H - 24, r); g.fillStyle = 'rgba(255,255,255,.96)'; g.fill(); g.lineWidth = 6; g.strokeStyle = '#34beed'; g.stroke();
+      const ix = x0 + 78, iy = H / 2; g.strokeStyle = g.fillStyle = '#1c8fd0'; g.lineWidth = 11; g.lineCap = 'round';
+      if (status === 'paused') { g.beginPath(); g.roundRect(ix - 26, iy - 32, 19, 64, 7); g.roundRect(ix + 7, iy - 32, 19, 64, 7); g.fill(); }
+      else if (status === 'calibrating') { g.beginPath(); g.arc(ix, iy, 30, 0, 7); g.stroke(); g.beginPath(); g.arc(ix, iy, 9, 0, 7); g.fill(); g.beginPath(); for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { g.moveTo(ix + dx * 30, iy + dy * 30); g.lineTo(ix + dx * 42, iy + dy * 42); } g.stroke(); }
+      else { for (const rr of [50, 31]) { g.beginPath(); g.arc(ix, iy + 28, rr, -Math.PI * 0.76, -Math.PI * 0.24); g.stroke(); } g.beginPath(); g.arc(ix, iy + 24, 9, 0, 7); g.fill(); }      // a wifi mark
+      g.fillStyle = '#39434d'; g.textBaseline = 'middle'; g.fillText(word, x0 + 140, H / 2 + 5); tex.needsUpdate = true;
+    };
+    draw(); try { const f = '800 72px "Poddle Rounded"'; if (document.fonts && !document.fonts.check(f)) document.fonts.load(f).then(draw, () => {}); } catch (_) { /* the fallback font is fine */ }
+    return tagTex[status] = tex;
+  }
+  let vpW = 1, vpH = 1;                                     // the viewport being drawn (a half, in split): the tag's size is set in its pixels
+  function placeTag(pd) {
+    const on = pd.avatar.visible && pd.ghost > 0.02 && !!pd.tagFor; pd.tag.visible = on; if (!on) return;
+    const e = camera.projectionMatrix.elements, px = clamp(vpH * 0.062, 34, 58);      // sizeAttenuation off: scale is NDC / lens, so pixels -> scale through the projection's own terms
+    pd.tag.scale.set(2 * px * 4 / (vpW * e[0]), 2 * px / (vpH * e[5]), 1); pd.tag.material.opacity = ease(pd.ghost);
+    pd.tag.position.set(pd.avatar.position.x, pd.avatar.position.y + 2.42, pd.avatar.position.z);
+  }
+  function paint(pd, matt) {                                // a seat changes hands between a person and Matt: repaint, don't rebuild
+    pd.matt = matt; const u = pd.avatar.userData, m = matt ? COL.matt : null, skin = m ? m.skin : COL.skin, shirt = m ? m.shirt : COL.shirt[pd.side];
+    u.skin.color.setHex(skin); u.shirt.color.setHex(shirt); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); for (const w of u.whites) w.visible = matt; u.hair.visible = !matt; for (const e of u.eyes) e.visible = !matt; for (const o of u.mattFace) o.visible = matt;      // Matt is bald, with his own eyes
+    pd.handM.color.setHex(skin); pd.ghostM.color.setHex(skin); pd.sleeveM.color.setHex(shirt);       // the hand on his paddle, and his forearm when a spectator looks through his eyes
+    rebase(pd); if (pd.ghost > 0) ghostify(pd);
+  }
+  // Whose eyes is the picture taken from? Their avatar is hidden and their ghost forearm shown. -1: nobody's (broadcast, free, attract, a spectator's menu).
+  const eyeSide = () => (at.on || (spectator && (menu || vName !== 'pov')) ? -1 : spectator ? vSide : localSide);
+  const isMe = side => !spectator && !at.on && side === localSide;      // the 1:1 paddle and "my" sounds. A spectator has neither; both paddles are remote
+  function dress(eye, hideBack, hideSide) {                 // what this camera may see: per view, and per half in split
+    for (const pd of pads) { pd.avatar.visible = pd.has && pd.side !== eye; pd.forearm.visible = pd.has && pd.side === eye; placeTag(pd); }
+    for (let i = 0; i < 2; i++) { const b = i !== hideBack, s = i !== hideSide; for (const o of backFence[i]) o.visible = b; for (const o of sideFence[i]) o.visible = s; }
+  }
   const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
   const D2R = Math.PI / 180;
 
   function updatePads(dt) {
     for (const pd of pads) {
-      const vis = pd.has; pd.group.visible = pd.hand.visible = vis;
-      pd.avatar.visible = vis && pd.side !== localSide; pd.forearm.visible = vis && pd.side === localSide;
+      const vis = pd.has; pd.group.visible = pd.hand.visible = vis;             // avatar / forearm: dress(), once the camera is known
+      const want = pd.status && vis && !at.on ? 1 : 0; if (pd.ghost !== want) { pd.ghost = clamp(pd.ghost + (want ? dt : -dt) / 0.25, 0, 1); ghostify(pd); }      // whited out while calibrating / paused / away
       if (!vis) continue;
-      const s = sgn(pd.side), local = pd.side === localSide, t = pd.tgt;
+      const s = sgn(pd.side), local = isMe(pd.side), t = pd.tgt;
       if (!pd.init) { pd.pos.set(t.x, t.y, t.z); pd.q.copy(t.q); pd.bodyX = t.x - s * BODY[0]; pd.bodyZ = t.z + s * BODY[1]; pd.init = true; }
       // local paddle is 1:1 (only the server-stepped z gets a whisper of filtering); remote is 20Hz -> slerp/lerp
       const kp = local ? 1 : damp(dt, 0.055);
@@ -526,10 +586,11 @@ export function createScene(containerEl) {
       pd.group.position.copy(w); pd.hand.position.copy(w);
       if (!pd.swoosh) pd.swoosh = makeSwoosh(local ? 0xfff1c9 : 0xffd0b8);
       updateSwoosh(pd.swoosh, pd.group, dt, timeS < (pd.swooshUntil || 0));
-      if (local) {                                         // ghost forearm: from the hand back toward a virtual elbow
+      if (local || spectator) {                            // ghost forearm: from the hand back toward a virtual elbow (a spectator may look through either player's eyes)
         vA.set(pd.pos.x + s * 0.2, Math.max(0.2, pd.pos.y - 0.3), pd.pos.z + s * 0.72).sub(w).normalize();
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
-      } else {                                             // Mii stands so its right shoulder is the arm pivot: the paddle sweeps around the body, not through it
+      }
+      if (!local) {                                             // Mii stands so its right shoulder is the arm pivot: the paddle sweeps around the body, not through it
         const bx = pd.pos.x - s * BODY[0], bz = pd.pos.z + s * BODY[1], px = pd.bodyX;
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
@@ -547,7 +608,7 @@ export function createScene(containerEl) {
         }
       }
       // bots: start the wind-up just before the ball arrives so contact lands mid-sweep
-      if (pd.bot && pd.swingT < 0 && ball.live && ball.lastBy !== pd.side && ball.vel.z * s > 0.5) {
+      if (pd.bot && pd.swingT < 0 && !frozen && !at.on && ball.live && ball.lastBy !== pd.side && ball.vel.z * s > 0.5) {      // attract times its own swings; a paused ball is not arriving
         const ahead = -(ball.pos.z - pd.pos.z) * s, tc = (ahead - 0.7) / Math.abs(ball.vel.z);
         if (ahead > 0 && tc < SWING_CONTACT && Math.abs(ball.pos.x - pd.pos.x) < 1.5) startSwing(pd);
       }
@@ -560,7 +621,12 @@ export function createScene(containerEl) {
   function updateBallVis(now, dt) {
     const b = ball;
     if (!b.seen) return;
-    if (b.live) {
+    if (frozen && !at.on) {                                // paused, or a seat is held: the ball stays where it is drawn. No coast, no hover, no blend, no new trail points
+      if (!ballMesh.visible && b.live) { b.pos.set(b.p[0], Math.max(BALL_R, b.p[1]), b.p[2]); b.core.copy(b.pos); b.errT = 1; ballMesh.position.copy(b.pos); blob.position.set(b.pos.x, 0.02, b.pos.z); ballMesh.visible = blob.visible = trailMesh.visible = true; }   // joined a paused room: the packet is where it hangs
+      return;
+    }
+    if (at.on) { coast(b.pos, b.vel, at.p, at.v, at.t - at.t0, at.spin, 0, at.kick); b.core.copy(b.pos); b.errT = 1; }      // one closed-form flight from the last contact: it cannot drift
+    else if (b.live) {
       const age = clamp((now - b.stamp) / 1000, 0, b.held ? HOVER_MAX : COAST_MAX), far = pads[1 - localSide];
       if (b.held) hover(vA, b.vel, b.p, b.v, age);
       else coastTo(vA, b.vel, b.p, b.v, age, b.spin, b.bounces, b.kick, far && far.has ? far.pos.z : 0);
@@ -579,7 +645,6 @@ export function createScene(containerEl) {
     }
     ballMesh.visible = blob.visible = trailMesh.visible = true; ballMesh.position.copy(b.pos);
     if (b.pulse > 0) { b.pulse = Math.max(0, b.pulse - dt / 0.16); ballMesh.scale.setScalar(1 + 0.9 * b.pulse * b.pulse); } else ballMesh.scale.setScalar(1);
-    updateFlash(dt);
     const sp2 = Math.hypot(b.vel.x, b.vel.z);
     // rolls the way it flies; a sliced ball visibly spins BACKWARDS, and fast
     // 60 rad/s at 60 fps is ~1 rad a frame on a ball with a regular hole pattern: it strobes and reads as NOT spinning.
@@ -598,6 +663,9 @@ export function createScene(containerEl) {
       if (b.ember > 0.028) { b.ember = 0; burst([b.pos.x, b.pos.y, b.pos.z], 0.2, 3, 1.6, b.cool > 0.3 ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0]); } }
     trail.glow = Math.max(b.live ? 0.16 + 0.6 * Math.max(b.cool, b.hot || 0) : 0, trail.glow - dt * 1.6); trail.acc += dt;
     if (trail.acc >= 1 / 90) { trail.acc = 0; trail.pts.unshift(b.pos.clone()); if (trail.pts.length > TRAIL_N) trail.pts.pop(); }
+  }
+  function drawTrail() {                                   // after the camera is posed (twice a frame in split: each half gets a ribbon that faces ITS camera)
+    const b = ball; if (!trailMesh.visible) return;
     const P = trailGeo.attributes.position.array, C = trailGeo.attributes.color.array, n = trail.pts.length;
     for (let i = 0; i < TRAIL_N; i++) {
       const p = trail.pts[Math.min(i, n - 1)] || b.pos, q = trail.pts[Math.min(i + 1, n - 1)] || p, f = i < n ? 1 - i / TRAIL_N : 0;
@@ -617,12 +685,17 @@ export function createScene(containerEl) {
     trailGeo.attributes.position.needsUpdate = trailGeo.attributes.color.needsUpdate = true;
   }
 
+  function faceFx() { for (const r of rings) if (r.m.visible && !r.flat) r.m.quaternion.copy(camera.quaternion); }      // per camera, like the trail
+  function stopFx() {                                      // a menu came up: nothing may hang in the air behind it, or pop back when it goes
+    for (const r of rings) { r.m.visible = false; r.t = r.dur; } sp.life.fill(0); sp.c.fill(0); sparkGeo.attributes.color.needsUpdate = true;
+    flashT = 0; flash.visible = false; marker.visible = false; cam.shake = 0; ball.pulse = 0;
+  }
   function updateFx(dt) {
+    updateFlash(dt);
     for (const r of rings) {
       if (!r.m.visible) continue;
       r.t += dt; const k = r.t / r.dur; if (k >= 1) { r.m.visible = false; continue; }
       r.m.scale.setScalar(lerp(r.r0, r.r1, 1 - (1 - k) ** 3) * 2); r.m.material.opacity = r.a * (1 - k) ** 1.5;
-      if (!r.flat) r.m.quaternion.copy(camera.quaternion);
     }
     for (let i = 0; i < SPARKS; i++) {
       const j = i * 3;
@@ -649,34 +722,84 @@ export function createScene(containerEl) {
     const w = 2 / tau, x = w * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), c = o[k] - target, tmp = (o[vk] + w * c) * dt;
     o[vk] = (o[vk] - w * tmp) * e; o[k] = target + (c + tmp) * e;
   }
-  function updateCamera(dt) {
-    const s = sgn(localSide), me = pads[localSide];
-    // viewer offset: setViewer() while it is fresh, else wherever the local paddle stands
+  const fovFor = (base, aspect) => (aspect < 1.2 ? lerp(Math.max(74, base), base, clamp((aspect - 0.5) / 0.7, 0, 1)) : base);   // keep the court in frame on tall windows (and in each tall half of a split)
+  const povSt = [0, 1].map(() => ({ x: 0, y: 0, vx: 0, vy: 0, z: 0, cut: true }));      // a spectator looking through a player's eyes: that seat's own smoothed offset + run-back
+  // The play camera, for any seat. st: that seat's smoothed state (the seated player's is `view`). viewer: honour setViewer() (the seated player only).
+  function playPose(side, st, aspect, viewer, dt) {
+    const s = sgn(side), me = pads[side];
+    camera.aspect = aspect; camera.fov = fovFor(cam.fovBase, aspect);
+    // viewer offset: setViewer() while it is fresh, else wherever that paddle stands
     let tx = 0, ty = 0;
-    if (timeS - view.at < 0.5) { tx = view.inX; ty = view.inY; }
+    if (viewer && timeS - view.at < 0.5) { tx = view.inX; ty = view.inY; }
     else if (me.has) { tx = me.pos.x * s / court.halfW; ty = (me.pos.y - 1) / 1.3; }
-    spring(view, 'x', 'vx', clamp(tx, -1, 1), VIEW.tau, dt); spring(view, 'y', 'vy', clamp(ty, -1, 1), VIEW.tau, dt);
     // the server runs you back for deep balls (up to ~2 m behind the baseline). The camera goes with you, or the
     // paddle drops off the bottom of the screen exactly when the ball arrives.
-    { const back = me.has ? me.pos.z * s - 6.5 : 0; cam.z = lerp(cam.z || 0, back > 0 ? back : back * 0.5, damp(dt, 0.18)); }
-    cam.shake = Math.max(0, cam.shake - dt * (0.35 + cam.shake * 6));
+    const back = me.has ? me.pos.z * s - 6.5 : 0, bz = back > 0 ? back : back * 0.5;
+    if (st.cut) { st.cut = false; st.x = clamp(tx, -1, 1); st.y = clamp(ty, -1, 1); st.vx = st.vy = 0; st.z = bz; }      // changing view is a cut: no slide in from the last pose
+    spring(st, 'x', 'vx', clamp(tx, -1, 1), VIEW.tau, dt); spring(st, 'y', 'vy', clamp(ty, -1, 1), VIEW.tau, dt);
+    st.z = lerp(st.z || 0, bz, damp(dt, 0.18));
     const k = cam.shake, t = timeS * 1000;
     // locked-off pose (+ shake): fixes the view direction and the window
-    camera.position.set(Math.sin(t * 0.093) * k, 3.1 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 5.4 + (cam.z || 0)) + Math.sin(t * 0.071 + 2) * k * 0.5);
-    vB.set(0, 0.35, s * (0.4 + (cam.z || 0) * 0.6)); camera.lookAt(vB);
+    camera.position.set(Math.sin(t * 0.093) * k, 3.1 + Math.sin(t * 0.117 + 1) * k * 0.8, s * (court.halfL + 5.4 + (st.z || 0)) + Math.sin(t * 0.071 + 2) * k * 0.5);
+    vB.set(0, 0.35, s * (0.4 + (st.z || 0) * 0.6)); camera.lookAt(vB);
     // window = the net plane: depth of the net's centre along the view axis (the look target itself moves with the run-back)
     const D = vB.set(0, court.net / 2, 0).sub(camera.position).dot(vA.set(0, 0, -1).applyQuaternion(camera.quaternion)), hh = D * Math.tan(camera.fov * D2R / 2), hw = hh * camera.aspect;
     // slide the eye in the camera's own axes (side 1's right is world -x, which the camera's right already is);
     // far offside it also drifts back so the whole near court still fits beside the paddle
-    const g = VIEW_PARALLAX, ex = view.x * VIEW.x * g * clamp(hw / 8, 0.4, 1),   // less sideways travel through a narrow window
-      ey = view.y * VIEW.y * g, eb = view.x * view.x * VIEW.back * g;
+    const g = VIEW_PARALLAX, ex = st.x * VIEW.x * g * clamp(hw / 8, 0.4, 1),   // less sideways travel through a narrow window
+      ey = st.y * VIEW.y * g, eb = st.x * st.x * VIEW.back * g;
     camera.position.add(vA.set(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(ex));
     camera.position.add(vA.set(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(ey));
     camera.position.add(vA.set(0, 0, 1).applyQuaternion(camera.quaternion).multiplyScalar(eb));
-    cam.x = camera.position.x;
+    if (viewer) cam.x = camera.position.x;
     const n = camera.near / (D + eb);
     camera.projectionMatrix.makePerspective((-hw - ex) * n, (hw - ex) * n, (hh - ey) * n, (-hh - ey) * n, camera.near, camera.far);
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+  }
+  const shaken = (x, y, z) => { const k = cam.shake, t = timeS * 1000; camera.position.set(x + Math.sin(t * 0.093) * k, y + Math.sin(t * 0.117 + 1) * k * 0.8, z + Math.sin(t * 0.071 + 2) * k * 0.5); };
+  function lens(fov, aspect) { camera.aspect = aspect; camera.fov = fov; camera.updateProjectionMatrix(); }
+  // Broadcast: side-on from beyond the +x net post, so side 0 (+z) is on screen LEFT, like the spectator scoreboard.
+  function broadcastPose(aspect) {
+    const X = court.halfW + 10, Y = 5.5; let fov = 38;
+    shaken(X, Y, still ? 0 : Math.sin(timeS / 6.1) * 0.3);
+    for (let i = 0; i < 2; i++) {                          // narrow window: widen until both players' run-off is in frame, and lift the gaze so the frame's foot stays on the apron
+      const down = Math.min(Math.atan2(Y - 0.8, X), (40 - fov / 2) * D2R); camera.lookAt(vB.set(0, Y - Math.tan(down) * X, 0)); camera.updateMatrixWorld();      // (past 40 deg down it would stare into the planting under the lens)
+      let need = 0; for (const z of [-1, 1]) { vA.set(court.halfW / 2, 1, z * (court.halfL + 2)).applyMatrix4(camera.matrixWorldInverse); need = Math.max(need, Math.abs(vA.x) / -vA.z); }
+      fov = clamp(2 * Math.atan(need * 1.06 / aspect) / D2R, 38, 100);
+    }
+    lens(fov, aspect);
+  }
+  // Free: orbit (0, 0.9, 0). Above the ground, never inside a fence's thickness. Returns nothing; freeHide() says which panels stand in the way.
+  function freePose(aspect) {
+    if (!isFinite(free.yaw + free.pitch + free.dist)) { free.yaw = 20; free.pitch = 25; free.dist = 17; }
+    free.pitch = clamp(free.pitch, 6, 80); free.dist = clamp(free.dist, 6, 30); free.yaw = ((free.yaw % 360) + 360) % 360;
+    const fx = court.halfW + 5.2, fz = court.halfL + 7.2, cp = Math.cos(free.pitch * D2R) * free.dist;
+    let x = Math.cos(free.yaw * D2R) * cp, z = Math.sin(free.yaw * D2R) * cp; const y = Math.max(1.2, 0.9 + Math.sin(free.pitch * D2R) * free.dist);
+    if (Math.abs(Math.abs(x) - fx) < 0.6 && Math.abs(z) < fz + 0.6 && y < 1.93) x = Math.sign(x) * (fx + 0.6);       // within 0.6 m of a side wall's plane (1.33 m tall): push it outward
+    if (Math.abs(Math.abs(z) - fz) < 0.6 && Math.abs(x) < fx + 0.6 && y < 3.07) z = Math.sign(z) * (fz + 0.6);       // and of a windscreen's (2.47 m)
+    camera.position.set(x, y, z); camera.lookAt(vB.set(0, 0.9, 0)); lens(fovFor(50, aspect), aspect);
+  }
+  // Menu: from behind a baseline, level gaze, wide: sky and palms instead of "green court, green mounds". It drifts by itself.
+  const menuSide = () => (spectator || at.on ? 0 : localSide);       // side 0 looks north at the hills
+  function menuPose(aspect) {
+    const s = sgn(menuSide()), d = still ? 0 : 1, y = 3.4 + Math.sin(timeS / 7.3 + 1) * 0.12 * d;
+    camera.position.set(Math.sin(timeS / 5.2) * 0.9 * d, y, s * (court.halfL + 7)); camera.lookAt(vB.set(0, y, -s * court.halfL)); lens(fovFor(60, aspect), aspect);
+  }
+  const easeFrom = { p: new THREE.Vector3(), q: new THREE.Quaternion(), m: new THREE.Matrix4() };
+  // One picture: pose the camera for the mode, ease out of the menu pose if a menu just closed, dress the scene for that camera.
+  function updateCamera(dt, aspect) {
+    let back = -1, sd = -1;
+    if (menu) { menuPose(aspect); back = menuSide(); }
+    else if (!spectator) { playPose(localSide, view, aspect, true, dt); back = localSide; }
+    else if (vName === 'pov') { playPose(vSide, povSt[vSide], aspect, false, dt); back = vSide; }
+    else if (vName === 'free') { freePose(aspect); const p = camera.position; sd = p.x > court.halfW + 5.2 ? 0 : p.x < -court.halfW - 5.2 ? 1 : -1; back = p.z > court.halfL + 7.2 ? 0 : p.z < -court.halfL - 7.2 ? 1 : -1; }
+    else { broadcastPose(aspect); sd = 0; }
+    if (easeT < 1) {                                       // the court opens: menu pose -> this pose, once (position, aim and lens together)
+      easeT = Math.min(1, easeT + dt / 0.8); const k = ease(easeT), a = easeFrom.m.elements, m = camera.projectionMatrix.elements;
+      vA.copy(camera.position); camera.position.copy(easeFrom.p).lerp(vA, k); qA.copy(camera.quaternion); camera.quaternion.copy(easeFrom.q).slerp(qA, k);
+      for (let i = 0; i < 16; i++) m[i] = lerp(a[i], m[i], k); camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    }
+    dress(eyeSide(), back, sd);
   }
 
   // ---------- WebAudio, no assets ----------
@@ -693,7 +816,7 @@ export function createScene(containerEl) {
       if (ac.state !== 'running') ac.resume();
     } catch (e) { ac = null; }
   }
-  const panOf = x => clamp(sgn(localSide) * (x - cam.x) / 4.5, -1, 1);
+  const panOf = x => (spectator ? 0 : clamp(sgn(localSide) * (x - cam.x) / 4.5, -1, 1));       // a spectator's left and right are not the court's: centred
   function out(pan) {                                     // -> node to connect a voice into
     if (!ac.createStereoPanner) return master;
     const p = ac.createStereoPanner(); p.pan.value = pan; p.connect(master); return p;
@@ -728,35 +851,36 @@ export function createScene(containerEl) {
 
   // ---------- public API ----------
   function onEvent(m) {
-    if (!m || !m.type) return;
+    if (!m || !m.type || at.on) return;
     if (m.type === 'launch') {
       ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k;
-      if (m.land) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
-        marker.material.color.set((m.land[1] > 0 ? 0 : 1) === localSide ? 0xffd23a : 0xffffff); }
+      if (m.land && !menu) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
+        marker.material.color.set(isMe(m.land[1] > 0 ? 0 : 1) ? 0xffd23a : 0xffffff); }      // yellow = coming to ME. A spectator has no me: always white
     } else if (m.type === 'hit') {
-      const n = clamp(+m.n || 0, 0, 1), p = m.p || ball.p, pd = pads[m.side], mine = m.side === localSide;
-      const rs = mine ? 0.6 : 1;                           // the local hit is 5 m from the lens: keep the ring off the ball
+      const n = clamp(+m.n || 0, 0, 1), p = m.p || ball.p, pd = pads[m.side], split = spectator && vName === 'split', mine = split || m.side === eyeSide();
+      const rs = mine ? 0.6 : 1;                           // the local hit is 5 m from the lens: keep the ring off the ball (in split every hit is near one of the two lenses)
+      const sk = menu ? 0 : spectator ? (split || vName === 'free' ? 0 : vName === 'pov' && mine ? 1 : 0.55) : mine ? 1 : 0.55;      // shake: mine, not mine, or none (two cameras or the spectator's own hand on it)
       // impact: three rings, a flash, twice the sparks, a harder shake and a ball that swells for a beat
       ring(p, false, 0.12 * rs, (0.7 + n * 0.9) * rs, 0.34, 0xfff2a8); ring(p, false, 0.08 * rs, (0.42 + n * 0.5) * rs, 0.24, 0xffffff);
       ring(p, false, 0.05 * rs, (1.0 + n * 1.3) * rs, 0.5, m.spin > 0.5 ? 0x9fe3ff : 0xffd23a, 0.55);
       burst(p, n, 22 + Math.round(n * 30), 3.6 + n * 6.5, m.spin > 0.5 ? [0xbfe9ff, 0x5ad1ff, 0xffffff] : [0xfff6b0, 0xffd23a, 0xffffff], -sgn(m.side) * (2.5 + n * 4));
-      cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * (mine ? 1 : 0.55));
+      cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * sk);
       flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = n;
       if (m.kind === 'smash') { const purple = m.spin > 0.3; ring(p, false, 0.1 * rs, 2.6 * rs, 0.6, purple ? 0xb070ff : 0xff5a1f, 0.7); flashAt(p, 2.2);
-        burst(p, 1, 40, 9, purple ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0], -sgn(m.side) * 6); cam.shake = Math.max(cam.shake, mine ? 0.34 : 0.18); }
+        burst(p, 1, 40, 9, purple ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0], -sgn(m.side) * 6); cam.shake = Math.max(cam.shake, sk === 1 ? 0.34 : sk ? 0.18 : 0); }
       ball.spin = clamp(+m.spin || 0, 0, 1);
       trail.glow = 0.55 + 0.45 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
         ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now());
         ball.bounces = 0; ball.kick = +m.k || 0; ball.held = false; }
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
-      sfx.pock(n, p[0]); if (m.spin > 0.5 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.16, 0.11, 0.004);   // a slice also hisses off the face
+      sfx.pock(n, p[0]); if (m.spin > 0.12 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.2 * Math.min(1, m.spin) ** 1.5, 0.11, 0.004);   // spin hisses off the face, as loud as there is spin: 0.5 -> 0.07, 0.8 -> 0.14, 1 -> 0.2
     } else if (m.type === 'swung') {
       const pd = pads[m.side]; if (!pd) return;
       pd.swooshUntil = timeS + 0.5;                          // the blur belongs to the swing, never to plain movement
       if (pd.bot && pd.swingT < 0) startSwing(pd);
       if (timeS - pd.swungAt < 0.25) return; pd.swungAt = timeS;          // main may play it locally AND the server echoes it: once
-      sfx.whoosh(pd.pos.x, m.side === localSide ? 0.22 : 0.12, m.side === localSide);
+      sfx.whoosh(pd.pos.x, isMe(m.side) ? 0.22 : 0.12, isMe(m.side));
     } else if (m.type === 'bounce') {
       const p = m.p || ball.p; ring(p, true, 0.1, 0.55, 0.4, 0xffffff, 0.7, false);
       burst([p[0], 0.06, p[2]], 0, 5, 1.2, [0xd8e6f5, 0xffffff]);
@@ -766,23 +890,23 @@ export function createScene(containerEl) {
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }
-      sfx.chime(m.winner === localSide);
-    } else if (m.type === 'whiff') { const me = pads[localSide]; if (ac) noise(out(panOf(me.pos.x)), 900, 500, 260, 1.0, 0.1, 0.22, 0.04); }
+      sfx.chime(spectator || m.winner === localSide);      // a spectator is on nobody's side: every point gets the winner's chime
+    } else if (m.type === 'whiff' && !spectator) { const me = pads[localSide]; if (ac) noise(out(panOf(me.pos.x)), 900, 500, 260, 1.0, 0.1, 0.22, 0.04); }
   }
 
   function updatePaddle(side, d) {
-    const pd = pads[side]; if (!pd) return;
-    if (!d) { pd.has = pd.init = false; return; }
+    const pd = pads[side]; if (!pd || at.on) return;
+    if (!d) { pd.has = pd.init = false; pd.status = null; return; }
     const t = pd.tgt; pd.has = true;
-    if (pd.bot !== !!d.bot) { pd.bot = !!d.bot; const u = pd.avatar.userData, m = pd.bot ? COL.matt : null;      // a seat changes hands between a person and Matt: repaint, don't rebuild
-      u.skin.color.setHex(m ? m.skin : COL.skin); u.shirt.color.setHex(m ? m.shirt : COL.shirt[pd.side]); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); pd.handM.color.setHex(m ? m.skin : COL.skin); for (const w of u.whites) w.visible = pd.bot; u.hair.visible = !pd.bot; for (const e of u.eyes) e.visible = !pd.bot; for (const o of u.mattFace) o.visible = pd.bot; }      // Matt is bald, with his own eyes
+    const st = TAG_WORD[d.status] ? d.status : null; if (st !== pd.status) { pd.status = st; if (st && st !== pd.tagFor) { pd.tagFor = st; pd.tag.material.map = tagTexture(st); pd.tag.material.needsUpdate = true; } }      // the tag keeps its last word while it fades out
+    pd.bot = !!d.bot; if (pd.matt !== pd.bot) paint(pd, pd.bot);      // bot:true IS Matt, at every level
     if (isFinite(d.x)) t.x = d.x; if (isFinite(d.y)) t.y = d.y; if (isFinite(d.z)) t.z = d.z;
     if (d.q && d.q.length === 4 && isFinite(d.q[0] + d.q[1] + d.q[2] + d.q[3])) { t.q.set(d.q[0], d.q[1], d.q[2], d.q[3]); if (t.q.lengthSq() > 1e-6) t.q.normalize(); else t.q.identity(); }
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;
   }
 
   function updateBall(p, v, live, tMs, spin, m) {         // tMs optional (tests); default = when the server made it, on the rAF clock. spin optional: the state packet's
-    if (!p || !v) return;                                  // m optional: the state packet itself ({ t, b, k, serving }), for the clock and for coast()
+    if (!p || !v || at.on) return;                         // m optional: the state packet itself ({ t, b, k, serving }), for the clock and for coast()
     if (isFinite(spin) && spin != null) ball.spin = clamp(+spin, 0, 1);
     if (live && !ball.live) ball.snap = true;
     if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.held = m.serving != null; }
@@ -790,30 +914,135 @@ export function createScene(containerEl) {
     if (live) ball.seen = true;
   }
 
-  function hideBall() { ball.seen = ball.live = false; ballMesh.visible = blob.visible = trailMesh.visible = spinFx.visible = marker.visible = false; trail.pts.length = 0; }   // the match it belonged to is over (opponent left, back to the lobby)
+  function hideBall() { if (at.on) return; ball.seen = ball.live = false; ballMesh.visible = blob.visible = trailMesh.visible = spinFx.visible = marker.visible = false; trail.pts.length = 0; }   // the match it belonged to is over (opponent left, back to the lobby)
+
+  // ---------- attract rally ----------
+  // `by` strikes the ball at `from` at rally time t0. Pick a landing spot and an arc, solve the launch so it lands there and clears the
+  // net, then look along that flight (coast(): the very function that draws it) for where the other one meets it, and send them there.
+  const aP = new THREE.Vector3(), aV = new THREE.Vector3();
+  function attractShot(by, from, t0) {
+    const r = at.rnd, s = sgn(by), kind = r(), arc = kind < 0.45 ? 0 : kind < 0.8 ? 1 : 2, st = at.stats;          // drive / soft / lob-ish
+    const spin = r() < 0.3 ? 0.45 + r() * 0.55 : 0, g = G * (1 - SPUN.lift * spin), kick = spin ? (r() - 0.5) * 1.2 * spin : 0;   // now and then a slice: the trail goes icy
+    const deep = arc === 1 ? r() * 0.75 : 0.55 + r() * 0.45;                                                            // drives and lobs land deep, soft ones anywhere past the kitchen line
+    const tx = (r() * 2 - 1) * (court.halfW - 0.4), tz = -s * lerp(court.kitchen + 0.4, court.halfL - 0.4, deep);        // 0.4 m inside the lines, always
+    let T = [0.75, 1.1, 1.6][arc] * (0.92 + r() * 0.16), v = null, over = 0;
+    for (let i = 0; i < 40; i++) { v = [(tx - from[0]) / T, (BALL_R - from[1]) / T + 0.5 * g * T, (tz - from[2]) / T];
+      const tn = -from[2] / v[2]; over = from[1] + v[1] * tn - 0.5 * g * tn * tn - BALL_R - court.net; if (over >= 0.25) break; T += 0.05; }      // too flat for the net: give it more air
+    let best = T + 0.3, cost = 1e9;
+    for (let t = T + 0.1; t < T + 1.8; t += 1 / 90) {       // after the bounce: a comfortable height, not miles behind the baseline, on the way down if there is a choice
+      coast(aP, aV, from, v, t, spin, 0, kick); if (aP.y <= BALL_R + 1e-4) break;                                        // second bounce: too late
+      const c = Math.abs(aP.y - 1.0) + (aV.y > 0 ? 0.12 : 0) + 3 * Math.max(0, -aP.z * s - court.halfL - 1.4) + 3 * Math.max(0, Math.abs(aP.x) - court.halfW - 1.6);
+      if (c < cost) { cost = c; best = t; }
+    }
+    coast(aP, aV, from, v, best, spin, 0, kick);
+    Object.assign(at, { by, p: [from[0], from[1], from[2]], v, t0, spin, kick, n: [0.5, 0.12, 0.3][arc] + r() * 0.1, hitAt: t0 + best, hitP: [aP.x, aP.y, aP.z], swung: false });
+    ball.spin = spin; ball.power = at.n; ball.lastBy = by; trail.glow = Math.max(trail.glow, 0.45 + 0.4 * at.n);
+    st.shots++; st.net = Math.min(st.net, over); if (Math.abs(tx) > court.halfW - 0.399 || Math.abs(tz) > court.halfL - 0.399 || over < 0.25) st.out++;
+    const go = (side, to, a, b, bh) => { const t = pads[side].tgt; Object.assign(at.run[side], { from: [t.x, t.y, t.z], to, t0: a, t1: b, bh }); };
+    const bh = r() < 0.35;                                  // the paddle waits beside the ball: a touch inside it for a forehand, well outside for a backhand (the hit's reach closes the rest)
+    go(1 - by, [aP.x - s * (bh ? 0.32 : -0.06), clamp(aP.y - 0.28, 0.35, 1.7), aP.z - s * 0.25], t0, t0 + best * 0.8, bh);   // there with a fifth of the flight to spare: never a miss
+    go(by, [(r() - 0.5) * 1.6, 1, s * 6.5], t0 + 0.18, t0 + 1.1, false);                                                // the striker recovers to the middle
+  }
+  function attractStep(dt) {
+    at.t += dt;
+    for (const pd of pads) { const r = at.run[pd.side], k = ease(clamp((at.t - r.t0) / (r.t1 - r.t0), 0, 1)), t = pd.tgt; t.x = lerp(r.from[0], r.to[0], k); t.y = lerp(r.from[1], r.to[1], k); t.z = lerp(r.from[2], r.to[2], k); }
+    const rc = pads[1 - at.by], run = at.run[rc.side];
+    if (!at.swung && at.t >= at.hitAt - SWING_CONTACT) { at.swung = true; startSwing(rc); rc.mirror = run.bh ? -1 : 1; }  // the existing bot swing, wound up so contact lands mid-sweep
+    if (at.t < at.hitAt) return;
+    const gap = Math.hypot(rc.pos.x - run.to[0], rc.pos.z - run.to[2]); at.stats.gap = Math.max(at.stats.gap, gap); if (gap > 0.5 || rc.swingT < 0) at.stats.late++;   // test/scene-next.mjs holds this at 0
+    rc.lunge = 1; rc.reach = true; rc.hitP = at.hitP;
+    attractShot(rc.side, at.hitP, at.hitAt);
+  }
+  function startAttract() {
+    if (at.on) return; at.on = true; at.t = 0; at.rnd = rng(20260920); Object.assign(at.stats, { shots: 0, late: 0, out: 0, net: 9, gap: 0 }); stopFx();
+    for (const pd of pads) { const s = sgn(pd.side), t = pd.tgt; pd.has = true; pd.init = false; pd.bot = true; pd.status = null; paint(pd, pd.side === 1); pd.swingT = -1; pd.lunge = 0; pd.cheer = 0; pd.swooshUntil = 0;
+      t.x = 0; t.y = 1; t.z = s * 6.5; t.off = null; Object.assign(at.run[pd.side], { from: [0, 1, s * 6.5], to: [0, 1, s * 6.5], t0: 0, t1: 1 }); }
+    Object.assign(ball, { seen: true, live: true, snap: false, blend: false, held: false, pulse: 0 }); trail.pts.length = 0;
+    attractShot(0, [0.5, 1.0, 6.2], 0);                     // no serve ritual: the rally is simply under way
+  }
+  function stopAttract() {                                 // the next welcome / state draws the real match from nothing
+    if (!at.on) return; at.on = false; hideBall(); ball.spin = ball.power = 0; ball.lastBy = -1;
+    for (const pd of pads) { pd.has = pd.init = pd.bot = false; pd.swingT = -1; pd.lunge = 0; paint(pd, false); }
+    clock.reset();
+  }
 
   function resize() {
-    const w = containerEl.clientWidth || window.innerWidth, h = containerEl.clientHeight || window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(w, h);
-    camera.aspect = w / h; camera.fov = camera.aspect < 1.2 ? lerp(74, cam.fovBase, clamp((camera.aspect - 0.5) / 0.7, 0, 1)) : cam.fovBase;   // keep the court in frame on tall windows
+    const w = size.w = containerEl.clientWidth || window.innerWidth, h = size.h = containerEl.clientHeight || window.innerHeight;
+    renderer.setPixelRatio(pixelRatio()); renderer.setSize(w, h); force = true;      // setSize wipes the canvas: the next frame must not be one the 30 fps cap skips
+    camera.aspect = w / h; camera.fov = fovFor(cam.fovBase, camera.aspect);
     camera.updateProjectionMatrix();
   }
 
-  function render(nowMs) {
+  function setMenu(on) {
+    on = !!on; if (on === menu) return;
+    if (!on) { easeFrom.p.copy(camera.position); easeFrom.q.copy(camera.quaternion); easeFrom.m.copy(camera.projectionMatrix); }      // the menu pose as last drawn (before resize() touches the lens)
+    menu = on; resize(); syncInput();
+    if (on) { stopFx(); shadowHold = 1; easeT = 1; }
+    else { renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true; shadowHold = 0;
+      const split = spectator && vName === 'split'; easeT = split || !drawn ? 1 : 0;                   // two cameras cannot ease out of one: split is a cut
+      povSt[0].cut = povSt[1].cut = true; }
+  }
+  const getView = () => (spectator ? { name: vName, side: vName === 'pov' ? vSide : 0 } : { name: 'play', side: localSide });
+  function setView(name, side = 0) {
+    if (spectator && VIEWS.includes(name)) { vName = name; if (name === 'pov') vSide = side === 1 ? 1 : 0; povSt[0].cut = povSt[1].cut = true; cam.shake = 0; if (name === 'split') easeT = 1; syncInput(); }      // changing view is a cut (an ease out of the menu, if one is running, carries on into the new view)
+    return getView();
+  }
+  function setSide(side) {                                 // 0 | 1: a seat. null: a spectator (both paddles remote, the view cameras). Anything else: seat 0, as ever
+    spectator = side === null; localSide = side === 1 ? 1 : 0; clock.reset(); cam.x = 0; view.x = view.y = view.vx = view.vy = 0; view.z = 0; povSt[0].cut = povSt[1].cut = true;
+    for (const pd of pads) pd.init = false; syncInput();
+  }
+  function setFrozen(on) {
+    on = !!on; if (on === frozen) return; frozen = on;
+    if (!on) { clock.reset(); ball.snap = true; if (!ball.ext) ball.stamp = performance.now(); }      // the server's t stood still while wall time ran: a stale offset would age every packet by the whole pause.
+    // The stamp too: every paused packet was dated to when the pause BEGAN, so the frame drawn before the next packet coasted the ball up to 0.6 s ahead and back (seen as a 3 m flick in test/spectate-e2e.mjs). Time starts again now.
+  }
+  // Free cam input lives here (MAIN forwards nothing): drag = orbit, wheel = zoom, only while a spectator is in the free view with no menu up.
+  const canOrbit = () => spectator && vName === 'free' && !menu;
+  function syncInput() { renderer.domElement.style.touchAction = canOrbit() ? 'none' : ''; }
+  { const el = renderer.domElement; let drag = null;
+    const end = e => { if (!drag || e.pointerId !== drag.id) return; drag = null; try { el.releasePointerCapture(e.pointerId); } catch (_) {} };
+    el.addEventListener('pointerdown', e => { if (!canOrbit() || drag) return; drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch (_) {} });
+    el.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id) return; if (!canOrbit()) { drag = null; return; }
+      free.yaw += (e.clientX - drag.x) * 0.25; free.pitch = clamp(free.pitch + (e.clientY - drag.y) * 0.25, 6, 80); drag.x = e.clientX; drag.y = e.clientY; });   // the court follows the hand, 0.25 deg per px
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    el.addEventListener('wheel', e => { if (!canOrbit()) return; e.preventDefault(); free.dist = clamp(free.dist * Math.exp(e.deltaY * 0.0012), 6, 30); }, { passive: false });
+  }
+
+  function render(nowMs) {                                 // -> true when a frame was drawn
     const now = nowMs == null ? performance.now() : nowMs;
-    const dt = lastMs ? clamp((now - lastMs) / 1000, 0, 0.05) : 1 / 60; lastMs = now; timeS += dt;
-    updateBallVis(now, dt); updatePads(dt); updateFx(dt); updateCamera(dt); if (scenery) scenery.update(dt, timeS, camera);
+    if (document.visibilityState === 'hidden') return false;                                        // nobody is looking: draw nothing, menu or not
+    if (menu && !force && lastMs && now >= lastMs && now - lastMs < 30) return false;               // a menu runs at 30 fps. dt below is between DRAWN frames
+    const dt = lastMs ? clamp((now - lastMs) / 1000, 0, 0.05) : 1 / 60; lastMs = now; timeS += dt; force = false; drawn++;
+    if (at.on) attractStep(dt);
+    updateBallVis(now, dt); updatePads(dt); if (!menu) updateFx(dt);
+    cam.shake = Math.max(0, cam.shake - dt * (0.35 + cam.shake * 6));
+    const w = size.w, h = size.h;
+    if (spectator && vName === 'split' && !menu) {         // two viewports, one scene: each half is that player's own picture (their fence gone, their avatar a ghost forearm)
+      const wl = Math.floor(w / 2); renderer.setScissorTest(true);
+      for (let i = 0; i < 2; i++) { const x = i ? wl : 0, ww = i ? w - wl : wl;
+        vpW = ww; vpH = h; playPose(i, povSt[i], ww / h, false, dt); dress(i, i, -1); drawTrail(); faceFx();                // trail and rings are rebuilt for each camera
+        if (!i && scenery) scenery.update(dt, timeS, camera);                                           // once a frame, with the left camera
+        renderer.setViewport(x, 0, ww, h); renderer.setScissor(x, 0, ww, h); renderer.render(scene, camera); }
+      renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h);
+      return true;
+    }
+    vpW = w; vpH = h; updateCamera(dt, w / h); drawTrail(); faceFx(); if (scenery) scenery.update(dt, timeS, camera);
+    const hold = menu && shadowHold === 1;                 // a menu's shadow map is drawn ONCE, without the players (a moving avatar must not leave its shadow baked on the court)
+    if (hold) { for (const o of casters) o.castShadow = false; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true; }
     renderer.render(scene, camera);
+    if (hold) { for (const o of casters) o.castShadow = true; renderer.shadowMap.autoUpdate = false; shadowHold = 2; }
+    return true;
   }
 
   resize();
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
-    setSide(side) { localSide = side === 1 ? 1 : 0; clock.reset(); cam.x = 0; view.x = view.y = view.vx = view.vy = 0; showFences(); for (const pd of pads) pd.init = false; },
+    setSide, setView, getView, setMenu, startAttract, stopAttract, setFrozen,
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
-    setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y)) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
+    setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize,
-    _dbg: { renderer, scene, camera, VIEW, pads, ball, cam },                    // test harness only
+    _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at,               // test harness only
+      view: () => ({ ...getView(), menu, attract: at.on, frozen, spectator, pixelRatio: renderer.getPixelRatio(), drawn }) },
   };
 }

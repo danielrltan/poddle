@@ -1,6 +1,8 @@
 <!doctype html>
 <!-- Standalone scene.js harness: fake rally, no servers. Params: ?side=0|1  &opp=bot|human  &t=<s> (deterministic freeze-frame)  &look=px,py,pz,tx,ty,tz[,fov] (debug camera, with t)
-     &viewer=-1..1 [&vy=-1..1] pins the head-coupled camera offset and the local paddle at the matching spot (&fallback=1: paddle only, no setViewer)  &view=x,y,back (tuning) -->
+     &viewer=-1..1 [&vy=-1..1] pins the head-coupled camera offset and the local paddle at the matching spot (&fallback=1: paddle only, no setViewer)  &view=x,y,back (tuning)
+     &spectate=1 (setSide(null): both players pushed as remote)  &view=broadcast|split|pov|free  &pov=0|1  &matt=1 (side 1 is Matt)  &attract=1 (startAttract; the fake server keeps pushing, to show it is ignored)
+     &menu=1 (setMenu(true))  &frozen=1 (the fake server pauses: at t, then 2 s more of frames; live: after 3 s; or __fake.pause(on))  &clean=1 (no info text) -->
 <html><head><meta charset="utf-8"><title>scene preview</title><link rel="icon" href="data:,">
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font:12px/1.4 system-ui,sans-serif}
@@ -18,7 +20,8 @@
 </script>
 <script type="module">
 import { createScene } from '../web/scene.js';
-const Q = new URLSearchParams(location.search), SIDE = Q.get('side') === '1' ? 1 : 0, OPP_BOT = Q.get('opp') !== 'human', FREEZE = Q.has('t') ? +Q.get('t') : null;
+const Q = new URLSearchParams(location.search), SIDE = Q.get('side') === '1' ? 1 : 0, OPP_BOT = Q.get('opp') !== 'human' || Q.get('matt') === '1', FREEZE = Q.has('t') ? +Q.get('t') : null;
+const SPECTATE = Q.get('spectate') === '1', VIEWNAME = /^[a-z]+$/.test(Q.get('view') || '') ? Q.get('view') : null, ATTRACT = Q.get('attract') === '1', MENU = Q.get('menu') === '1', FROZEN = Q.get('frozen') === '1';
 const VIEWER = Q.has('viewer') ? +Q.get('viewer') : null, VY = +Q.get('vy') || 0, FALLBACK = Q.get('fallback') === '1';
 
 // armOffset: the real one if motion.js exists yet, else a stub of the contract's kinematic arm
@@ -33,8 +36,9 @@ const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 }, G = 9.81, R
 const sgn = s => (s === 0 ? 1 : -1), clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a) * t;
 let seed = 12345; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 const scene = createScene(document.getElementById('view'));
-scene.setCourt(COURT); scene.setSide(SIDE); window.__scene = scene; window.__players = null;
-if (Q.has('view')) { const v = Q.get('view').split(',').map(Number); Object.assign(scene._dbg.VIEW, { x: v[0], y: v[1], back: v[2] }); }
+scene.setCourt(COURT); scene.setSide(SPECTATE ? null : SIDE); window.__scene = scene; window.__players = null;
+if (VIEWNAME) scene.setView(VIEWNAME, Q.get('pov') === '1' ? 1 : 0); if (MENU) scene.setMenu(true); if (ATTRACT) scene.startAttract(); if (Q.get('clean') === '1') document.getElementById('info').style.display = 'none';
+if (Q.has('view') && !VIEWNAME) { const v = Q.get('view').split(',').map(Number); Object.assign(scene._dbg.VIEW, { x: v[0], y: v[1], back: v[2] }); }
 const players = [0, 1].map(side => ({ side, bot: side !== SIDE && OPP_BOT, x: 0, y: 1, z: sgn(side) * HIT_LINE, zT: sgn(side) * HIT_LINE, contact: null, q: [0, 0, 0, 1], swingT: -1, hitAt: -1, sentQ: [0, 0, 0, 1] }));
 const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
 let now = 0, tick = 0, hits = 0, resetAt = 0.5, score = [0, 0], events = 0;
@@ -99,15 +103,17 @@ function step(dt) {
 function push(ms) {
   if (VIEWER != null) { const me = players[SIDE]; me.x = VIEWER * COURT.halfW * sgn(SIDE); me.y = 1 + VY * 1.3; if (!FALLBACK) scene.setViewer({ x: VIEWER, y: VY }); }   // x is the PLAYER's right: world -x for side 1
   for (const pl of players) {
-    if (pl.side === SIDE) scene.updatePaddle(pl.side, { x: pl.x, y: pl.y, z: pl.z, q: pl.q, offset: armOffset(pl.q), bot: false });
+    if (pl.side === SIDE && !SPECTATE) scene.updatePaddle(pl.side, { x: pl.x, y: pl.y, z: pl.z, q: pl.q, offset: armOffset(pl.q), bot: false });
     else { if (tick % 3 === 0) pl.sentQ = pl.q; scene.updatePaddle(pl.side, { x: pl.x, y: pl.y, z: pl.z, q: pl.bot ? [0, 0, 0, 1] : pl.sentQ, offset: null, bot: pl.bot }); }
   }
   scene.updateBall([...ball.p], [...ball.v], ball.live, ms);
 }
+let paused = false; window.__fake = { pause(on) { paused = !!on; scene.setFrozen(paused); }, step, push, ball, players };      // a paused server: time stands still, the same state keeps arriving
 
 const info = document.getElementById('info');
 if (FREEZE != null) {                                    // deterministic: fixed 60Hz steps to t, render each, leave the last frame up
   const N = Math.round(FREEZE * 60); for (let i = 1; i <= N; i++) { step(1 / 60); push(i * 1000 / 60); scene.render(i * 1000 / 60); }
+  if (FROZEN) { __fake.pause(true); for (let i = N + 1; i <= N + 120; i++) { push(i * 1000 / 60); scene.render(i * 1000 / 60); } }
   if (Q.has('look')) { const L = Q.get('look').split(',').map(Number), d = scene._dbg; d.camera.position.set(L[0], L[1], L[2]); d.camera.lookAt(L[3], L[4], L[5]); if (L[6]) { d.camera.fov = L[6]; d.camera.updateProjectionMatrix(); } d.renderer.render(d.scene, d.camera); }
   info.textContent = `side ${SIDE} · opp ${OPP_BOT ? 'bot' : 'human'} · t=${FREEZE}s · hits ${hits} · events ${events} · score ${score.join(':')} · arm ${armSrc}`;
   document.title = 'ready errors=' + window.__errors.length; console.log('HARNESS-TIMELINE ' + timeline.join(' | ')); console.log('HARNESS-READY errors=' + window.__errors.length + ' hits=' + hits + ' events=' + events);
@@ -116,7 +122,7 @@ if (FREEZE != null) {                                    // deterministic: fixed
   addEventListener('pointerdown', () => scene.unlockAudio()); addEventListener('keydown', () => scene.unlockAudio());
   addEventListener('resize', () => scene.resize());
   const loop = ms => { requestAnimationFrame(loop);
-    const d = Math.min(0.1, (ms - last) / 1000); worst = Math.max(worst, ms - last); last = ms; acc += d; while (acc >= 1 / 60) { step(1 / 60); acc -= 1 / 60; }
+    const d = Math.min(0.1, (ms - last) / 1000); worst = Math.max(worst, ms - last); last = ms; acc += d; if (FROZEN && now >= 3 && !paused) __fake.pause(true); while (acc >= 1 / 60) { if (!paused) step(1 / 60); acc -= 1 / 60; }
     push(performance.now()); scene.render(ms);
     if (++frames && ms - fpsT >= 1000) { fps = frames * 1000 / (ms - fpsT); frames = 0; fpsT = ms;
       info.textContent = `side ${SIDE} · opp ${OPP_BOT ? 'bot' : 'human'} · ${fps.toFixed(0)} fps · worst frame ${worst.toFixed(1)} ms · hits ${hits} · score ${score.join(':')} · arm ${armSrc}\nclick = audio on · ?side=1 · ?opp=human · ?t=3.2`;

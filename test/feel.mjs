@@ -3,7 +3,7 @@
 // Usage: node test/feel.mjs [server.js] [seconds]   (a second server file = measure an older build for comparison)
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const PORT = 8170, root = new URL('..', import.meta.url).pathname, file = process.argv[2] || 'server/game.js', SECS = +process.argv[3] || 40;
+const PORT = +process.env.TEST_PORT || 8170, root = new URL('..', import.meta.url).pathname, file = process.argv[2] || 'server/game.js', SECS = +process.argv[3] || 40;
 const proc = spawn('node', [file], { cwd: root, env: { ...process.env, NODE_PATH: root + 'node_modules', PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0' } });
 await new Promise(r => setTimeout(r, 700));
 const G = 9.81, DT = 1 / 60, ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 }, wait = ms => new Promise(r => setTimeout(r, ms));
@@ -81,7 +81,7 @@ if (process.argv[2] == null) {                        // assertions only for the
   ok(lh.every(r => r.ahead > -0.15), 'a back-dated hit launches from the paddle, not from behind the player');
   for (const tag of Object.keys(FIX)) { const rs = analyse(a, tag).filter(r => !r.miss);
     ok(rs.length >= 2 && rs.every(r => r.kink < 3), `${tag}: no single-packet kink (< 3 m/s per packet)`);
-    ok(rs.every(r => r.launches === 2 && r.land && Math.abs(Math.abs(r.land[1]) - 5.43) < 0.1), `${tag}: landing marker re-sent on the refined power`);
+    ok(rs.every(r => r.launches === 2 && (r.land ? Math.abs(Math.abs(r.land[1]) - 5.43) < 0.1 : r === rs[rs.length - 1])), `${tag}: landing marker re-sent on the refined power`);   // land is only known once the bounce was seen: the run may end before the last one's
     ok(rs.filter(r => r.off != null).every(r => r.off < 0.25), `${tag}: the ball really lands on the refined target`); }
 }
 a.ws.close(); b.ws.close(); proc.kill(); console.log(fails ? fails + ' FAILURES' : 'FEEL TESTS DONE'); process.exit(fails ? 1 : 0);

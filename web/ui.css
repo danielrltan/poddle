@@ -148,13 +148,14 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 /* the key strip is help, not HUD: it shows on a key press / pointer move and when the HUD first appears, then gets out of the way.
    It also yields the bottom band to a toast (body.has-toast). */
 /* no plate behind it: two white keys and their words straight on the court, so the words carry their own dark edge */
-.keyhints{position:fixed;left:var(--edge);bottom:var(--edge);z-index:var(--z-hud);max-width:min(46vw, calc(100vw - 11.25rem - 3 * var(--edge)));padding:0;
-  color:#fff;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.75), 0 0 .5rem rgba(10,30,45,.45);font-size:max(var(--t-sm),12px);font-weight:800;line-height:1;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
-.keyhints.is-idle,body.has-toast .keyhints{opacity:0;transform:translateY(.5rem)}
-body.has-toast .keyhints{transition-duration:140ms}                 /* out of the toast's way before it has faded in */
-.keyhints .keycap{min-width:1.625rem;height:1.625rem;font-size:max(var(--t-xs),11px);background:#fff;border-color:#fff;border-bottom-color:#c9d6de;text-shadow:none;box-shadow:0 .0625rem .25rem rgba(10,30,45,.45)}
-.keyhints .key-off{display:none}                        /* Q still leaves; it is not advertised (it moves to the settings panel) */
-.keyhints ul{display:flex;flex-wrap:wrap;gap:.375rem .875rem;list-style:none;margin:0;padding:0}
+.keyhints,.views{position:fixed;bottom:var(--edge);z-index:var(--z-hud);max-width:46vw;padding:0;
+  color:#fff;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.8), 0 0 .5rem rgba(10,30,45,.5);font-size:max(var(--t-sm),12px);font-weight:800;line-height:1;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
+.keyhints{right:var(--edge)} .views{left:var(--edge);max-width:calc(100vw - 2 * var(--edge))}               /* players: two keys bottom-right. Spectators: four view chips bottom-left. Never both */
+.keyhints.is-idle,.views.is-idle,body.has-toast .keyhints,body.has-toast .views{opacity:0;transform:translateY(.5rem)}
+.views.is-idle:has(:focus-visible){opacity:1;transform:none}       /* a chip reached with Tab must be seen (a clicked one may fade) */
+body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}                 /* out of the toast's way before it has faded in */
+.keyhints .keycap,.views .keycap{min-width:1.625rem;height:1.625rem;font-size:max(var(--t-xs),11px);background:#fff;border-color:#fff;border-bottom-color:#c9d6de;text-shadow:none;box-shadow:0 .0625rem .25rem rgba(10,30,45,.5)}
+.keyhints ul{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.375rem .875rem;list-style:none;margin:0;padding:0}
 .keyhints li{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap}
 .keyhints p{display:none}
 .menu-foot .keyhints-inline{display:flex;gap:var(--s-5);list-style:none;margin:0;padding:0;font-weight:700;font-size:var(--t-sm);color:var(--ink)}
@@ -233,17 +234,19 @@ body[data-overlay] .toast.on{opacity:0}
 .is-wait > .light,.light.is-wait{background:radial-gradient(circle at 35% 30%,#fff0c4,var(--warn) 55%,var(--warn-lamp));box-shadow:0 0 0 .125rem #fff, 0 0 .5rem rgba(255,181,52,.8);animation:light-blink 1200ms var(--ease-soft) infinite}
 .is-off > .light,.light.is-off{background:radial-gradient(circle at 35% 30%,#fff,var(--sky-4) 55%,var(--ink-faint));box-shadow:0 0 0 .125rem #fff}
 .light-lg{width:1.125rem;height:1.125rem}
-.status-lights{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;gap:.375rem}
-.status-lights{align-items:center;flex-wrap:wrap;max-width:calc(50vw - 21.5rem - var(--edge))}   /* never under the scoreboard (40.3rem, centred, drawn above): three worded pills plus the room code wrap to a second row */
-.status-pill{display:inline-flex;align-items:center;gap:.5rem;height:1.875rem;padding:0 .75rem 0 .625rem;border-radius:var(--r-pill);background:rgba(255,255,255,.92);border:.09375rem solid rgba(255,255,255,.95);
-  box-shadow:var(--sh-hud);font-size:max(var(--t-xs),11px);font-weight:800;letter-spacing:.04em;color:var(--ink)}
-/* everything fine = three quiet dots; a problem changes SHAPE and FILL, not just hue (colour-blind safe, readable from the play position) */
-.status-lights.all-ok .status-pill{font-size:0;gap:0;padding:0 .5rem;background:rgba(255,255,255,.6);opacity:.85}
-.status-pill.is-wait{background:#fff6e0}
-.status-pill.is-bad{background:var(--bad-deep);border-color:#fff;color:#fff;height:2.25rem;font-size:max(var(--t-sm),12px)}
-.status-pill.is-bad .light{background:#fff;box-shadow:none}
-.status-pill.is-bad .light::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;font:900 .625rem/1 var(--font);color:var(--bad-deep)}
-.status-pill i{font-style:normal;font-weight:500;color:var(--ink-soft)}
+/* HUD corner, top-left: hamburger, room code, then the spectator bits. No status pills any more: the three statuses are rows in the settings panel. */
+.corner-br{flex-basis:100%;height:0}                                 /* the stats panel always starts its own row */
+.corner{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:calc(50vw - 21.5rem - var(--edge))}   /* never under the scoreboard (40.3rem, centred, drawn above): it wraps to a second row first */
+body[data-settings] .corner{z-index:var(--z-screen)}                /* paused + open: the hamburger stays sharp above the blur, it is the way back */
+.btn-icon{width:2.75rem;height:2.75rem;padding:0;flex:none;box-shadow:var(--sh-hud), var(--inner-hi)}
+.btn-icon svg{width:1.5rem;height:1.5rem;fill:none;stroke:var(--ink-strong);stroke-width:2.75;stroke-linecap:round}
+.btn-icon[aria-expanded="true"]{background:linear-gradient(180deg,#e4f3fa,#d3ebf6)} .btn-icon[aria-expanded="true"] svg{stroke:var(--line-deep)}
+.hud-pill{display:inline-flex;align-items:center;gap:.375rem;height:1.875rem;padding:0 .75rem;border-radius:var(--r-pill);background:rgba(255,255,255,.92);border:.09375rem solid rgba(255,255,255,.95);
+  box-shadow:var(--sh-hud);font:800 max(var(--t-xs),11px)/1 var(--font);letter-spacing:.04em;color:var(--ink);white-space:nowrap}
+.hud-pill svg{width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .hud-pill svg circle{fill:var(--ink-soft);stroke:none}
+.hud-pill.is-tag{display:none;background:linear-gradient(180deg,#2a86ea,#0f5cc0);border-color:#fff;color:#fff;letter-spacing:.08em;text-transform:uppercase}
+.hud-pill.is-paused{background:linear-gradient(180deg,#ffc04d,#e08d00);color:#4a2c00}
+body[data-role="spectator"] #watch-tag,body[data-paused]:not([data-settings]) #paused-tag{display:inline-flex}
 /* big status rows for the connect screen */
 .status-list{display:flex;flex-direction:column;gap:.75rem;margin:0;padding:0;list-style:none;text-align:left}
 .status-row{display:flex;align-items:center;gap:1.125rem;min-height:4.5rem;padding:.75rem 1.5rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
@@ -268,12 +271,12 @@ body[data-overlay] .toast.on{opacity:0}
 body[data-screen="calibrate"] .inset,body[data-screen="connect"] .inset-cam{z-index:calc(var(--z-screen) + 1);top:auto;bottom:calc(4.5rem + var(--edge));width:11rem}
 body[data-screen="calibrate"] .inset-pod{left:var(--edge);right:auto;width:9rem}
 body[data-screen="hud"] #camwrap[hidden] ~ .inset-pod{top:var(--edge)}
-body[data-screen="title"] .inset,body[data-screen="connect"] .inset-pod,body[data-overlay] .inset,body[data-overlay] .keyhints,body[data-overlay] .status-lights,body[data-overlay] .scoreboard,body[data-overlay] .dev-panel,body[data-overlay] .banner-tag,body[data-overlay] .callout-layer{opacity:0;pointer-events:none}
+body[data-screen="title"] .inset,body[data-screen="connect"] .inset-pod,body[data-overlay] .inset,body[data-overlay] .keyhints,body[data-overlay] .views,body[data-overlay] .corner,body[data-overlay] .hold-card,body[data-overlay] #split-line,body[data-overlay] .scoreboard,body[data-overlay] .banner-tag,body[data-overlay] .callout-layer{opacity:0;pointer-events:none}
 /* 'This game is full' must not wait behind the whole set-up routine: it is the one overlay that also covers the menu screens */
 body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 2);background:var(--tex-scan), linear-gradient(180deg,#fff,var(--sky-2))}
 
-/* stats panel (H) — hidden by default */
-.dev-panel{position:fixed;left:var(--edge);top:calc(var(--edge) + 2.5rem);z-index:var(--z-hud);width:21rem;padding:.875rem 1.125rem;border-radius:var(--r-lg);text-align:left;
+/* stats panel (H) — hidden by default. The last thing in the corner: on its own row under the hamburger, as wide as it likes (the corner's max-width is for the pills) */
+.dev-panel{flex:none;width:21rem;margin-top:.125rem;padding:.875rem 1.125rem;border-radius:var(--r-lg);text-align:left;
   background:rgba(255,255,255,.92);border:.09375rem solid #fff;box-shadow:var(--sh-hud);font-size:max(var(--t-sm),12px);font-weight:500;line-height:1.7;color:var(--ink);font-variant-numeric:tabular-nums}
 .dev-panel b{font-weight:800;color:var(--ink-strong)} .dev-panel b.big{font-size:var(--t-lg)}
 
@@ -348,10 +351,17 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
 .tally-num{font-size:6rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--me-ink);min-width:7rem}
 .tally-num.is-them{color:var(--them-ink)} .tally-dash{flex:none;width:1.5rem;height:.375rem;border-radius:var(--r-pill);background:var(--ink-faint)}
 .tally-side.is-winner .chip{box-shadow:0 0 0 .1875rem var(--gold-2), 0 .125rem .5rem rgba(120,80,0,.35)}
-.next-up{display:flex;flex-direction:column;align-items:center;gap:.625rem;font-size:var(--t-md);font-weight:700;color:var(--ink-soft)}
-.next-bar{width:14rem;height:.5rem;border-radius:var(--r-pill);background:var(--sky-3);overflow:hidden}
-.next-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--line-soft),var(--line));transform-origin:0 50%;transform:scaleX(0)}
-.screen.is-active .next-bar i{animation:bar-fill var(--d-newgame) linear both}
+/* under the tally: Rematch / Leave, what the other player chose, and the seconds left (a bar that drains + a bare number). Spectators and rooms with no vote get the note alone. */
+#result-note{min-height:0;margin:calc(var(--s-3) * -1) 0 var(--s-4);font-size:var(--t-lg);font-weight:700;color:var(--ink-soft)} #result-note:empty{display:none}
+.rematch{display:flex;flex-direction:column;align-items:center;gap:.75rem}
+.rematch-btns{display:flex;gap:var(--s-4);justify-content:center}
+.rematch-btns .btn{min-width:13rem}
+.btn.is-pressed:disabled{opacity:1;border-color:var(--line-deep)} .btn.is-pressed:disabled::after{display:block;opacity:.55}       /* my choice stays lit, the other one fades */
+#rematch-note{min-height:1.5em;margin:0;font-size:var(--t-md);font-weight:700;color:var(--ink-soft)}
+.rematch-count{display:flex;align-items:center;gap:.75rem;font-size:var(--t-md);font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.rematch-count b{min-width:1.5em;text-align:left}
+.rematch-bar{--p:1;width:14rem;height:.5rem;border-radius:var(--r-pill);background:var(--sky-3);overflow:hidden}
+.rematch-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--line-soft),var(--line));transform-origin:0 50%;transform:scaleX(var(--p));transition:transform 1s linear}
 
 /* medal: ribbon tails + disc.  .medal.is-gold / .is-silver  */
 .medal{position:absolute;left:50%;top:-4.75rem;width:9rem;height:10.5rem;margin-left:-4.5rem;transform-origin:50% 100%;scale:1.2}
@@ -411,7 +421,7 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
   *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;animation-delay:0ms!important;transition-duration:1ms!important}
   .banner-tag.show > span{animation:banner-hold var(--d-banner) linear both!important}
   .callout.go{animation:banner-hold var(--d-callout) linear both!important}
-  .screen.is-active .next-bar i{animation:bar-fill var(--d-newgame) linear both!important}
+  .rematch-bar i{transition-duration:1s!important}                   /* a countdown is information, not decoration */
   .confetti{display:none}
 }
 @keyframes banner-hold{0%,85%{opacity:1;transform:none}100%{opacity:0;transform:none}}
@@ -461,10 +471,32 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .panel.lobby-view{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);padding:var(--s-6)}
 #screen-lobby[aria-busy="true"] .lobby-view{pointer-events:none;opacity:.6;transition:opacity var(--d-fast) linear 250ms}      /* 250 ms: an answer normally beats it, so no flicker */
 #screen-lobby.is-down .rooms{display:none}
-#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join{pointer-events:none;opacity:.5}
+#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
+/* first visit, no name yet: the choices are dimmed but still take the click, which sends the player to the name field */
+#screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
+#screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
 
-/* the three big tiles */
-.tiles{display:flex;gap:var(--s-5);justify-content:center}
+/* name: one field above every lobby view but the share card. Also the look of the name field in the settings panel (.field) */
+.name-row{flex:none;display:flex;align-items:center;gap:var(--s-3);padding:.375rem .375rem .375rem 1.5rem;border-radius:var(--r-pill);background:rgba(255,255,255,.72);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1)}
+.name-row label{font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
+.field{width:17rem;height:3rem;padding:0 1.25rem;border-radius:var(--r-pill);border:.1875rem solid var(--sky-4);background:linear-gradient(180deg,var(--sky-1),#fff);box-shadow:inset 0 .125rem .375rem rgba(120,170,200,.25);
+  color:var(--ink-strong);font:700 var(--t-lg)/1 var(--font);letter-spacing:.02em;caret-color:var(--line);outline:0;min-width:0}
+.field:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .125rem .375rem rgba(120,170,200,.25)}
+.name-row.is-bad .field{border-color:var(--bad)} .name-row.is-error{animation:nudge 420ms var(--ease-soft) 1}
+#screen-lobby.needs-name .name-row{background:#fff;border-color:var(--line)}
+
+/* Play a bot: Matt's three levels, one click plays */
+.bot-levels{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-4)}
+.bot-levels .btn{min-width:12rem;height:auto;min-height:5.25rem;padding:.75rem 1.5rem;flex-direction:column;gap:.25rem} .bot-levels .btn small{font-size:var(--t-sm);font-weight:600;letter-spacing:0;color:var(--ink-soft)}
+#bot-title{margin:0 0 var(--s-4);text-align:center}
+
+/* "Court is full. Watch instead?": a notice over the lobby. Its own spread shadow is the scrim; the lobby behind it is inert (ui.js) */
+.ask{position:fixed;inset:0;margin:auto;height:fit-content;z-index:2;width:min(44rem,92vw);box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff, 0 0 0 200vmax rgba(232,243,249,.72)}
+.ask h2{margin-bottom:var(--s-4)} .ask-btns{display:flex;gap:var(--s-3);margin:0!important} .ask-btns .btn{min-width:9rem}
+#screen-lobby.is-asking .lobby-view,#screen-lobby.is-asking .name-row{filter:saturate(.7)}
+
+/* the four big tiles */
+.tiles{display:flex;flex-wrap:wrap;gap:var(--s-5);justify-content:center}
 .tile{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-3);width:17rem;height:14.5rem;padding:0;border-radius:var(--r-xl);
   border:.25rem solid rgba(255,255,255,.9);background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 var(--t-xl)/1.1 var(--font);letter-spacing:.02em;
   box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce)}
@@ -481,12 +513,17 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .rooms{display:flex;flex-direction:column;align-items:center;gap:var(--s-2);width:min(55rem,100%);padding:var(--s-3) var(--s-5) var(--s-4);border-radius:var(--r-lg);background:rgba(255,255,255,.66);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1)}
 .rooms h2{margin:0;color:var(--ink-soft)}
 .rooms .t-note{text-shadow:none;color:var(--ink)}
-.room-list{display:flex;flex-wrap:wrap;justify-content:center;gap:.625rem;list-style:none;margin:0;padding:.25rem;max-height:7.5rem;overflow-y:auto}
+.room-list{display:flex;flex-wrap:wrap;justify-content:center;gap:.625rem 1.125rem;list-style:none;margin:0;padding:.25rem;max-height:7.5rem;overflow-y:auto}
 .room-list:empty{display:none}
 .room-row{position:relative;display:inline-flex;align-items:center;gap:.75rem;height:3rem;padding:0 1rem 0 1.25rem;border-radius:var(--r-pill);border:.15625rem solid var(--line);background:linear-gradient(180deg,#fff,#eaf3f8);
   color:var(--ink);font:700 var(--t-md)/1 var(--font);box-shadow:var(--sh-1);cursor:pointer;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}
 .room-row b{font-size:var(--t-lg);font-weight:900;letter-spacing:.14em;color:var(--me-ink)}
 .room-row::after{content:"";width:.5rem;height:.5rem;border:solid var(--line);border-width:.1875rem .1875rem 0 0;rotate:45deg;margin-left:.125rem}
+.room-list li{display:inline-flex;align-items:center;gap:.375rem}
+.room-row.is-full{cursor:default;border-color:var(--sky-4);background:rgba(255,255,255,.7);box-shadow:none;padding-right:1.25rem} .room-row.is-full::after{display:none}      /* a full court: its score, nothing to press but Watch */
+.room-row.is-full b{color:var(--ink-strong)} .room-row.is-full span{font-variant-numeric:tabular-nums}
+.room-row.is-full:hover{transform:none;box-shadow:none}
+.room-watch{height:3rem;padding:0 1.25rem}
 .room-row:hover,.room-row:focus-visible{transform:scale(1.05);box-shadow:var(--glow)}
 .room-row:active{transform:scale(.96)}
 
@@ -508,17 +545,18 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 .share-link{display:flex;align-items:center;gap:var(--s-3);max-width:100%;padding:.5rem .5rem .5rem 1.25rem;border-radius:var(--r-pill)}
 .share-link .addr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-md);font-weight:700;color:var(--ink);user-select:all}
 
-/* HUD: the room code, small, next to the lights. It keeps its text when the lights collapse to dots. */
+/* HUD: the room code, small, next to the hamburger. A click copies the link. */
 .room-pill{cursor:pointer;font-family:var(--font);gap:.375rem;padding:0 .75rem}
-.status-lights.all-ok .status-pill.room-pill{font-size:max(var(--t-xs),11px);gap:.375rem;padding:0 .75rem;opacity:.9}
 .room-pill:hover,.room-pill:focus-visible{background:#fff;outline:0;box-shadow:var(--glow)}
 
 /* narrow / tall windows: stack the tiles as wide bars */
 @media (max-aspect-ratio: 1/1){
   .menu-glass .menu-body{padding:var(--s-4);justify-content:safe center;overflow-y:auto}
-  .tiles{flex-direction:column;width:100%;align-items:center;gap:var(--s-3)}
-  .tile{flex-direction:row;justify-content:flex-start;width:min(34rem,100%);height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);font-size:var(--t-xl)}
-  .tile svg{width:4.75rem;height:4.75rem}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}             /* four tiles: two by two */
+  .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
+  .tile svg{width:5.5rem;height:5.5rem}
+  .name-row .field{width:14rem}
+  .rematch-btns .btn{min-width:0;padding:0 2rem} .result-card{padding-left:var(--s-5);padding-right:var(--s-5)} .tally-num{min-width:5rem;font-size:5rem} .tally-side{min-width:6rem}
   .menu-glass .logo-mark{font-size:6.25rem}
   .btn-xl{min-width:0;width:min(21rem,100%)}
   .code-box{width:4.75rem;height:6rem;font-size:3.25rem}
@@ -531,14 +569,72 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 /* narrow windows (the root size is at or near its 10px floor, so the HUD no longer shrinks with the window): the scoreboard gives way to
    the corners. Lights and room code stack in a column on the left, the webcam inset shrinks to the AirPod's width on the right. */
 @media (max-width: 900px){
-  .status-lights{flex-direction:column;align-items:flex-start;max-width:none}
-  .status-lights.all-ok{flex-direction:row;max-width:7rem}
+  .corner{flex-direction:column;align-items:flex-start;flex-wrap:nowrap;max-width:none} .corner-br{display:none}
   .inset-cam{width:9rem} .inset-pod{top:calc(var(--edge) + 5.6875rem + .5rem)}       /* 5.6875rem = the smaller webcam frame's height */
   .scoreboard{width:min(41rem, calc(100vw - 2 * (10rem + var(--edge))))}
   .score-tab{flex:1 1 0;width:auto;min-width:0;gap:.375rem}
   .score-num{min-width:2.25rem} .rally{min-width:3rem;padding:0 .375rem}
   .score-tab .chip{display:none} .score-tab,.score-tab.is-them{padding:0 .75rem}       /* the coloured underline already says whose tab it is; the name and its sub-label need the room */
 }
+
+/* ==========================================================================================================
+   SETTINGS PANEL (hamburger). A compact card under the corner, not a screen: the rally goes on behind it, so it is
+   see-through enough to show that (no backdrop blur here: that would re-run on every WebGL frame). Against Matt the
+   server pauses instead, and then the one shared blur layer (.glass) comes up behind it: nothing is being played.
+   ========================================================================================================== */
+/* --set-top: ui.js measures it on open. Under the hamburger on a wide window; on a narrow one also under the room code and the scoreboard, which it would otherwise cover */
+.settings{--set-top:calc(var(--edge) + 3.25rem);position:fixed;left:var(--edge);top:var(--set-top);z-index:calc(var(--z-screen) - 1);width:min(23rem, calc(100vw - 2 * var(--edge)));max-height:calc(100vh - var(--set-top) - var(--edge));overflow-y:auto;
+  display:flex;flex-direction:column;gap:.375rem;padding:1rem 1rem 1.125rem;border-radius:var(--r-lg);border-width:.15625rem;text-align:left;outline:0;
+  background:linear-gradient(180deg,rgba(246,250,252,.84),rgba(231,241,246,.74));box-shadow:var(--sh-3), inset 0 0 0 .125rem rgba(255,255,255,.9);animation:panel-in var(--d-med) var(--ease-out) both}
+/* Show stats is switched from this card, so the stats step out from under it while it is open: beside it, below the scoreboard */
+body[data-settings] .dev-panel{position:fixed;left:calc(var(--edge) + min(23rem, 100vw - 2 * var(--edge)) + .5rem);top:calc(var(--edge) + 4.75rem);max-width:calc(100vw - 2 * var(--edge))}
+.settings::before{display:none}
+body[data-paused] .settings{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}             /* paused: nothing to see through to */
+body[data-settings][data-paused] .glass{opacity:1;visibility:visible;transition-delay:0s}
+.settings h2{margin:0 0 .25rem .5rem;font-size:var(--t-lg);font-weight:800;letter-spacing:.03em;color:var(--ink-strong)}
+body[data-paused] .settings h2{color:var(--warn-deep)}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:3rem;width:100%;padding:0 .5rem 0 .875rem;border:.125rem solid transparent;border-radius:var(--r-md);background:rgba(255,255,255,.62);
+  color:var(--ink-strong);font:700 var(--t-md)/1.2 var(--font);text-align:left}
+button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent} button.set-row:hover{background:#fff}
+button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
+.set-row .field{width:11.5rem;height:2.375rem;padding:0 .875rem;font-size:var(--t-md);border-width:.125rem}
+.stepper{display:inline-flex;align-items:center;gap:.375rem} .stepper b{min-width:2rem;text-align:center;font-size:var(--t-lg);font-weight:800;font-variant-numeric:tabular-nums}
+.stepper .btn-icon{width:2.375rem;height:2.375rem;box-shadow:var(--sh-1), var(--inner-hi)} .stepper .btn-icon svg{width:1.25rem;height:1.25rem;stroke-width:3.25}
+/* switch: a track and a knob. Off = grey track, knob left; on = the outline blue, knob right, a tick of shape as well as colour */
+.set-switch i{flex:none;position:relative;width:3.25rem;height:1.875rem;border-radius:var(--r-pill);background:var(--sky-4);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3);transition:background var(--d-fast) linear}
+.set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform var(--d-fast) var(--ease-out)}
+.set-switch[aria-checked="true"] i{background:linear-gradient(180deg,var(--line),var(--line-deep))} .set-switch[aria-checked="true"] i::after{transform:translateX(1.375rem)}
+.settings > .btn{width:100%;height:2.875rem;margin:.125rem 0}
+.set-pick{flex-wrap:wrap;row-gap:.25rem;padding:.375rem .5rem .375rem .875rem} .set-pick small{flex-basis:100%;font-size:var(--t-xs);font-weight:700;color:var(--warn-deep)}      /* Move, Select difficulty: a small segmented control in the row */
+.seg-sm{padding:.1875rem;gap:.125rem;margin-left:auto} .seg-sm .seg-opt{height:2.125rem;min-width:0;padding:0 .75rem;font-size:var(--t-sm);border-width:.125rem} .seg-sm .seg-opt:disabled{opacity:.4;cursor:default}
+#set-bot{flex-direction:column;align-items:stretch} #set-bot .seg-sm{margin-left:0;justify-content:space-between} #set-bot .seg-opt{flex:1}
+#btn-leave-room{color:var(--bad-deep);border-color:#f3a3a3}
+.set-status{display:flex;flex-direction:column;gap:.125rem;list-style:none;margin:.375rem 0 0;padding:.5rem .875rem;border-radius:var(--r-md);background:rgba(255,255,255,.45)}
+.set-status li{display:flex;align-items:center;gap:.625rem;min-height:1.75rem;font-size:var(--t-sm);font-weight:700;color:var(--ink)}
+.set-status b{flex:1;font-weight:700} .set-status em{font-style:normal;font-size:var(--t-xs);font-weight:800;letter-spacing:.06em;color:var(--ink-faint)}
+.set-status .is-ok em{color:var(--good-deep)} .set-status .is-wait em{color:var(--warn-deep)} .set-status .is-bad em{color:var(--bad-deep)}
+.set-note{margin:.375rem 0 0;padding:.5rem .875rem;border-radius:var(--r-md);background:#fff6e0;border:.09375rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-sm);font-weight:700;text-align:center}
+.settings.is-spectator #set-move,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}
+
+/* ==========================================================================================================
+   SPECTATORS: view chips bottom-left, the split-screen divider, no key hints and no insets. And the seat-hold card.
+   ========================================================================================================== */
+.views{display:none;flex-wrap:wrap;gap:.25rem .375rem}
+body[data-role="spectator"] .views{display:flex}
+body[data-role="spectator"] .keyhints,body[data-role="spectator"] #podwrap,body[data-role="spectator"] #camwrap{display:none}
+/* a chip is a key hint you can press: keycap + word straight on the court. The active one gets the HUD's white plate */
+.view-chip{display:inline-flex;align-items:center;gap:.375rem;height:2.25rem;padding:0 .75rem 0 .3125rem;border-radius:var(--r-pill);border:.125rem solid transparent;background:none;color:inherit;font:inherit;text-shadow:inherit;white-space:nowrap;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent}
+.view-chip:hover{background:rgba(255,255,255,.22)}
+.view-chip[aria-pressed="true"]{background:rgba(255,255,255,.94);border-color:#fff;color:var(--ink-strong);text-shadow:none;box-shadow:var(--sh-hud)}
+.view-chip[aria-pressed="true"] .keycap{background:linear-gradient(180deg,var(--line),var(--line-deep));border-color:var(--line-deep);color:#fff;box-shadow:none}
+.view-chip:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
+#split-line{display:none;position:fixed;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;z-index:calc(var(--z-hud) - 1);pointer-events:none}
+body[data-role="spectator"][data-view="split"] #split-line{display:block}
+.hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;
+  background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:var(--sh-3), var(--inner-hi);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;max-width:calc(100vw - 2 * var(--edge))}
+.hold-card .dots-wait{margin-right:.125rem} .hold-card .dots-wait i{margin-left:0;margin-right:.25rem}
+.hold-card b{display:grid;place-items:center;min-width:2.5rem;height:2.5rem;padding:0 .5rem;border-radius:var(--r-pill);background:var(--sky-2);border:.125rem solid var(--line-faint);font-weight:800;font-variant-numeric:tabular-nums;color:var(--me-ink)} .hold-card b:empty{display:none}
+body:not([data-screen="hud"]) .hold-card{display:none}                /* the title and the lobby are see-through: nothing of a room shows under them */
 
 /* ping: bars + ms beside the court code. Calm on purpose: ink-coloured bars, fewer of them on a slow link, never a warning colour */
 .ping-pill{gap:.4375rem;padding:0 .75rem 0 .625rem;font-variant-numeric:tabular-nums}

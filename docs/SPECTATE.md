@@ -88,3 +88,18 @@ and "Waiting for a rematch" and are carried into the next match or back to the l
 seat, or the client sent `{type:'status', cal:true}` (cleared by `cal:false` or the next `paddle` after it). The next serve
 waits while any human is calibrating. `paused`: the seat that paused the room. `away`: the seat being held for a reconnect.
 Clients white out that character and float a tag over it: Paused / Calibrating / Reconnecting, each with an icon.
+
+## As built (the integrator's notes; where the code and the text above differ, this is what runs)
+- `matchover` also carries `names` (as they were at the end: a forfeit has emptied a seat by then). A `rematch` message follows
+  it at once whenever a vote is already known (Matt's yes, a forfeiter's no).
+- After a forfeit the room stays until the stayer answers, leaves, or the 20 s run out, so the result card can be read; it seats
+  nobody meanwhile (`open:false`, a join gets `full`). The client disables Rematch there: only Leave is left.
+- Hold and forfeit do not apply in the legacy room LOCAL (no `lobby=1`). When the last human leaves, spectators get
+  `closed empty`; the room itself still waits out its 30 s as before.
+- The lobby lists public rooms with at least one human in them (an empty public room is not listed).
+- A `pause` that changes nothing answers only the asker. `bot` is ignored during a rematch vote. A human joining a bot room
+  during its vote gets `rematchon` and a fresh match. Watching with a cid that is seated somewhere counts as that seat leaving.
+- Names also lose zero-width and bidi characters. The joiner is not sent `names` (the welcome has them). `pong.t` is room time.
+- Page URL: `?court=CODE[&watch=1]` (`?room=` is a silent alias, rewritten). Socket URL and messages keep `room`.
+- Seat status: `status` is only present while set (like `wait`). `{type:'status', cal}` is heard from players only, booleans only.
+

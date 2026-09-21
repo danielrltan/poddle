@@ -2,7 +2,7 @@
 // player), power corrections (`fix`, eased in), and no added latency. Usage: node test/lagcomp.mjs
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const PORT = 8171, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0' } });
+const PORT = +process.env.TEST_PORT || 8171, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0' } });
 await new Promise(r => setTimeout(r, 700));
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 }, G = 9.81, wait = ms => new Promise(r => setTimeout(r, ms));

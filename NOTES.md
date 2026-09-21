@@ -227,3 +227,46 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Arrival hitched 125 ms. Fix: one module per task, hidden, `compileAsync`, then swap old look for new in a single frame.
 - Budget: 21 draws / 62k triangles / 1 MB (low: 14 / 32k / 0.5 MB), +0.3 ms GPU at 2560x1440 on an M4. `?q=low|high` overrides.
 - Still open: the play view shows ~6 degrees of sky. A menu camera (eye 3.4 m, level gaze, fov 60) is where this pays off.
+
+## 17. Spectators, rematch, seat hold, pause, names, Matt, and a menu that plays itself (`docs/NEXT.md`, `docs/SPECTATE.md`, `docs/API-NEXT.md`)
+- **How it was built.** A contract first (`docs/API-NEXT.md`: every function name, id, string and message), then four owners in
+  parallel who never saw each other's code (server, scene, UI, main), then one integrator who ran it together. The contract held:
+  in the first merged run of three real browsers every flow worked; what failed first was the new test itself.
+- **What the merge did find.** (1) On resume from a pause the ball flicked 3 m forward and back for ONE frame. Every paused packet is
+  dated by the server clock to when the pause began, so the frame drawn between "un-freeze" and the next packet coasted the ball
+  by the length of the pause (capped). The scene's own test could not see it: there a packet arrives with every frame. Fix:
+  `setFrozen(false)` restarts the ball's stamp as well as the clock. Found by sampling the drawn ball every frame for 0.5 s after
+  Esc in `test/spectate-e2e.mjs`. (2) A result card left after a forfeit offered Rematch to nobody: it is disabled now, focus goes to
+  Leave. (3) The hold card sat on the very character it was about; it moved below the net so the pale player and the tag show.
+- **Shots (from 143 recorded swings, `node test/kinds.mjs`).** A smash is earned (overhead bonus only on a real stroke, threshold
+  0.76) and rewarded (up to 0.07 s less flight): 16 % -> 11 %. Lobs are meant (a curved swing is not an underhand): powered lobs
+  3 -> 1. Spin is continuous, every hit carries its own amount: 76 % of real strokes used to get exactly zero, now 5 %, and 27 %
+  read as a slice (> 0.5), the player's number. The serve ignores the wind-up (a lone middling swing is held 0.7 s for the real stroke).
+- **Spectators.** Up to 8 a court, never seated, never counted. A full court asks "Court is full. Watch instead?"; public courts in
+  play are listed with their score and a Watch button. Four views: broadcast (default, side 0 on the left like the scoreboard),
+  split (one scene, two scissored viewports, each dressed as that player sees it), either player's view, a free orbit camera.
+- **Match end.** No more auto-restart: `matchover`, both vote, yes + yes = a new match with the spectators still there, anything else
+  = `closed` and everyone (spectators too) lands in the lobby. **Seat hold:** a socket that closes without `leave` mid-match keeps
+  its seat 15 s, room time stops, the point is replayed on return, a forfeit otherwise. `leave` mid-match is a forfeit at once.
+- **Pause.** The hamburger (or Esc) opens Settings; against Matt that pauses the room (room time is per room now, the ball hangs,
+  the court blurs), against a person it cannot ("Online games can’t pause") and the rally goes on behind the card.
+- **Names.** Asked once, kept in `poddle.name`, cleaned by the server, used wherever the game says who did something. The bot is Matt
+  (bald, orange shirt) at every level; his level is the line under his name.
+- **Seat status (14a).** `state.paddles[n].status` = calibrating | paused | away. That character and its paddle ease to a pale ghost
+  (the same materials lerped to white and half see-through, one tween value per pad) under a billboard tag: one sprite per pad,
+  `sizeAttenuation` off, so its size is set in pixels through the projection's own terms and each split half faces its own camera.
+  While someone calibrates mid-match the rally in flight plays on and the NEXT serve waits.
+- **The menu.** An endless client-side rally (Matt and a generic player, every shot solved to land in) behind the glass, at half
+  pixel ratio and 30 fps with the shadow map frozen; nothing of a real game can reach a menu (`seated()` / `live()` in main.js).
+- **Say court, not room (14c).** Everything a person reads or types. The page link is `?court=CODE`; `?room=` still works and is
+  rewritten. The wire protocol keeps `room`. **Movement style left the court (14d):** M is gone, Move is a row in Settings; the second
+  key hint is `1 2 3 Difficulty: Club`, only against Matt.
+- **Tests.** `test/spectate-e2e.mjs` (three Chromes, 113 checks: every flow above end to end, screenshots `test/ui-shots/next-*`),
+  `test/rooms.test.mjs` (protocol: 155 checks, seat status and hostile input among them), `test/menu.mjs` (real page + main.js against
+  recording stubs), `test/ui-next.mjs`, `test/scene-next.mjs`. `test/rooms-e2e.mjs` and `test/e2e.mjs` were moved to the new rules
+  (a reload mid-match is a hold, a leave is a forfeit, a full court stays listed).
+- **Known rough edges.** The shaded ball against the milky south sky from side 1 is 1.55 : 1 (target 1.6). The free camera can
+  still fly into a palm or a lamp head. Pinch zoom is not implemented. `test/server.test.mjs` still fails its stale scripted
+  scenarios (sections 11-12); its solve() sweep is clean. The movement-mode bug of `docs/NEXT.md` 14f is not fixed here, only
+  narrowed: every mode switch now restarts that mode's state in one place (`setMode`).
+

@@ -1,7 +1,7 @@
 // Deep drives and lobs must be returnable by a player who never leans back and whose paddle height comes from their head.
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const PORT = 8148, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0' } });
+const PORT = +process.env.TEST_PORT || 8148, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0' } });
 await new Promise(r => setTimeout(r, 700));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function player(o) {

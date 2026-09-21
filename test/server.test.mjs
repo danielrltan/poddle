@@ -12,7 +12,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GAME = path.join(ROOT, 'server/game.js');
 const SCALE = +process.env.TEST_SCALE || 6;
 const DT = 1 / 60;
-process.env.PORT = '8140';                                   // the in-process copy (only used for solve())
+const P0 = +process.env.TEST_PORT || 8140;                       // TEST_PORT=<base> moves the whole block (P0 .. P0+19)
+process.env.PORT = String(P0);                                 // the in-process copy (only used for solve())
 const { COURT, ZONE, BOUNCE, G, R, solve } = createRequire(import.meta.url)(GAME);
 
 const sg = side => (side === 0 ? 1 : -1);
@@ -24,7 +25,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------- server processes ----------
 const procs = new Set();
-let nextPort = 8141;
+let nextPort = P0 + 1;
 function startServer(scale = SCALE) {
   const port = nextPort++;
   return new Promise((res, rej) => {

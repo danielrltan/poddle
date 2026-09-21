@@ -1,7 +1,7 @@
 // Bot system: auto-join when alone, levels, B cycles, rallies vs a decent human, comes back after a 2nd human leaves.
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const PORT = 8145, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT } });
+const PORT = +process.env.TEST_PORT || 8145, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT } });
 await new Promise(r => setTimeout(r, 700));
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 function human(skill = 1) {

@@ -1,5 +1,5 @@
 import http from 'http'; import fs from 'fs'; import path from 'path'; import puppeteer from 'puppeteer-core';
-const root = new URL('../..', import.meta.url).pathname, PORT = 8245;
+const root = new URL('../..', import.meta.url).pathname, PORT = +process.env.UI_PORT || 8245;
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => { const f = path.join(root, decodeURIComponent(new URL(q.url, 'http://x').pathname)); fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); }).listen(PORT, '127.0.0.1');
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new' });

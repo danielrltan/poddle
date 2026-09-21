@@ -1,7 +1,7 @@
 // Short balls must be reachable for a player who walks themselves (body mode), and a paddle held up at the net blocks.
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const PORT = 8147, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0' } });
+const PORT = +process.env.TEST_PORT || 8147, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0' } });
 await new Promise(r => setTimeout(r, 700));
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const wait = ms => new Promise(r => setTimeout(r, ms));

@@ -101,6 +101,8 @@ Analysis scripts: scratchpad/tune.mjs, lobs.mjs, windup.mjs (run against HEAD co
   the Play button's top corners). Any new button style must keep it.
 
 ## 14. LATE ADDITIONS (added after the four owners started: the INTEGRATOR builds these; verifiers check them; fixer keeps them)
+STATUS (integrator): 1-13 merged and running together; 14a-14e built and covered by test/spectate-e2e.mjs, test/rooms.test.mjs, test/menu.mjs, test/ui-next.mjs.
+14f is NOT fixed (setMode now restarts each mode's state in one place, nothing more). Details and deviations: docs/API-NEXT.md section 7, docs/SPECTATE.md "As built", NOTES.md 17.
 ### 14a. A player who is paused or calibrating shows it on their character (player request)
 "when a user is paused or calibrating themselves, can you put a white overlay on their character and put an icon too of their
 status? like have it say paused or calibrating with an icon"

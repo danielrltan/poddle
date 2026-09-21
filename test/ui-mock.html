@@ -7,7 +7,8 @@
   /* mock-only: placeholder court, frozen animation frames for screenshots, and the contact sheet */
   #stage svg{width:100%;height:100%;display:block}
   .freeze *, .freeze *::before, .freeze *::after{animation-play-state:paused!important;animation-delay:var(--freeze-at,-700ms)!important}
-  .freeze .callout{--freeze-at:-600ms} .freeze .light{--freeze-at:0ms} .freeze .medal{--freeze-at:-1200ms} .freeze .next-bar i{--freeze-at:-1800ms} .freeze .medal-disc::after{--freeze-at:-1150ms}
+  .freeze .callout{--freeze-at:-600ms} .freeze .light{--freeze-at:0ms} .freeze .medal{--freeze-at:-1200ms} .freeze .medal-disc::after{--freeze-at:-1150ms}
+  #stage.bg-court svg,#stage.bg-grass svg{display:none} #stage.bg-court{background:#3569b8} #stage.bg-grass{background:#4b9a66}      /* &bg=court|grass: the two grounds the white key hints must read on */
   .fake-cam{aspect-ratio:16/9;background:radial-gradient(circle at 50% 38%,#f1c9a5 0 9%,transparent 9.5%),radial-gradient(ellipse 22% 34% at 50% 92%,#4f7fb3 0 98%,transparent 100%),linear-gradient(180deg,#cfd8de,#aab6bf)}
   .fake-pod{aspect-ratio:1;display:grid;place-items:center} .fake-pod svg{width:62%}
   body.sheet{overflow:auto;height:auto;background:#e8f1f6}
@@ -55,7 +56,9 @@
 <script type="module">
   // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
   const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
-  const SCREENS = ['title', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-airpod-lost', 'match-win', 'match-lose', 'server-down', 'game-full', 'hud-stats'];
+  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
+    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full'];
+  // extra params: &bg=court|grass (flat ground under the HUD) · &name=<player name> · &opp=<opponent> (try a hostile one) · &idle=1 · &freeze=1
   if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
   if (screen === 'all') {
     document.documentElement.classList.add('sheet-root'); document.body.classList.add('sheet'); const sheet = $('sheet'); sheet.hidden = false;
@@ -67,11 +70,20 @@
     // stand-ins for the two live canvases
     $('camc').outerHTML = '<div class="inset-fill fake-cam"></div>'; $('camwrap').hidden = false;
     $('pod').outerHTML = '<div class="inset-fill fake-pod"><svg viewBox="0 0 100 160"><rect x="40" y="52" width="20" height="98" rx="10" fill="#f4f6f8" stroke="#c4ced6" stroke-width="3"/><ellipse cx="46" cy="38" rx="30" ry="32" fill="#fbfcfd" stroke="#c4ced6" stroke-width="3"/><circle cx="34" cy="34" r="7" fill="#59636c"/></svg></div>';
+    const me = screen === 'lobby-first' ? '' : qs.get('name') ?? 'Daniel', opp = qs.get('opp') || 'Matt';
+    try { if (me) localStorage.setItem('poddle.name', me); else localStorage.removeItem('poddle.name'); } catch { /* fine */ }      // ui.js reads it as it loads
     const ui = await import('../web/ui.js'); window.__ui = ui;
-    const hud = (me = 7, them = 5, rally = 4) => { $('stage').hidden = false; ui.showScreen(null); ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.setNames({ them: qs.get('opp') || 'Club Bot', themSub: '' }); ui.setScore(me, them); ui.setServe('me'); ui.setRally(rally); };
+    if (qs.get('bg')) $('stage').classList.add('bg-' + qs.get('bg'));
+    const hud = (a = 7, b = 5, rally = 4) => { $('stage').hidden = false; ui.showScreen(null); ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.setRoom('K24M', 'https://poddle.fly.dev/?court=K24M'); ui.setNames({ them: opp, themSub: opp === 'Matt' ? 'Club' : 'Far side' }); ui.setBot(opp === 'Matt' ? 'Club' : null); ui.setScore(a, b); ui.setServe('me'); ui.setRally(rally); ui.setSettings({ sens: 8, airpod: true, stats: false, inRoom: true }); };
+    const watch = (view = 'broadcast', who = '') => { hud(6, 4, 7); $('camwrap').hidden = true; ui.setNames({ me: me || 'Player 1', meSub: '', them: opp, themSub: '' }); ui.setSpectator(true); ui.setWatchers(3); ui.setSettings({ spectator: true }); ui.setView(view, who); };
+    const lobby = (view = 'home') => { $('stage').hidden = false; ui.showScreen('lobby'); ui.lobbyView(view); ui.lobbyRooms([{ code: 'KXQ7', players: 1, open: true, watch: 8, watchers: 0, score: [0, 0], live: false }, { code: 'M3PD', players: 2, open: false, watch: 6, watchers: 2, score: [7, 4], live: true },
+      { code: 'RN2S', players: 2, open: false, watch: 0, watchers: 8, score: [10, 9], live: true }, { code: 'WXYZ', players: 1, open: true }], 5); };
+    const result = (o, votes) => { hud(o.me, o.them, 0); ui.setServe(null); ui.matchResult({ nameThem: opp, ...o }); if (votes) ui.rematch({ name: opp, ...votes }); };
     const cal = (e, o) => { ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.showScreen('calibrate'); ui.calibration(e, o); };
     const R = {
-      'title': () => ui.showScreen('title'),
+      'title': () => { $('stage').hidden = false; ui.showScreen('title'); },
+      'lobby': () => lobby(), 'lobby-first': () => lobby(), 'lobby-bot': () => lobby('bot'),
+      'lobby-ask': () => { lobby(); ui.askWatch('M3PD'); },
       'connect': () => { ui.setStatus({ airpod: 'wait', game: 'ok', camera: 'wait' }); ui.showScreen('connect'); },
       'calibrate1': () => cal({ stage: 'hold', progress: .62, ok: true, msg: 'Hold it like a paddle, pointed at the screen. Keep still.' }),
       'calibrate2': () => cal({ stage: 'tilt', progress: .4, ok: true, msg: 'Now tip the front of the AirPod up.' }),
@@ -85,13 +97,27 @@
       'hud-point-enemy': () => { hud(7, 6, 0); ui.pointBanner(false); },
       'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve. Swing to hit it.', 1e6); },
       'hud-airpod-lost': () => { hud(); ui.setStatus({ airpod: 'bad' }); ui.toast('AirPod signal lost', 1e6); },
-      'match-win': () => { hud(11, 8, 0); ui.setServe(null); ui.matchResult(true, 11, 8, 'Club Bot'); },
-      'match-lose': () => { hud(9, 11, 0); ui.setServe(null); ui.matchResult(false, 9, 11, 'Club Bot'); },
+      'settings': () => { hud(); ui.setSettings({ canPause: false }); ui.settings(true); },                                   // against a human: live behind it, the can't-pause note
+      'settings-paused': () => { hud(); ui.setPaused(true); ui.settings(true); },                                              // against Matt: blurred, "Paused"
+      'settings-stats': () => { hud(); ui.show('dev', true); ui.setSettings({ stats: true }); ui.setStat('pw', '12.4'); ui.setStat('pkmax', '31.2'); ui.setStat('pklist', '22 (96°) · × (31°) · 30 (128°) · 17 (74°) · 26 (110°)'); ui.settings(true); },      // the stats step out from under the card
+      'settings-watch': () => { watch(); ui.settings(true); },
+      'hud-paused': () => { watch(); ui.setPaused(true); },                                                                   // the tag a spectator sees
+      'hold': () => { hud(); ui.setServe(null); ui.hold(opp, 12); },
+      'watch': () => watch(), 'watch-split': () => watch('split'), 'watch-pov': () => watch('pov', opp),
+      'watch-point': () => { watch(); ui.pointBanner(null, opp, 1); },
+      'match-win': () => result({ won: true, me: 11, them: 8 }, { mine: null, theirs: null, left: 20 }),
+      'match-voted': () => result({ won: true, me: 11, them: 8 }, { mine: true, theirs: null, left: 14 }),
+      'match-asked': () => result({ won: false, me: 9, them: 11 }, { mine: null, theirs: true, left: 17 }),
+      'match-left': () => result({ won: true, me: 11, them: 8 }, { mine: true, theirs: false, left: 9 }),
+      'match-lose': () => result({ won: false, me: 9, them: 11 }, { left: 20 }),
+      'match-forfeit': () => result({ won: true, me: 6, them: 4, forfeit: true }, { left: 20 }),
+      'match-watch': () => { watch(); ui.matchResult({ won: false, me: 9, them: 11, nameMe: me, nameThem: opp, role: 'spectator' }); ui.rematch({ left: 16 }); },
+      'match-legacy': () => { hud(11, 8, 0); ui.setServe(null); ui.matchResult(true, 11, 8, opp); },                           // the old positional call: no vote
       'server-down': () => { hud(); ui.setStatus({ game: 'bad' }); ui.setServerAddress('ws://localhost:8080'); ui.showOverlay('server-down'); },
       'game-full': () => { hud(); ui.showOverlay('game-full'); },
     };
     (R[screen] || R.title)();
-    if (qs.get('idle') === '1') $('keys').classList.add('is-idle');
+    if (qs.get('idle') === '1') for (const id of ['keys', 'views']) $(id).classList.add('is-idle');
     document.title = 'ready ' + screen;
   }
 </script>

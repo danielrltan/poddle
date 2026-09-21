@@ -1,5 +1,9 @@
 # Poddle UI spec
 
+> Newer than parts of this file: docs/API-NEXT.md sections 3, 5 and 7. The three HUD status pills, `.next-up`, the ten key hints
+> and the word "room" are gone: a hamburger + settings card top-left, `C Calibrate` and (against Matt) `1 2 3 Difficulty` bottom-right,
+> spectator chips bottom-left, Rematch / Leave on the result card, a hold card, status tags in the 3D scene, "court" everywhere.
+
 The look: a bright, airy, glossy-white living-room sports game. White and pale blue-grey panels with big radii, a thin
 light-blue outline, soft shadows; pill buttons that glow and breathe when focused; pale striped menu grounds; rounded
 friendly type in dark grey; a minimal HUD pushed to the edges; big outlined callouts that pop and fade. Everything is

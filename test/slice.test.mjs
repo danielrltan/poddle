@@ -1,8 +1,10 @@
 // Slice shots: the same swing with and without `slice`, measured from the state packets; and can a receiver who only
 // places the paddle and times the swing (footwork by the server) still return them?   node test/slice.test.mjs
+// Spin is CONTINUOUS (docs/NEXT.md 3b): the ball carries exactly the amount the client sent, so a third of the swings
+// here send 0.4 and must land BETWEEN flat and sliced (the old curve had a dead zone below 0.3 and made 0.4 into 0.16).
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const PORT = 8172, root = new URL('..', import.meta.url).pathname;
+const PORT = +process.env.TEST_PORT || 8172, root = new URL('..', import.meta.url).pathname;
 const proc = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0' } });
 await new Promise(r => setTimeout(r, 700));
 const wait = ms => new Promise(r => setTimeout(r, ms)), NET = 0.91;
@@ -32,16 +34,19 @@ function player(o) {
   return P;
 }
 let i = 0;
-const A = player({ track: true, power: 22, slice: () => (i++ % 2 ? 0 : 0.9) });        // same swing, every other one sliced
+const A = player({ track: true, power: 22, slice: () => [0.9, 0, 0.4][i++ % 3] });     // same swing: sliced, flat, half sliced
 const B = player({ power: 16, slice: () => 0 });                                        // (B sends slice: 0; A's flat ones send 0 too)
-await wait(45000);
-const done = shots.filter(s => s.T && s.land && s.net != null), S = done.filter(s => s.sliced > 0.5), F = done.filter(s => !(s.sliced > 0.5));
+await wait(66000);
+const done = shots.filter(s => s.T && s.land && s.net != null), S = done.filter(s => s.sliced > 0.5), F = done.filter(s => !s.sliced), M = done.filter(s => s.sliced === 0.4);
 const avg = (xs, k) => xs.reduce((p, c) => p + k(c), 0) / (xs.length || 1), f = v => v.toFixed(2);
 const row = (name, xs) => console.log(`${name} n=${xs.length}  kind ${[...new Set(xs.map(s => s.kind))]}  spin ${f(avg(xs, s => s.spin))}  depth ${f(avg(xs, s => Math.abs(s.bounce[2])))} m  flight ${f(avg(xs, s => s.T))} s  over the net at ${f(avg(xs, s => s.net))} m (min ${f(Math.min(...xs.map(s => s.net)))})` +
   `  bounce apex ${f(avg(xs, s => s.apex))} m  forward speed ${f(avg(xs, s => s.vBefore))} -> ${f(avg(xs, s => s.vAfter))} m/s  returned ${xs.filter(s => s.returned).length}/${xs.length}`);
-row('flat  ', F); row('sliced', S);
-ok(S.length >= 5 && F.length >= 5, `enough rallies measured (${S.length} sliced, ${F.length} flat)`);
-ok(S.every(s => s.kind === 'slice' && s.spinHit > 0.5) && F.every(s => s.kind !== 'slice' && !s.spinHit), "hit event: kind === 'slice' and spin set, only for the sliced swings");
+row('flat  ', F); row('half  ', M); row('sliced', S);
+ok(S.length >= 5 && F.length >= 5 && M.length >= 5, `enough rallies measured (${S.length} sliced, ${M.length} half, ${F.length} flat)`);
+ok(S.every(s => s.kind === 'slice' && Math.abs(s.spinHit - 0.9) < 1e-9) && F.every(s => s.kind !== 'slice' && !s.spinHit), "hit event: spin is the amount sent (0.9, not rounded up to 1), kind === 'slice' only for the sliced swings");
+ok(M.every(s => s.kind !== 'slice' && Math.abs(s.spinHit - 0.4) < 1e-9), `continuous: slice 0.4 flies with spin 0.4 and is not called a slice (that label starts above 0.5): ${[...new Set(M.map(s => s.kind + ' ' + s.spinHit))]}`);
+ok(avg(M, s => s.T) > avg(F, s => s.T) && avg(M, s => s.T) < avg(S, s => s.T) && avg(M, s => s.apex) < avg(F, s => s.apex) && avg(M, s => s.apex) > avg(S, s => s.apex) && avg(M, s => s.vAfter) < avg(F, s => s.vAfter) && avg(M, s => s.vAfter) > avg(S, s => s.vAfter),
+  'and the ball shows it: flight, bounce height and check-up all sit between flat and sliced');
 ok(Math.abs(avg(S, s => Math.abs(s.bounce[2])) - avg(F, s => Math.abs(s.bounce[2]))) < 0.5, 'same landing depth within 0.5 m (power still sets depth)');
 ok(done.every(s => s.net > NET + 0.05), 'every one clears the net');
 ok(done.every(s => Math.abs(s.bounce[0]) <= 3.05 && Math.abs(s.bounce[2]) <= 6.7 && Math.abs(s.bounce[2]) > 0.1), 'every one lands in');
