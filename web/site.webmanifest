@@ -1,0 +1,19 @@
+{
+  "name": "Poddle: AirPod pickleball",
+  "short_name": "Poddle",
+  "description": "Poddle is a browser pickleball game where one AirPod in your hand is the paddle. Play friends online, play Matt the bot, or watch a match.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#dfeef6",
+  "theme_color": "#dfeef6",
+  "lang": "en",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

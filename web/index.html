@@ -2,14 +2,78 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="data:,">
-<title>Poddle</title>
+<title>Poddle: pickleball you play with an AirPod</title>
+<meta name="description" content="Hold one AirPod and swing it like a paddle. Play pickleball with friends online, take on Matt the bot, or watch a match. Free, in Chrome on a Mac.">
+<link rel="canonical" href="https://poddle.fly.dev/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#dfeef6">
+<meta name="color-scheme" content="light">
+<meta name="application-name" content="Poddle">
+<meta name="apple-mobile-web-app-title" content="Poddle">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Poddle">
+<meta property="og:title" content="Poddle: pickleball you play with an AirPod">
+<meta property="og:description" content="Swing one AirPod like a paddle. Play friends online or take on Matt the bot. Free, on a Mac in Chrome.">
+<meta property="og:url" content="https://poddle.fly.dev/">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://poddle.fly.dev/og.jpg?v=2">
+<meta property="og:image:secure_url" content="https://poddle.fly.dev/og.jpg?v=2">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. A white AirPod sits beside the words: Pickleball with friends. Your AirPod is the paddle.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Poddle: pickleball you play with an AirPod">
+<meta name="twitter:description" content="Swing one AirPod like a paddle. Play friends online or take on Matt the bot. Free, on a Mac in Chrome.">
+<meta name="twitter:image" content="https://poddle.fly.dev/og.jpg?v=2">
+<meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. A white AirPod sits beside the words: Pickleball with friends. Your AirPod is the paddle.">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": ["VideoGame", "WebApplication"],
+  "@id": "https://poddle.fly.dev/#game",
+  "name": "Poddle",
+  "alternateName": "Poddle AirPod pickleball",
+  "url": "https://poddle.fly.dev/",
+  "description": "Poddle is a browser pickleball game where one AirPod in your hand is the paddle. Play friends online, play Matt the bot, or watch a match.",
+  "image": "https://poddle.fly.dev/og.jpg",
+  "screenshot": "https://poddle.fly.dev/og.jpg",
+  "genre": ["Sports", "Pickleball"],
+  "applicationCategory": "GameApplication",
+  "applicationSubCategory": "Sports game",
+  "operatingSystem": "macOS 14 or later",
+  "browserRequirements": "Requires Google Chrome with JavaScript and WebGL, and the Poddle AirPod helper running on the same Mac.",
+  "gamePlatform": ["Web browser", "macOS"],
+  "playMode": ["SinglePlayer", "MultiPlayer"],
+  "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 2 },
+  "inLanguage": "en",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock" },
+  "softwareHelp": { "@type": "CreativeWork", "url": "https://poddle.fly.dev/how-to-play.html" }
+}
+</script>
 <link rel="preload" href="vendor/fonts/mplus-rounded-1c-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="ui.css">
 <!-- Design system: ui.css · behaviour: ui.js · spec and copy: docs/ui-spec.md · static mock of every state: test/ui-mock.html
      (the mock loads the markup between UI:BEGIN and UI:END from this file, so there is only one copy of the DOM). -->
 
 <div id="stage"></div>
+<noscript>
+  <div style="position:fixed;inset:0;z-index:9999;display:grid;place-content:center;gap:.75rem;padding:2rem;text-align:center;font:500 1.125rem/1.5 system-ui,sans-serif;color:#39434d;background:#dfeef6">
+    <h1 style="margin:0;font-size:3rem">Poddle</h1>
+    <p style="margin:0">Pickleball in your browser. Hold one AirPod like a paddle and swing. Play friends online or take on Matt the bot.</p>
+    <p style="margin:0">Poddle needs JavaScript. Turn it on and reload.</p>
+    <p style="margin:0">For Mac: macOS 14 or later, Chrome, and AirPods Pro, 3, 4 or Max.</p>
+    <p style="margin:0"><a href="/how-to-play.html">How to play</a></p>
+  </div>
+</noscript>
 
 <!-- UI:BEGIN -->
 <!-- ============================================== HUD ============================================== -->
@@ -101,13 +165,13 @@
 <section class="screen menu-glass" id="screen-title" data-screen="title" hidden>
   <div class="menu-body" style="gap:var(--s-6)">
     <div class="logo" data-fit>
-      <div class="logo-mark" aria-label="Poddle"><span class="lg-a">P</span><span class="logo-ball"></span><span class="lg-a">d</span><span class="lg-b">dle</span></div>
+      <h1 class="logo-mark"><span class="lg-a">P</span><span class="logo-ball"><span class="vh">o</span></span><span class="lg-a">d</span><span class="lg-b">dle</span></h1>
       <p class="logo-tag">AirPod pickleball</p>
     </div>
     <div class="title-prompt" data-fit>
       <span class="room-chip" id="title-room" hidden>Joining court <b id="title-room-code"></b></span>
       <button class="btn btn-xl is-focus" id="btn-start">Play</button>
-      <p class="t-note">or swing the AirPod</p>
+      <p class="t-note" id="title-note">or swing the AirPod</p>
     </div>
     <div class="panel panel-sm safety" id="safety" data-fit>
       <svg class="safety-icon" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="33" fill="#eaf6fc" stroke="#a9e0f6" stroke-width="2.5"/><g class="art-line" style="stroke-width:3.6"><circle cx="36" cy="21" r="5.5"/><path d="M36 28v17M36 45l-7 13M36 45l7 13M24 31l12 4 12-4"/></g><g class="art-accent" style="stroke-width:3.2"><path d="M13 30a24 24 0 0 0 0 16M59 30a24 24 0 0 1 0 16"/></g></svg>
@@ -117,7 +181,7 @@
       </div>
     </div>
   </div>
-  <footer class="menu-foot menu-foot-note"><span>For Mac: macOS 14 or later, Chrome, and AirPods Pro, 3, 4 or Max</span></footer>
+  <footer class="menu-foot menu-foot-note"><span>For Mac: macOS 14 or later, Chrome, and AirPods Pro, 3, 4 or Max</span><a class="foot-link" href="/how-to-play.html" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">How to play</a></footer>
 </section>
 
 <!-- ============================================== LOBBY ============================================== -->
@@ -203,7 +267,7 @@
   <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Back</button><span class="menu-title">Getting ready</span></header>
   <div class="menu-body">
     <div class="panel panel-mid" data-fit>
-      <h1 class="t-title" style="margin-bottom:1.5rem">Connect your AirPod</h1>
+      <h2 class="t-title" style="margin-bottom:1.5rem">Connect your AirPod</h2>
       <ul class="status-list">
         <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name">AirPod</b><span class="status-text" id="row-airpod-text">Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
         <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game</b><span class="status-text" id="row-game-text">Finding the game</span><em class="status-state" id="row-game-state">Waiting</em></li>
@@ -211,7 +275,7 @@
       </ul>
     </div>
   </div>
-  <footer class="menu-foot"><span>Still waiting? Start the AirPod bridge on this Mac.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+  <footer class="menu-foot"><span>Still waiting? Start the Poddle helper on this Mac.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CALIBRATE ============================================== -->
@@ -220,7 +284,7 @@
   <div class="menu-body">
     <ol class="steps" id="steps"><li id="st1" class="is-on"><i>1</i>Hold still</li><li id="st2"><i>2</i>Tip up</li></ol>
     <div class="panel panel-cal" id="calcard" data-fit>
-      <h1 class="t-title" id="calh">Hold still</h1>
+      <h2 class="t-title" id="calh">Hold still</h2>
       <p class="t-lead" id="calp">Hold the AirPod like a paddle handle, pointing at the screen.</p>
       <div class="well cal-art" id="calart">
         <!-- one drawing, two poses: #art-hold (level) and #art-tilt (tipped up about the wrist) -->
@@ -264,7 +328,7 @@
 <section class="screen veil is-result" id="screen-match" data-screen="match" hidden>
   <div class="result-card" id="result" data-fit>
     <div class="medal is-gold" id="medal"><div class="medal-disc"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div></div>
-    <h1 id="result-title">You win!</h1>
+    <h2 id="result-title"></h2>
     <p id="result-note"></p>
     <div class="tally well">
       <div class="tally-side is-winner" id="tally-me"><span class="chip chip-me chip-lg"></span><b id="tally-name-me">You</b></div>

@@ -270,3 +270,24 @@ Build log. What we tried, what broke, and how each problem was solved.
   scenarios (sections 11-12); its solve() sweep is clean. The movement-mode bug of `docs/NEXT.md` 14f is not fixed here, only
   narrowed: every mode switch now restarts that mode's state in one place (`setMode`).
 
+
+## 19. Being found: the share card, the words for crawlers, a How to play page
+- **The problem.** The site is a canvas. A crawler that does not run scripts saw an empty page with the title "Poddle", a link
+  pasted in a chat unfurled as nothing, and the tab had no icon.
+- **The share card** (`web/og.jpg`, 1200x630, 106 KB) is rendered from the real game, not drawn: `node test/make-og.mjs` opens the
+  real scene, composes the wordmark, a player mid-swing, Matt, the ball in flight, the AirPod tile and the tagline, and writes the
+  card plus every icon (favicon.svg/.ico/32, apple-touch 180, 192, 512). A reviewer mocked it in iMessage, Discord, X, Slack and
+  WhatsApp: the first card had no AirPod in it and the X title label covered the tagline. Both fixed by the layout.
+- **The words.** Title "Poddle: pickleball you play with an AirPod"; a description that says friends, AirPod, Matt, watching, and
+  Mac + Chrome; Open Graph and Twitter tags with absolute URLs; VideoGame/WebApplication JSON-LD; a `<noscript>` block that says
+  what the game is; one `<h1>` (the static HTML had four, one of them "You win!").
+- **A page with real text**, `web/how-to-play.html`: what you need, set up for someone who has never opened Terminal, friends, Matt,
+  watching, an FAQ with matching FAQPage data. Works with JavaScript off, and tells a phone or Windows visitor early that they can
+  watch but need a Mac to play. The title screen links to it.
+- **Compatibility, checked against Apple:** CMHeadphoneMotionManager is macOS 14.0+; Safari blocks an https page from reaching
+  `ws://localhost`, Chrome allows it (and since Chrome 147 asks for local network access: the set-up steps say to press Allow).
+- **Crawl files and server:** robots.txt, sitemap.xml, site.webmanifest, a real 404 page and status, clean `/how-to-play`, content
+  types and cache lifetimes for the new files, invitation links (`?court=CODE`) kept out of indexes. `node test/seo.test.mjs` checks
+  all of it over plain HTTP, including the JPEG's real dimensions.
+- **Only the owner can do:** verify in Google Search Console (HTML tag method, fly.dev has no DNS to edit) and submit the sitemap,
+  import into Bing Webmaster Tools, re-scrape in the Facebook/LinkedIn debuggers.

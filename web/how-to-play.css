@@ -1,0 +1,80 @@
+/* How to play: a scrolling document page. ui.css locks the body (overflow:hidden) and sizes type from the window,
+   which suits the game and fights a page you read, so this file carries the same font and colour tokens on its own. */
+@font-face{font-family:"Poddle Rounded";font-weight:500;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-500.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:800;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-800.woff2) format("woff2")}
+@font-face{font-family:"Poddle Rounded";font-weight:900;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-900.woff2) format("woff2")}
+
+:root{
+  --ink:#555e67; --ink-strong:#39434d; --ink-soft:#65717b;
+  --white:#fff; --sky-1:#f6fafd; --sky-2:#eaf3f8; --sky-3:#d9e9f2; --bg:#dfeef6;
+  --line:#34beed; --line-deep:#1a9fd0; --line-soft:#a9e0f6; --link:#0f7aa6;
+  --ball:#e6f03c; --ball-deep:#b9c916;
+  --r-md:1rem; --r-lg:1.5rem; --r-pill:999px;
+  --sh-2:0 .125rem 0 rgba(90,150,185,.22), 0 .25rem .625rem rgba(40,80,110,.12);
+  --font:"Poddle Rounded", ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Helvetica Neue", Arial, sans-serif;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 22rem,var(--bg) 44rem) no-repeat;
+  font:500 1.0625rem/1.6 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+a{color:var(--link);font-weight:800;text-underline-offset:.15em}
+a:hover{color:var(--ink-strong)}
+a:focus-visible,.btn:focus-visible{outline:.1875rem solid var(--line);outline-offset:.1875rem;border-radius:.375rem}
+.wrap{width:100%;max-width:46rem;margin:0 auto;padding:0 1rem}
+
+/* header: the wordmark, the ball is the o */
+.top{background:linear-gradient(180deg,#fff,var(--sky-2));border-bottom:.125rem solid var(--line-soft);box-shadow:0 .125rem .75rem rgba(80,140,175,.12)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:4.25rem}
+.logo-mark{display:inline-flex;align-items:center;font-size:2.5rem;font-weight:900;line-height:1;letter-spacing:-.01em;text-decoration:none;
+  filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
+.lg-a{color:#39434d} .lg-b{color:var(--line)}
+.logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
+  background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
+    radial-gradient(circle at 22% 62%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 78% 54%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 48% 82%, var(--ball-deep) 0 7%, transparent 8%),
+    radial-gradient(circle at 34% 28%, #fbffa8, var(--ball) 58%, #c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35), 0 .03em .06em rgba(40,80,110,.25)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* the game's glossy pill button */
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:3rem;padding:0 2rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);
+  background:linear-gradient(180deg,#fff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 1.125rem/1 var(--font);letter-spacing:.02em;
+  text-decoration:none;box-shadow:var(--sh-2), inset 0 .125rem 0 rgba(255,255,255,.95)}
+.btn:hover{border-color:var(--line-deep);color:var(--ink-strong)}
+.btn:active{background:linear-gradient(180deg,#e4f3fa,#d3ebf6)}
+.btn-lg{min-height:3.75rem;padding:0 3.5rem;font-size:1.5rem}
+.btn-sm{min-height:2.75rem;padding:0 1.5rem;font-size:1rem}
+
+/* intro */
+.intro{padding:1.5rem 0 .5rem}
+.hero{display:block;width:100%;height:auto;aspect-ratio:1200/630;border:.1875rem solid var(--line);border-radius:var(--r-lg);background:var(--sky-3);box-shadow:var(--sh-2);
+  color:var(--ink-soft);font-size:.9375rem;object-fit:cover}
+h1{margin:1.5rem 0 .5rem;font-size:clamp(2rem,7vw,2.75rem);font-weight:900;line-height:1.15;letter-spacing:.01em;color:var(--ink-strong)}
+.lead{margin:0;font-size:1.1875rem}
+.note{margin:1rem 0 0;padding:.875rem 1.125rem;border-radius:var(--r-md);border:.125rem solid var(--line-soft);background:var(--white);color:var(--ink-strong)}
+.cta{margin:1.25rem 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.25rem}
+.cta small{font-size:.9375rem;color:var(--ink-soft)}
+
+/* sections: white rounded panels */
+.card{margin:1rem 0;padding:1.25rem 1.25rem 1.375rem;border-radius:var(--r-lg);border:.125rem solid var(--line-soft);background:linear-gradient(180deg,#fff,var(--sky-1));box-shadow:var(--sh-2)}
+h2{margin:0 0 .625rem;font-size:1.5rem;font-weight:800;line-height:1.25;color:var(--ink-strong)}
+h3{margin:1.25rem 0 .25rem;font-size:1.125rem;font-weight:800;line-height:1.35;color:var(--ink-strong)}
+h2 + h3{margin-top:.5rem}
+p{margin:0 0 .75rem} .card > :last-child{margin-bottom:0}
+ul,ol{margin:0 0 .75rem;padding-left:1.375rem} li{margin:.375rem 0;padding-left:.25rem}
+li::marker{color:var(--line-deep);font-weight:800}
+strong{font-weight:800;color:var(--ink-strong)}
+pre{margin:.5rem 0;padding:.75rem 1rem;max-width:100%;overflow-x:auto;border-radius:.75rem;background:#2f3a44;color:#f3f8fb;font:500 .9375rem/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace;-webkit-overflow-scrolling:touch}
+code,samp{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.9375em}
+li>code,samp{white-space:nowrap;padding:.0625rem .375rem;border-radius:.375rem;background:#e4eef4;color:var(--ink-strong)}      /* words typed into, or printed by, Terminal, inside a sentence */
+kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.4375rem;border:.125rem solid var(--line-soft);border-bottom-width:.1875rem;background:var(--white);
+  color:var(--ink-strong);font:800 .875rem/1.5 var(--font);text-align:center}
+
+.end{padding:1rem 0 3rem;text-align:center}
+.end p{margin:.875rem 0 0;font-size:.9375rem;color:var(--ink-soft)}
+
+@media (min-width:40rem){
+  .wrap{padding:0 1.5rem}
+  .card{padding:1.5rem 1.75rem 1.625rem}
+  .intro{padding-top:2rem}
+}
+@media print{ body{background:#fff} .card,.hero,.btn{box-shadow:none} }

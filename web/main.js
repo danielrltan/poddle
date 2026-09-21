@@ -21,6 +21,7 @@ const model = new MotionModel();
 const scene = createScene($('stage'));
 const pod = createPodView($('pod'));
 ui.setServerAddress(GAME);
+if (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1) { $('title-note').textContent = 'Poddle plays on a Mac. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // Windows, a phone, an iPad (which says it is a Mac, but has touch): no helper can run here, so say it under Play
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
 const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 

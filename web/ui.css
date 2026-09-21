@@ -325,7 +325,7 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
    TITLE
    ========================================================================================================== */
 .logo{display:flex;flex-direction:column;align-items:center;gap:.5rem}
-.logo-mark{display:flex;align-items:center;font-size:8.5rem;font-weight:900;line-height:1;letter-spacing:-.01em;filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
+.logo-mark{margin:0;display:flex;align-items:center;font-size:8.5rem;font-weight:900;line-height:1;letter-spacing:-.01em;filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
 .logo-mark .lg-a{color:#39434d} .logo-mark .lg-b{color:var(--line)}
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
   background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
@@ -343,8 +343,8 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
    ========================================================================================================== */
 .result-card{position:relative;z-index:1;width:min(50rem,92vw);padding:8rem var(--s-8) var(--s-7);margin-top:6rem;text-align:center;border-radius:var(--r-xl);border:.1875rem solid var(--line);
   background:linear-gradient(180deg,#fff 0%,#fbfdfe 45%,#e9f2f7 100%);box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
-.result-card h1{margin:0 0 var(--s-4);font-size:4.25rem;font-weight:900;line-height:1.1;color:var(--me-ink);letter-spacing:.01em}
-.result-card.is-lose h1{color:var(--ink-strong);font-size:3.5rem}
+.result-card h2{margin:0 0 var(--s-4);font-size:4.25rem;font-weight:900;line-height:1.1;color:var(--me-ink);letter-spacing:.01em}
+.result-card.is-lose h2{color:var(--ink-strong);font-size:3.5rem}
 .tally{display:flex;align-items:center;justify-content:center;gap:var(--s-4);padding:var(--s-4) var(--s-5);margin:0 auto var(--s-5);border-radius:var(--r-lg)}
 .tally-side{display:flex;flex-direction:column;align-items:center;gap:.375rem;min-width:8rem}
 .tally-side b{font-size:var(--t-md);font-weight:800;color:var(--ink);white-space:nowrap}
@@ -665,4 +665,10 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .room-bar i:active{cursor:grabbing;background:var(--line-deep)}
 
 /* title screen: the one line a visitor needs before anything else, centred in the footer */
-.menu-foot-note{justify-content:center;text-align:center;font-weight:700;font-size:var(--t-sm);color:var(--ink)}
+.menu-foot-note{justify-content:center;text-align:center;font-weight:700;font-size:max(14px,var(--t-sm));color:var(--ink)}      /* a px floor: in a small window 1rem is 10px and this line, the one that says Mac, fell to 9 px there */
+.menu-glass .menu-foot-note{flex-wrap:wrap;height:auto;min-height:3.5rem;row-gap:.125rem;column-gap:var(--s-4);padding-top:.375rem;padding-bottom:.375rem}
+.foot-link{flex:none;color:var(--line-deep);font-weight:800;font-size:max(14px,var(--t-sm));text-decoration:none;white-space:nowrap}
+.t-note.is-loud{font-size:max(14px,var(--t-sm));font-weight:700}      /* not on a Mac (main.js): the note under Play says so, at a size a phone can read */
+.foot-link:hover,.foot-link:focus-visible{text-decoration:underline}
+/* the logo is the page's h1 and reads "Poddle" to crawlers and screen readers: the ball that is drawn for the o holds a real o */
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

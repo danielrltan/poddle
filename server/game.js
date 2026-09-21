@@ -7,17 +7,37 @@ const http = require('http'), fs = require('fs'), path = require('path');
 // The same port also serves web/ over plain HTTP, so a hosted copy (fly.io) is one process behind one address:
 // the page loads from https://<app>/ and its game socket is wss://<app>/. Locally nothing changes.
 const WEB = path.join(__dirname, '..', 'web');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
-  '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon' };
+const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
+const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html' };            // clean URLs: a fixed map, no extension guessing
+let PAGE_404 = null; try { PAGE_404 = fs.readFileSync(path.join(WEB, '404.html')); } catch { /* no page: plain words */ }
+function notFound(req, res) {                                                                           // a miss is a real 404 (never a soft 200) and never indexed
+  const body = PAGE_404 || Buffer.from('not found');
+  res.writeHead(404, { 'Content-Type': PAGE_404 ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex' });
+  res.end(req.method === 'HEAD' ? undefined : body);
+}
 const httpServer = http.createServer((req, res) => {
-  let rel; try { rel = decodeURIComponent(req.url.split('?')[0]); } catch { rel = '/'; }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD', 'Content-Length': 0 }); return res.end(); }   // a WebSocket upgrade never comes through here
+  const [rawPath, ...query] = req.url.split('?');
+  let rel; try { rel = decodeURIComponent(rawPath); } catch { rel = '/'; }
   if (rel.includes('\0')) { res.writeHead(400); return res.end(); }                                     // fs.stat THROWS on a null byte (GET /%00), and a throw in here ends the process and every room in it
+  if (MOVED[rel]) { res.writeHead(301, { Location: MOVED[rel] + (query.length ? '?' + query.join('?') : ''), 'Cache-Control': 'no-cache', 'Content-Length': 0 }); return res.end(); }
+  if (rel === '/404.html') return notFound(req, res);
   const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
   if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }      // no climbing out of web/
   fs.stat(file, (err, st) => {
-    if (err || !st.isFile()) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Content-Length': st.size,
-      'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : 'no-cache' });     // vendor/ is 18 MB and never changes
+    if (err || !st.isFile()) return notFound(req, res);
+    const ext = path.extname(file).toLowerCase(), mtime = Math.floor(st.mtimeMs / 1000) * 1000;
+    // Validators make 'no-cache' cheap: a reload is a handful of 304s, not 300 KB of JS and CSS again. The tag is weak because the proxy in front (fly) compresses the body.
+    const head = { 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : IMAGE.has(ext) ? 'public, max-age=604800' : 'no-cache',     // vendor/ is 18 MB and never changes
+      ETag: `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`, 'Last-Modified': new Date(mtime).toUTCString() };
+    const inm = req.headers['if-none-match'], ims = Date.parse(req.headers['if-modified-since']);
+    const same = inm ? inm.split(',').some(t => t.trim() === '*' || t.trim().replace(/^W\//, '') === head.ETag.slice(2)) : ims >= mtime;
+    if (same) { res.writeHead(304, head); return res.end(); }
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': st.size, ...head });
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);   // a file that went away after the stat must not be an uncaught 'error'
   });
