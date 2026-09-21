@@ -171,7 +171,7 @@ function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal:
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
   phase = 'lobby'; screen('lobby');
-  if (wantRoom.length === 4) { ui.lobbyView('code', { code: wantRoom }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
+  if (wantRoom.length === 4) { ui.lobbyView('code', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
 function begin() {                                 // seated: straight to calibration if the AirPod is already streaming, straight to the court if that is done too
   phase = 'connect'; startCam();
@@ -211,7 +211,7 @@ function refreshStatus() {
 if (sideDeg !== 75) model.setSidelineDeg(sideDeg);
 show('podwrap', showPod); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
 if (LOBBY && qs.get('room')) setUrl(wantRoom.length === 4 ? wantRoom : null, wantWatch);      // an old ?room= link: same court, the address bar now says ?court=
-if (!LOBBY) { phase = 'connect'; screen('connect'); startCam(); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : ''); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
+if (!LOBBY) { phase = 'connect'; screen('connect'); startCam(); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
 refreshStatus(); setInterval(refreshStatus, 250);
 
 // ---------- sockets (auto-reconnect) ----------
@@ -397,7 +397,7 @@ let unlocked = false;
 const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); } };
 addEventListener('pointerdown', () => { unlock(); play(); });
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
-ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: 'join', code }),
+ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: level => { if (pending) return; botWant = [0, 1, 2].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: () => say('Link copied', null, 1600) });

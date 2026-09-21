@@ -352,3 +352,9 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Each reaction is born just above the emote row, swells in, then floats up about half the screen height, swaying side to
   side, and fades. ui.js gives each its own start offset, sway and duration (3.2-4.4 s) so a burst spreads into a stream
   instead of a stack. Eight on screen at most. Reduced motion: no rise or sway, just a fade in the corner.
+
+## 27. A watch link says so before you join
+- "If you're joining as a spectator, it will say that in the menu screen before u actually join. 'Joining as spectator'"
+- A `?court=CODE&watch=1` link: the title chip reads "Joining court CODE as spectator". With no name yet the link stops
+  on the code screen, which is now titled "Joining as spectator" with a Watch button, and pressing it watches. Before,
+  that button sent a plain join and could seat the spectator as a player.

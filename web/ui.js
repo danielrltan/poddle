@@ -341,12 +341,13 @@ const VIEW_TITLE = { home: 'Play', create: 'Create court', share: 'Your court', 
 const boxes = () => [...$('code-boxes').children];
 let view = 'home', roomsKey = '', on = {};
 export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied() }
-export function lobbyView(name, { code } = {}) {
+export function lobbyView(name, { code, watch } = {}) {
   if (!name) return view;
   view = VIEW_TITLE[name] ? name : 'home';
   for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view;
   setText($('lobby-title'), VIEW_TITLE[view]); codeError(''); show('name-row', view !== 'share'); askWatch(null);
   if (view === 'code') setCode(code || '');
+  if (view === 'code' && watch) setText($('lobby-title'), 'Joining as spectator'); setText($('btn-join'), view === 'code' && watch ? 'Watch' : 'Join');      // a watch link with no name yet: the code screen says what Join will do
   nameGate();
   setTimeout(() => { if (slots.menu === 'lobby' && !asking()) firstFocus().focus({ preventScroll: true, focusVisible: true }); }, 60);    // after the key that brought us here is up: a held Enter must not press it
 }
@@ -410,7 +411,7 @@ export function setRoom(code, link = '') {
   [...$('share-code').children].forEach((el, i) => setText(el, code ? code[i] : ''));
   $('share-row').hidden = !link; setText($('share-link'), link.replace(/^https?:\/\//, '')); $('share-link').dataset.href = link;
 }
-export function titleRoom(code) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); }     // opened from a shared link
+export function titleRoom(code, watch) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); setText($('title-room-spec'), watch ? '\u00a0as spectator' : ''); }     // opened from a shared link (&watch=1: 'as spectator')
 async function copyLink(btn) {
   const href = $('share-link').dataset.href; if (!href) return;
   try { await navigator.clipboard.writeText(href); } catch { const r = document.createRange(); r.selectNodeContents($('share-link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); try { document.execCommand('copy'); } catch { /* still selected: Cmd+C works */ } }
