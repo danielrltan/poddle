@@ -663,3 +663,6 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .room-bar{position:absolute;right:-.25rem;top:.25rem;bottom:.25rem;width:.5rem;border-radius:999px;background:rgba(90,150,185,.22);box-shadow:inset 0 0 0 .0625rem rgba(255,255,255,.7);cursor:pointer;touch-action:none}
 .room-bar i{position:absolute;left:0;right:0;min-height:1.25rem;border-radius:999px;background:var(--line);box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.6);cursor:grab}
 .room-bar i:active{cursor:grabbing;background:var(--line-deep)}
+
+/* title screen: the one line a visitor needs before anything else, centred in the footer */
+.menu-foot-note{justify-content:center;text-align:center;font-weight:700;font-size:var(--t-sm);color:var(--ink)}
