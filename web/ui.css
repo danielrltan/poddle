@@ -539,3 +539,20 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
   .score-num{min-width:2.25rem} .rally{min-width:3rem;padding:0 .375rem}
   .score-tab .chip{display:none} .score-tab,.score-tab.is-them{padding:0 .75rem}       /* the coloured underline already says whose tab it is; the name and its sub-label need the room */
 }
+
+/* ping: bars + ms beside the court code. Calm on purpose: ink-coloured bars, fewer of them on a slow link, never a warning colour */
+.ping-pill{gap:.4375rem;padding:0 .75rem 0 .625rem;font-variant-numeric:tabular-nums}
+.status-lights.all-ok .status-pill.ping-pill{font-size:max(var(--t-xs),11px);gap:.4375rem;padding:0 .75rem 0 .625rem;opacity:.9}
+.ping-pill .bars{display:inline-flex;align-items:flex-end;gap:.125rem;height:.75rem}
+.ping-pill .bars i{display:block;width:.1875rem;border-radius:.0625rem;background:var(--ink-faint)}
+.ping-pill .bars i:nth-child(1){height:30%}.ping-pill .bars i:nth-child(2){height:53%}.ping-pill .bars i:nth-child(3){height:76%}.ping-pill .bars i:nth-child(4){height:100%}
+.ping-pill[data-bars="1"] .bars i:nth-child(-n+1),.ping-pill[data-bars="2"] .bars i:nth-child(-n+2),.ping-pill[data-bars="3"] .bars i:nth-child(-n+3),.ping-pill[data-bars="4"] .bars i{background:var(--me-ink)}
+.ping-pill b{font-weight:800;color:var(--ink-strong)}
+
+/* open courts: our own scrollbar (ui.js roomBar), always drawn while the list has more than fits. The native one is hidden. */
+.room-wrap{position:relative;align-self:stretch;display:flex;justify-content:center}
+.room-list{scrollbar-width:none;overscroll-behavior:contain;flex:1}
+.room-list::-webkit-scrollbar{display:none}
+.room-bar{position:absolute;right:-.25rem;top:.25rem;bottom:.25rem;width:.5rem;border-radius:999px;background:rgba(90,150,185,.22);box-shadow:inset 0 0 0 .0625rem rgba(255,255,255,.7);cursor:pointer;touch-action:none}
+.room-bar i{position:absolute;left:0;right:0;min-height:1.25rem;border-radius:999px;background:var(--line);box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.6);cursor:grab}
+.room-bar i:active{cursor:grabbing;background:var(--line-deep)}

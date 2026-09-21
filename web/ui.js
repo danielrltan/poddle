@@ -170,8 +170,8 @@ export function onRetry(fn) { $('btn-retry').addEventListener('click', fn); }
 // Four views inside #screen-lobby, one at a time: home (three tiles + open rooms), create (public / private), share (the
 // new room's code and link), code (four letter boxes). main.js owns the socket; this only draws and reports what was chosen.
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
-export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /ROOM=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
-const VIEW_TITLE = { home: 'Play', create: 'Create room', share: 'Your room', code: 'Enter code' };
+export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
+const VIEW_TITLE = { home: 'Play', create: 'Create court', share: 'Your court', code: 'Enter code' };
 const boxes = () => [...$('code-boxes').children];
 let view = 'home', roomsKey = '', on = {};
 export function onLobby(handlers) { on = handlers; }                                    // { quick(), create(isPublic), join(code), start(), back(), copied() }
@@ -184,6 +184,16 @@ export function lobbyView(name, { code } = {}) {
   const first = { home: $('btn-quick'), create: $('btn-create-go'), share: $('btn-share-go'), code: boxes().find(b => !b.value) || $('btn-join') }[view];
   setTimeout(() => { if (slots.menu === 'lobby') first.focus({ preventScroll: true, focusVisible: true }); }, 60);    // after the key that brought us here is up: a held Enter must not press it
 }
+// The list scrolls when it is full, and macOS hides scrollbars until you already know to scroll. So the bar is ours: a
+// track and a thumb that are always drawn while there is more to see, sized from the list's own scroll numbers. Drag it or wheel.
+function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) return; const more = l.scrollHeight > l.clientHeight + 1; t.hidden = !more; if (!more) return;
+  const th = t.firstElementChild, share = l.clientHeight / l.scrollHeight; th.style.height = share * 100 + '%'; th.style.top = l.scrollTop / l.scrollHeight * 100 + '%'; }
+{ const l = $('room-list'), t = $('room-bar'); if (l && t) { l.addEventListener('scroll', roomBar, { passive: true }); addEventListener('resize', roomBar);
+  let grab = null; const th = t.firstElementChild;
+  th.addEventListener('pointerdown', e => { grab = { y: e.clientY, top: l.scrollTop }; th.setPointerCapture(e.pointerId); e.preventDefault(); });
+  th.addEventListener('pointermove', e => { if (grab) l.scrollTop = grab.top + (e.clientY - grab.y) * l.scrollHeight / t.clientHeight; });
+  th.addEventListener('pointerup', () => { grab = null; }); th.addEventListener('pointercancel', () => { grab = null; });
+  t.addEventListener('pointerdown', e => { if (e.target === t) l.scrollTop += (e.offsetY > th.offsetTop ? 1 : -1) * l.clientHeight * 0.9; }); } }      // a click on the track pages
 export function lobbyRooms(rooms = [], online = 0) {
   const list = $('room-list'), key = rooms.map(r => r.code + r.players).join();
   $('lobby-online').hidden = !(online > 1); setText($('lobby-online'), `${online} online`);      // 1 online is you: say nothing
@@ -193,7 +203,7 @@ export function lobbyRooms(rooms = [], online = 0) {
   for (const r of rooms.slice(0, 12)) { const li = document.createElement('li'), b = document.createElement('button');
     b.className = 'room-row'; b.dataset.code = r.code; b.dataset.nav = ''; b.innerHTML = `<b></b><span>${r.players ? '1 player' : 'Empty'}</span>`; b.firstChild.textContent = r.code;
     li.appendChild(b); list.appendChild(li); }
-  $('room-empty').hidden = rooms.length > 0;
+  $('room-empty').hidden = rooms.length > 0; roomBar();
   if (had) (list.querySelector(`[data-code="${had}"]`) || $('btn-quick')).focus({ preventScroll: true });
 }
 export function lobbyBusy(busy) { $('screen-lobby').setAttribute('aria-busy', busy ? 'true' : 'false'); }
@@ -205,6 +215,9 @@ export function codeError(text) {
 function setCode(code) { boxes().forEach((b, i) => { b.value = code[i] || ''; }); $('btn-join').disabled = code.length < 4; }
 const getCode = () => boxes().map(b => b.value).join('');
 // room: the code I am seated in (null = none). link: the address to share, or '' when this page is only reachable on this computer.
+// the connection, said quietly: four bars and the round trip. It never turns red and never interrupts; a slow link just shows fewer bars.
+export function setPing(ms) { const el = $('ping-pill'); if (!el) return; el.hidden = !(ms > 0); if (!(ms > 0)) return; const r = Math.round(ms);
+  el.dataset.bars = r < 60 ? 4 : r < 110 ? 3 : r < 180 ? 2 : 1; setText($('ping-ms'), r + ' ms'); el.title = 'Ping'; }
 export function setRoom(code, link = '') {
   $('room-pill').hidden = $('key-leave').hidden = !code; setText($('room-code'), code || ''); $('room-pill').title = link ? 'Copy link' : '';      // no link on localhost: promise nothing
   for (const b of document.querySelectorAll('.screen:not(#screen-lobby) [data-back]')) b.hidden = !code;      // set-up screens: Back only when there is a lobby to go back to
@@ -226,7 +239,7 @@ async function copyLink(btn) {
   $('btn-copy').addEventListener('click', e => copyLink(e.currentTarget)); $('room-pill').addEventListener('click', e => copyLink(e.currentTarget));
   for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => on.back && on.back());
   $('room-list').addEventListener('click', e => { const b = e.target.closest('.room-row'); if (b && on.join) on.join(b.dataset.code); });
-  const pick = opt => { for (const o of $('seg').children) { const yes = o === opt; o.setAttribute('aria-checked', yes); o.tabIndex = yes ? 0 : -1; } setText($('seg-note'), opt.dataset.public === '1' ? 'Shows in open rooms' : 'Join by code only'); };
+  const pick = opt => { for (const o of $('seg').children) { const yes = o === opt; o.setAttribute('aria-checked', yes); o.tabIndex = yes ? 0 : -1; } setText($('seg-note'), opt.dataset.public === '1' ? 'Shows in open courts' : 'Join by code only'); };
   $('seg').addEventListener('click', e => { const o = e.target.closest('.seg-opt'); if (o) pick(o); });
   $('lobby-create').addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); const o = $('seg').children[e.key === 'ArrowLeft' ? 0 : 1]; pick(o); if ($('seg').contains(document.activeElement)) o.focus(); });   // Left = Public, Right = Private, from anywhere on the card
   // code boxes: type, paste (a code or a whole link), Backspace walks back, arrows move, Enter joins

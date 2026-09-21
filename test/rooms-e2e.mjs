@@ -56,10 +56,10 @@ await shot(a, '1-title'); await shot(b, '1-title');
 await toLobby(a); await shot(a, '2-lobby-empty');
 await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await shot(a, '3-create');
 await a.click('#btn-create-go'); s = await until(a, s => s.view === 'share' && s.share.length === 4, 3000, 'a create -> share view with a code');
-const CODE = s.share; ok(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/.test(CODE) && s.search.includes('room=' + CODE), `a made private room ${CODE}, address bar ${s.search}`); await shot(a, '4-share');
+const CODE = s.share; ok(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/.test(CODE) && s.search.includes('court=' + CODE), `a made private court ${CODE}, address bar ${s.search}`); await shot(a, '4-share');
 await toLobby(b); s = await st(b); ok(!s.rooms.some(r => r.startsWith(CODE)), `b: private room is not in the open list (${s.rooms})`);
 await b.click('#btn-code'); await sleep(300); await shot(b, '5-code-empty'); await type(b, 'zz' + 'zz'); await shot(b, '5-code-filled');
-await b.keyboard.press('Enter'); s = await until(b, s => s.err, 3000, 'b wrong code -> inline error'); ok(s.err === 'Room not found' && s.view === 'code', `b wrong code: "${s.err}"`); await shot(b, '5-code-error');
+await b.keyboard.press('Enter'); s = await until(b, s => s.err, 3000, 'b wrong code -> inline error'); ok(s.err === 'Court not found' && s.view === 'code', `b wrong code: "${s.err}"`); await shot(b, '5-code-error');
 for (let i = 0; i < 4; i++) await b.keyboard.press('Backspace'); await type(b, CODE.toLowerCase()); await b.keyboard.press('Enter');
 await a.click('#btn-share-go'); [s, t] = await Promise.all([toCourt(a), toCourt(b)]);
 ok(s.pill === CODE && t.pill === CODE && s.leaveKey && t.leaveKey, `both on the court in room ${CODE} (pills ${s.pill}/${t.pill})`);
@@ -74,12 +74,12 @@ ok(agree >= 3 && last.s.points >= 1, `scores agree: a ${last.s.me}-${last.s.op},
 ok(!/Matt/.test(last.s.them + last.t.them), `still no bot (${last.s.them} / ${last.t.them})`); await shot(a, '7-hud-rally'); await shot(b, '7-hud-rally');
 
 // ---- 2. a third tab with the link finds the room full ----
-const c = await open('c', '&room=' + CODE.toLowerCase()); s = await st(c); ok(s.chip === 'Joining room ' + CODE, `c title chip: "${s.chip}"`); await shot(c, '8-title-link');
-await c.click('#btn-start'); s = await until(c, s => s.err, 3000, 'c gets an answer'); ok(s.err === 'Room is full' && s.screen === 'lobby' && s.view === 'code' && !/room=/.test(s.search), `c full room: "${s.err}" on ${s.screen}/${s.view}, address bar "${s.search}"`); await shot(c, '8-full');
+const c = await open('c', '&room=' + CODE.toLowerCase()); s = await st(c); ok(s.chip === 'Joining court ' + CODE, `c title chip: "${s.chip}"`); await shot(c, '8-title-link');
+await c.click('#btn-start'); s = await until(c, s => s.err, 3000, 'c gets an answer'); ok(s.err === 'Court is full' && s.screen === 'lobby' && s.view === 'code' && !/(court|room)=/.test(s.search), `c full room: "${s.err}" on ${s.screen}/${s.view}, address bar "${s.search}"`); await shot(c, '8-full');
 
 // ---- 3. reload mid-game: same room, same side (b is on the far side, so a seat handed out afresh would not do) ----
 rest('b'); [, s] = await Promise.all([b.reload(), until(a, s => s.toast === 'Opponent left', 4000, 'a hears b go')]); ok(s.toast === 'Opponent left', `a while b reloads: "${s.toast}"`);
-await sleep(1500); s = await st(b); ok(s.screen === 'title' && s.chip === 'Joining room ' + CODE, `b reloaded: title with "${s.chip}"`);
+await sleep(1500); s = await st(b); ok(s.screen === 'title' && s.chip === 'Joining court ' + CODE, `b reloaded: title with "${s.chip}"`);
 await b.click('#btn-start'); await until(b, s => s.screen === 'calibrate', 6000, 'b reaches calibration again');
 s = await until(a, s => s.themSub === 'Setting up', 4000, 'a is told b is setting up'); const sv0 = s.serves; await sleep(2000); s = await st(a);      // the serve waits for whoever is still calibrating
 ok(s.them === 'Player 2' && s.themSub === 'Setting up' && s.serves === sv0 && s.me + s.op === 0, `while b calibrates: a sees "${s.them} / ${s.themSub}", ${s.serves - sv0} serves, ${s.me}-${s.op}`);
@@ -93,7 +93,7 @@ await b.keyboard.press('KeyQ'); s = await until(b, s => s.toast, 2000, 'b first 
 await b.keyboard.press('KeyQ'); const leftAt = Date.now();
 s = await until(a, s => s.toast === 'Opponent left', 3000, 'a gets the toast'); ok(s.toast === 'Opponent left', `a toast: "${s.toast}"`); await shot(a, '9-opponent-left');
 s = await until(a, s => s.them === 'Matt', 8000, 'the bot comes back for a'); ok(s.them === 'Matt' && /Rookie|Club|Pro/.test(s.themSub), `a plays "${s.them}" ${((Date.now() - leftAt) / 1000).toFixed(1)} s after b left`);
-s = await until(b, s => s.screen === 'lobby' && s.view === 'home', 2000, 'b back in the lobby'); ok(s.pill === null && !/room=/.test(s.search) && s.toast === null, `b is in the lobby, no room pill, clean address bar, no stale toast`);
+s = await until(b, s => s.screen === 'lobby' && s.view === 'home', 2000, 'b back in the lobby'); ok(s.pill === null && !/(court|room)=/.test(s.search) && s.toast === null, `b is in the lobby, no room pill, clean address bar, no stale toast`);
 await c.click('#btn-join'); s = await until(c, s => s.screen !== 'lobby', 4000, 'c joins once there is a seat'); ok(s.pill === CODE, `c takes the free seat in ${s.pill} (screen ${s.screen})`);
 await c.browser().close(); await a.browser().close();
 

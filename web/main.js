@@ -27,7 +27,7 @@ const stats = window.__stats = { get cam() { return body ? { ready: body.ready, 
 let side = 0, state = null, players = 0, calibrating = true;
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
-let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('room')) : '', pending = null, leaveAt = 0;   // room: seated here. wantRoom: from a shared link (or a reload). pending: the lobby request still waiting for its answer
+let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', pending = null, leaveAt = 0;   // room: seated here. wantRoom: from a shared link (or a reload). pending: the lobby request still waiting for its answer
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 if (qs.get('uitest') === '1') window.__ui = ui;                 // test hook: lets test/e2e.mjs force UI states for screenshots
@@ -97,8 +97,8 @@ function request(m) {                               // one lobby request at a ti
   if (pending) return; pending = m; ui.lobbyBusy(true); game.send(m);
   pendT = setTimeout(() => { if (pending !== m) return; settle(); if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // an old server never answers: do not leave the lobby dimmed for good
 }
-function setUrl(code) { const u = new URL(location.href); if (code) u.searchParams.set('room', code); else u.searchParams.delete('room'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room
-const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?room=${code}`;      // a localhost link is no use to a friend
+function setUrl(code) { const u = new URL(location.href); u.searchParams.delete('room'); if (code) u.searchParams.set('court', code); else u.searchParams.delete('court'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room
+const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?court=${code}`;      // a localhost link is no use to a friend
 function toLobby(msg) {                            // out of a room, back to the three choices. Calibration is kept.
   room = null; wantRoom = ''; state = null; clearFar(); phase = 'lobby'; setUrl(null); settle();
   ui.setRoom(null); ui.showOverlay(null); ui.showScreen('lobby'); ui.lobbyView('home');
@@ -185,8 +185,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'joinfail') {
     const was = pending; settle(); wantRoom = '';
-    if (room) { toLobby('Room closed'); return; }                                            // a reconnect found the room gone
-    const text = { notfound: 'Room not found', full: 'Room is full', busy: 'No free rooms. Try again soon.' }[m.reason] || 'Couldn’t join';
+    if (room) { toLobby('Court closed'); return; }                                            // a reconnect found the room gone
+    const text = { notfound: 'Court not found', full: 'Court is full', busy: 'No free courts. Try again soon.' }[m.reason] || 'Couldn’t join';
     setUrl(null); if (was && was.type === 'join' && ui.lobbyView() === 'code') ui.codeError(text); else say(text, null, 2600);
     return;
   }
@@ -230,9 +230,9 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
 // ---------- link quality ----------
 // The ball already rides out gaps by itself (scene.js coast()). This watches the connection so that (1) a swing can be
 // back-dated by the round trip, (2) a struggling link gets half the state packets: over TCP every lost packet stalls
-// everything behind it, so fewer packets means fewer stalls, and (3) the player is told it is the wifi, not the game.
+// everything behind it, so fewer packets means fewer stalls, and (3) the ping bars by the court code show the link, quietly.
 const net = (() => {
-  const rtts = []; let lastPacket = 0, gaps = 0, late = 0, worst = 0, hz = 60, bad = 0, good = 0, told = false;
+  const rtts = []; let lastPacket = 0, gaps = 0, late = 0, worst = 0, hz = 60, bad = 0, good = 0;
   const floor = () => rtts.length ? Math.min(...rtts) : 0;
   setInterval(() => game.send({ type: 'ping', c: performance.now() }), 500);
   setInterval(() => {                                                   // judged every 2 s
@@ -240,13 +240,13 @@ const net = (() => {
     stats.net = { rtt: Math.round(rtt), floor: Math.round(floor()), late: +lateShare.toFixed(3), worst: Math.round(worst), hz };
     ui.setStat('ping', link.g && rtts.length ? Math.round(rtt) + ' ms' : '-'); ui.setStat('netq', !link.g ? 'offline' : poor ? `weak (worst gap ${Math.round(worst)} ms)` : 'good'); ui.setStat('nethz', hz);
     if (poor) { bad++; good = 0; } else { good++; bad = 0; }
-    if (bad >= 2 && hz === 60) { hz = 30; game.send({ type: 'net', hz }); if (!told && inPlay()) { told = true; say('Weak connection. Smoothing it out.', null, 2600); } }
+    if (bad >= 2 && hz === 60) { hz = 30; game.send({ type: 'net', hz }); }      // said nowhere: the player cannot do anything about it mid-rally; the ping bars show it
     if (good >= 8 && hz === 30) { hz = 60; game.send({ type: 'net', hz }); }
     gaps = late = worst = 0;
   }, 2000);
   return {
     packet() { const t = performance.now(), g = t - lastPacket; lastPacket = t; if (g > 1000) return; gaps++; if (g > worst) worst = g; if (g > 1000 / hz + 45) late++; },
-    pong(m) { const r = performance.now() - m.c; if (r >= 0 && r < 5000) { rtts.push(r); if (rtts.length > 12) rtts.shift(); } },
+    pong(m) { const r = performance.now() - m.c; if (r >= 0 && r < 5000) { rtts.push(r); if (rtts.length > 12) rtts.shift(); if (ui.setPing) ui.setPing(room || !LOBBY ? [...rtts].sort((a, b) => a - b)[rtts.length >> 1] : 0); } },      // the median of the last 6 s: a number that sits still
     lag: () => Math.round(floor()),                                     // the quietest recent round trip: queueing spikes are not the link's real delay
     rejoined() { hz = 60; bad = good = 0; rtts.length = 0; },           // a new socket starts at the full rate on the server
   };

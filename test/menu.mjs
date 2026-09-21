@@ -57,7 +57,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   // Play -> lobby
   await pg.click('#btn-start'); await sleep(700); s = await st(pg);
   ok(s.screen === 'lobby' && s.view === 'home' && s.title === 'Play' && s.focus === 'btn-quick', `${tag} Play -> lobby home, Quick play focused (${s.screen}/${s.view}/${s.focus})`);
-  const tiles = await pg.evaluate(() => [...document.querySelectorAll('#lobby-home .tile')].map(b => b.textContent.trim())); ok(tiles.join('|') === 'Quick play|Create room|Enter code', `${tag} three choices: ${tiles.join(' | ')}`);
+  const tiles = await pg.evaluate(() => [...document.querySelectorAll('#lobby-home .tile')].map(b => b.textContent.trim())); ok(tiles.join('|') === 'Quick play|Create court|Enter code', `${tag} three choices: ${tiles.join(' | ')}`);
   ok(s.rooms.join('|') === 'KXQ71 player|M3PDEmpty' && s.online === '3 online', `${tag} room list from the server: ${s.rooms.join(' | ')}, "${s.online}"`);
   ok((await pg.evaluate(() => getComputedStyle(document.getElementById('glass')).visibility)) === 'visible', `${tag} glass stays under the lobby`);
   if (s.fs) await pg.evaluate(() => document.exitFullscreen()); await shot('2-lobby');
@@ -71,45 +71,45 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.keyboard.press('Backspace'); await pg.keyboard.press('Backspace'); await sleep(80); await type(pg, 'ab2k'); s = await st(pg); ok(s.typed === 'AB2K', `${tag} typed "ab2k" reads ${s.typed}`);
   await pg.keyboard.press('Enter'); await sleep(500); s = await st(pg);
   ok(J(sent('join').at(-1)) === J({ type: 'join', code: 'AB2K' }), `${tag} join sent upper case: ${J(sent('join').at(-1))}`);
-  ok(s.err === 'Room not found' && s.screen === 'lobby' && s.view === 'code' && s.typed === 'AB2K' && !s.busy && !/room=/.test(s.search), `${tag} joinfail notfound: inline "${s.err}", stays on the code view`); await shot('5-code-error');
+  ok(s.err === 'Court not found' && s.screen === 'lobby' && s.view === 'code' && s.typed === 'AB2K' && !s.busy && !/(court|room)=/.test(s.search), `${tag} joinfail notfound: inline "${s.err}", stays on the code view`); await shot('5-code-error');
   await pg.evaluate(() => { const dt = new DataTransfer(); dt.setData('text', 'https://poddle.fly.dev/?room=fvvv'); document.querySelector('#code-boxes input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
   await sleep(100); s = await st(pg); ok(s.typed === 'FVVV' && s.err === '', `${tag} pasting a link fills the code and clears the error (${s.typed})`);
-  await pg.keyboard.press('Enter'); await sleep(450); ok((await st(pg)).err === 'Room is full', `${tag} joinfail full: inline "${(await st(pg)).err}"`);
+  await pg.keyboard.press('Enter'); await sleep(450); ok((await st(pg)).err === 'Court is full', `${tag} joinfail full: inline "${(await st(pg)).err}"`);
   await pg.click('#screen-lobby [data-back]'); await sleep(350); s = await st(pg); ok(s.view === 'home' && s.screen === 'lobby', `${tag} Back button -> lobby home`);
   // Create room
-  await pg.click('#btn-create'); await sleep(350); s = await st(pg); ok(s.view === 'create' && s.title === 'Create room', `${tag} Create room view`); await shot('3-create');
+  await pg.click('#btn-create'); await sleep(350); s = await st(pg); ok(s.view === 'create' && s.title === 'Create court', `${tag} Create room view`); await shot('3-create');
   await pg.click('#btn-create-go'); await sleep(500); s = await st(pg);
   ok(J(sent('create').at(-1)) === J({ type: 'create', public: true }), `${tag} create sent: ${J(sent('create').at(-1))}`);
-  ok(s.view === 'share' && s.title === 'Your room' && s.share === 'CRTD' && /room=CRTD/.test(s.search) && s.screen === 'lobby', `${tag} 'room' -> share view shows ${s.share}, url ${s.search}`); await shot('4-share');
-  await pg.keyboard.press('Escape'); await sleep(450); s = await st(pg); ok(s.view === 'home' && sent('leave').length === 1 && !/room=/.test(s.search), `${tag} Esc on the share view leaves the room (${sent('leave').length} leave, url "${s.search}")`);
+  ok(s.view === 'share' && s.title === 'Your court' && s.share === 'CRTD' && /court=CRTD/.test(s.search) && s.screen === 'lobby', `${tag} 'room' -> share view shows ${s.share}, url ${s.search}`); await shot('4-share');
+  await pg.keyboard.press('Escape'); await sleep(450); s = await st(pg); ok(s.view === 'home' && sent('leave').length === 1 && !/(court|room)=/.test(s.search), `${tag} Esc on the share view leaves the room (${sent('leave').length} leave, url "${s.search}")`);
   await pg.click('#btn-create'); await sleep(300); await pg.keyboard.press('ArrowRight'); await sleep(80); ok(await pg.evaluate(() => document.getElementById('seg-note').textContent) === 'Join by code only', `${tag} Right selects Private`);
   await pg.keyboard.press('Enter'); await sleep(500); ok(J(sent('create').at(-1)) === J({ type: 'create', public: false }), `${tag} private create sent: ${J(sent('create').at(-1))}`);
   await pg.click('#btn-share-go'); await sleep(800); s = await st(pg); ok(s.screen === 'connect' && s.backs === 1, `${tag} Start -> connect screen with a Back button (${s.screen}, backs=${s.backs})`); await shot('6-connect');
   await pg.keyboard.press('KeyC'); await sleep(600); s = await st(pg); ok(s.screen === 'calibrate' && s.backs === 1, `${tag} C -> calibrate (${s.screen})`);
-  await pg.click('#cal [data-back]'); await sleep(600); s = await st(pg); ok(s.screen === 'lobby' && s.view === 'home' && sent('leave').length === 2 && !/room=/.test(s.search), `${tag} Back on calibrate -> lobby, leave sent, url cleared`);
+  await pg.click('#cal [data-back]'); await sleep(600); s = await st(pg); ok(s.screen === 'lobby' && s.view === 'home' && sent('leave').length === 2 && !/(court|room)=/.test(s.search), `${tag} Back on calibrate -> lobby, leave sent, url cleared`);
   // Quick play, then a room from the list
-  await pg.click('#btn-quick'); await sleep(800); s = await st(pg); ok(J(sent('quick').at(-1)) === J({ type: 'quick' }) && s.screen === 'connect' && /room=QQQQ/.test(s.search), `${tag} Quick play sent ${J(sent('quick').at(-1))} -> ${s.screen}, url ${s.search}`);
+  await pg.click('#btn-quick'); await sleep(800); s = await st(pg); ok(J(sent('quick').at(-1)) === J({ type: 'quick' }) && s.screen === 'connect' && /court=QQQQ/.test(s.search), `${tag} Quick play sent ${J(sent('quick').at(-1))} -> ${s.screen}, url ${s.search}`);
   await pg.keyboard.press('Escape'); await sleep(600); await pg.click('.room-row[data-code="KXQ7"]'); await sleep(800); s = await st(pg);
   ok(J(sent('join').at(-1)) === J({ type: 'join', code: 'KXQ7' }) && s.screen === 'connect', `${tag} room row joins KXQ7 -> ${s.screen}`);
   // reload: the URL carries the room, the title says so, Play rejoins
-  await pg.reload(); await sleep(1600); s = await st(pg); ok(s.screen === 'title' && s.chip === 'Joining room KXQ7', `${tag} reload: title chip "${s.chip}"`); await shot('7-title-room');
+  await pg.reload(); await sleep(1600); s = await st(pg); ok(s.screen === 'title' && s.chip === 'Joining court KXQ7', `${tag} reload: title chip "${s.chip}"`); await shot('7-title-room');
   await pg.keyboard.press('Enter'); await sleep(900); s = await st(pg); ok(s.screen === 'connect' && J(sent('join').at(-1)) === J({ type: 'join', code: 'KXQ7' }), `${tag} Play rejoins KXQ7 -> ${s.screen}`);
   await pg.close();
 }
 
 // ?room=WXYZ: nothing joins until Play, then it joins at once and moves on
 { got.length = 0; urls.length = 0; const pg = await open('link', '&room=wxyz'); let s = await st(pg);
-  ok(s.chip === 'Joining room WXYZ' && !got.length && !urls.some(u => /room=/.test(u)), `?room=WXYZ: chip "${s.chip}", nothing sent before Play`);
+  ok(s.chip === 'Joining court WXYZ' && !got.length && !urls.some(u => /room=/.test(u)), `?room=WXYZ: chip "${s.chip}", nothing sent before Play`);
   await pg.click('#btn-start'); await sleep(900); s = await st(pg); ok(J(got[0]) === J({ type: 'join', code: 'WXYZ' }) && s.screen === 'connect', `?room=WXYZ: Play sent ${J(got[0])} -> ${s.screen}`);
   // seated, then the socket drops: the reconnect must ask for the seat back
   urls.length = 0; await stopFake(); await sleep(700); startFake(); await sleep(2500); s = await st(pg);
   ok(urls.length && urls.every(u => /cid=\w+&lobby=1&room=WXYZ$/.test(u)) && s.screen === 'connect', `reconnect while seated: ${urls[0]} (screen ${s.screen})`);
   urls.length = 0; gone = true; await stopFake(); await sleep(700); startFake(); await sleep(2500); s = await st(pg); gone = false;      // and once more, but the room expired meanwhile
-  ok(/room=WXYZ/.test(urls[0] || '') && s.screen === 'lobby' && s.view === 'home' && s.toast === 'Room closed' && !/room=/.test(s.search) && s.pill === null, `reconnect to a room that is gone: ${s.screen}/${s.view}, toast "${s.toast}", url "${s.search}"`);
+  ok(/room=WXYZ/.test(urls[0] || '') && s.screen === 'lobby' && s.view === 'home' && s.toast === 'Court closed' && !/(court|room)=/.test(s.search) && s.pill === null, `reconnect to a room that is gone: ${s.screen}/${s.view}, toast "${s.toast}", url "${s.search}"`);
   await pg.close(); }
 // a shared link to a room that is gone
 { const pg = await open('gone', '&room=ZZZZ'); await pg.click('#btn-start'); await sleep(900); const s = await st(pg);
-  ok(s.screen === 'lobby' && s.view === 'code' && s.typed === 'ZZZZ' && s.err === 'Room not found' && !/room=/.test(s.search), `dead link: code view, "${s.err}", url "${s.search}"`); await pg.close(); }
+  ok(s.screen === 'lobby' && s.view === 'code' && s.typed === 'ZZZZ' && s.err === 'Court not found' && !/(court|room)=/.test(s.search), `dead link: code view, "${s.err}", url "${s.search}"`); await pg.close(); }
 // server down in the lobby, then back; and a server that never answers
 { const pg = await open('down'); await pg.click('#btn-start'); await sleep(600); await stopFake(); await sleep(1500); let s = await st(pg);
   ok(s.down && !s.rooms.length && s.screen === 'lobby', `server down: the lobby says so (down=${s.down})`); await sleep(300); await pg.screenshot({ path: `${root}test/ui-shots/menu-8-lobby-down-1280x720.png` });
