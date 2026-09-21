@@ -217,11 +217,16 @@ refreshStatus(); setInterval(refreshStatus, 250);
 // ---------- sockets (auto-reconnect) ----------
 // urls: tried in turn until one opens. A stale '#<old-ip>' in the address bar must never strand you: this machine's
 // own server is always the second candidate, and when it wins the dead address is dropped from the URL.
+// What a reconnect says about the court it was in. If the server restarted meanwhile (every deploy does), the court is gone
+// from its memory; with this the first tab back rebuilds it under the same code, same seats, same score (server: revive()).
+let roomPub = false, restartUntil = 0;
+function backTo() { const o = state && state.paddles && state.paddles[1 - side], lv = o && o.bot ? ['Rookie', 'Club', 'Pro'].indexOf(botLevel) : -1, sc = state && Array.isArray(state.score) ? state.score : null;
+  return '&back=1&pub=' + (roomPub ? 1 : 0) + (spec() ? '' : '&side=' + side) + (sc ? '&score=' + (sc[0] | 0) + '-' + (sc[1] | 0) : '') + (lv >= 0 ? '&bot=' + lv : ''); }
 function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
     const url = urls[i % urls.length]; let opened = false;
-    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (LOBBY ? '&lobby=1' + (room ? '&room=' + room + (spec() ? '&watch=1' : '') + (myName() ? '&name=' + encodeURIComponent(myName()) : '') : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back
+    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (LOBBY ? '&lobby=1' + (room ? '&room=' + room + (spec() ? '&watch=1' : '') + (myName() ? '&name=' + encodeURIComponent(myName()) : '') + backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
       if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Saved address didn’t answer. Using this Mac.', null, 2800); } }
@@ -229,7 +234,7 @@ function connect(urls, el, onmsg, onopen) {
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
     ws.onclose = () => { link[el] = false; ui.setLink(el, false);
       if (!opened) { i++; fails++; }                                   // never connected: try the next candidate
-      if (el === 'g' && fails >= urls.length) { ui.setServerAddress(urls.join('  or  ')); if (ui.currentOverlay() !== 'game-full') ui.showOverlay('server-down'); }
+      if (el === 'g' && fails >= urls.length && performance.now() > restartUntil) { ui.setServerAddress(urls.join('  or  ')); if (ui.currentOverlay() !== 'game-full') ui.showOverlay('server-down'); }
       setTimeout(open, opened ? 300 : delay); delay = Math.min(delay * 1.5, 3000); };
     ws.onerror = () => {};
   };
@@ -278,9 +283,11 @@ const SCENE_EVENTS = ['serve', 'hit', 'swung', 'bounce', 'launch', 'whiff', 'poi
 const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'pong') { net.pong(m); return; }
+  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
   if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online); return; }
   if (m.type === 'room') {                                       // seated, or let in to watch (the normal 'welcome' follows). Also the answer to a reconnect with room=CODE.
+    roomPub = m.public === true;
     const made = pending && pending.type === 'create' && botWant == null, again = room === m.code; settle(); room = m.code; role = m.role === 'spectator' ? 'spectator' : 'player'; wantRoom = ''; wantWatch = false;
     ui.askWatch(null); ui.setRoom(room, shareLink(room)); setUrl(room, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined
     if (phase === 'lobby' && !again) { if (spec()) enterWatch(); else if (made) ui.lobbyView('share'); else begin(); }        // again: a reconnect got the seat back, the player stays where they were. Play a bot skips the share view

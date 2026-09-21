@@ -129,7 +129,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.click('#btn-start'); await sleep(900); s = await st(pg); ok(J(got[0]) === J({ type: 'join', code: 'WXYZ', name: NAME }) && s.screen === 'connect', `?room=WXYZ: Play sent ${J(got[0])} -> ${s.screen}`);
   // seated, then the socket drops: the reconnect must ask for the seat back
   urls.length = 0; await stopFake(); await sleep(700); startFake(); await sleep(2500); s = await st(pg);
-  ok(urls.length && urls.every(u => /cid=\w+&lobby=1&room=WXYZ&name=Dan$/.test(u)) && s.screen === 'connect', `reconnect while seated: ${urls[0]} (screen ${s.screen})`);
+  ok(urls.length && urls.every(u => /cid=\w+&lobby=1&room=WXYZ&name=Dan&back=1&pub=[01]&side=[01](&score=\d+-\d+)?(&bot=\d)?$/.test(u)) && s.screen === 'connect', `reconnect while seated: ${urls[0]} (screen ${s.screen})`);
   urls.length = 0; gone = true; await stopFake(); await sleep(700); startFake(); await sleep(2500); s = await st(pg); gone = false;      // and once more, but the room expired meanwhile
   ok(/room=WXYZ/.test(urls[0] || '') && s.screen === 'lobby' && s.view === 'home' && s.toast === 'Court closed' && !/(court|room)=/.test(s.search) && s.pill === null, `reconnect to a room that is gone: ${s.screen}/${s.view}, toast "${s.toast}", url "${s.search}"`);
   await pg.close(); }
@@ -357,7 +357,7 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
   ok(!got.some(m => !['net'].includes(m.type)), `a spectator sent nothing but ping / net (${[...new Set(got.map(m => m.type))]})`);
   // the socket drops: the reconnect asks for the same place to watch
   urls.length = 0; await stopFake(); await sleep(700); startFake(); await sleep(2500); i = await info(pg);
-  ok(urls.length && urls.every(u => /cid=\w+&lobby=1&room=FWWW&watch=1&name=Dan$/.test(u)) && i.phase === 'watch' && i.view.name === 'pov' && i.view.side === 1, `reconnect while watching: ${urls[0]} (still ${i.phase}, view ${i.view.name} ${i.view.side}: a restore does not flip it)`);
+  ok(urls.length && urls.every(u => /cid=\w+&lobby=1&room=FWWW&watch=1&name=Dan&back=1&pub=[01](&score=\d+-\d+)?$/.test(u)) && i.phase === 'watch' && i.view.name === 'pov' && i.view.side === 1, `reconnect while watching: ${urls[0]} (still ${i.phase}, view ${i.view.name} ${i.view.side}: a restore does not flip it)`);
   // reload: the link carries the role; Play watches at once, in the remembered view
   got.length = 0; await pg.reload(); await sleep(1500); await h(pg, 'start'); await sleep(800); cs = await since(pg, 0); i = await info(pg);
   ok(J(got.filter(m => m.type !== 'net')[0]) === J({ type: 'watch', code: 'FWWW', name: NAME }) && i.phase === 'watch' && has(cs, 'scene.setView', n => n === 'pov'), `?room=FWWW&watch=1 after Play: ${J(got[0])}, view ${i.view.name}`);

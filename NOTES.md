@@ -291,3 +291,25 @@ Build log. What we tried, what broke, and how each problem was solved.
   all of it over plain HTTP, including the JPEG's real dimensions.
 - **Only the owner can do:** verify in Google Search Console (HTML tag method, fly.dev has no DNS to edit) and submit the sitemap,
   import into Bing Webmaster Tools, re-scrape in the Facebook/LinkedIn debuggers.
+
+## 20. "Sometimes the court just closes and dies, kicking everyone out"
+- **It was not fly being flaky.** Three causes, found in the machine events and logs:
+  1. **Every deploy killed every court.** Courts live in one process's memory. A deploy replaces the process; each open tab
+     reconnected within a second and asked for its court by code; the new process had never heard of it and answered
+     `notfound`; the client showed "Court closed" and sent everyone to the lobby. There were 17 deploys in 18 hours.
+  2. **A second machine.** One had been added in Dallas "in case of US players". Two machines cannot see each other's courts,
+     so friends could land on different servers ("Court not found"), a reconnect could land on the other one, and fly's proxy
+     autostopped whichever looked idle (`App poddle has excess capacity, autostopping machine`), taking its courts with it.
+  3. By design: a player gone for more than 15 s forfeits, and with no rematch the court closes for everyone.
+- **Courts now survive a restart.** On SIGINT/SIGTERM the server tells every tab `restart` ("Updating. Back in a moment.",
+  and the server-down card is held back for 15 s). A reconnecting tab reports what it was in: `back=1`, its seat, the
+  score, public or private, Matt's level. For its first 120 s a new process takes that word: the first tab back rebuilds the
+  court under the same code with that score, the rest find it standing and take their own seats; spectators too. Only
+  the point in play is lost. A typed code that does not exist is still `notfound`; a finished score is not restored; the
+  court cap still applies. `test/revive.test.mjs` (protocol) and `test/revive-e2e.mjs` (two real tabs, server killed under them).
+- **One machine, enforced.** `./deploy.sh` tests, shows who is online (`/status.json`), deploys, and removes any machine
+  beyond the one in `yyz`. Serving US players from Toronto costs ~40 ms; a second region would need shared court state first.
+- **Courts say why they closed** in the server log (`[CODE] court closed: norematch ...`), so the next report can be answered
+  from `fly logs`.
+- A test race I introduced and removed: the shutdown notice waited 250 ms before exiting, and a test that restarts a server
+  on the same port found it taken. 50 ms is enough (the kernel sends what was queued).

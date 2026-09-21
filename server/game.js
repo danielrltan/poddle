@@ -28,6 +28,9 @@ const httpServer = http.createServer((req, res) => {
   let rel; try { rel = decodeURIComponent(rawPath); } catch { rel = '/'; }
   if (rel.includes('\0')) { res.writeHead(400); return res.end(); }                                     // fs.stat THROWS on a null byte (GET /%00), and a throw in here ends the process and every room in it
   if (MOVED[rel]) { res.writeHead(301, { Location: MOVED[rel] + (query.length ? '?' + query.join('?') : ''), 'Cache-Control': 'no-cache', 'Content-Length': 0 }); return res.end(); }
+  if (rel === '/status.json') { let pl = 0, sp = 0; for (const c of wss.clients) if (c.room) (c.spec ? sp++ : pl++);      // who a restart would interrupt (deploy.sh reads it)
+    const body = JSON.stringify({ courts: rooms.size, playing: pl, watching: sp, online: wss.clients.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
   if (rel === '/404.html') return notFound(req, res);
   const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
   if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }      // no climbing out of web/
@@ -108,6 +111,7 @@ const AUTOBOT = process.env.AUTOBOT !== '0';                   // tests turn off
 const SWING_SERVE = process.env.SWING_SERVE != null ? process.env.SWING_SERVE !== '0' : AUTOBOT;   // off in tests
 const WIN_AT = process.env.WIN_AT != null ? +process.env.WIN_AT : (AUTOBOT ? 11 : 0);   // first to 11, win by 2 (off in tests)
 const WIN_BY = process.env.WIN_BY != null ? +process.env.WIN_BY : 2;                  // tests only: a browser test needs a match that is SURE to end (two scripted players can trade points at deuce for ever)
+const REVIVE_S = process.env.REVIVE_S != null ? +process.env.REVIVE_S : 120;   // s after this process starts during which a returning tab may bring its court back (see revive())
 const ROOM_TTL = (process.env.ROOM_TTL != null ? +process.env.ROOM_TTL : 30) * 1000;   // ms a room may stand with no human in it (tests shorten it)
 const ROOM_CAP = +process.env.ROOM_CAP || 40;                  // rooms at once: one small machine hosts them all (tests lower it)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';          // no I, L, O, 0, 1: a code gets read out across a room
@@ -203,7 +207,7 @@ function createRoom(code, pub) {
   let started = false, firstServe = 0;      // has a ball been struck in this match (before that a leaver just leaves); who served first (the next match alternates)
   let over = null, hold = null, paused = null, slow = null;   // over: { winner, forfeit, votes, until, names }  hold: { side, until, said }  paused: { by, until }  slow: { side, until, said } a seat calibrating mid-match   (until = wall clock ms)
   const ball = { spin: 0, kick: 0, aim: null, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
-  const score = [0, 0];
+  const score = [0, 0]; let revived = null;
   let server = 0, serveAt = Infinity, tick = 0;     // who serves next; when (sim time); steps taken
 
   function send(pl, msg) { put(pl.ws, JSON.stringify(msg)); }
@@ -311,7 +315,8 @@ function createRoom(code, pub) {
 
   // a fresh pair (human+human or human+bot): clean score, first serve
   function startMatch(first) {
-    score[0] = score[1] = 0; server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
+    score[0] = score[1] = 0; if (revived) { score[0] = revived[0]; score[1] = revived[1]; revived = null; }      // a court brought back after a restart carries its score
+    server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
     if (pub) lobbyChanged();
   }
 
@@ -337,6 +342,7 @@ function createRoom(code, pub) {
   function close(reason) {
     if (LEGACY || room.dead) return;
     const out = [...players.filter(p => p.ws).map(p => p.ws), ...spectators];
+    console.log(`[${code}] court closed: ${reason} (${out.length} sent to the lobby, score ${score.join('-')})`);      // fly logs: "why did my court die" has an answer
     room.dead = true; players.length = 0; spectators.clear(); over = hold = paused = slow = null;
     if (rooms.get(code) === room) rooms.delete(code);
     for (const ws of out) { ws.room = ws.pl = null; ws.spec = false; tell(ws, { type: 'closed', reason }); if (ws.readyState === 1) enterLobby(ws); }
@@ -507,7 +513,7 @@ function createRoom(code, pub) {
     if (over) { over = null; newMatchAt = Infinity; broadcast({ type: 'rematchon' }); }   // (a bot room being voted on) the result screen closes, a fresh match starts below
     if (humans().length >= 1) removeBot();                     // a second human replaces the bot
     botJoinAt = Infinity;
-    const side = players.length && players[0].side === 0 ? 1 : 0;
+    const want = ws.wantSide, side = (want === 0 || want === 1) && !players.some(p => p.side === want) ? want : players.length && players[0].side === 0 ? 1 : 0;   // wantSide: a court brought back after a restart seats people where they were
     const me = newPlayer(ws, side); me.cid = ws.cid; me.name = ws.name || (side ? 'Player 2' : 'Player 1');
     players.push(me); ws.room = room; ws.pl = me; ws.spec = false;
     if (humans().length === 1) room.waitAt = Date.now();
@@ -726,7 +732,7 @@ function createRoom(code, pub) {
   // what the lobby list says about this room (public rooms only get asked). open: a human seat is free. watch: spectator places left
   const free = () => humans().length < 2 && !hold && !(over && over.forfeit);   // a seat to sit down in. Not after a forfeit: that room only waits to close. Not while a seat is held (a bot court's too)
   const info = () => ({ code, players: humans().length, open: free(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over });
-  const room = { code, pub, join, leave, retake, heldBy, watch, unwatch, canWatch: () => spectators.size < SPEC_CAP, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
+  const room = { code, pub, revive: sc => { revived = sc; }, join, leave, retake, heldBy, watch, unwatch, canWatch: () => spectators.size < SPEC_CAP, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
   return room;
 }
 
@@ -783,6 +789,25 @@ function joinCode(ws, code) {
   const r = roomOf(code);
   if (!r) tell(ws, { type: 'joinfail', reason: 'notfound' }); else if (!seat(ws, r)) tell(ws, { type: 'joinfail', reason: 'full', watch: r.canWatch(), code: r.code });   // "Court is full. Watch instead?"
 }
+// The server restarted (a deploy, or fly moved the machine) and every court went with the old process. The tabs are still
+// open and reconnect within a second, asking for a code this process has never heard of. For the first REVIVE_S seconds of
+// its life the server takes their word for it: the first one back rebuilds the court under its old code, with the score
+// and the seat it reports, and everyone after it finds the court standing. The point in play is lost; the match is not.
+// Only a tab that WAS in that court sends back=1; a typed code that does not exist is still 'notfound'. The stakes are a
+// pickleball score, so a client's word is good enough.
+const BOOT = Date.now();
+function revive(ws, q) {
+  const code = String(q.get('room') || '').trim().toUpperCase(), watch = q.get('watch') === '1';
+  if (Date.now() - BOOT > REVIVE_S * 1000 || code.length !== 4 || [...code].some(c => !CODE_CHARS.includes(c)) || rooms.size >= ROOM_CAP) return false;
+  const r = createRoom(code, q.get('pub') === '1'); r.by = ws.addr; rooms.set(code, r);
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('score') || ''), a = m ? +m[1] : 0, b = m ? +m[2] : 0;
+  if (m && !(WIN_AT > 0 && Math.max(a, b) >= WIN_AT && Math.abs(a - b) >= WIN_BY)) r.revive([a, b]);      // a finished score is not brought back: start level
+  console.log(`[${code}] brought back after a restart by a ${watch ? 'spectator' : 'player'} (${a}-${b})`);
+  if (watch) { watchCode(ws, code); return true; }
+  seat(ws, r);
+  const lv = q.get('bot'); if (lv != null && lv !== '' && ws.pl) r.onMessage(ws.pl, { type: 'bot', level: +lv });      // they were playing Matt at this level
+  return true;
+}
 // Watch a room (any room whose code you have; a free seat in it does not matter, you chose to watch).
 function watchCode(ws, code) {
   const r = roomOf(code); if (!r) return tell(ws, { type: 'joinfail', reason: 'notfound' });
@@ -828,7 +853,8 @@ wss.on('connection', (ws, req) => {
 
   if (!ws.viaLobby) { if (!seat(ws, LOCAL)) { ws.send(JSON.stringify({ type: 'full' })); ws.close(); } return; }
   enterLobby(ws);
-  if (q.get('room')) (q.get('watch') === '1' ? watchCode : joinCode)(ws, q.get('room'));   // a reconnect getting its seat (or its place to watch) back, or a shared link
+  const ws0 = +q.get('side'); if (q.get('back') === '1' && (ws0 === 0 || ws0 === 1) && q.get('side') !== null && q.get('side') !== '') ws.wantSide = ws0;
+  if (q.get('room') && !(q.get('back') === '1' && !roomOf(q.get('room')) && revive(ws, q))) (q.get('watch') === '1' ? watchCode : joinCode)(ws, q.get('room'));   // a reconnect getting its seat (or its place to watch) back, or a shared link
 });
 
 // fixed 60Hz steps against the real clock (setInterval alone runs ~2% slow and drifts). Every room steps on every one. One state packet per room per step.
@@ -848,4 +874,11 @@ setInterval(() => {
 }, HEARTBEAT);
 
 console.log('game server on port ' + (+process.env.PORT || 8080));
+// fly stops the machine with SIGINT on every deploy. Say so before going: tabs show "Updating" instead of a dead court, then
+// reconnect to the new process and bring their courts back (revive() above).
+let going = false;
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (going) return; going = true;
+  for (const ws of wss.clients) { try { if (ws.readyState === 1) ws.send('{"type":"restart"}'); } catch { /* it is leaving anyway */ } }
+  setTimeout(() => process.exit(0), 50); });                      // the frames are handed to the kernel within a tick and it sends them after we are gone; any longer and a test that restarts on the same port finds it taken
+
 module.exports = { COURT, ZONE, BOUNCE, SLICE, G, R, PASSED, solve, shotKind, bounceV, gOf };   // test/server.test.mjs sweeps solve() directly
