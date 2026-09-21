@@ -123,6 +123,31 @@ export function hold(name, left) {
 }
 
 // ---------- connection status ----------
+// What is in the player's hand (NOTES 34): an AirPod through the helper on this Mac, or a phone through its page.
+const PADDLE = {
+  airpod: { name: 'AirPod', wait: 'Take one AirPod out and hold it in your hand.', bad: 'Signal lost. Check the AirPod is still connected to this Mac.', lost: 'AirPod signal lost', hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', waiting: 'Waiting for the AirPod' },
+  phone: { name: 'Phone', wait: 'Scan the code with your phone’s camera.', bad: 'Signal lost. Wake the phone and keep its Poddle page open.', lost: 'Phone signal lost', hold: 'Hold the phone like a paddle handle, top end pointing at the screen.', tilt: 'Tip the top end up toward the ceiling.', waiting: 'Waiting for the phone' },
+};
+let paddle = 'airpod';
+export function setPaddle(kind) {
+  if (!PADDLE[kind] || kind === paddle) return; paddle = kind; const P = PADDLE[kind];
+  ROW.airpod.wait = P.wait; ROW.airpod.bad = P.bad; LOST.airpod = P.lost; LEAD.hold = P.hold; LEAD.tilt = P.tilt;
+  setText($('row-airpod-name'), P.name); setText($('set-airpod-name'), P.name);
+  const v = status.airpod; if (v) { status.airpod = null; setStatus({ airpod: v }); }      // the row says its line again, in the new words
+}
+export const paddleKind = () => paddle;
+// The set-up screen's phone block: the QR (drawn here, no image fetched), the code to type instead, and the footer's way over
+// to the other paddle. o = { show, url, code, title, foot, swap }.
+let qrFor = '';
+export function padPair(o) {
+  const box = $('pad-pair'); if (!box) return;
+  box.hidden = !o.show; setText($('connect-title'), o.title || ''); setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
+  const sw = $('btn-paddle-swap'); if (sw) { sw.hidden = !o.swap; setText(sw, o.swap || ''); }
+  if (o.show && o.url && qrFor !== o.url) { qrFor = o.url;
+    import('./vendor/qrcode.mjs').then(({ default: qrcode }) => { const q = qrcode(0, 'M'); q.addData(o.url); q.make(); $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true'); })
+      .catch(() => { qrFor = ''; }); }
+}
+export function onPaddleSwap(fn) { const sw = $('btn-paddle-swap'); if (sw) sw.addEventListener('click', e => { e.stopPropagation(); fn(); }); }
 const ROW = {
   airpod: { ok: '', wait: 'Take one AirPod out and hold it in your hand.', bad: 'Signal lost. Check the AirPod is still connected to this Mac.' },
   game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
@@ -177,7 +202,7 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
   count.style.visibility = settle && !done ? 'hidden' : '';                  // settling: the bar alone counts; a tick would read as 'finished'
   $('cal-num').hidden = !showNum; $('cal-up').toggleAttribute('hidden', showNum || settle || done); $('cal-check').toggleAttribute('hidden', !done);
   if (showNum) setText($('cal-num'), String(bad ? HOLD_SECONDS : Math.max(1, Math.ceil(HOLD_SECONDS * (1 - e.progress)))));
-  const m = $('calmsg'); setText(m, waiting ? 'Waiting for the AirPod' : camLost && !tilt ? 'The camera can’t see you. Step into view.' : '');
+  const m = $('calmsg'); setText(m, waiting ? PADDLE[paddle].waiting : camLost && !tilt ? 'The camera can’t see you. Step into view.' : '');
   // replay the sideways nudge for every new mistake (also a second one in a row), not for every 20 ms sample
   if (fresh || (!e.ok && calPrev.msg !== msg)) restart($('calcard'), 'is-error'); else if (!bad) $('calcard').classList.remove('is-error');
   calPrev = { ok: e.ok, msg };

@@ -69,7 +69,7 @@ try {
     const img = /^https:\/\/poddleball\.com\/og\.jpg\?v=\d+$/; ok(img.test(og['og:image']) && og['og:image:secure_url'] === og['og:image'] && tw['twitter:image'] === og['og:image'], `share image is one absolute https URL with ?v=: ${og['og:image']}`);
     ok(og['og:image:width'] === '1200' && og['og:image:height'] === '630' && og['og:image:type'] === 'image/jpeg', 'og:image is declared 1200x630 image/jpeg');
     ok((og['og:title'] || '').length <= 60 && (og['og:description'] || '').length <= 110 && og['og:title'] === tw['twitter:title'] && og['og:description'] === tw['twitter:description'], `og:title ${(og['og:title'] || '').length} chars, og:description ${(og['og:description'] || '').length} chars, Twitter says the same`);
-    ok(/\bMac\b/.test(og['og:description'] || '') && /AirPod/.test(og['og:description'] || '') && /friends/.test(og['og:description'] || '') && og['og:title'] !== 'Poddle: your AirPod is the paddle', 'the card says AirPod, friends and Mac, and its title does not repeat the line in the picture');
+    ok(/phone/.test(og['og:description'] || '') && /AirPod/.test(og['og:description'] || '') && /friends/.test(og['og:description'] || '') && og['og:title'] !== 'Poddle: your AirPod is the paddle', 'the card says phone, AirPod and friends, and its title does not repeat the line in the picture');
     ok(/AirPod/.test(og['og:image:alt'] || ''), 'the image alt mentions the AirPod that is in the picture');
     ok((og['og:image:alt'] || '').length >= 20 && og['og:image:alt'].length <= 200 && og['og:image:alt'] === tw['twitter:image:alt'] && !/PENDING/.test(og['og:image:alt']), `image alt, ${(og['og:image:alt'] || '').length} chars: ${og['og:image:alt']}`);
     ok(!/twitter:site|twitter:creator/.test(home), 'no invented Twitter handle');
@@ -81,18 +81,18 @@ try {
   { const blocks = [...home.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(m => m[1]); let parsed = []; try { parsed = blocks.map(b => JSON.parse(b)); } catch (e) { ok(false, 'JSON-LD does not parse: ' + e.message); }
     ok(blocks.length === 1 && parsed.length === 1, `${blocks.length} JSON-LD block, parses`); const g = parsed[0] || {};
     ok(g['@context'] === 'https://schema.org' && [].concat(g['@type']).includes('VideoGame') && g.name === 'Poddle' && g.url === ORIGIN + '/' && typeof g.description === 'string' && g.description.length > 40 && g.image === ORIGIN + '/og.jpg', `@type ${g['@type']}, name, url, description, image`);
-    ok(g.operatingSystem === 'macOS 14 or later' && g.applicationCategory === 'GameApplication' && g.isAccessibleForFree === true && g.offers && g.offers.price === '0' && g.offers.priceCurrency === 'USD', 'operatingSystem, applicationCategory, free offer');
+    ok(g.operatingSystem === 'Any, in a modern browser' && g.applicationCategory === 'GameApplication' && g.isAccessibleForFree === true && g.offers && g.offers.price === '0' && g.offers.priceCurrency === 'USD', 'operatingSystem, applicationCategory, free offer');
     ok(g.softwareHelp && g.softwareHelp.url === ORIGIN + '/how-to-play.html' && !g.aggregateRating && !g.review && !g.author, 'softwareHelp points at the help page. No rating, review or author is claimed');
     const urls = JSON.stringify(g).match(/"https?:[^"]+"/g) || []; ok(urls.every(u => /^"https:\/\/(poddleball\.com|schema\.org)/.test(u)), `every URL in it is https on poddleball.com or schema.org (${urls.length})`); }
 
   console.log('text a crawler reads without JavaScript');
   { const ns = [...home.matchAll(/<noscript>([\s\S]*?)<\/noscript>/g)].map(m => m[1]), text = (ns[0] || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     ok(ns.length === 1 && home.indexOf('<noscript>') > home.indexOf('<div id="stage">') && home.indexOf('<noscript>') < home.indexOf('<!-- UI:BEGIN -->'), 'one <noscript>, in the body, outside the markup the mock loads');
-    ok(text.length > 120 && /Poddle/.test(text) && /AirPod/.test(text) && /JavaScript/.test(text) && /macOS 14/.test(text) && /href="\/how-to-play\.html"/.test(ns[0]), `it holds real words (${text.length} chars) and the How to play link`);
+    ok(text.length > 120 && /Poddle/.test(text) && /AirPod/.test(text) && /JavaScript/.test(text) && /phone is the paddle/.test(text) && /href="\/how-to-play\.html"/.test(ns[0]), `it holds real words (${text.length} chars) and the How to play link`);
     const body = home.replace(/<noscript>[\s\S]*?<\/noscript>/g, ''), h1 = [...body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map(m => m[1].replace(/<[^>]+>/g, '').trim());
     const title = (body.match(/<section[^>]*id="screen-title"[\s\S]*?<\/section>/) || [''])[0], th1 = [...title.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map(m => m[1].replace(/<[^>]+>/g, ''));
     ok(th1.length === 1 && th1[0] === 'Poddle' && h1.length === 1, `one <h1> outside noscript, on the title screen, and its text is "${th1[0]}"${h1.length > 1 ? ' (others: ' + h1.slice(1).join(', ') + ')' : ''}`);
-    ok(/AirPod pickleball/.test(title) && /macOS 14 or later/.test(title) && (title.match(/<a\b[^>]*href="\/how-to-play\.html"[^>]*>How to play<\/a>/g) || []).length === 1, 'the title screen says AirPod pickleball, what you need, and links How to play');
+    ok(/AirPod pickleball/.test(title) && /Nothing to install/.test(title) && (title.match(/<a\b[^>]*href="\/how-to-play\.html"[^>]*>How to play<\/a>/g) || []).length === 1, 'the title screen says AirPod pickleball, what you need, and links How to play');
     ok(!/First to 11/.test(title), 'the title screen does not say First to 11'); }
 
   console.log('robots.txt, sitemap.xml');

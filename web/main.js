@@ -16,12 +16,21 @@ const LOBBY = qs.get('skiptitle') !== '1';                       // ?skiptitle=1
 // One id per tab, kept across reloads and reconnects: the server gives a returning tab its seat back instead of seating
 // it against its own half-dead socket (bad wifi drops connections without telling the server).
 let CID = ''; try { CID = sessionStorage.getItem('cid') || ''; if (!CID) sessionStorage.setItem('cid', CID = Math.random().toString(36).slice(2, 12)); } catch { CID = Math.random().toString(36).slice(2, 12); }
+// The code a phone uses to be this tab's paddle (NOTES 34). Made here, shown as a QR on the set-up screen, named on the game
+// socket; the server only matches the two. Kept per tab like the cid, so a reload or a server restart pairs up again by itself.
+const PAD_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let PAD = ''; try { PAD = sessionStorage.getItem('pad') || ''; } catch { /* private window */ }
+if (!/^[A-HJ-NP-Z2-9]{6}$/.test(PAD)) { PAD = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => PAD_ABC[b % 32]).join(''); try { sessionStorage.setItem('pad', PAD); } catch { /* same */ } }
 
 const model = new MotionModel();
 const scene = createScene($('stage'));
 const pod = createPodView($('pod'));
 ui.setServerAddress(GAME);
-if (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1) { $('title-note').textContent = 'Poddle plays on a Mac. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // Windows, a phone, an iPad (which says it is a Mac, but has touch): no helper can run here, so say it under Play
+// A phone can be the paddle wherever the page is served securely (its sensors need https, and it cannot open 'localhost'), so
+// the hosted game needs no helper and no Mac. ?padtest=1 lets the tests pair a fake phone on localhost.
+const CAN_PHONE = HOSTED && location.protocol === 'https:' || qs.get('padtest') === '1';
+const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 600;
+if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
+else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'Poddle plays on a Mac. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
 const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
@@ -166,8 +175,8 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 // ---------- screens: title -> connect -> calibrate -> play ----------
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
 function screen(name) { ui.showScreen(name); scene.setMenu(!!name); }      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
-function openCourt() { screen(null); if (over) showOver(); }
-function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(true); }
+function openCourt() { screen(null); if (over) showOver(); padPhase(); }
+function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(true); padPhase(); }
 function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal: on }); }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
@@ -195,6 +204,7 @@ function toLobby(msg) {                            // out of a room, back to the
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
+  padPhase();
 }
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
@@ -227,7 +237,7 @@ function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
     const url = urls[i % urls.length]; let opened = false;
-    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (LOBBY ? '&lobby=1' + (room ? '&room=' + room + (spec() ? '&watch=1' : '') + (myName() ? '&name=' + encodeURIComponent(myName()) : '') + backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back
+    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (CAN_PHONE ? '&pad=' + PAD : '') + (LOBBY ? '&lobby=1' + (room ? '&room=' + room + (spec() ? '&watch=1' : '') + (myName() ? '&name=' + encodeURIComponent(myName()) : '') + backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
       if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Saved address didn’t answer. Using this Mac.', null, 2800); } }
@@ -243,7 +253,36 @@ function connect(urls, el, onmsg, onopen) {
   return { send: m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); } };
 }
 
-const bridge = connect(BRIDGE, 'm', sample => {
+// ---------- the paddle: an AirPod (the helper on this Mac) or a phone (its page, by way of the game server) ----------
+// Hosted, the helper's socket is only opened for someone who has played with an AirPod here before or asks to: a page
+// reaching for localhost makes Chrome ask a first-time visitor about 'devices on your local network' for nothing.
+// A phone weighs forty AirPods and nobody whips it round at 30 rad/s, so its swings count for more (?padgain= to try another value).
+const PHONE_GAIN = Math.max(0.5, Math.min(3, +qs.get('padgain') || 1.5)), pw = v => src === 'phone' ? v * PHONE_GAIN : v;
+let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE || qs.has('bridge') && qs.get('padtest') !== '1' || ls.get('poddle.airpod') === '1';
+// Someone who played here before phones could be paddles (a name is saved, no choice yet) may have the helper running: it is
+// tried quietly behind the phone's QR, and the first AirPod sample makes the AirPod the paddle, with no click and no change for them.
+let tryBridge = !useAirpod && CAN_PHONE && ls.get('poddle.airpod') == null && !!ls.get('poddle.name');
+function openBridge() { if (!bridge) bridge = connect(BRIDGE, 'm', sample => onSample(sample, 'airpod')); }
+const padFx = (fx, n) => { if (padOn) game.send({ type: 'padfx', fx, n }); };      // the phone buzzes on my hits and says which step we are at
+const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 'play' : 'idle');
+function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
+  const phone = CAN_PHONE && !useAirpod;
+  ui.setPaddle(src || (phone ? 'phone' : 'airpod'));
+  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod',
+    foot: phone ? 'Nothing to install.' : 'Still waiting? Start the Poddle helper on this Mac.', swap: !CAN_PHONE ? '' : phone ? 'Playing with an AirPod?' : 'Use your phone instead' });
+}
+ui.onPaddleSwap(() => { useAirpod = !useAirpod; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); });
+if (useAirpod || tryBridge) openBridge();
+showPair();
+if (CAN_PHONE && !useAirpod && !PHONE_SIZED) $('title-note').textContent = 'Nothing to install. Your phone is the paddle.';
+function onSample(sample, from) {
+  if (from === 'airpod' && (padOn || !useAirpod && !tryBridge)) return;      // a phone was scanned in (or chosen): it is the paddle, the AirPod in a pocket is not
+  if (from === 'airpod' && !useAirpod) { useAirpod = true; tryBridge = false; }      // a returning AirPod player's helper answered
+  if (!sample || !Array.isArray(sample.r)) return;
+  if (from !== src) { src = from; lastT = -1e9; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
+    if (stats.calibrated) { stats.calibrated = false; if (phase === 'play') startCal(); } else if (phase === 'calibrate') startCal(); }
+  if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if (phase === 'play' || phase === 'calibrate') startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero
+  lastT = sample.t;
   const power = Math.hypot(sample.r[0], sample.r[1], sample.r[2]);
   lastSample = performance.now();
   ui.setStat('pw', power.toFixed(1));
@@ -271,19 +310,22 @@ const bridge = connect(BRIDGE, 'm', sample => {
         // A lob is meant (docs/NEXT.md 2): a curved swing ends travelling upward without being an underhand, so the upward
         // share fades out as the swing's axis turns 0.6 -> 1.0 rad. Of the recorded powered lobs only the deliberate one stays.
         const g = Math.max(0, Math.min(1, ((e.turn || 0) - 0.6) / 0.4)), lob = e.lob * (1 - g * g * (3 - 2 * g));
-        game.send({ type: 'swing', power: e.power, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
-        unsettled = e.final ? null : { power: e.power, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
+        game.send({ type: 'swing', power: pw(e.power), dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
+        unsettled = e.final ? null : { power: pw(e.power), dir: e.dir, lob, chop: e.chop, age: e.age, slice };
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);
-      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
+      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: pw(e.peak), net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
   }
-});
+}
 
 const SCENE_EVENTS = ['serve', 'hit', 'swung', 'bounce', 'launch', 'whiff', 'point'];
 const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
+  if (m.type === 'm') { onSample(m, 'phone'); return; }           // my phone's motion, passed on by the server: 60 a second, so before anything else
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'pong') { net.pong(m); return; }
+  if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
+  if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Re-center, pressed on the phone
   if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
   if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online); return; }
@@ -351,7 +393,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'paused') { if (m.refused) ui.setSettings({ canPause: false }); else { setPaused(!!m.on); scene.setFrozen(!!m.on || holding); } return; }
   if (m.type === 'wait') { if (live() && !holding) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // the serve waits for a seat that is calibrating mid-match: the last 30 s of its minute are counted down, then it forfeits
   if (m.type === 'waitoff') { if (!holding) ui.hold(null); return; }
-  if (m.type === 'hit') { struck = true; stats.hits++; if (m.side === side && !spec()) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
+  if (m.type === 'hit') { struck = true; stats.hits++; if (m.side === side && !spec()) { stats.myHits++; padFx('hit', m.n); } rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
     if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve!', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed

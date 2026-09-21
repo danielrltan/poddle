@@ -95,3 +95,20 @@ left, and 35 deg = full court, so the base slams into the left sideline. Require
  - The follow-through must still be VISIBLE — that is the arm-arc offset's job, not the base's.
  - test/motion.test.mjs must include: righty forehand with 110 deg follow-through held for 0.5 s then returned to
    ready -> base x changes < 0.35 m at every instant; same for lefty/backhand mirrored; and max |dx/dt| <= 5.5 m/s always.
+
+## A phone as the paddle (added later; NOTES 34)
+The hosted game needs nothing installed: a phone's browser is the motion sensor.
+ - The game tab invents a code `[A-HJ-NP-Z2-9]{6}` (sessionStorage `pad`), names it on its game socket (`?pad=CODE`, or
+   `{type:'padcode', code}`), and shows `https://<site>/pad.html?k=CODE` as a QR on the set-up screen.
+ - `web/pad.html` + `pad.js` on the phone: permission (iOS), wake lock, one socket `wss://<site>/?padfor=CODE`.
+   `web/padmotion.js` (pure, runs in node) turns deviceorientation (Z-X'-Y'' degrees -> q) and devicemotion (rotationRate
+   deg/s -> r rad/s, acceleration m/s^2 -> a in g) into the SAME sample as above and works out which axis naming the
+   browser uses for rotationRate. Phone -> server: `{type:'m', t, q, r, a}` ~60 Hz, `{type:'padkey', k:'c'|'r'}`, `ping`.
+ - Server: a phone socket is in no lobby and no room and is not counted as online. It rebuilds each valid sample and sends it
+   to the tab that named the code; tells the tab `{type:'pad', on}` and the phone `{type:'padhost', on}`; passes the tab's
+   `{type:'padfx', fx:'hit'|'point'|'cal'|'play'|'idle', n}` to the phone as `{type:'fx', ...}`.
+ - Tab: `{type:'m'}` goes through the same `onSample()` as a bridge message. While a phone is connected the bridge is ignored.
+   A change of paddle, or the phone's clock going backwards (its page was reloaded), recalibrates. Phone swings are scaled
+   by PHONE_GAIN (1.5) before they are sent as `swing`.
+ - Hosted, `ws://localhost:8787` is only opened for players who chose the AirPod (localStorage `poddle.airpod` = '1'), so a
+   first-time visitor never gets Chrome's local-network permission prompt.

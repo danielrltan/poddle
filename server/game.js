@@ -11,7 +11,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon' };
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
-const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html' };            // clean URLs: a fixed map, no extension guessing
+const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html' };            // clean URLs: a fixed map, no extension guessing
 let PAGE_404 = null; try { PAGE_404 = fs.readFileSync(path.join(WEB, '404.html')); } catch { /* no page: plain words */ }
 function notFound(req, res) {                                                                           // a miss is a real 404 (never a soft 200) and never indexed
   const body = PAGE_404 || Buffer.from('not found');
@@ -29,7 +29,7 @@ const httpServer = http.createServer((req, res) => {
   if (rel.includes('\0')) { res.writeHead(400); return res.end(); }                                     // fs.stat THROWS on a null byte (GET /%00), and a throw in here ends the process and every room in it
   if (MOVED[rel]) { res.writeHead(301, { Location: MOVED[rel] + (query.length ? '?' + query.join('?') : ''), 'Cache-Control': 'no-cache', 'Content-Length': 0 }); return res.end(); }
   if (rel === '/status.json') { let pl = 0, sp = 0; for (const c of wss.clients) if (c.room) (c.spec ? sp++ : pl++);      // who a restart would interrupt (deploy.sh reads it)
-    const body = JSON.stringify({ courts: rooms.size, playing: pl, watching: sp, online: wss.clients.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
+    const body = JSON.stringify({ courts: rooms.size, playing: pl, watching: sp, online: wss.clients.size - pads.size, phones: pads.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
   if (rel === '/404.html') return notFound(req, res);
   const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
@@ -746,7 +746,7 @@ function createRoom(code, pub) {
 const LOCAL = createRoom('LOCAL', false);                      // every socket without lobby=1 (tests, ?skiptitle=1, old clients): never listed, never deleted
 const rooms = new Map(), lobby = new Set();                    // code -> room (LOCAL is not in it, so no code can reach it); sockets that have not chosen yet
 const tell = (ws, msg) => put(ws, JSON.stringify(msg));
-const lobbyMsg = () => JSON.stringify({ type: 'lobby', online: wss.clients.size,                 // every public room somebody is in: to join while a seat is free, to watch otherwise
+const lobbyMsg = () => JSON.stringify({ type: 'lobby', online: wss.clients.size - pads.size,                 // every public room somebody is in: to join while a seat is free, to watch otherwise
   rooms: [...rooms.values()].filter(r => r.pub && r.humans().length).map(r => r.info()) });
 // a socket goes from wherever it sits: a seat (dropped = its socket closed by itself: mid-match that seat is held) or a spectator place
 const quit = (ws, dropped) => { const r = ws.room; if (!r) return; if (ws.pl) r.leave(ws.pl, false, !!dropped); else r.unwatch(ws); };
@@ -830,6 +830,34 @@ function quick(ws) {
   if (!best || !seat(ws, best.r)) create(ws, true);
 }
 
+// ---------- a phone as the paddle (NOTES 34): nothing to install ----------
+// The tab makes up a code (it is in the QR it shows) and names it on its game socket (?pad=CODE). The phone's page opens a
+// socket of its own (?padfor=CODE) and its motion samples are passed on to that tab, which feeds them to the same
+// MotionModel an AirPod would. The code is the tab's, not ours: after a restart both sides come back and find each other
+// again with nothing remembered here. A phone is no player: it is in no lobby and no room, and counts nowhere.
+const PAD_CODE = /^[A-HJ-NP-Z2-9]{6}$/, padHosts = new Map(), pads = new Map();      // code -> the tab's socket / the phone's socket
+const PAD_FX = new Set(['hit', 'point', 'cal', 'play', 'idle']);                     // what a tab may tell its phone (a buzz on contact, which step calibration is at)
+const vec = (v, n) => Array.isArray(v) && v.length === n && v.every(Number.isFinite);
+function padHost(ws, code) {                                   // a tab says which code its phone will use
+  if (!PAD_CODE.test(code)) return;
+  ws.padCode = code; padHosts.set(code, ws);
+  const p = pads.get(code); if (p) { tell(p, { type: 'padhost', on: true }); tell(ws, { type: 'pad', on: true }); }
+}
+function padJoin(ws, code) {                                   // a phone
+  ws.pad = code; const old = pads.get(code); if (old && old !== ws) { old.pad = null; old.terminate(); }      // the page was reloaded: its old socket goes
+  pads.set(code, ws);
+  const h = padHosts.get(code); tell(ws, { type: 'padhost', on: !!h }); if (h) tell(h, { type: 'pad', on: true });
+}
+function padMessage(ws, m) {
+  const h = padHosts.get(ws.pad); if (!h) return;
+  if (m.type === 'm') { if (Number.isFinite(m.t) && vec(m.q, 4) && vec(m.r, 3) && vec(m.a, 3)) put(h, JSON.stringify({ type: 'm', t: m.t, q: m.q, r: m.r, a: m.a })); }      // rebuilt, never passed on as it came: a phone cannot speak as the server
+  else if (m.type === 'padkey' && (m.k === 'c' || m.k === 'r')) tell(h, { type: 'padkey', k: m.k });                      // Calibrate / Re-center, pressed on the phone
+}
+function padGone(ws) {
+  if (ws.pad && pads.get(ws.pad) === ws) { pads.delete(ws.pad); const h = padHosts.get(ws.pad); if (h) tell(h, { type: 'pad', on: false }); }
+  if (ws.padCode && padHosts.get(ws.padCode) === ws) { padHosts.delete(ws.padCode); const p = pads.get(ws.padCode); if (p) tell(p, { type: 'padhost', on: false }); }
+}
+
 wss.on('connection', (ws, req) => {
   ws.on('error', () => {});                                    // a bad frame must not take the process down
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
@@ -845,8 +873,11 @@ wss.on('connection', (ws, req) => {
     if (++ws.msgN > MSG_DROP) { if (ws.msgN > MSG_KILL) ws.terminate(); return; }
     const m = JSON.parse(raw);
     if (!m || typeof m !== 'object') return;
+    if (ws.pad && m.type !== 'ping') return padMessage(ws, m);
     if (m.type === 'ping') return tell(ws, { type: 'pong', c: Number.isFinite(m.c) ? m.c : 0, t: ws.room ? ws.room.time() : clock });   // the client times the round trip itself (in the lobby too). c is echoed only as a number
     if (m.type === 'net') return void (ws.every = num(m.hz, 60) <= 30 ? 2 : 1);   // a struggling link asks for half the state packets; it is the link's, so it follows the socket from room to room
+    if (m.type === 'padfx') { const p = ws.padCode && pads.get(ws.padCode); if (p && PAD_FX.has(m.fx)) tell(p, { type: 'fx', fx: m.fx, n: clamp(num(m.n, 0), 0, 1) }); return; }
+    if (m.type === 'padcode') return padHost(ws, String(m.code || ''));
     if (typeof m.name === 'string') ws.name = cleanName(m.name);   // rides on quick / create / join / watch / name. Strings only, like every other field
     if (ws.room) {
       if (m.type === 'leave' && ws.viaLobby) { quit(ws); enterLobby(ws); }
@@ -856,8 +887,11 @@ wss.on('connection', (ws, req) => {
       if (m.type === 'quick') quick(ws); else if (m.type === 'create') create(ws, m.public === true); else if (m.type === 'join') joinCode(ws, m.code); else if (m.type === 'watch') watchCode(ws, m.code);
     }
   } catch (err) { if (!(err instanceof SyntaxError)) console.error('bad message:', err.message); } });
-  ws.on('close', () => { quit(ws, true); lobby.delete(ws); lobbyChanged(); });
+  ws.on('close', () => { padGone(ws); quit(ws, true); lobby.delete(ws); lobbyChanged(); });
 
+  const padFor = String(q.get('padfor') || '').toUpperCase();
+  if (q.get('padfor') != null) { if (PAD_CODE.test(padFor)) padJoin(ws, padFor); else { tell(ws, { type: 'padhost', bad: true }); ws.close(); } return; }      // a phone: no lobby, no seat
+  if (q.get('pad')) padHost(ws, String(q.get('pad')).toUpperCase());
   if (!ws.viaLobby) { if (!seat(ws, LOCAL)) { ws.send(JSON.stringify({ type: 'full' })); ws.close(); } return; }
   enterLobby(ws);
   const ws0 = +q.get('side'); if (q.get('back') === '1' && (ws0 === 0 || ws0 === 1) && q.get('side') !== null && q.get('side') !== '') ws.wantSide = ws0;

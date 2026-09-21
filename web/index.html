@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Poddle | AirPod Pickleball</title>
-<meta name="description" content="Hold one AirPod and swing it like a paddle. Play pickleball with friends online, take on Matt the bot, or watch a match. Free, in Chrome on a Mac.">
+<meta name="description" content="Swing your phone or an AirPod like a paddle. Play pickleball with friends online, take on Matt the bot, or watch a match. Free, with nothing to install.">
 <link rel="canonical" href="https://poddleball.com/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#dfeef6">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Poddle">
 <meta property="og:title" content="Poddle: Pickleball You Play With an AirPod">
-<meta property="og:description" content="Swing one AirPod like a paddle. Play friends online or take on Matt the bot. Free, on a Mac in Chrome.">
+<meta property="og:description" content="Swing your phone or an AirPod like a paddle. Play friends online or Matt the bot. Free, no install.">
 <meta property="og:url" content="https://poddleball.com/">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://poddleball.com/og.jpg?v=3">
@@ -26,7 +26,7 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Poddle: Pickleball You Play With an AirPod">
-<meta name="twitter:description" content="Swing one AirPod like a paddle. Play friends online or take on Matt the bot. Free, on a Mac in Chrome.">
+<meta name="twitter:description" content="Swing your phone or an AirPod like a paddle. Play friends online or Matt the bot. Free, no install.">
 <meta name="twitter:image" content="https://poddleball.com/og.jpg?v=3">
 <meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball using an AirPod!">
 
@@ -42,15 +42,15 @@
   "name": "Poddle",
   "alternateName": "Poddle AirPod pickleball",
   "url": "https://poddleball.com/",
-  "description": "Poddle is a browser pickleball game where one AirPod in your hand is the paddle. Play friends online, play Matt the bot, or watch a match.",
+  "description": "Poddle is a browser pickleball game where the phone in your hand, or one AirPod, is the paddle. Nothing to install. Play friends online, play Matt the bot, or watch a match.",
   "image": "https://poddleball.com/og.jpg",
   "screenshot": "https://poddleball.com/og.jpg",
   "genre": ["Sports", "Pickleball"],
   "applicationCategory": "GameApplication",
   "applicationSubCategory": "Sports game",
-  "operatingSystem": "macOS 14 or later",
-  "browserRequirements": "Requires Google Chrome with JavaScript and WebGL, and the Poddle AirPod helper running on the same Mac.",
-  "gamePlatform": ["Web browser", "macOS"],
+  "operatingSystem": "Any, in a modern browser",
+  "browserRequirements": "Requires a browser with JavaScript and WebGL, and a phone with motion sensors to be the paddle. An AirPod works instead with the Poddle helper on a Mac.",
+  "gamePlatform": ["Web browser"],
   "playMode": ["SinglePlayer", "MultiPlayer"],
   "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 2 },
   "inLanguage": "en",
@@ -68,9 +68,9 @@
 <noscript>
   <div style="position:fixed;inset:0;z-index:9999;display:grid;place-content:center;gap:.75rem;padding:2rem;text-align:center;font:500 1.125rem/1.5 system-ui,sans-serif;color:#39434d;background:#dfeef6">
     <h1 style="margin:0;font-size:3rem">Poddle</h1>
-    <p style="margin:0">Pickleball in your browser. Hold one AirPod like a paddle and swing. Play friends online or take on Matt the bot.</p>
+    <p style="margin:0">Pickleball in your browser. Hold your phone, or one AirPod, like a paddle and swing. Play friends online or take on Matt the bot.</p>
     <p style="margin:0">Poddle needs JavaScript. Turn it on and reload.</p>
-    <p style="margin:0">For Mac: macOS 14 or later, Chrome, and AirPods Pro, 3, 4 or Max.</p>
+    <p style="margin:0">Nothing to install: scan a code and your phone is the paddle. AirPods work too, on a Mac.</p>
     <p style="margin:0"><a href="/how-to-play.html">How to play</a></p>
   </div>
 </noscript>
@@ -156,7 +156,7 @@
   <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
   <button class="btn btn-sm" id="btn-leave-room" hidden>Leave court</button>
   <ul class="set-status">
-    <li class="is-wait" id="set-airpod"><span class="light"></span><b>AirPod</b><em id="set-airpod-state">Waiting</em></li>
+    <li class="is-wait" id="set-airpod"><span class="light"></span><b id="set-airpod-name">AirPod</b><em id="set-airpod-state">Waiting</em></li>
     <li class="is-wait" id="set-game"><span class="light"></span><b>Game</b><em id="set-game-state">Waiting</em></li>
     <li class="is-wait" id="set-camera"><span class="light"></span><b>Camera</b><em id="set-camera-state">Waiting</em></li>
   </ul>
@@ -179,11 +179,11 @@
       <svg class="safety-icon" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="33" fill="#eaf6fc" stroke="#a9e0f6" stroke-width="2.5"/><g class="art-line" style="stroke-width:3.6"><circle cx="36" cy="21" r="5.5"/><path d="M36 28v17M36 45l-7 13M36 45l7 13M24 31l12 4 12-4"/></g><g class="art-accent" style="stroke-width:3.2"><path d="M13 30a24 24 0 0 0 0 16M59 30a24 24 0 0 1 0 16"/></g></svg>
       <div>
         <h3>Clear some space</h3>
-        <p>Check behind you before you swing. Hold the AirPod tight, it has no strap.</p>
+        <p>Check behind you before you swing. Hold your paddle tight, it has no strap.</p>
       </div>
     </div>
   </div>
-  <footer class="menu-foot menu-foot-note"><span>For Mac: macOS 14 or later, Chrome, and AirPods Pro, 3, 4 or Max</span><a class="foot-link" href="/how-to-play.html" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">How to play</a></footer>
+  <footer class="menu-foot menu-foot-note"><span>Nothing to install: scan a code and your phone is the paddle. AirPods work too, on a Mac</span><a class="foot-link" href="/how-to-play.html" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">How to play</a></footer>
 </section>
 
 <!-- ============================================== LOBBY ============================================== -->
@@ -270,15 +270,23 @@
   <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Back</button><span class="menu-title">Getting ready</span></header>
   <div class="menu-body">
     <div class="panel panel-mid" data-fit>
-      <h2 class="t-title" style="margin-bottom:1.5rem">Connect your AirPod</h2>
+      <h2 class="t-title" id="connect-title" style="margin-bottom:1.5rem">Grab your paddle</h2>
+      <div class="pad-pair" id="pad-pair" hidden>
+        <div class="pad-qr" id="pad-qr" role="img" aria-label="QR code that opens the paddle page on your phone"></div>
+        <div class="pad-how">
+          <h3>Your phone is the paddle</h3>
+          <ol><li>Point your phone’s camera at the code.</li><li>Tap <b>Start</b>, then hold the phone like a paddle handle.</li></ol>
+          <p class="pad-alt">No camera? Open <b>poddleball.com/pad</b> on the phone and type <b class="pad-code" id="pad-code"></b></p>
+        </div>
+      </div>
       <ul class="status-list">
-        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name">AirPod</b><span class="status-text" id="row-airpod-text">Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name" id="row-airpod-name">AirPod</b><span class="status-text" id="row-airpod-text">Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
         <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game</b><span class="status-text" id="row-game-text">Finding the game</span><em class="status-state" id="row-game-state">Waiting</em></li>
         <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Allow the camera when the browser asks.</span><em class="status-state" id="row-camera-state">Waiting</em></li>
       </ul>
     </div>
   </div>
-  <footer class="menu-foot"><span>Still waiting? Start the Poddle helper on this Mac.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+  <footer class="menu-foot"><span id="connect-foot"><span id="connect-foot-text">Still waiting? Start the Poddle helper on this Mac.</span> <button class="foot-link foot-btn" id="btn-paddle-swap" hidden></button></span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CALIBRATE ============================================== -->

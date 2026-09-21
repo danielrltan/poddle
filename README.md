@@ -1,22 +1,29 @@
 # Poddle 🏓
 
-**Wii-Sports-style pickleball where the controller is an AirPod.**
+**Wii-Sports-style pickleball where the controller is your phone, or an AirPod.**
 
-Hold one AirPod in your hand, swing it like a paddle, and play a friend online or the built-in bot.
-No extra hardware: AirPods Pro/3/Max have motion sensors (orientation, rotation rate, acceleration at 50 Hz) that macOS
-exposes through `CMHeadphoneMotionManager`, and Poddle turns that into a motion controller.
+Open https://poddleball.com on a computer, scan the code with your phone, and swing it like a paddle: nothing to install.
+Play a friend online or the built-in bot.
+On a Mac, one AirPod can be the paddle instead: AirPods Pro/3/Max have motion sensors (orientation, rotation rate,
+acceleration at 50 Hz) that macOS exposes through `CMHeadphoneMotionManager`, and Poddle turns that into a motion controller.
 
 ![screenshot](docs/screenshot.png)
 
 ## How it works
 
 ```
+phone ── pad.html (deviceorientation + devicemotion, web/padmotion.js) ──wss──▶ server/game.js ──▶ browser   (nothing installed)
 AirPod ──BLE──▶ motion/ (Swift, CoreMotion) ──stdout JSON──▶ bridge/ (ws :8787) ──▶ browser
                                                                                    │  web/motion.js  calibration, aim, swing detection, arm model
                                                                                    │  web/scene.js   three.js court, paddles, ball, audio
 browser ◀──────────────── ws :8080 ────────────────▶ server/game.js  serves web/, rooms, authoritative ball, contact, scoring, bot
 ```
 
+- **A phone is a paddle with no install.** The game tab makes up a 6 character code and shows it as a QR. The phone opens
+  `pad.html?k=CODE`, turns its motion events into the same `{t, q, r, a}` sample the AirPod bridge sends, and the game
+  server passes each one to that tab (`?pad=` / `?padfor=`, test/pad.test.mjs). From there on MotionModel cannot tell a
+  phone from an AirPod. Browsers disagree on which axis `rotationRate.alpha` is, so padmotion.js works it out from how the
+  orientation actually turned.
 - **There is no position sensor.** A motion sensor can't tell where your hand is (double-integrated acceleration drifts in
   about a second), so Poddle is built on what the sensor is good at: *orientation* and *rotation rate*.
 - **Jitter buffer:** real AirPods deliver samples in pairs every ~40 ms with gaps to ~80 ms, so the paddle is rendered
@@ -38,21 +45,26 @@ browser ◀──────────────── ws :8080 ───�
   actually inside the contact box around your paddle. The server reports why each swing missed (early / late / left /
   right / high / low).
 
-## Set up
+## Play online
+
+Open https://poddleball.com on a computer, press Play and pick a court. The set-up screen shows a QR code: scan it with
+your phone, tap Start, and the phone is your paddle. Nothing to install, any computer, any modern phone (an iPhone asks
+to allow motion once per visit). No camera on the phone? Open `poddleball.com/pad` and type the code.
+
+### With an AirPod instead (Mac only)
 
 Requires macOS 14+, Node 18+, and AirPods with motion sensors connected to the Mac **as the audio output**.
 Turn **off** *Automatic Ear Detection* (Settings → Bluetooth → AirPods ⓘ) so motion keeps streaming out of your ear.
-Leave the other AirPod in its case.
-
-## Play online
-
-Open https://poddleball.com in Chrome. The game runs there, but your AirPod talks to your own Mac, so each player
-clones this repo and starts the AirPod bridge first:
+Leave the other AirPod in its case. The game runs at poddleball.com, but your AirPod talks to your own Mac, so clone this
+repo and start the AirPod bridge first:
 
 ```bash
 npm install && ./motion/build.sh
 node bridge/bridge.js
 ```
+
+On the set-up screen press **Playing with an AirPod?** (remembered from then on; Chrome asks once to let the page reach
+the helper on your Mac).
 
 Type your name once, press Play, then Quick play, Create court, Enter code, or Play a bot (Matt: Rookie, Club or Pro).
 Courts have a 4-character code and a link (`?court=CODE`) to share. Alone on a court? Matt walks in after 2.5 s. With two
@@ -85,6 +97,9 @@ node test/rom.mjs             # flicks ignored, arm swings scored
 node test/bot.test.mjs        # bot auto-join, levels, comes back when player 2 leaves
 node test/server.test.mjs     # rallies, contact box, whiff reasons, scoring, bot, 26k launch solves
 node test/rooms.test.mjs      # rooms: quick play, codes, full, leave, reconnect, hostile input
+node test/padmotion.test.mjs  # phone paddle: event angles -> samples, rotationRate naming found, MotionModel calibrates on them
+node test/pad.test.mjs        # phone paddle: the server passes a phone's samples to its tab and nobody else
+node test/pad-e2e.mjs         # phone paddle end to end: the game in one Chrome, pad.html in another, calibrate and rally   (needs Google Chrome)
 node test/menu.mjs            # title, lobby and room flow in headless Chrome   (needs Google Chrome)
 node test/rooms-e2e.mjs       # two players through the lobby into one court, one Chrome each   (needs Google Chrome)
 node test/spectate-e2e.mjs    # three Chromes: Play a bot + pause, a spectator and the four views, rematch, wifi drop, forfeit, status tags   (needs Google Chrome)

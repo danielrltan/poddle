@@ -398,3 +398,31 @@ Build log. What we tried, what broke, and how each problem was solved.
   server running you (Auto); the wrist's yaw never moves you. Range ([ ] and the panel's - / +) is Body's step reach
   only; the old sideline-angle range (`sideDeg`) is dropped from the saved settings. motion.js still works out its yaw
   point internally: the swing's base lock needs it.
+
+## 34. Your phone is the paddle: nothing to install
+- "Find a way to make this webapp game a visit-and-play. I don't want users having to open up their terminal to install
+  shit before they play. Destroys UX."
+- The AirPod needed a Swift helper and a Node bridge on every player's Mac, because a web page cannot read AirPod motion.
+  A phone's browser CAN read its own motion sensors (deviceorientation + devicemotion) over https, so the phone is the
+  paddle now and the helper is optional.
+- Flow: the set-up screen ("Grab your paddle") shows a QR code for `poddleball.com/pad.html?k=CODE`. Scan it, tap Start
+  (iPhone asks to allow motion), and the game starts calibrating by itself. No camera? `poddleball.com/pad` and type the
+  6 characters. The code is made by the tab (sessionStorage), so a reload or a deploy pairs the two up again unaided.
+- `web/padmotion.js` turns the events into the exact `{t, q, r, a}` sample the AirPod bridge sends, so MotionModel,
+  swing detection and calibration are untouched. Browsers disagree on which of rotationRate's alpha/beta/gamma is which
+  axis; it is not guessed: the naming whose rates agree with how the orientation actually turned wins (and locks).
+- The game server relays: the phone's socket (`?padfor=CODE`) is in no lobby and no room and is not counted online; each
+  valid sample is rebuilt and passed to the tab that named the code (`?pad=CODE`). The tab sends back `padfx` so the phone
+  buzzes on your hits (Android) and says which step you are on. Calibrate again / Re-center on the phone are press-and-hold,
+  because a gripped phone gets its screen touched all rally.
+- Phones are heavier and swung slower than an AirPod, so their swing power is scaled by 1.5 (`?padgain=` to try others).
+  This number is a first guess, not measured on a real phone yet.
+- AirPods still work: "Playing with an AirPod?" at the bottom of the set-up screen (remembered). Hosted, the page no longer
+  opens `ws://localhost:8787` for a first-time visitor, so Chrome's "devices on your local network" prompt only appears for
+  AirPod players. Someone who played before this (a name saved, no choice made) sees the QR too, but their helper is tried
+  quietly behind it: the first AirPod sample makes the AirPod the paddle, with no click.
+- Copy: title, meta, share card text, noscript and how-to-play are phone-first; the AirPod set-up is its own section.
+- Tests: `test/padmotion.test.mjs` (maths, both namings, MotionModel calibrates and swings on phone samples),
+  `test/pad.test.mjs` (relay, isolation, hostile input, reconnects either order, 60 Hz within the budget),
+  `test/pad-e2e.mjs` (a first visit never touches localhost; game in one Chrome, pad.html in another fed synthetic sensor events: QR, calibrate, rally, the
+  phone page closing and coming back, a typed code, a device with no sensors).
