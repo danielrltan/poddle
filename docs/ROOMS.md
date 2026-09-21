@@ -40,6 +40,8 @@ client -> server (only valid in the lobby, ignored otherwise, except `leave`)
   `wait: true`. Additive: nothing else in `state` changes. (Off with `AUTOBOT=0`, where scripted clients may never
   send one.)
 - Input is untrusted: `code` must be a string, `ping.c` is echoed only if it is a number, messages over 4 KB close the socket.
+  A socket is heard 200 times a second (the rest is dropped unread; past 1000 it is closed), a socket with 256 KB unread is closed, and one address
+  (`fly-client-ip`, never this machine's own) may have 4 rooms of its making standing at once: `busy` beyond that.
 - When the other human leaves BEFORE a ball is struck, the one who stays gets `{ type:'left' }`, then the bot comes back as it
   does today. Mid-match it is a seat hold or a forfeit: docs/SPECTATE.md.
 

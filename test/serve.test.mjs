@@ -131,8 +131,11 @@ t6 = await myServe(); A.send({ type: 'swing', power: 15, dir: 0.5, lob: 0 }); aw
 h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - t6 > 0.6 && h6[0].at - t6 < 0.9 && Math.abs(h6[0].n - 0.35) < 1e-6, `lone stroke 15: struck ${h6[0] && (h6[0].at - t6).toFixed(2)} s later (want ~0.7), n ${h6[0] && h6[0].n.toFixed(3)} (9/28 lifted to the serve floor)`);
 await done(t6);
 
-t6 = await myServe(); A.send({ type: 'swing', power: 20, dir: 0.5, lob: 0 }); await wait(300); A.send({ type: 'swing', power: 12, dir: 0.4, lob: 0 }); await until(() => hitsSince(t6).length, 1500, 'the held 20');
-h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - t6 > 0.6 && h6[0].at - t6 < 0.9 && Math.abs(h6[0].n - 0.5) < 1e-6, `20, then a weaker 12 the same way: the 12 changes nothing, the 20 serves at ${h6[0] && (h6[0].at - t6).toFixed(2)} s with n ${h6[0] && h6[0].n.toFixed(2)}`);
+t6 = await myServe(); A.send({ type: 'swing', power: 16, dir: 0.5, lob: 0 }); await wait(300); A.send({ type: 'swing', power: 12, dir: 0.4, lob: 0 }); await until(() => hitsSince(t6).length, 1500, 'the held 16');
+h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - t6 > 0.6 && h6[0].at - t6 < 0.9 && Math.abs(h6[0].n - 10 / 28) < 1e-6, `16, then a weaker 12 the same way: the 12 changes nothing, the 16 serves at ${h6[0] && (h6[0].at - t6).toFixed(2)} s with n ${h6[0] && h6[0].n.toFixed(2)}`);
+await done(t6);
+t6 = await myServe(); A.send({ type: 'swing', power: 20, dir: 0.5, lob: 0 }); await until(() => hitsSince(t6).length, 1000, 'a lone 20');
+h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - t6 < 0.1 && Math.abs(h6[0].n - 0.5) < 1e-6, `lone settled 20 (SERVE_SURE is 17 now: his median real stroke is 18.3 and used to hang 0.7 s): struck at once (${h6[0] && (h6[0].at - t6).toFixed(3)} s)`);
 await done(t6);
 
 // the client reports a swing early and corrects it (fix): a correction belongs to its own swing, it is never "the stroke after the wind-up"
@@ -141,6 +144,23 @@ h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - t6 > 0.6 && h6[0].at - t6 <
 await done(t6);
 t6 = await myServe(); A.send({ type: 'swing', power: 13, dir: 0.5, lob: 0 }); await wait(80); const tFix = t(); A.send({ type: 'swing', power: 28, dir: 0.5, lob: 0, fix: true }); await until(() => hitsSince(t6).length, 1500, 'the corrected 13');
 h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - tFix < 0.1 && Math.abs(h6[0].n - 22 / 28) < 1e-6 && since(t6, 'swung').length === 1, `early call 13 corrected to 28: that is no wind-up, struck at once with n ${h6[0] && h6[0].n.toFixed(3)}, one swing animated`);
+await done(t6);
+// 7. the first report of a swing is a BET that overshoots (final:false); the settled one follows 60-280 ms later (final:true). Only a settled report decides.
+// Recorded wind-ups: first called 30.4, settled 8.2 (and 32.3 > 8.0, 26.6 > 6.0): before this each of them served at once, as a smash.
+t6 = await myServe(); A.send({ type: 'swing', power: 30, dir: 1, lob: 0, final: false }); await wait(80); A.send({ type: 'swing', power: 8, dir: 1, lob: 0, fix: true, final: true }); await wait(420);
+const none7 = hitsSince(t6).length, tS7 = t(); A.send({ type: 'swing', power: 31, dir: -1, lob: 0, final: false }); await wait(100); const tF7 = t(); A.send({ type: 'swing', power: 28, dir: -1, lob: 0, fix: true, final: true }); await wait(1200);
+h6 = hitsSince(t6); l6 = since(t6, 'launch');
+ok(none7 === 0 && h6.length === 1 && Math.abs(h6[0].n - 22 / 28) < 1e-6 && h6[0].at >= tF7 - 0.02 && h6[0].at - tF7 < 0.1 && l6.length === 1 && l6[0].land[0] < -0.5,
+  `wind-up called 30 that settles at 8, then the stroke (called 31, settled 28) 0.5 s later: ONE hit, n ${h6[0] && h6[0].n.toFixed(3)} and the aim are the stroke's, struck when it settled, ${h6[0] && (h6[0].at - tS7).toFixed(2)} s after its first report (hits ${h6.length}, ${none7} on the wind-up, launches ${l6.length})`);
+await done(t6);
+t6 = await myServe(); A.send({ type: 'swing', power: 34, dir: 0.3, lob: 0, final: false }); await until(() => hitsSince(t6).length, 1000, 'the bet that never settles');
+h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - t6 > 0.25 && h6[0].at - t6 < 0.45 && Math.abs(h6[0].n - 0.76) < 1e-6 && h6[0].kind === 'drive', `a bet of 34 whose settled report never comes: taken as it stands after ${h6[0] && (h6[0].at - t6).toFixed(2)} s, and a bet never smashes (n ${h6[0] && h6[0].n.toFixed(2)}, ${h6[0] && h6[0].kind})`);
+await done(t6);
+t6 = await myServe(); A.send({ type: 'swing', power: 34, dir: 0.3, lob: 0, final: false }); await wait(90); const tF8 = t(); A.send({ type: 'swing', power: 33, dir: 0.3, lob: 0, fix: true, final: true }); await until(() => hitsSince(t6).length, 1000, 'the settled smash');
+h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - tF8 < 0.1 && h6[0].kind === 'smash' && h6[0].n > 0.76, `called 34, settled 33: struck when it settled, and THAT is a smash (n ${h6[0] && h6[0].n.toFixed(2)}, ${h6[0] && h6[0].kind})`);
+await done(t6);
+t6 = await myServe(); A.send({ type: 'swing', power: 9, dir: 0.5, lob: 0 }); await wait(500); const tW7 = t(); A.send({ type: 'swing', power: 14, dir: 0.5, lob: 0 }); await until(() => hitsSince(t6).length, 1000, 'the stroke after a soft wind-up');
+h6 = hitsSince(t6); ok(h6.length === 1 && h6[0].at - tW7 < 0.1, `soft wind-up 9, then 14 half a second later: the 14 is the stroke, struck at once (${h6[0] && (h6[0].at - tW7).toFixed(3)} s)`);
 await done(t6);
 ok(onOwnHalf, "a hanging ball never left the server's half");
 ok(bad === 0 && states > 1000, `${states} state packets, ${bad} with NaN/missing fields`);

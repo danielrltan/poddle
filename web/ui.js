@@ -57,7 +57,7 @@ export function callout(kind, them = false) {              // only the shot's na
 // won: true = mine, false = theirs, null = I am watching (then side says whose colour: 0 blue, 1 orange). "Their point" is only for a caller with no name.
 export function pointBanner(won, name = '', side) {
   const b = $('banner'), mine = won === true, blue = won == null ? side !== 1 : mine; name = String(name || '') || (won == null ? (side === 1 ? 'Player 2' : 'Player 1') : '');
-  $('banner-text').textContent = mine ? 'Your point!' : name ? `${name} scores` : 'Their point';
+  $('banner-text').textContent = mine ? 'Your point' : name ? `${name} scores` : 'Their point';
   b.classList.toggle('is-me', blue); b.classList.toggle('is-them', !blue); restart(b, 'show');
 }
 let toastT;
@@ -66,8 +66,9 @@ export function toast(text, ms = 1200) {
   clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('on'); b.classList.remove('has-toast'); }, ms);
 }
 export function toastOff() { clearTimeout(toastT); $('toast').classList.remove('on'); document.body.classList.remove('has-toast'); }     // the screen it spoke about is gone
+export function confettiOff() { for (const c of document.querySelectorAll('.confetti')) c.remove(); }      // the court it fell over is gone
 export function confetti(colors, n = 46) {
-  if (reduced()) return;
+  if (reduced() || slots.menu) return;                                               // nothing of a game shows over a menu
   const frag = document.createDocumentFragment(), made = [];
   for (let i = 0; i < n; i++) { const c = document.createElement('div'); c.className = 'confetti';
     c.style.left = Math.random() * 100 + 'vw'; c.style.background = colors[i % colors.length];
@@ -79,7 +80,7 @@ export function confetti(colors, n = 46) {
 }
 // o = { won, me, them, nameMe, nameThem, forfeit, role, vote }: me / them are the left and right scores, won = the left side won.
 // The old positional call (won, me, them, name) still works and means a room with no vote: the next game starts by itself.
-let resultRole = 'player', voted = false, countT = 0, countLeft = 0, countTotal = 0;
+let resultRole = 'player', voted = false, votedYes = false, noCount = false, countT = 0, countLeft = 0, countTotal = 0;
 export function matchResult(o, me, them, name) {
   if (o === null || typeof o !== 'object') o = { won: !!o, me, them, nameThem: name, vote: false };
   const won = !!o.won, watching = o.role === 'spectator', nameMe = String(o.nameMe || 'You'), nameThem = String(o.nameThem || 'Opponent'), lost = !watching && !won, vote = !watching && o.vote !== false;
@@ -89,16 +90,16 @@ export function matchResult(o, me, them, name) {
   setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : '');
   $('tally-sc-me').textContent = o.me ?? 0; $('tally-sc-them').textContent = o.them ?? 0; setText($('tally-name-me'), nameMe); setText($('tally-name-them'), nameThem);
   $('tally-me').classList.toggle('is-winner', won); $('tally-them').classList.toggle('is-winner', !won);
-  resultRole = watching ? 'spectator' : 'player'; voted = false; stopCount(); countTotal = 0; votes = { mine: null, theirs: null, name: nameThem };
+  resultRole = watching ? 'spectator' : 'player'; voted = votedYes = false; noCount = !!o.forfeit; stopCount();      // a forfeit leaves one thing to press (Leave): a bar ticking down beside it read as a rematch clock nobody could answer. The court still closes by itself countTotal = 0; votes = { mine: null, theirs: null, name: nameThem };
   show('rematch-btns', vote); show('rematch-count', false);
   for (const id of ['btn-rematch', 'btn-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
-  setText($('rematch-note'), watching ? 'Waiting for a rematch' : vote ? '' : 'New game starting');
+  setText($('rematch-note'), watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
   showOverlay('match');
   if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60);
 }
 function stopCount() { clearInterval(countT); countT = 0; }
 function drawCount(n) { countLeft = n; setText($('rematch-left'), String(n)); $('rematch-bar')?.style.setProperty('--p', (countTotal ? Math.min(1, n / countTotal) : 0).toFixed(3)); }
-function lockVote(yes) { voted = true; for (const [id, mine] of [['btn-rematch', yes], ['btn-leave', !yes]]) { const b = $(id); if (b) { b.disabled = true; b.classList.toggle('is-pressed', mine); } } }
+function lockVote(yes) { voted = true; votedYes = yes; for (const [id, mine] of [['btn-rematch', yes], ['btn-leave', !yes]]) { const b = $(id); if (b) { b.disabled = mine || !yes; b.classList.toggle('is-pressed', mine); } } }      // after Rematch, Leave stays open: nobody is locked in for 20 s behind someone who walked off
 let onVote = null;
 export function onRematch(fn) { onVote = fn; }                                          // Rematch -> fn(true), Leave -> fn(false)
 // { mine, theirs, left, name }: each vote true | false | null, a missing key = unchanged. The server only speaks when a vote changes, so the seconds tick here.
@@ -108,7 +109,7 @@ export function rematch(o = {}) {
   if ('theirs' in o) { votes.theirs = o.theirs; const r = $('btn-rematch'); if (o.theirs === false && r && !voted) { const had = document.activeElement === r; r.disabled = true; if (had) $('btn-leave')?.focus({ preventScroll: true }); } }      // they left (a forfeit): there is nobody to play again, only Leave
   if (o.name != null) votes.name = String(o.name);
   if (typeof o.left === 'number' && isFinite(o.left)) { const n = Math.max(0, Math.round(o.left)); countTotal = Math.max(countTotal, n) || 1;       // the bar drains from the first number it was given
-    stopCount(); show('rematch-count', true); drawCount(n); countT = setInterval(() => { if (countLeft > 0) drawCount(countLeft - 1); else stopCount(); }, 1000); }
+    stopCount(); show('rematch-count', !noCount); drawCount(n); countT = setInterval(() => { if (countLeft > 0) drawCount(countLeft - 1); else stopCount(); }, 1000); }
   if (resultRole === 'spectator') return;                                                // their note stays "Waiting for a rematch"
   // (after a forfeit the card already says "<name> left" under the title: not twice)
   if ('mine' in o || 'theirs' in o || o.name != null) { const who = votes.name || 'Opponent';
@@ -215,7 +216,7 @@ export function onRetry(fn) { $('btn-retry').addEventListener('click', fn); }
 // ---------- names ----------
 // One name, two fields (lobby and settings panel), kept in localStorage. The server cleans it again: this is only so the player sees what they will get.
 const NAME_KEY = 'poddle.name';
-const cleanName = t => String(t ?? '').replace(/[\u0000-\u001f\u007f-\u009f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12).trim();
+const cleanName = t => { const n = [...String(t ?? '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (server/game.js cleanName): a name that draws as nothing is no name
 let savedName = ''; try { savedName = cleanName(localStorage.getItem(NAME_KEY)); } catch { /* private window: ask every time */ }
 for (const id of ['name-input', 'set-name-input']) { const el = $(id); if (el) { el.value = savedName; el.addEventListener('focus', () => el.select()); } }      // like the code boxes: typing replaces what is there
 export const playerName = () => cleanName(($('name-input') || {}).value ?? savedName);
@@ -258,6 +259,7 @@ export function setSettings(o = {}) {
   for (const [key, id] of [['sensMin', 'btn-sens-less'], ['sensMax', 'btn-sens-more']]) if (key in o && $(id)) { if (o[key] && document.activeElement === $(id)) $('settings')?.focus({ preventScroll: true }); $(id).disabled = !!o[key]; }   // a disabled button drops focus to <body>: keep it in the card
   for (const [key, id] of [['airpod', 'tog-airpod'], ['stats', 'tog-stats']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
   if ('inRoom' in o) show('btn-leave-room', !!o.inRoom);
+  if ('forfeit' in o) setText($('btn-leave-room'), o.forfeit ? 'Forfeit' : 'Leave court');      // mid-match against a person, leaving is a forfeit: the button says so
   if ('canPause' in o) show('set-note', o.canPause === false);
   if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }      // no camera: Body cannot be picked, and the row says why
   if ('spectator' in o) $('settings')?.classList.toggle('is-spectator', !!o.spectator);
@@ -299,7 +301,7 @@ export function setView(name, who = '') {
 on2('views', 'click', e => { const c = e.target.closest('.view-chip'); if (c && onViewFn) onViewFn(c.dataset.view); });
 on2('views', 'keydown', e => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; const cs = [...$('views').children], i = cs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault(); cs[(i + d + 4) % 4].focus(); });
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });
-on2('btn-leave', 'click', () => { if (voted) return; lockVote(false); if (onVote) onVote(false); });
+on2('btn-leave', 'click', () => { if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
 on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const b = $(e.key === 'ArrowLeft' ? 'btn-rematch' : 'btn-leave'); if (b && !b.disabled) { e.preventDefault(); b.focus(); } });
 
 // ---------- lobby ----------

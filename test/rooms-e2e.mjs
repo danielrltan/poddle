@@ -94,7 +94,7 @@ ok(s.pill === CODE && s.meSub === 'Near side', `a is back in ${s.pill} on the ${
 
 // ---- 4. b leaves mid-match: a forfeit (NEW RULE). a wins, the court closes, nobody can join it any more ----
 await until(a, s => s.hits > 0, 30000, 'a ball is struck after the reloads');
-await b.keyboard.press('KeyQ'); s = await until(b, s => s.toast, 2000, 'b first Q'); ok(s.toast === 'Press Q again to leave' && s.screen === 'hud', `b first Q only asks: "${s.toast}"`); await shot(b, '9-leave-ask');
+await b.keyboard.press('KeyQ'); s = await until(b, s => s.toast, 2000, 'b first Q'); ok(s.toast === 'Press Q again to forfeit' && s.screen === 'hud', `b first Q only asks, and says what leaving costs mid-match: "${s.toast}"`); await shot(b, '9-leave-ask');
 await b.keyboard.press('KeyQ');
 s = await until(a, s => s.result, 3000, 'a gets the result'); ok(s.result === 'You win! / Bo left', `a after b left: "${s.result}"`); await shot(a, '9-opponent-left');
 s = await until(b, s => s.screen === 'lobby' && s.view === 'home', 2000, 'b back in the lobby'); ok(s.pill === null && !/(court|room)=/.test(s.search) && s.toast === null, `b is in the lobby, no court pill, clean address bar, no stale toast`);

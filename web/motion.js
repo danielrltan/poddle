@@ -26,7 +26,7 @@ export const DEFAULTS = {
   SNAP_LO: 130, SNAP_HI: 230,               // rad/s^2 over two samples: below LO an arm is building up, above HI a wrist is snapping (called soft at once)
   REARM_HOT: 5.5, REARM_RISE: 3.5,          // rad/s: a finished swing lets go below this without coming to rest; the next one must rise this far off the bottom
   ONSET: 75,                                // rad/s^2: a rise gentler than this has not taken off yet
-  FIX_ABS: 1.5, FIX_REL: 0.08, FIX_STEP: 3, FIX_GAP: 0.06,   // once the real peak is in, a 'swingFix' follows if the call was off by more than this; on the way there, when it has moved by STEP, at most every GAP s
+  FIX_STEP: 3, FIX_GAP: 0.06,   // on the way to the peak a 'swingFix' follows when the call has moved by STEP, at most every GAP s; once the real peak is in, one always follows (final: true)
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
   POWER_MAX: 34,
   ROM_IDLE: 4, ROM_MIN: 35, ROM_FULL: 110, ROM_T_MIN: 0.10, ROM_T_FULL: 0.18,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
@@ -315,7 +315,9 @@ export class MotionModel {
         ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, roll: sw.roll || 0, turn: sw.turn || 0, curl: sw.curl || 0, age, final: past });
       } else if (sw.sent && !sw.fixed) {                              // the call moved, or the real peak is in and the call was off
         const eff = call(), sh = shot();
-        if ((past || t - sw.tFix >= c.FIX_GAP - 1e-4) && (Math.abs(eff - sw.eff) > (past ? Math.max(c.FIX_ABS, c.FIX_REL * sw.eff) : c.FIX_STEP) || Math.abs(sh.lob - sw.lob) > 0.15 || Math.abs(sh.dir - sw.dir) > 0.3)) {
+        // Once the peak is in, the settled score ALWAYS goes out (final: true), however little it moved: the server lets only a settled
+        // report serve at once or be called a smash (the early bet overshoots: 38 of 140 recorded swings were first called at smash pace, 14 settled there).
+        if (past || (t - sw.tFix >= c.FIX_GAP - 1e-4 && (Math.abs(eff - sw.eff) > c.FIX_STEP || Math.abs(sh.lob - sw.lob) > 0.15 || Math.abs(sh.dir - sw.dir) > 0.3))) {
           ev.push({ type: 'swingFix', power: eff, raw: sw.peak, rom: sw.sweep / DEG, ...sh, age, final: past }); sw.eff = eff; sw.tFix = t; Object.assign(sw, sh); }
         if (past) { sw.fixed = true; sw.eff = eff; }
       }

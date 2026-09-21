@@ -8,15 +8,15 @@ import http from 'http';
 const PORT = +process.env.ROOMS_PORT || 8300, PORT2 = PORT + 1, PORT3 = PORT + 2, root = new URL('..', import.meta.url).pathname;
 const up = (port, env) => spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: port, ...env }, stdio: 'ignore' });
 const procs = [up(PORT, {}), up(PORT2, { ROOM_CAP: '2', ROOM_TTL: '2' }),                   // the second one only for the cap and the closing of empty rooms
-  up(PORT3, { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', PAUSE_S: '3' })];                   // the third: a match is 2 points, and the three countdowns are short enough to sit through
+  up(PORT3, { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', PAUSE_S: '3', CAL_S: '5' })];       // the third: a match is 2 points, and the four countdowns are short enough to sit through
 process.on('exit', () => procs.forEach(p => p.kill()));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const until = async (f, ms = 3000) => { const t = Date.now(); while (Date.now() - t < ms) { if (f()) return true; await wait(20); } return !!f(); };
 await wait(700);
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const all = [];                                              // every client ever made: LOCAL must never show up in anyone's list
-function client(q = 'lobby=1', port = PORT) {
-  const ws = new WebSocket(`ws://localhost:${port}/?${q}`), c = { ws, log: [], n: {}, lobbies: [], closed: false, t0: Date.now() };
+function client(q = 'lobby=1', port = PORT, addr) {             // addr: as the hosting proxy would name this player (fly-client-ip). Without it we are this machine
+  const ws = new WebSocket(`ws://localhost:${port}/?${q}`, addr ? { headers: { 'fly-client-ip': addr } } : undefined), c = { ws, log: [], n: {}, lobbies: [], closed: false, t0: Date.now() };
   ws.on('message', raw => { const m = JSON.parse(raw); c.n[m.type] = (c.n[m.type] || 0) + 1;
     if (m.type === 'state') { c.st = m; if (c.onState) c.onState(m); return; }
     c.log.push(m);
@@ -29,7 +29,7 @@ function client(q = 'lobby=1', port = PORT) {
   c.listed = code => !!c.lobby && c.lobby.rooms.find(r => r.code === code);
   all.push(c); return c;
 }
-const inLobby = async (q, port) => { const c = client(q || 'lobby=1', port); await until(() => c.lobby); return c; };
+const inLobby = async (q, port, addr) => { const c = client(q || 'lobby=1', port, addr); await until(() => c.lobby); return c; };
 const make = async (pub, q, port, name) => { const c = await inLobby(q, port); c.send({ type: 'create', public: pub, name }); await until(() => c.side != null || c.fail); return c; };
 const joined = async (code, q, port, name) => { const c = await inLobby(q, port); c.send({ type: 'join', code, name }); await until(() => c.side != null || c.fail); return c; };
 const watching = async (code, q, port) => { const c = await inLobby(q, port); c.send({ type: 'watch', code }); await until(() => c.welcome || c.fail); return c; };
@@ -162,7 +162,7 @@ ok(r1c.room.code !== code && await until(() => r2.n.left === 1 && r1b.closed), '
 console.log('the serve waits for a player who is still calibrating');
 const g1 = await make(false), g2 = await joined(g1.room.code); play(g1); await wait(2500);
 ok(g1.st && !g1.st.live && g1.st.score.join() === '0,0' && g1.st.paddles[1].wait === true && !g1.st.paddles[0].wait, `no paddle message from the second human yet: no ball in 2.5 s, their paddle says wait (${JSON.stringify(g1.st.paddles[1].wait)})`);
-park(g2); ok(await until(() => g1.st.live && g1.st.serving === 0 && !g1.st.paddles[1].wait, 3000), 'their first paddle message: the serve comes');
+park(g2); ok(await until(() => g1.st.live && !g1.st.paddles[1].wait, 3000), 'their first paddle message: the serve comes');      // not `serving === 0`: the scripted server strikes the moment the ball hangs, often between two polls
 
 console.log('names');
 const nest = n => '['.repeat(n) + ']'.repeat(n);
@@ -175,6 +175,12 @@ n2.ws.send(`{"type":"name","name":${nest(1500)}}`); n2.send({ type: 'name', name
 ok(await until(() => n1.names[1] === 'Player 2') && n1.st && n1.n.state > 0, `a nested array, an object, a number, only brackets as a name: back to Player 2, server still up (${JSON.stringify(n1.names)})`);
 n2.send({ type: 'name', name: 'x'.repeat(3000) }); ok(await until(() => n1.names[1] === 'xxxxxxxxxxxx'), '3000 characters: the first 12');
 n2.send({ type: 'name', name: '👍'.repeat(20) }); ok(await until(() => n1.names[1] === '👍'.repeat(12)), '12 characters, not 12 half characters (emoji are not cut in two)');
+for (const [what, blank] of [['Hangul fillers', '\u3164\u3164\u3164'], ['braille blanks', '\u2800\u2800'], ['a soft hyphen', '\u00ad'], ['an Arabic letter mark', '\u061c'], ['tag characters', '\u{e0041}\u{e0042}'], ['a Mongolian vowel separator', '\u180e'], ['a grapheme joiner', '\u034f'], ['combining marks alone', '\u0301\u0302']]) {
+  n2.send({ type: 'name', name: 'Vis' }); await until(() => n1.names[1] === 'Vis'); n2.send({ type: 'name', name: blank });
+  ok(await until(() => n1.names[1] === 'Player 2'), `a name of ${what} draws as nothing: Player 2 (${JSON.stringify(n1.names[1])})`); }
+n2.send({ type: 'name', name: 'A\u3164\u00adB\u{e0041}' }); ok(await until(() => n1.names[1] === 'AB'), 'among real letters they are dropped');
+n2.send({ type: 'name', name: 'Z' + '\u0300'.repeat(30) }); ok(await until(() => n1.names[1] === 'Z\u0300\u0300'), `a letter under 30 stacked marks keeps 2: ${[...(n1.names[1] || '')].length} code points`);
+n2.send({ type: 'name', name: '\u4e39\u5c3c' }); ok(await until(() => n1.names[1] === '\u4e39\u5c3c'), 'other scripts are names like any other');
 n2.send({ type: 'leave' }); ok(await until(() => n1.names[1] === null && n1.n.left === 1), `the seat empties: ${JSON.stringify(n1.names)}`);
 ok(await until(() => n1.info && n1.info.active && n1.names[1] === 'Matt', 4000) && ['Rookie', 'Club', 'Pro'].includes(n1.info.name), `the bot is Matt in names (${JSON.stringify(n1.names)}); botinfo.name stays the level (${n1.info.name})`);
 n1.send({ type: 'bot', level: 2 }); await until(() => n1.info.name === 'Pro'); ok(n1.names[1] === 'Matt', 'Matt at every level');
@@ -280,10 +286,19 @@ const pj = await joined(pz.room.code, 'lobby=1', PORT, 'Joy');
 ok(pj.side === 1 && await until(() => pzW.got('paused', m => m.on === false).length === 2 && pz.last('paused').on === false) && await until(() => pz.st && !pz.st.paused && pj.st && !pj.st.paused), `a second human sits down in the paused public room: it resumes (${JSON.stringify(pz.last('paused'))})`);
 play(pj); pz.send({ type: 'pause', on: true }); const np = pj.n.paused || 0;
 ok(await until(() => pz.last('paused').refused === true && pz.last('paused').on === false) && (pj.n.paused || 0) === np && !pz.st.paused, `two humans: refused, only the one who asked hears it: ${JSON.stringify(pz.last('paused'))}`);
-const pd = await make(false, 'lobby=1', PORT, 'Pod'), pdW = await watching(pd.room.code); pd.send({ type: 'bot', level: 0 }); await until(() => pd.info.active); pd.send({ type: 'pause', on: true }); await until(() => pdW.n.paused === 1);
-pd.ws.terminate();
-ok(await until(() => pdW.n.closed === 1) && pdW.got('paused').pop().on === false && pdW.last('closed').reason === 'empty', `the pauser drops: the pause ends (${JSON.stringify(pdW.got('paused').pop())}) and the empty room sends its spectators home`);
-const pd2 = await joined(pd.room.code); ok(pd2.side === 0 && await until(() => pd2.n.state > 10 && !pd2.st.paused), 'the room itself is not stuck paused');
+// A bot court with people watching: a socket that closes by itself (a reload, a wifi blip) no longer empties the stands at once. The seat is held like any other (HOLD_S=3).
+const pd = await make(false, 'lobby=1&cid=pod1', PORT3, 'Pod'), pdW = await watching(pd.room.code, 'lobby=1', PORT3); pd.send({ type: 'bot', level: 0 }); await until(() => pd.info.active); pd.send({ type: 'pause', on: true }); await until(() => pdW.n.paused === 1);
+pd.ws.terminate(); const tPd = Date.now();
+ok(await until(() => pdW.n.hold >= 1) && pdW.got('paused').pop().on === false && !pdW.n.closed && pdW.last('hold').side === 0 && pdW.last('hold').left === 3, `the pauser drops: the pause ends (${JSON.stringify(pdW.got('paused').pop())}), the spectator is not sent home, the seat is held: ${JSON.stringify(pdW.last('hold'))}`);
+const pdJ = await joined(pd.room.code, 'lobby=1', PORT3, 'Jon'); ok(pdJ.fail === 'full' && pdJ.failMsg.watch === true, 'nobody else sits down in a held court');
+ok(await until(() => pdW.n.closed === 1, 5000) && pdW.last('closed').reason === 'empty' && Date.now() - tPd > 2500 && Date.now() - tPd < 4500 && pdW.n.holdoff === 1, `not back in time: closed (empty) for the spectator ${((Date.now() - tPd) / 1000).toFixed(1)} s later`);
+const pd2 = await joined(pd.room.code, 'lobby=1', PORT3); ok(pd2.side === 0 && await until(() => pd2.n.state > 10 && !pd2.st.paused), 'the room itself is not stuck paused or held');
+const rl = await make(false, 'lobby=1&cid=rel1', PORT3, 'Ann'), rlW = await watching(rl.room.code, 'lobby=1', PORT3); rl.send({ type: 'bot', level: 0 }); play(rl); await until(() => rl.info.active && (rl.n.hit || 0) >= 1, 12000);
+rl.ws.terminate(); await until(() => rlW.n.hold >= 1); const rl2 = client(`lobby=1&cid=rel1&room=${rl.room.code}`, PORT3); await until(() => rl2.side != null || rl2.fail); play(rl2);
+ok(rl2.side === 0 && await until(() => rlW.n.holdoff === 1) && !rlW.n.closed && rlW.names[1] === 'Matt' && await until(() => rlW.st && !rlW.st.paused && rlW.st.paddles[1] && rlW.st.paddles[1].bot), `a reload in a bot court: the same cid is back, the spectator never left, Matt is still there (${JSON.stringify(rlW.names)})`);
+rl2.send({ type: 'leave' }); ok(await until(() => rlW.n.closed === 1) && rlW.last('closed').reason === 'empty' && rlW.n.hold === 1, 'an explicit leave stays immediate: closed (empty), no hold');
+const solo = await make(false, 'lobby=1&cid=solo1', PORT3, 'Sol'); solo.send({ type: 'bot', level: 0 }); await until(() => solo.info.active); solo.ws.terminate(); await wait(300);
+const solo2 = await joined(solo.room.code, 'lobby=1', PORT3, 'New'); ok(solo2.side === 0, 'nobody watching: no hold, the court is free at once, as before');
 const pm = await make(false, 'lobby=1', PORT3, 'Max'); pm.send({ type: 'pause', on: true }); await until(() => pm.n.paused === 1); const tP = Date.now();
 ok(await until(() => pm.n.paused === 2, 5000) && pm.last('paused').on === false && Date.now() - tP > 2500 && Date.now() - tP < 4200, `nobody pauses for ever: resumed by itself after ${((Date.now() - tP) / 1000).toFixed(1)} s (PAUSE_S=3; 10 minutes in real life)`);
 leg.send({ type: 'pause', on: true }); ok(await until(() => leg.n.paused === 1 && leg.st.paused === true), 'LOCAL pauses too (one human and Matt in it)');
@@ -310,6 +325,29 @@ const z3 = await make(false, 'lobby=1', PORT, 'Una'), z3W = await watching(z3.ro
 z3.send({ type: 'pause', on: true });
 ok(await until(() => z3W.st.paddles[0].status === 'paused') && !('status' in z3W.st.paddles[1]), 'the seat that paused reads paused; Matt never has a status');
 z3.send({ type: 'pause', on: false }); ok(await until(() => !z3W.st.paddles[0].status), 'resumed: gone');
+
+console.log('a seat that says it is calibrating and then goes silent cannot hold the serve for ever (CAL_S=5; 60 s in real life)');
+const [wA, wB, wW] = await pair(false, 'Wa', 'Wb'); await until(() => (wA.n.hit || 0) >= 1, 8000);
+wB.onState = null; wB.send({ type: 'status', cal: true }); await until(() => (wA.n.point || 0) >= 1, 12000); const tWd = Date.now(), wSv = wA.n.serve;
+wA.send({ type: 'pause', on: true }); ok(await until(() => wA.last('paused') && wA.last('paused').refused === true), 'the one who waits cannot pause (two humans), and leaving would be his forfeit: the wedge');
+ok(await until(() => wA.n.matchover === 1, 9000) && wA.n.serve === wSv && wA.last('matchover').forfeit === true && wA.last('matchover').winner === 0 && wA.last('matchover').names[1] === 'Wb' && Date.now() - tWd > 4500 && Date.now() - tWd < 8500,
+  `no serve for CAL_S, then the staller forfeits: ${JSON.stringify(wA.last('matchover'))} ${((Date.now() - tWd) / 1000).toFixed(1)} s after the point`);
+ok(wA.got('wait').length >= 3 && wA.got('wait').every(m => m.side === 1 && m.left >= 0 && m.left <= 5) && wW.got('wait').length >= 3 && wA.n.waitoff === 1, `the wait is counted down to the room: ${wA.got('wait').map(m => m.left)} then waitoff`);
+ok(await until(() => wB.n.closed === 1) && wB.last('closed').reason === 'away' && wB.log[wB.log.length - 1].type === 'lobby' && JSON.stringify(wA.last('rematch').votes) === '[null,false]', `the staller is back in the lobby (closed ${wB.last('closed') && wB.last('closed').reason}); votes ${JSON.stringify(wA.last('rematch') && wA.last('rematch').votes)}`);
+wA.send({ type: 'rematch', yes: false }); await until(() => wA.n.closed === 1);
+const [xA, xB] = await pair(false, 'Xa', 'Xb'); await until(() => (xA.n.hit || 0) >= 1, 8000); xB.onState = null; xB.send({ type: 'status', cal: true }); await until(() => (xA.n.point || 0) >= 1, 12000); await wait(2500); const xWaits = xA.got('wait').length; serveOnly(xB);
+ok(xWaits >= 1 && await until(() => xA.n.waitoff === 1 && xA.n.serve >= 2, 4000) && !xA.n.matchover, `back in time (their next paddle): waitoff, the serve comes, no forfeit (${xWaits} wait messages before)`);
+
+console.log('one socket may not starve the rest: a message budget per socket, and rooms per address');
+const fl = await inLobby(); for (let i = 0; i < 3000; i++) fl.ws.send('{"type":"ping","c":1}');
+ok(await until(() => fl.closed, 4000) && (fl.n.pong || 0) <= 200, `3000 pings at once: ${fl.n.pong || 0} answered (200 a second at most), past 1000 the socket is closed`);
+const fl2 = await inLobby(); for (let i = 0; i < 600; i++) fl2.ws.send('{"type":"ping","c":1}'); await wait(1300); fl2.send({ type: 'ping', c: 42 });
+ok(await until(() => fl2.log.find(m => m.type === 'pong' && m.c === 42)) && !fl2.closed && fl2.n.pong <= 201, `600 at once: the first 200 are heard, the rest dropped, and a second later the socket is heard again (${fl2.n.pong} pongs)`);
+const hog = []; for (let i = 0; i < 6; i++) { const c = await inLobby('lobby=1', PORT, '203.0.113.9'); c.send({ type: 'create', public: false }); await until(() => c.side != null || c.fail); hog.push(c); }
+const other = await inLobby('lobby=1', PORT, '203.0.113.10'); other.send({ type: 'create', public: false }); await until(() => other.side != null || other.fail);
+ok(hog.filter(c => c.side === 0).length === 4 && hog.slice(4).every(c => c.fail === 'busy') && other.side === 0, `one address (fly-client-ip) makes 4 rooms, then busy: ${hog.map(c => c.fail || 'seated')}; another address is not affected`);
+hog[0].send({ type: 'leave' }); hog[5].fail = null; hog[5].send({ type: 'join', code: other.room.code }); ok(await until(() => hog[5].side === 1), 'joining a room somebody else made is never limited');
+for (const c of [...hog, other]) c.ws.close();
 
 console.log('hostile input');
 const h1 = await inLobby(), h2 = await inLobby();

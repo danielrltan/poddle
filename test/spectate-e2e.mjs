@@ -130,7 +130,7 @@ await c.click('#btn-start'); await sleep(300); await c.evaluate(() => document.f
 s = await until(c, s => s.ask, 4000, 'c is asked to watch'); ok(s.ask === 'Court is full. Watch instead?' && s.screen === 'lobby' && !s.room, `third page: "${s.ask}"`); await shot(c, '07-ask-watch', BOTH);
 await c.click('#btn-watch-yes'); s = await until(c, s => s.phase === 'watch' && s.screen === 'hud' && s.scene.name === 'broadcast', 5000, 'c lands in the broadcast view');
 ok(s.srole === 'spectator' && s.role === 'spectator' && s.dview === 'broadcast' && s.scene.spectator && !s.scene.menu && s.search.includes('watch=1'), `spectator: view ${s.scene.name}, address bar ${s.search}`);
-ok(s.cam === null && !s.camwrap && !s.podwrap && !s.keys && s.views && s.watchTag && s.menuBtn, `spectator HUD: chips and tag, no AirPod, no camera, no key hints (cam ${JSON.stringify(s.cam)})`);
+ok(s.cam === null && !s.camwrap && !s.podwrap && !s.keys && s.views && !s.watchTag && s.menuBtn, `spectator HUD: chips, no WATCHING tag (docs/NEXT.md 14g: removed), no AirPod, no camera, no key hints (cam ${JSON.stringify(s.cam)})`);
 s = await until(c, s => s.me === 'Ann' && s.them === 'Ben', 4000, 'c sees both names'); ok(s.me === 'Ann' && s.them === 'Ben', `spectator scoreboard: "${s.me}" left, "${s.them}" right, never You`);
 [s, t] = await Promise.all([until(a, s => s.watchers === 1, 4000, 'a sees the watcher count'), until(c, s => s.watchers === 1, 4000, 'c sees the watcher count')]); ok(s.watchers === 1 && t.watchers === 1, `watchers: Ann sees ${s.watchers}, Cat sees ${t.watchers}`);
 await sleep(1500); await shot(c, '08-view-broadcast', BOTH);
@@ -146,7 +146,7 @@ await c.click('#views [data-view="broadcast"]'); await until(c, s => s.scene.nam
 let agree = 0, last = null;
 for (let i = 0; i < 900 && !(agree >= 3 && last.s.hits >= 2 && last.s.ev.point >= 1); i++) { await sleep(100); [s, t, u] = await Promise.all([st(a), st(b), st(c)]); last = { s, t, u }; if (s.scMe === t.scThem && s.scThem === t.scMe && u.scMe === s.scMe && u.scThem === s.scThem) agree++; else agree = 0; }
 ok(agree >= 3 && last.s.hits >= 2 && last.s.ev.point >= 1, `a rally, and three screens agree: Ann ${last.s.scMe}-${last.s.scThem}, Ben ${last.t.scMe}-${last.t.scThem}, Cat ${last.u.scMe}-${last.u.scThem} (${last.s.hits} hits)`);
-ok(/^(Ann|Ben) scores$/.test(last.u.banner) && /^(Your point!|Ben scores)$/.test(last.s.banner) && /^(Your point!|Ann scores)$/.test(last.t.banner), `point banner: Cat "${last.u.banner}", Ann "${last.s.banner}", Ben "${last.t.banner}"`);
+ok(/^(Ann|Ben) scores$/.test(last.u.banner) && /^(Your point|Ben scores)$/.test(last.s.banner) && /^(Your point|Ann scores)$/.test(last.t.banner), `point banner: Cat "${last.u.banner}", Ann "${last.s.banner}", Ben "${last.t.banner}"`);
 [s, u] = await Promise.all([st(a), st(c)]); s = await until(a, s => s.svMe !== s.svThem, 8000, 'a serve dot'); u = await st(c); t = await st(b);
 ok(u.svMe === s.svMe && t.svThem === s.svMe, `serve dot: beside ${s.svMe ? 'Ann' : 'Ben'} on all three (Ann me:${s.svMe}, Ben them:${t.svThem}, Cat left:${u.svMe})`);
 

@@ -103,3 +103,23 @@ Clients white out that character and float a tag over it: Paused / Calibrating /
 - Page URL: `?court=CODE[&watch=1]` (`?room=` is a silent alias, rewritten). Socket URL and messages keep `room`.
 - Seat status: `status` is only present while set (like `wait`). `{type:'status', cal}` is heard from players only, booleans only.
 
+## Added by the fixer (after the attack, the critics and the verifiers)
+- **A calibrating seat cannot hold a match for ever.** Two humans, a ball already struck, the serve waiting on a seat that is `calibrating`: after 60 s
+  (`CAL_S`) that seat is out (`{type:'closed', reason:'away'}`, back to the lobby) and it is a forfeit for the one who waited (`matchover`, `forfeit:true`).
+  The last 30 s are counted down to the room, `{type:'wait', side, left}` once a second, then `{type:'waitoff'}` (also when the seat is ready again in time).
+  Clients show the same card as a held seat ("Waiting for Ben 27"). Before it: `status cal:true` and silence held the serve for good, `pause` was refused,
+  and the only way out for the honest player was his own forfeit.
+- **A bot court with people watching is held too.** A socket that closes without `leave` while ONE human is seated and at least one spectator watches: the
+  seat is held `HOLD_S` like any other (`hold`, room time stops, `holdoff` when the same `cid` is back, nobody else may sit down meanwhile). Not back in time:
+  the court empties as it always did (`closed empty` for the spectators). `leave` stays immediate. Nobody watching: nothing changes. This REPLACES "Rooms that
+  were human + bot are unchanged" above for a dropped socket; the pauser dropping ends the pause first, then the hold starts.
+- **Names** also lose every character that draws as nothing (format characters, Hangul fillers, the braille blank, the grapheme joiner, tags), keep at most
+  2 combining marks in a row, and must have a letter, digit, symbol or punctuation mark left, otherwise it is `Player N`. A human may still be called Matt.
+- **Swings carry `final`** (`web/motion.js` settles every swing): the first report is a bet, the settled one follows 60-280 ms later. The server serves at
+  once, and calls a smash, only on a settled report (absent = settled, for a client from before). A re-aim's `launch` carries `n`, and `kind` when the settled
+  swing changed it: that is where a smash is announced when the hit went out on a bet.
+- **Limits.** 200 messages a second per socket are heard, the rest dropped unread, past 1000 the socket is closed. A socket with 256 KB unread is closed.
+  One address (`fly-client-ip`; never this machine's own) may have 4 rooms of its making standing: `busy` beyond.
+- **Result card.** After Rematch the Leave button stays open (Leave then = leaving the vote: `leave`, which closes the court for everyone). After a forfeit
+  there is no countdown on the card and spectators are not told to wait for a rematch.
+

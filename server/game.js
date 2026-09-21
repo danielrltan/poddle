@@ -55,8 +55,11 @@ const SERVE_FOLLOW = 3.5;                 // critically damped spring, rad/s: ~0
 const SERVE_ZONE = { x: 0.9, y: 0.9, front: 1.4, behind: 0.5 };   // a serve has to meet the ball: tighter than the rally box
 const SERVE_POWER = 11;                   // swing power (rad/s scale: 6 = twitch/tap, 14+ = real stroke) needed to serve
 // A serve is wound up first, and the wind-up is a swing too (30 recorded pairs: 0.4-0.9 s apart, 27 of 30 the other way, wind-up power median 7, p90 15, max 21).
-const SERVE_SURE = 22;                    // this hard is no wind-up: struck at once
-const SERVE_PREV = 1.2;                   // s: a swing this soon after another one IS the stroke, the one before was its wind-up
+// The client reports a swing EARLY, on a bet that overshoots (recorded wind-ups: first called 30.4, settled 8.2; 32.3 > 8.0; 26.6 > 6.0), then sends
+// the settled power (final). Only a settled report decides a serve: the bets alone still served with 10 of 27 recorded wind-ups, settled ones with 2.
+const SERVE_SURE = 17;                    // SETTLED this hard is no wind-up: struck at once (settled wind-ups: median 6.9, p90 15.2, 2 of 31 reach 17)
+const SERVE_WAIT = 0.3;                   // s a bet may wait for its settled report (it lands 60-280 ms later) before it is taken as it stands
+const SERVE_PREV = 1.2;                   // s: a swing this soon after another one IS the stroke, the one before was its wind-up (if it beats that one: as strong, or the other way)
 const SERVE_HOLD = 0.7;                   // s a lone middling swing waits for the real stroke to follow before it serves by itself
 const SERVE_FLOOR = 0.35;                 // a legal soft serve still carries past the kitchen
 const REACH = 3.2;                        // no shot asks the receiver to get the paddle wider than this
@@ -86,14 +89,24 @@ const ROOM_TTL = (process.env.ROOM_TTL != null ? +process.env.ROOM_TTL : 30) * 1
 const ROOM_CAP = +process.env.ROOM_CAP || 40;                  // rooms at once: one small machine hosts them all (tests lower it)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';          // no I, L, O, 0, 1: a code gets read out across a room
 const SPEC_CAP = 8;                                            // spectators per room (docs/SPECTATE.md)
-const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause. Tests shorten them
+const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one address may have made and still standing: 40 idle sockets from one machine took every court (busy beyond that)
+const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
+const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
+const SMASH = 0.76;                                            // n above this is a smash (27.3 rad/s)
+const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
 let clock = 0;                            // sim clock of the process. A room starts its own time from it and stops that while paused or holding a seat, so rooms agree until one of them pauses
 // A name is untrusted text that lands on other people's screens: strings only, no control, invisible or bidi characters, no angle brackets, 12 characters. '' = none given.
-const cleanName = v => (typeof v === 'string' ? [...v.slice(0, 64).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff\ud800-\udfff<>]/gu, '').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim() : '');
+// Nor characters that draw as nothing (Hangul fillers, the braille blank, soft hyphen, tags: a name of those was a blank on every scoreboard), nor more than 2 stacked marks on a letter. What is left must have something to see in it.
+const NAME_OUT = /[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}\ud800-\udfff<>]/gu;
+const cleanName = v => { if (typeof v !== 'string') return '';
+  const n = [...v.slice(0, 64).replace(NAME_OUT, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim();
+  return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };
 const secsTo = ms => Math.max(0, Math.ceil((ms - Date.now()) / 1000));
+// Every message leaves through here. A socket that has stopped reading (BUF_MAX queued) is let go instead of fed: whoever it was reconnects by cid if they are still there.
+function put(ws, s) { if (!ws || ws.readyState !== 1) return; if (ws.bufferedAmount > BUF_MAX) return ws.terminate(); ws.send(s); }
 
 function newPlayer(ws, side) {
-  return { ws, side, x: 0, y: 1.0, z: sgn(side) * HIT_LINE, zT: sgn(side) * HIT_LINE, q: [0, 0, 0, 1], swing: null, lunge: null, contact: null, react: 0, err: 0, bot: !ws, swAt: -Infinity, swPrev: -Infinity, servePending: null };
+  return { ws, side, x: 0, y: 1.0, z: sgn(side) * HIT_LINE, zT: sgn(side) * HIT_LINE, q: [0, 0, 0, 1], swing: null, lunge: null, contact: null, react: 0, err: 0, bot: !ws, swAt: -Infinity, swPrev: -Infinity, swPow: 0, swDir: 0, pvPow: 0, pvDir: 0, servePending: null };   // sw*: my latest swing (when, and its last reported power and dir), swPrev / pv*: the one before it
 }
 
 // Ballistic solve: pick where the ball should land, find the velocity that gets it there
@@ -104,8 +117,9 @@ const underhand = lob => { const t = clamp((lob / 0.8 - 0.62) / 0.26, 0, 1); ret
 // CONTINUOUS: every hit carries its own amount (a threshold made 76 % of real strokes exactly 0 and 16 % full, nothing between). A scoop is never much of a slice.
 const sliced = (slice, lob) => clamp(Math.abs(slice || 0), 0, 1) * (1 - 0.6 * underhand(lob));
 const hard = n => { const t = clamp((n - 0.45) / 0.25, 0, 1); return t * t * (3 - 2 * t); };   // 0 below n 0.45, 1 from 0.7: power beats spin (nothing in here uses it today; test/kinds.mjs still reads it)
-// smash: n 0.76 = 27 rad/s, this player's p90: it has to be earned. 'slice' is the label for spin that READS as one (> 0.5: blue ring, hiss).
-const shotKind = (n, lob, slice) => (n > 0.76 && underhand(lob) <= 0.5 ? 'smash' : sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.76 ? 'smash' : n < 0.1 ? 'tap' : 'drive');
+// smash: n 0.76 = 27.3 rad/s: it has to be earned (p90 of every recorded swing, twitches included; of his real strokes, power >= 9, one in four gets there).
+// 'slice' is the label for spin that READS as one (> 0.5). A twitch (n < 0.1) is a tap whatever the wrist did: 28 of the 41 recorded 'slices' were under 9 rad/s.
+const shotKind = (n, lob, slice) => (n > 0.76 && underhand(lob) <= 0.5 ? 'smash' : n < 0.1 && underhand(lob) <= 0.5 ? 'tap' : sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.76 ? 'smash' : n < 0.1 ? 'tap' : 'drive');
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
@@ -127,7 +141,7 @@ function solve(p, side, n, dir, lob, slice) {
   const top = clamp((n - 0.76) / 0.24, 0, 1);                  // a smash is rewarded: above n 0.76 the drive gets faster still, 0.58 s -> 0.51 s at full power (where the net allows: see fly)
   let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)) - 0.07 * top * top * (3 - 2 * top), lerp(1.2, 1.95, nu), u);   // underhands always travel on a high, slow arc
   const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
-  T *= 1 + SLICE.slow * spin;                                  // same depth (power still sets it), slower and floatier
+  T *= 1 + SLICE.slow * spin * (1 - top);                      // same depth (power still sets it), slower and floatier. Not a smash: every swing carries some spin now (median 0.27 on his smashes) and the full slow-down made 3 of 16 recorded smashes SLOWER than a flat 27 rad/s drive
   // From the baseline a flat drive is limited by the net, not by T, and fly()'s 0.05 s steps would hand the 0.07 s straight back (measured:
   // 0.73 s became 0.76 s). So a smash takes the exact fastest flight that clears: never slower than before, as fast as the net lets it be.
   const v = [0, 0, 0]; T = fly(v, px, py, pz, tx, tz, T, g, lerp(0.25, SLICE.clear, spin), top > 0 && !u);
@@ -164,13 +178,13 @@ function createRoom(code, pub) {
   const spectators = new Set();             // sockets that watch: never seated, never counted by humans(), never keep the room alive (docs/SPECTATE.md)
   let now = clock;                          // ROOM time: state.t, hit.t and every timer in here. It stands still while paused or holding a seat, so serveBy, swing windows and the bot freeze for free
   let started = false, firstServe = 0;      // has a ball been struck in this match (before that a leaver just leaves); who served first (the next match alternates)
-  let over = null, hold = null, paused = null;   // over: { winner, forfeit, votes, until, names }  hold: { side, until, said }  paused: { by, until }   (until = wall clock ms)
+  let over = null, hold = null, paused = null, slow = null;   // over: { winner, forfeit, votes, until, names }  hold: { side, until, said }  paused: { by, until }  slow: { side, until, said } a seat calibrating mid-match   (until = wall clock ms)
   const ball = { spin: 0, kick: 0, aim: null, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
   const score = [0, 0];
   let server = 0, serveAt = Infinity, tick = 0;     // who serves next; when (sim time); steps taken
 
-  function send(pl, msg) { if (pl.ws && pl.ws.readyState === 1) pl.ws.send(JSON.stringify(msg)); }
-  function broadcast(msg, skip) { const s = JSON.stringify(msg); for (const pl of players) if (pl.ws && pl.ws !== skip && pl.ws.readyState === 1) pl.ws.send(s); for (const ws of spectators) if (ws.readyState === 1) ws.send(s); }
+  function send(pl, msg) { put(pl.ws, JSON.stringify(msg)); }
+  function broadcast(msg, skip) { const s = JSON.stringify(msg); for (const pl of players) if (pl.ws !== skip) put(pl.ws, s); for (const ws of spectators) put(ws, s); }
   const bySide = side => players.find(p => p.side === side);
   // the server owns the names: a human's clean one, Matt for the bot (at every level), null for an empty seat
   const names = () => [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? 'Matt' : p.name) : null; });
@@ -187,12 +201,12 @@ function createRoom(code, pub) {
   }
 
   // A corrected power arrived just after the hit. Never swap the velocity: steer onto the new landing spot over FIX_EASE.
-  function reaim(side, n, dir, lob, slice) {
+  function reaim(side, n, dir, lob, slice, kind) {
     const sol = solve(ball.p, side, n, dir, lob, slice);
     ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(FIX_EASE / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
     ball.spin = sol.spin; ball.kick = sol.kick;
     planFootwork(1 - side, sol.v);
-    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick });     // the landing marker moves now
+    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
   }
   const aimV = [0, 0, 0];
   function easeAim() {
@@ -266,9 +280,10 @@ function createRoom(code, pub) {
     // A ball taken out of the air up near the net with a short, soft stroke is a block: it just pops back over, soft and short.
     if (!sw.kind && ball.serving == null && ball.bounces === 0 && Math.abs(pl.z) <= BLOCK.volley && sw.n < 0.4 && underhand(sw.lob) < 0.5)
       sw = { ...sw, kind: 'block', n: Math.min(sw.n, 0.12), lob: 0.55 };
-    pl.swing = null; pl.hit = sw.kind ? null : { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0 };   // a swing (not a block) may still be corrected (floor: a serve's correction keeps the serve floor)
+    const kind = sw.kind || shotKind(sw.n, sw.lob, sw.slice);
+    pl.swing = null; pl.hit = sw.kind ? null : { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind };   // a swing (not a block) may still be corrected (floor: a serve's correction keeps the serve floor)
     pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
-    launch(pl.side, sw.n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n: sw.n, kind: sw.kind || shotKind(sw.n, sw.lob, sw.slice) }, sw.slice);
+    launch(pl.side, sw.n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n: sw.n, kind }, sw.slice);
   }
 
   // a fresh pair (human+human or human+bot): clean score, first serve
@@ -299,7 +314,7 @@ function createRoom(code, pub) {
   function close(reason) {
     if (LEGACY || room.dead) return;
     const out = [...players.filter(p => p.ws).map(p => p.ws), ...spectators];
-    room.dead = true; players.length = 0; spectators.clear(); over = hold = paused = null;
+    room.dead = true; players.length = 0; spectators.clear(); over = hold = paused = slow = null;
     if (rooms.get(code) === room) rooms.delete(code);
     for (const ws of out) { ws.room = ws.pl = null; ws.spec = false; tell(ws, { type: 'closed', reason }); if (ws.readyState === 1) enterLobby(ws); }
     console.log(`[${code}] room closed (${reason})`); lobbyChanged();
@@ -311,16 +326,32 @@ function createRoom(code, pub) {
   // ---------- a dropped player's seat is held (two humans, mid-match): room time stops, everyone counts down with it ----------
   function sayHold() { const l = secsTo(hold.until); if (l !== hold.said) { hold.said = l; broadcast({ type: 'hold', side: hold.side, left: l }); } }   // once a second
   function startHold(me) {
+    if (paused) resume();                                        // (a bot court) the pauser went: they pause again when they are back with the panel still open
     me.ws = null; me.swing = me.servePending = null;             // the seat stays taken (humans() still counts it): nobody else can sit down in it
     hold = { side: me.side, until: Date.now() + HOLD_S * 1000, said: -1 }; sayHold();
     console.log(`[${code}] side ${me.side} dropped: seat held ${HOLD_S} s`);
   }
   function forfeitHeld() {                                        // not back in time: the one who stayed wins
+    if (humans().length === 1) { const me = bySide(hold.side); hold = null; broadcast({ type: 'holdoff' }); return leave(me); }   // a bot court held for its spectators: nobody else was playing, so the court empties as if they had left (closed empty)
     const sd = hold.side, nm = names(), i = players.findIndex(p => p.side === sd);
     hold = null; if (i >= 0) players.splice(i, 1);
     broadcast({ type: 'holdoff' }); endMatch(1 - sd, true, nm);
   }
   const heldBy = cid => (cid && hold && players.find(p => !p.bot && !p.ws && p.cid === cid)) || null;
+
+  // ---------- a seat that says it is calibrating mid-match holds the next serve. Not for ever: {type:'status',cal:true} and then silence kept a court at
+  // 'serving null' for good, the honest player could not pause and his only way out was a forfeit LOSS. CAL_S, the last 30 s counted down to everyone, then the
+  // staller is out (closed, reason away) and it is a forfeit for the one who waited.
+  function slowSeat(ms) {
+    const p = !LEGACY && started && !over && !hold && !ball.live && now >= serveAt && humans().length === 2 ? players.find(q => !ready(q)) : null;   // only while the serve is really waiting for them: a rally in flight plays on
+    if (!p) { if (slow) { if (slow.said >= 0) broadcast({ type: 'waitoff' }); slow = null; } return; }
+    if (!slow || slow.side !== p.side) { if (slow && slow.said >= 0) broadcast({ type: 'waitoff' }); slow = { side: p.side, until: ms + CAL_S * 1000, said: -1 }; }
+    const l = secsTo(slow.until);
+    if (ms < slow.until) { if (l <= 30 && l !== slow.said) { slow.said = l; broadcast({ type: 'wait', side: p.side, left: l }); } return; }
+    const nm = names(), ws = p.ws; slow = null; broadcast({ type: 'waitoff' }); players.splice(players.indexOf(p), 1);
+    if (ws) { ws.room = ws.pl = null; tell(ws, { type: 'closed', reason: 'away' }); enterLobby(ws); }
+    console.log(`[${code}] side ${p.side} calibrating for ${CAL_S} s mid-match: forfeit`); endMatch(1 - p.side, true, nm);
+  }
 
   // ---------- pause: only while ONE human is seated (Matt or nobody opposite). Spectators do not prevent it ----------
   function resume() { const by = paused.by; paused = null; broadcast({ type: 'paused', on: false, by }); }
@@ -485,6 +516,7 @@ function createRoom(code, pub) {
     if (!LEGACY) {
       if (over) { players.splice(i, 1); return close('norematch'); }            // walked away from the vote
       if (hold) { players.splice(i, 1); return close('empty'); }                // the other seat is only being held: nobody is left
+      if (dropped && humans().length === 1 && spectators.size) return startHold(me);   // a reload or a wifi blip in a bot court with people watching: the court and the score survived it anyway, the stands emptied ('Court closed' at once). Held like any seat; 'leave' stays immediate
       if (humans().length === 2 && started) {                     // two humans, mid-match (before a ball is struck a leaver just leaves)
         if (dropped) return startHold(me);                        // wifi: the seat is held
         const nm = names(); players.splice(i, 1); console.log(`[${code}] side ${me.side} left mid-match: forfeit`);
@@ -503,20 +535,23 @@ function createRoom(code, pub) {
     console.log(`[${code}] side ${me.side} left (${players.length} connected)`);
   }
 
-  // My serve and I swung (power >= SERVE_POWER decides below). A wind-up is a swing too, so a lone middling swing is held
-  // for SERVE_HOLD in case the real stroke follows: see the SERVE_ constants. A correction (fix) belongs to the latest swing.
-  function serveStrike(me, sw) { me.servePending = null; if (serveReach(me)) { ball.serving = null; strike(me, sw); } }   // swung at air: no whiff, no point, the ball keeps hanging
-  function serveSwing(me, fix, power, sw) {
+  // My serve and I swung (power >= SERVE_POWER decides below). A wind-up is a swing too, and the first report of any swing is a bet, so nothing is
+  // struck on a bet: c = { sw, of: whose swing, born, at: when its hold runs out, final: settled?, after: the settled swing already held, prev*: the swing before }.
+  function serveStrike(me, c) { me.servePending = null; if (serveReach(me)) { ball.serving = null; strike(me, c.sw); } }   // swung at air: no whiff, no point, the ball keeps hanging
+  function serveDecide(me, c) {                                  // c has settled: is it the stroke?
+    const a = c.after, pw = c.sw.power, d = c.sw.dir;
+    if (a) { if (pw >= 0.9 * a.sw.power || d * a.sw.dir < 0) serveStrike(me, c); else me.servePending = a; return; }   // after a held swing: as strong, or the other way = the stroke, struck with THIS one, now. Weaker the same way changes nothing
+    if (pw >= SERVE_SURE || c.born - c.prevAt < SERVE_PREV && (pw >= 0.9 * c.pvPow || d * c.pvDir < 0)) serveStrike(me, c);   // no wind-up is this hard; or the swing just before was the wind-up (any twitch used to count: now this one has to beat it)
+  }                                                              // else: held until c.at in case it was a wind-up (step() strikes with it when nothing better came)
+  function serveSwing(me, fix, power, sw, final) {
     const pend = me.servePending, own = fix && pend && pend.of === me.swAt;     // own: this corrects the very swing that is being held
-    if (power < SERVE_POWER) { if (own) me.servePending = null; return; }       // a twitch, a flick, a quick step: nothing happens at all (and a held swing that turns out to have been one is dropped)
+    if (power < SERVE_POWER) { if (own) me.servePending = pend.after; return; }   // a twitch, a flick, a quick step: nothing happens at all (and a held swing that settles as one is dropped: the bet said 30, the hand did 8)
     if (me.swSaid !== me.swAt) { me.swSaid = me.swAt; broadcast({ type: 'swung', side: me.side }); }   // animates at once, held or not; once per swing
     sw.power = power;
-    if (own) { Object.assign(pend.sw, sw); if (power >= SERVE_SURE) serveStrike(me, pend.sw); return; }
-    if (pend) { if (power >= 0.9 * pend.sw.power || sw.dir * pend.sw.dir < 0) serveStrike(me, sw); return; }   // the stroke after the wind-up: as strong or the other way. Struck with THIS one, now
-    if (power >= SERVE_SURE || now - me.swPrev < SERVE_PREV) return serveStrike(me, sw);                        // no wind-up is this hard; or the swing just before was the wind-up
-    me.servePending = { sw, of: me.swAt, at: now + SERVE_HOLD };  // step() strikes with it when nothing better came
+    if (own) { pend.sw = sw; pend.final = final; }
+    else me.servePending = { sw, of: me.swAt, born: now, at: now + SERVE_HOLD, final, after: pend ? (pend.final ? pend : pend.after) : null, prevAt: me.swPrev, pvPow: me.pvPow, pvDir: me.pvDir };
+    if (final) serveDecide(me, me.servePending);
   }
-
 
   function onMessage(me, m) {
     if (m.type === 'pause') return pause(me, m.on);
@@ -538,15 +573,20 @@ function createRoom(code, pub) {
       // an overhead is a smash: the paddle comes DOWN through the ball. But it has to be a real stroke first, and the
       // bonus adds to it (it used to lift ANY downward swing over 13 rad/s to full smash pace: 4 of 23 recorded smashes).
       if (clamp(num(m.chop, 0), 0, 1) > 0.45 && pw > 0.55) pw = Math.min(1, pw + 0.2);
+      // final: the settled report (web/motion.js sends one for every swing; a client from before that sends no such field and is taken at its word).
+      // A bet never smashes: 38 of 140 recorded swings were FIRST called at smash pace, 14 settled there, 12 settled as taps, and the label, ring, flash, shake and flame went out on the bet.
+      const final = m.final !== false; if (!final) pw = Math.min(pw, SMASH);
       const dir = clamp(num(m.dir, 0), -1, 1), lob = clamp(num(m.lob, 0), 0, 1), slice = clamp(num(m.slice, 0), -1, 1);   // signed spin, 0 when the client sends none
-      if (!m.fix) { me.swPrev = me.swAt; me.swAt = now; }        // EVERY swing, twitches too: what came just before tells a serve's stroke from its wind-up
-      if (ball.live && ball.serving === me.side) return serveSwing(me, !!m.fix, num(m.power, 6), { n: Math.max(pw, SERVE_FLOOR), dir, lob, slice, floor: SERVE_FLOOR });   // my serve: only a real stroke that meets the ball counts
+      if (!m.fix) { me.swPrev = me.swAt; me.pvPow = me.swPow; me.pvDir = me.swDir; me.swAt = now; }        // EVERY swing, twitches too: what came just before tells a serve's stroke from its wind-up
+      me.swPow = num(m.power, 6); me.swDir = dir;                // its latest report: settled by the time the next swing asks
+      if (ball.live && ball.serving === me.side) return serveSwing(me, !!m.fix, me.swPow, { n: Math.max(pw, SERVE_FLOOR), dir, lob, slice, floor: SERVE_FLOOR }, final);   // my serve: only a real stroke that meets the ball counts
       if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
         if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice });                     // hasn't met the ball yet: just correct it
         else if (me.hit && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
-          && (Math.abs(pw - me.hit.n) > 0.04 || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
-          Object.assign(me.hit, { n: pw, dir, lob, slice }); reaim(me.side, pw, dir, lob, slice);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side
+          && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
+          const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
+          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side
         }
         return;
       }
@@ -564,6 +604,7 @@ function createRoom(code, pub) {
     if (hold) { if (ms >= hold.until) forfeitHeld(); else sayHold(); }
     if (paused && ms >= paused.until) resume();
     if (over && !LEGACY && ms >= over.until) return close('norematch');
+    slowSeat(ms);
     const frozen = !!(paused || hold);
     if (!frozen) { now += DT; if (players.length) sim(); }       // an empty room costs nothing while it waits to be joined or closed
     if (!players.length) return;
@@ -579,7 +620,7 @@ function createRoom(code, pub) {
   function stateTo(ws, packet) {
     if (ws.readyState !== 1) return;
     if (ws.every > 1 && tick % ws.every) return;                 // asked for fewer packets (see 'net'): fewer to lose, and every loss stalls a TCP stream
-    if (ws.bufferedAmount > 8192) return;                        // link stalled: state is disposable, stale copies must not pile up behind the blockage
+    if (ws.bufferedAmount > 8192) { if (ws.bufferedAmount > BUF_MAX) ws.terminate(); return; }   // link stalled: state is disposable, stale copies must not pile up behind the blockage (and a socket that reads nothing at all goes)
     ws.send(packet);
   }
 
@@ -612,7 +653,9 @@ function createRoom(code, pub) {
       if (!pl || ball.lastHit === ball.serving) ball.serving = null;            // it's been struck (or the server left)
       else {
         hangBall(DT);
-        if (pl.servePending && now >= pl.servePending.at) serveStrike(pl, pl.servePending.sw);   // held in case it was a wind-up; nothing better followed
+        let c = pl.servePending;
+        if (c && !c.final && now >= c.born + SERVE_WAIT) { c.final = true; serveDecide(pl, c); c = pl.servePending; }   // its settled report never came (an old client sends none): taken as it stands
+        if (c && c.final && now >= c.at) serveStrike(pl, c);     // held in case it was a wind-up; nothing better followed (a bet that came meanwhile is heard out first: strokes follow 0.4-0.9 s after the wind-up, right where the hold ends)
         if (ball.serving != null && now >= ball.serveBy) {
           ball.serving = null; broadcast({ type: 'swung', side: pl.side });
           launch(pl.side, pl.bot ? 0.2 + Math.random() * 0.3 : 0.25, (Math.random() - 0.5) * 1.4, 0.2, { type: 'hit', side: pl.side, n: 0.3 });
@@ -658,7 +701,7 @@ function createRoom(code, pub) {
       point(ball.bounces ? ball.lastHit : 1 - ball.lastHit, ball.bounces ? 'passed' : 'out');
   }
   // what the lobby list says about this room (public rooms only get asked). open: a human seat is free. watch: spectator places left
-  const free = () => humans().length < 2 && !(over && over.forfeit);   // a seat to sit down in. Not after a forfeit: that room only waits to close
+  const free = () => humans().length < 2 && !hold && !(over && over.forfeit);   // a seat to sit down in. Not after a forfeit: that room only waits to close. Not while a seat is held (a bot court's too)
   const info = () => ({ code, players: humans().length, open: free(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over });
   const room = { code, pub, join, leave, retake, heldBy, watch, unwatch, canWatch: () => spectators.size < SPEC_CAP, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
   return room;
@@ -667,7 +710,7 @@ function createRoom(code, pub) {
 // ---------- lobby: which room does a socket sit in? ----------
 const LOCAL = createRoom('LOCAL', false);                      // every socket without lobby=1 (tests, ?skiptitle=1, old clients): never listed, never deleted
 const rooms = new Map(), lobby = new Set();                    // code -> room (LOCAL is not in it, so no code can reach it); sockets that have not chosen yet
-const tell = (ws, msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
+const tell = (ws, msg) => put(ws, JSON.stringify(msg));
 const lobbyMsg = () => JSON.stringify({ type: 'lobby', online: wss.clients.size,                 // every public room somebody is in: to join while a seat is free, to watch otherwise
   rooms: [...rooms.values()].filter(r => r.pub && r.humans().length).map(r => r.info()) });
 // a socket goes from wherever it sits: a seat (dropped = its socket closed by itself: mid-match that seat is held) or a spectator place
@@ -679,10 +722,10 @@ function lobbyChanged() {
   lobbyTimer = setTimeout(() => {
     lobbyTimer = null; lobbySent = Date.now();
     const s = lobbyMsg(); if (s === lobbyLast) return; lobbyLast = s;     // came and went within the second: nothing to say
-    for (const ws of lobby) if (ws.readyState === 1 && ws.lobbySeen !== s) ws.send(ws.lobbySeen = s);   // whoever just walked in already has this one
+    for (const ws of lobby) if (ws.lobbySeen !== s) put(ws, ws.lobbySeen = s);   // whoever just walked in already has this one
   }, Math.max(0, lobbySent + 1000 - Date.now()));
 }
-function enterLobby(ws) { lobby.add(ws); if (ws.readyState === 1) ws.send(ws.lobbySeen = lobbyMsg()); lobbyChanged(); }   // its own copy now; the rest hear within the second (online went up)
+function enterLobby(ws) { lobby.add(ws); put(ws, ws.lobbySeen = lobbyMsg()); lobbyChanged(); }   // its own copy now; the rest hear within the second (online went up)
 
 // false = both seats are taken by other humans
 function seat(ws, r) {
@@ -705,10 +748,12 @@ function seat(ws, r) {
   if (ws.viaLobby) tell(ws, { type: 'room', code: r.code, public: r.pub, role: 'player' });
   r.join(ws); lobbyChanged(); return true;
 }
+const loopback = a => !a || a === '::1' || a.endsWith('127.0.0.1');   // this machine (its own player, every test): no address limit. Hosted, every socket carries fly-client-ip
 function create(ws, pub) {
-  if (rooms.size >= ROOM_CAP) return tell(ws, { type: 'joinfail', reason: 'busy' });
+  let mine = 0; if (!loopback(ws.addr)) for (const r of rooms.values()) if (r.by === ws.addr) mine++;
+  if (rooms.size >= ROOM_CAP || mine >= ADDR_ROOMS) return tell(ws, { type: 'joinfail', reason: 'busy' });
   let code; do { code = ''; for (let i = 0; i < 4; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; } while (rooms.has(code));
-  const r = createRoom(code, pub); rooms.set(code, r); seat(ws, r);
+  const r = createRoom(code, pub); r.by = ws.addr; rooms.set(code, r); seat(ws, r);
 }
 const roomOf = code => (typeof code === 'string' ? rooms.get(code.trim().toUpperCase().slice(0, 8)) : null) || null;   // strings only: String() of a deeply nested array overflows the stack
 function joinCode(ws, code) {
@@ -740,7 +785,10 @@ wss.on('connection', (ws, req) => {
   ws.cid = q.get('cid') || null; ws.room = ws.pl = null; ws.spec = false; ws.viaLobby = q.get('lobby') === '1';
   ws.name = cleanName(q.get('name'));                          // names a seat taken by URL (room=CODE); otherwise it rides on the seat request
 
+  ws.msgN = 0; ws.msgT = 0;
   ws.on('message', raw => { try {                              // one process hosts every room: no message, however malformed, may throw out of here
+    const ms = Date.now(); if (ms - ws.msgT >= 1000) { ws.msgT = ms; ws.msgN = 0; }      // a budget per socket per second, spent before the message is even parsed
+    if (++ws.msgN > MSG_DROP) { if (ws.msgN > MSG_KILL) ws.terminate(); return; }
     const m = JSON.parse(raw);
     if (!m || typeof m !== 'object') return;
     if (m.type === 'ping') return tell(ws, { type: 'pong', c: Number.isFinite(m.c) ? m.c : 0, t: ws.room ? ws.room.time() : clock });   // the client times the round trip itself (in the lobby too). c is echoed only as a number

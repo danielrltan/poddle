@@ -100,6 +100,7 @@ Honoured only in spectator mode (a seated player always gets `{ name:'play', sid
   MAIN's global `pointerdown -> play()` is harmless (it returns unless phase is title).
 
 ### 2.4 `setMenu(on)`: the menu camera and the cheap mode (NEXT 11, 12)
+(Added by the fixer: `setDim(on)` is the same cheap picture, half pixel ratio, 30 fps, shadow map as it stands, WITHOUT the menu camera. MAIN turns it on while a match against Matt is paused behind the open settings card, i.e. behind the full blur, and off on resume. Also new on the scene side: a `launch` event may carry `n` and `kind` (a re-aim after the settled swing report: the trail follows `n`, a smash's effects fire on `kind: 'smash'`); split screen stacks the two views when the window is taller than wide; the free camera's target slides along the court, right-drag / shift-drag / arrow keys, and its leash shortens as it gets low: 16 m at 6 degrees, 30 m from 20.)
 MAIN calls `setMenu(true)` whenever a menu screen covers the court (title, lobby, connect, calibrate) and
 `setMenu(false)` the moment the court opens. Idempotent.
 - on: **menu camera**: eye about `(0, 3.4, s*(halfL + 7))`, level gaze (target at eye height, toward the far
@@ -225,7 +226,7 @@ enough that a live rally is visible behind it. While open: `body.dataset.setting
   while the panel is open, `#paused-tag` shows while the panel is closed (spectators, mostly).
 
 ### 3.3 Lobby (NEXT 6, 9, 10)
-- Name: `div#name-row` > `label` "Your name" + `input#name-input` (`maxlength="12"`, `autocomplete="off"`,
+- Name: `div#name-row` > `label` "Name" + `input#name-input` (`maxlength="12"`, `autocomplete="off"`,
   `spellcheck="false"`), at the top of the lobby body, shown on the views `home`, `create`, `code`, `bot`; hidden on `share`.
   Prefilled from `localStorage['poddle.name']` (try/catch); UI saves it on every change. It is not one of the four
   code boxes: the code form's `input` / `paste` handlers must not swallow it.
@@ -264,7 +265,7 @@ enough that a live rally is visible behind it. While open: `body.dataset.setting
 - Split dressing is CSS on `body[data-view="split"]`: a 2 px white centre line (`#split-line`), nothing else.
 
 ### 3.5 Who did what: banner, serve, result, rematch, hold (NEXT 9, 10)
-- `pointBanner(won, name = '', side)`: `won === true` -> "Your point!" (blue). `won === false` -> `"<name> scores"`
+- `pointBanner(won, name = '', side)`: `won === true` -> "Your point" (blue). `won === false` -> `"<name> scores"`
   (orange), or "Their point" when no name is given (old callers). `won == null` (spectator) -> `"<name> scores"`,
   blue when `side === 0`, orange when 1.
 - `setServe('me' | 'them' | null)`: unchanged (the dot beside the name). Spectators: MAIN maps side 0 -> 'me'.
@@ -277,7 +278,7 @@ enough that a live rally is visible behind it. While open: `body.dataset.setting
   `div#rematch` replaces `.next-up`: `button#btn-rematch.btn` "Rematch", `button#btn-leave.btn` "Leave",
   `p#rematch-note`, a countdown bar `#rematch-bar` and `b#rematch-left` (seconds, a bare number).
   `role:'spectator'` -> no buttons, note "Waiting for a rematch". `vote:false` with role player (legacy room) -> no
-  buttons, note "New game starting". Opens the `match` overlay as today. Focus lands on Rematch.
+  buttons, note "Rematch starting". Opens the `match` overlay as today. Focus lands on Rematch.
 - `onRematch(fn)`: Rematch -> `fn(true)`, Leave -> `fn(false)`. After a click both buttons disable and the chosen
   one keeps a pressed look.
 - `rematch({ mine, theirs, left, name })` (each `true | false | null`; any key may be missing = unchanged):
@@ -389,7 +390,7 @@ Socket URL: `?cid=..&lobby=1[&room=CODE][&watch=1][&name=..]`; `room` / `watch` 
 
 | where | string | owner |
 |---|---|---|
-| lobby, name label | Your name | UI |
+| lobby, name label | Name (the same word as the settings row) | UI |
 | lobby, 4th tile and its view title | Play a bot | UI |
 | bot view, three buttons | Rookie / Club / Pro | UI |
 | lobby, list heading (was "Open rooms") | Rooms | UI |
@@ -414,7 +415,7 @@ Socket URL: `?cid=..&lobby=1[&room=CODE][&watch=1][&name=..]`; `room` / `watch` 
 | watcher count, accessible name | 2 watching | UI |
 | view chips | Broadcast / Split / Player / Free | UI |
 | pov chip with a name | Player: <name> | UI |
-| point banner, mine | Your point! (unchanged) | UI |
+| point banner, mine | Your point (no exclamation mark except a win) | UI |
 | point banner, theirs or spectating (was "Their point") | <name> scores | UI |
 | result title | You win! (unchanged) / <name> wins | UI |
 | result note, forfeit | <name> left | UI |
@@ -422,7 +423,7 @@ Socket URL: `?cid=..&lobby=1[&room=CODE][&watch=1][&name=..]`; `room` / `watch` 
 | rematch note | <name> wants a rematch | UI |
 | rematch note, I said yes | Waiting for <name> | UI |
 | rematch note, spectator | Waiting for a rematch | UI |
-| rematch note, legacy room (unchanged text) | New game starting | UI |
+| rematch note, legacy room | Rematch starting | UI |
 | rematch countdown, hold countdown | 14 (a bare number) | UI |
 | hold card | Waiting for <name> | UI |
 | toast, second player sits down | <name> joined | MAIN |

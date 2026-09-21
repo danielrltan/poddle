@@ -576,6 +576,15 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
   .score-num{min-width:2.25rem} .rally{min-width:3rem;padding:0 .375rem}
   .score-tab .chip{display:none} .score-tab,.score-tab.is-them{padding:0 .75rem}       /* the coloured underline already says whose tab it is; the name and its sub-label need the room */
 }
+/* phone width: there is no room for the board BETWEEN the corners (the names read 'Y..' and 'M.'). The corner is one row again beside the webcam, the board takes
+   the full width under them, and what hung under the board or the webcam moves down with it. */
+@media (max-width: 480px){
+  .corner{flex-direction:row;flex-wrap:wrap;align-items:center;max-width:calc(100vw - 9rem - 3 * var(--edge))}
+  .scoreboard{top:calc(var(--edge) + 5.6875rem + .5rem);width:calc(100vw - 2 * var(--edge))}
+  body[data-role="spectator"] .scoreboard{top:calc(var(--edge) + 3.25rem)}                 /* no insets to clear when watching: straight under the hamburger */
+  .inset-pod,body[data-screen="hud"] #camwrap[hidden] ~ .inset-pod{top:calc(var(--edge) + 5.6875rem + .5rem + 4.25rem + .5rem)}
+  .banner-tag{top:calc(var(--edge) + 5.6875rem + .5rem + 4.25rem + .5rem)} body[data-role="spectator"] .banner-tag{top:calc(var(--edge) + 3.25rem + 4.25rem + .5rem)}
+}
 
 /* ==========================================================================================================
    SETTINGS PANEL (hamburger). A compact card under the corner, not a screen: the rally goes on behind it, so it is
@@ -630,6 +639,8 @@ body[data-role="spectator"] .keyhints,body[data-role="spectator"] #podwrap,body[
 .view-chip:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
 #split-line{display:none;position:fixed;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;z-index:calc(var(--z-hud) - 1);pointer-events:none}
 body[data-role="spectator"][data-view="split"] #split-line{display:block}
+@media (max-aspect-ratio: 1/1){ #split-line{left:0;right:0;top:50%;bottom:auto;width:auto;height:2px;margin:-1px 0 0} }       /* taller than wide: scene.js stacks the two views (same test, w <= h), so the line lies across */
+body[data-role="spectator"] #ping-pill{display:none}                           /* the ping is shown while seated only (docs/NEXT.md 14g) */
 .hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:var(--sh-3), var(--inner-hi);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;max-width:calc(100vw - 2 * var(--edge))}
 .hold-card .dots-wait{margin-right:.125rem} .hold-card .dots-wait i{margin-left:0;margin-right:.25rem}

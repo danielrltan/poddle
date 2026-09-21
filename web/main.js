@@ -28,7 +28,7 @@ let side = 0, role = 'player', names = [null, null], state = null, players = 0, 
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
 let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', wantWatch = LOBBY && qs.get('watch') === '1', pending = null, leaveAt = 0;   // room: the court I am seated in (the wire still says 'room'). wantRoom / wantWatch: from a shared link ?court=CODE (?room= is the old spelling and still works) or a reload. pending: the lobby request still waiting for its answer
-let botWant = null, botLevel = '', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
+let botWant = null, botLevel = '', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 // The two gates of docs/API-NEXT.md 4.2. seated: nothing from the game gets past the lobby messages while no room is joined
@@ -37,7 +37,7 @@ const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverl
 const seated = () => !LOBBY || !!room, live = () => phase === 'play' || phase === 'watch', spec = () => role === 'spectator';
 if (qs.get('uitest') === '1') { window.__ui = ui; window.__scene = scene; }      // test hooks: test/e2e.mjs forces UI states for screenshots, test/menu.mjs reads the scene's mode
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } } };
-const cleanName = t => String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12).trim();      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
+const cleanName = t => { const n = [...String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
 const myName = () => cleanName(ui.playerName()) || cleanName(ls.get('poddle.name'));      // the lobby field; what was kept last time when the field is not there
 const nameOf = i => names[i] || (state && state.paddles[i] && state.paddles[i].bot ? 'Matt' : i ? 'Player 2' : 'Player 1');
 const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, sideDeg, reach }
@@ -66,7 +66,7 @@ const s = () => (side === 0 ? 1 : -1);
 
 // ---------- messages ----------
 const say = (text, _color, ms = 1200) => ui.toast(text, ms);   // small pill toast
-let rally = 0;
+let rally = 0, unsettled = null;                  // unsettled: my last swing report, while it is still a bet
 const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'B adds a bot', meSub: '' });      // the far side of the scoreboard with nobody on it. In a room the bot walks in by itself
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].slice(0, 24) : null);      // untrusted text: ui.js writes it with textContent only
@@ -82,7 +82,7 @@ function drawNames() {
   else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side') });
 }
 const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' };
-function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); }
+function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDim(); }
 
 // ---------- match end, rematch (docs/SPECTATE.md) ----------
 function showOver() {                              // the result card. A matchover that came while a set-up screen was up waits in `over` for the court to open
@@ -93,7 +93,7 @@ function showOver() {                              // the result card. A matchov
   const left = Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000));      // less what was spent behind a set-up screen
   if (vote) ui.rematch(spec() ? { left } : { mine: null, theirs: null, left, name: nameOf(1 - L) });
   else setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s
-  if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); setTimeout(() => ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80), 900); }
+  if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card: a quick 'No rematch' had it falling over the lobby
 }
 
 // ---------- spectator views: keys 1-4 and the chips are one function (docs/API-NEXT.md 2.3, 3.4) ----------
@@ -122,12 +122,14 @@ function recenter() { model.recenter(); if (body) body.center(); say('Re-centere
 function leave() { if (!LOBBY || !room) return; game.send({ type: 'leave' }); toLobby(); }
 // Opening the panel pauses a match against Matt (or an empty court); against a human it is only a card over a live rally.
 const vsHuman = () => { const o = state && state.paddles[1 - side]; return !!o && !o.bot; };
+const forfeits = () => LOBBY && !spec() && vsHuman() && !holding && ui.currentOverlay() !== 'match' && (struck || !!state && state.score[0] + state.score[1] > 0);      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
 function pause(on) {
   if (spec() || !seated() || !live()) return;
   if (vsHuman()) { if (on) ui.setSettings({ canPause: !(noPause = true) }); return; }
   if (on) ui.setSettings({ canPause: !(noPause = false) }); game.send({ type: 'pause', on });
 }
-let sentName = '', polledName = '', healAt = 0, noPause = false;
+let sentName = '', polledName = '', healAt = 0, noPause = false, burstT = 0, struck = false, saidForfeit = false, dim = false;
+function setDim() { const on = pausedUi && ui.settings() && !spec(); if (on !== dim) scene.setDim(dim = on); }      // paused against Matt behind the full blur: the menu's cheap picture (it ran at 2560x1440, 52 fps for up to 10 minutes)
 function rename(n) {                               // the settings panel's Name row (docs/NEXT.md 10b): kept, and told to the room
   n = cleanName(n); if (!n) return; ls.set('poddle.name', n);
   if (seated() && LOBBY && n !== sentName) game.send({ type: 'name', name: sentName = n });
@@ -185,7 +187,7 @@ function request(m) {                               // one lobby request at a ti
 function setUrl(code, watch) { const u = new URL(location.href), q = u.searchParams; q.delete('room'); if (code) q.set('court', code); else q.delete('court'); if (code && watch) q.set('watch', '1'); else q.delete('watch'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room, in the same role
 const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?court=${code}`;      // a localhost link is no use to a friend
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
-  clearFar(); room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
+  clearFar(); clearTimeout(burstT); ui.confettiOff(); room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.hold(null); setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
@@ -253,18 +255,21 @@ const bridge = connect(BRIDGE, 'm', sample => {
         // sign says which way the ball breaks off the bounce. (How level the paddle is held is NOT used: this player rests
         // the AirPod flat in the hand, so it read "level" nearly all the time and made every shot a slice.)
         // The amount is CONTINUOUS (docs/NEXT.md 3b): every hit carries its own spin, linear from what a plain swing does
-        // (roll 0.12, turn 0.3) to the most the wrist gives (roll 0.95, turn 2.6). The old gates (0.6, 1.2) left 76 % of real
-        // strokes at exactly zero and 16 % at 0.8+. Now p50 0.28, p75 0.51, and 27 % read as a slice (> 0.5 on the server).
-        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.12) / 0.83)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 0.3) / 2.3));
+        // (roll 0.12, turn 0.3) to the most the wrist gives (roll 0.95, turn 2.9). The old gates (0.6, 1.2) left 76 % of real
+        // strokes at exactly zero and 16 % at 0.8+. Now p50 0.27, p75 0.55, and 27 % read as a slice (> 0.5 on the server).
+        // (2.9, not 2.6: every swing now ends in its settled report, whose turn has had longer to add up. Measured on those: 2.6 gave 29 %.)
+        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.12) / 0.83)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 0.3) / 2.6));
         const amount = Math.max(roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
         const slice = amount * (way || 1);
         // A lob is meant (docs/NEXT.md 2): a curved swing ends travelling upward without being an underhand, so the upward
         // share fades out as the swing's axis turns 0.6 -> 1.0 rad. Of the recorded powered lobs only the deliberate one stays.
         const g = Math.max(0, Math.min(1, ((e.turn || 0) - 0.6) / 0.4)), lob = e.lob * (1 - g * g * (3 - 2 * g));
-        game.send({ type: 'swing', power: e.power, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix });
+        game.send({ type: 'swing', power: e.power, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
+        unsettled = e.final ? null : { power: e.power, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
-    else if (e.type === 'swingEnd') logSwing(e);
+    else if (e.type === 'swingEnd') { logSwing(e);
+      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
   }
 });
 
@@ -303,7 +308,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'names') {
-    const was = names; names = cleanNames(m.names); drawNames(); showView();
+    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) struck = false; drawNames(); showView();      // a seat changed hands: a fresh match
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) say(`${names[i]} joined`, null, 2200);      // a human sat down (a changed name is not news)
     return;
   }
@@ -314,6 +319,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     setPaused(frozen && !holding); drawNames();
     if (spec()) { ui.setScore(m.score[0], m.score[1]); for (const i of [0, 1]) { const o = m.paddles[i]; scene.updatePaddle(i, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null); } return; }
     if (ui.settings() && noPause !== vsHuman()) ui.setSettings({ canPause: !(noPause = vsHuman()) });      // somebody sat down (or left) while the panel was open: the note follows
+    if (forfeits() !== saidForfeit) ui.setSettings({ forfeit: saidForfeit = forfeits() });      // the Leave button says what it costs
     if (live() && !frozen && !holding) serveCoach(m); else svT = 0;      // no serve coaching over a set-up screen or a stopped room; its clock starts again afterwards
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side]; players = o ? 2 : 1;
@@ -323,17 +329,19 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'botinfo') {
     const said = botLevel; if (m.active && typeof m.name === 'string') botLevel = m.name.slice(0, 12); drawNames();
-    if (m.reason) { if (live()) say('Can’t add a bot with two players in', null, 1800); } else if (m.active && live() && botLevel !== said) say(`Matt · ${botLevel}`, null, 1400);
+    if (m.reason) { if (live()) say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said) say(`Matt · ${botLevel}`, null, 1400);
     return;
   }
   if (m.type === 'left') { const who = lastOpp || nameOf(1 - side); clearFar(); ui.setServe(null); if (live() && !spec()) say(`${who} left`, null, 2200); return; }      // only before a match has started now; mid-match it is a hold or a forfeit
-  if (m.type === 'match' || m.type === 'matchover') { over = m; overAt = performance.now(); votedNo = false; if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
+  if (m.type === 'match' || m.type === 'matchover') { struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false; if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
   if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
-  if (m.type === 'rematchon') { over = null; if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
+  if (m.type === 'rematchon') { over = null; struck = false; if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
   if (m.type === 'hold') { holding = true; scene.setFrozen(true); setPaused(false); if (live()) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // their wifi dropped: the seat is held, the ball waits where it is
   if (m.type === 'holdoff') { holding = false; ui.hold(null); return; }                     // frozen follows the next 'state'
   if (m.type === 'paused') { if (m.refused) ui.setSettings({ canPause: false }); else { setPaused(!!m.on); scene.setFrozen(!!m.on || holding); } return; }
-  if (m.type === 'hit') { stats.hits++; if (m.side === side && !spec()) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
+  if (m.type === 'wait') { if (live() && !holding) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // the serve waits for a seat that is calibrating mid-match: the last 30 s of its minute are counted down, then it forfeits
+  if (m.type === 'waitoff') { if (!holding) ui.hold(null); return; }
+  if (m.type === 'hit') { struck = true; stats.hits++; if (m.side === side && !spec()) stats.myHits++; rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
     if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve. Swing to hit it.', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
@@ -362,7 +370,7 @@ const net = (() => {
   }, 2000);
   return {
     packet() { const t = performance.now(), g = t - lastPacket; lastPacket = t; if (g > 1000) return; gaps++; if (g > worst) worst = g; if (g > 1000 / hz + 45) late++; },
-    pong(m) { const r = performance.now() - m.c; if (r >= 0 && r < 5000) { rtts.push(r); if (rtts.length > 12) rtts.shift(); if (ui.setPing) ui.setPing(room || !LOBBY ? [...rtts].sort((a, b) => a - b)[rtts.length >> 1] : 0); } },      // the median of the last 6 s: a number that sits still
+    pong(m) { const r = performance.now() - m.c; if (r >= 0 && r < 5000) { rtts.push(r); if (rtts.length > 12) rtts.shift(); if (ui.setPing) ui.setPing((room || !LOBBY) && !spec() ? [...rtts].sort((a, b) => a - b)[rtts.length >> 1] : 0); } },      // the median of the last 6 s: a number that sits still
     lag: () => Math.round(floor()),                                     // the quietest recent round trip: queueing spikes are not the link's real delay
     rejoined() { hz = 60; bad = good = 0; rtts.length = 0; },           // a new socket starts at the full rate on the server
     idle() { lastPacket = 0; },                                         // paused or held: the gap to the next live packet is not the link's
@@ -384,11 +392,12 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: level => { if (pending) return; botWant = [0, 1, 2].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: () => say('Link copied', null, 1600) });
-ui.onSettings({ open: () => pause(true), close: () => pause(false), sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, stats: setStats, recenter, leave, name: rename,
+ui.onSettings({ open: () => { pause(true); setDim(); }, close: () => { pause(false); setDim(); }, sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, stats: setStats, recenter, leave, name: rename,
   move: m => { if (MODES.includes(m) && m !== mode && (m !== 'body' || body && body.ready)) setMode(m); },      // how you move is chosen here now, not on the court
   bot: level => { if ([0, 1, 2].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onView(name => setView(name, true));
-ui.onRematch(yes => { if (!room || spec()) return; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
+ui.onRematch(yes => { if (!room || spec()) return; if (!yes && votedYes) { votedNo = true; return leave(); }      // Leave after Rematch: the server takes one answer each, and a player leaving the vote closes the court for everyone just the same
+  votedYes = !!yes; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
   if (!yes) { const r = room; setTimeout(() => { if (room === r && votedNo) leave(); }, 3000); } });      // unless it never answers
 ui.onRetry(() => location.reload());
 function esc() { if (ui.asking()) ui.askWatch(null); else if (live() && !ui.currentScreen()) { if (!ui.currentOverlay()) ui.settings(!ui.settings()); } else back(); }      // in play and while watching Esc is the hamburger
@@ -401,7 +410,7 @@ addEventListener('keydown', e => {
   if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
   if (phase === 'lobby') return;                                 // the lobby's keys live in ui.js; game keys wait for a room
-  if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say('Press Q again to leave', null, 2500); } return; }
+  if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
   if (k === 'h') setStats(!showStats);
   if (spec()) { if ('1234'.includes(k) && !e.repeat) setView(VIEWS[+k - 1], true); return; }      // watching: 1-4 pick the view (3 again = the other player), F, H, Q Q and Esc. Nothing else
   if (k === 'c') startCal();

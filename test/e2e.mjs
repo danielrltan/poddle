@@ -55,7 +55,7 @@ await a.screenshot({ path: root + 'test/shots/3-rally.png' });
   check(seen.toastTop == null || seen.toastTop > 0.88, `HUD toast sits over the court (top at ${(seen.toastTop * 100).toFixed(0)}% of the height)`); check(u.screen === 'hud' && u.hud, `HUD not showing after calibration (screen=${u.screen})`);
   check(u.g === 'live', `#g is "${u.g}", expected "live"`); check(!u.dev, 'stats panel visible by default'); check(u.camCaption === '', 'webcam inset has a caption');
   check(/Poddle Rounded/.test(u.font) && !/mono/i.test(u.font), 'body font is ' + u.font); check(/Poddle Rounded/.test(u.fontsLoaded), 'vendored font did not load: ' + u.fontsLoaded);
-  check(!seen.banner || /^(Your point!|Matt scores)$/.test(seen.banner), 'banner text was "' + seen.banner + '"');      // the point banner names who scored (docs/SPECTATE.md Names)
+  check(!seen.banner || /^(Your point|Matt scores)$/.test(seen.banner), 'banner text was "' + seen.banner + '"');      // the point banner names who scored (docs/SPECTATE.md Names)
   check(!seen.callout || SHOT_NAMES.includes(seen.callout), 'callout text was "' + seen.callout + '"');
   await sleep(500); check((await ui(a)).calHidden, '#cal not hidden once calibrated');
   console.log('ui seen:', JSON.stringify(seen), '| fonts:', u.fontsLoaded); }

@@ -14,9 +14,10 @@ Analysis scripts: scratchpad/tune.mjs, lobs.mjs, windup.mjs (run against HEAD co
 ## 1. Smash must be earned (server/game.js, swing handler + shotKind) and rewarded (solve)
 - NOW: `if (chop > 0.45 && pw > 0.25) pw = Math.max(pw, 0.86)` -> any downward swing over 13 rad/s is a full smash. 4 of 23 smashes were these.
 - NEW: overhead bonus only for a real stroke and additive: `if (chop > 0.45 && pw > 0.55) pw = Math.min(1, pw + 0.2)`.
-- shotKind smash threshold 0.62 -> 0.76 (27.3 rad/s ~ this player's p90). Both occurrences in shotKind. Check `hard(n)` (0.45..0.7) users still make sense.
+- shotKind smash threshold 0.62 -> 0.76 (27.3 rad/s ~ this player's p90 of ALL detected swings, 80 of 143 of which are twitches under 9 rad/s; of his 63 real strokes it is p75: one in four is a smash. `node test/kinds.mjs` prints both lines; tune on the REAL STROKES one: 0.82 = 29 rad/s would give ~17 %). Both occurrences in shotKind. Check `hard(n)` (0.45..0.7) users still make sense.
 - Reward: in solve(), flight time T for drives gets faster at the top: subtract ~0.07*smoothstep(0.76,1,n) from the level-swing T (0.58 -> ~0.51 at full power). Run test/deep.test.mjs, kitchen, serve, server sweeps: ball must still clear net and land in.
-- Expected mix: smash 16% -> ~10-11%, none boosted.
+- Expected mix: smash 16% -> ~10-11% of all swings (= 25 % of real strokes), none boosted that did not earn it (5 boosted, 2 needed the boost: 25.7 and 25.8 rad/s overheads).
+- FIXER: a smash is only ever called on a SETTLED report (`final`), see section 4; spin no longer slows a smash down (`T *= 1 + slow * spin * (1 - top)`); flame and embers start at 0.76, not at the old 0.55-0.6.
 
 ## 2. Lobs intentional (web/main.js where the swing is sent; server underhand())
 - Curved (C-shaped) swings are not underhands: client sends `lob: e.lob * (1 - smoothstep(e.turn, 0.6, 1.0))`.
@@ -34,6 +35,7 @@ Analysis scripts: scratchpad/tune.mjs, lobs.mjs, windup.mjs (run against HEAD co
   - a previous swing from this player (any power) within 1.2 s -> A is the real stroke -> strike now. (needs me.lastSwingAt recorded for EVERY swing msg incl. sub-threshold, before the SERVE_POWER return)
   - else hold A as me.servePending until now + 0.7 s; a swing B arriving meanwhile that is stronger (>= 0.9*A) or opposite dir -> strike with B now; timeout (checked in step() serving branch) -> strike with A. serveReach re-checked at strike time. 'swung' broadcast still immediate.
 - Serve floor: n = max(pw, 0.35) on serves so a legal soft serve still clears the kitchen properly.
+- FIXER (the rule above was sized on SETTLED wind-up powers, but the server saw the first report, a bet that overshoots: recorded wind-ups go 30.4 > 8.2, 32.3 > 8.0, 26.6 > 6.0, and 10 of 27 still served). Now every swing ends in a settled report (`final:true`, web/motion.js) and ONLY a settled report decides: a bet >= 11 is held until it settles (0.3 s at most), dropped if it settles under 11. SERVE_SURE 22 -> 17 on settled power (his median real stroke is 18.3 and hung 0.7 s). Replayed live on a real server: 8 of 15 -> 2 of 15 wind-ups serve (one settles at 21.0, one at 16.9 with its stroke 0.80 s later, outside the 0.7 s hold).
 - Add test to test/serve.test.mjs: windup(15, dir +1) then stroke(28, dir -1) 0.6 s later -> ONE hit with n from 28; lone stroke 28 -> immediate; lone stroke 15 -> hit after ~0.7 s; twitch 8 -> nothing.
 
 ## 5. Also pending: NPC attract rally behind the blurred menu (client-side, scene.js/main.js), NOTES.md sections, deploy, push.
@@ -43,6 +45,7 @@ Analysis scripts: scratchpad/tune.mjs, lobs.mjs, windup.mjs (run against HEAD co
 - Client (web/main.js spin maths): amount = max( clamp((|roll| - 0.12) / 0.83, 0, 1), clamp((turn - 0.3) / 2.3, 0, 1) )   [roll 0.12..0.95, turn 0.3..2.6, linear]. Sign (`way`) logic unchanged.
 - Server: sliced(slice, lob) loses its smoothstep(0.3, 0.7): spin = clamp(|slice|, 0, 1) * (1 - 0.6 * underhand(lob)). Physics (gOf, SLICE.slow, bounce lerp, kick) already scale with spin.
 - Result on the recordings: p25 0.14, p50 0.28, p75 0.51, p90 0.80; > 0.5 ("reads as a slice": blue ring, hiss, 'slice' label): 27% (the user's number); >= 0.8: 11%; exactly zero: 5%.
+- FIXER: the curve's range is turn 0.3..2.9 now (was 2.6): every swing ends in its settled report, whose turn has had longer to add up; on those 2.6 gave 29 %, 2.9 gives his 27 %. A twitch (n < 0.1) is a tap whatever the wrist did.
 - 'slice' LABEL stays spin > 0.5 (shotKind). Check: FIX re-aim comparison uses sliced() differences > 0.2 (fine), bot shots, test/slice.test.mjs expectations (it may assert on the old dead zone: update the test to the new curve, do not bend the curve to the test), test/kinds.mjs greps the client maths between 'const roll = Math.max(' and 'const slice = amount' (keep those anchors).
 - Feel: the trail tint already follows spin continuously (b.cool). Consider scaling the hit hiss volume by spin instead of the > 0.5 gate.
 
@@ -150,3 +153,4 @@ status? like have it say paused or calibrating with an icon"
 - NO "Weak connection" toast, ever (player: "that's useless, don't distract the user with negative stuff"). The 30 Hz switch stays, silently. No other negative network toasts either, except the two that tell the player something they must act on (AirPod signal lost, reconnecting to the game).
 - PING INDICATOR: `<span class="status-pill ping-pill" id="ping-pill" data-bars="0..4"><span class="bars"><i>x4</i></span><b id="ping-ms"></b></span>` + `ui.setPing(ms)` (bars: <60 ms 4, <110 3, <180 2, else 1; calm ink colours, never red) fed from net.pong() with the median of recent round trips, shown only while seated in a court. It sits TOP-LEFT, directly right of the hamburger, then the court code. If the UI owner rebuilt that corner, re-add the pill there (the mirror could not place the markup in this tree's index.html).
 - OPEN COURTS SCROLLBAR: a custom always-visible bar (`.room-wrap > ul#room-list + div#room-bar > i`, `roomBar()` in ui.js: thumb sized/positioned from scroll metrics, draggable, track click pages, native bar hidden). macOS fades native scrollbars so players did not know the list scrolls. Keep it; give the same treatment to any other scrolling list you add (spectatable courts, settings if it scrolls).
+- (live, commit after 2d83377) The spectator "WATCHING" tag is REMOVED (player: "its useless and given"): no `#watch-tag` element, no CSS for it; the watcher count and the view chips stay. FIXER: do not bring it back; tests already expect it gone. The ping pill sits between the hamburger and the court code (test/ui-next.mjs allows it).
