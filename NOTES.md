@@ -313,3 +313,9 @@ Build log. What we tried, what broke, and how each problem was solved.
   from `fly logs`.
 - A test race I introduced and removed: the shutdown notice waited 250 ms before exiting, and a test that restarts a server
   on the same port found it taken. 50 ms is enough (the kernel sends what was queued).
+
+## 21. "The ball spin indicator is perpendicular to the player"
+- The three spin streaks whipped around the ball's true spin axis (horizontal, across the flight), so their ring lay in the
+  plane of flight: from behind the baseline, where every player stands, it was edge-on and read as a thin line or nothing.
+- Turned 90 degrees: the ring's normal is now the line of flight, so it faces the player the ball is coming to (and the one
+  it left). Same streaks, same speed and colour. Checked with a before/after render of a full-spin ball from the player's camera.
