@@ -854,3 +854,19 @@ Build log. What we tried, what broke, and how each problem was solved.
 - So the marker no longer says whose side the ball is heading for. That was the one thing the colour carried, and it is
   redundant: the marker is already drawn at the spot, on one side of the net or the other, in a 3-D view from your end.
 - One line in scene.js's `launch` handler. Nothing reads the marker's colour, in the game or in the tests.
+
+## 62. The X moves off the corner, to the bottom of the middle (supersedes the placement in 59)
+- "Can you put it in 3/4 middle of the screen to bottom? Shouldn't be corner in case you press it when holding phone." Right:
+  a hand wrapped round a phone rests on the corners, so the one button that ends the session was under a palm all rally.
+- It is now pinned to the middle of the screen near the bottom (1.25 rem above the home bar, `env(safe-area-inset-bottom)`),
+  the same place on every phone. Nothing else is down there: the live view carries 5.5 rem of bottom padding to keep clear of it.
+- Two placements were measured and thrown away first. Fixed at 75% of the height sat ON the "Press and hold a button" line
+  at 390x844 and on the Calibrate again / Re-center row at 360x640. Last in the flow instead put it at y 667 on a 640-tall
+  screen: off the bottom of the page.
+- Short screens (`max-height:760px`) tighten the live view — smaller ring, smaller gaps — so the whole thing including the X
+  fits with no scrolling. Measured after: 390x844 has the X at 780-824, 360x640 at 576-620, scrollHeight equals the window
+  on both, no overlaps either side.
+- Sideways (`max-height:520px`) there is no room to keep a strip clear at the bottom, and pinning the X there dropped it
+  straight onto the Calibrate again / Re-center row (measured at 844x390 and 740x360). Below that height it goes back into
+  the flow as the last thing in the view: no overlap, but it is under the fold and reached by scrolling. This page already
+  overflowed when turned sideways (587 px of content in 390), so that is not new — it is just not fixed here either.
