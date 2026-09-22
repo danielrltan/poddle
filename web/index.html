@@ -82,7 +82,8 @@
   <div class="corner" id="corner" data-fit>
     <button class="btn btn-icon" id="btn-menu" aria-label="Settings" aria-expanded="false" aria-controls="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
     <span class="hud-pill ping-pill" id="ping-pill" data-bars="0" hidden><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b id="ping-ms"></b></span>
-    <button class="hud-pill room-pill" id="room-pill" hidden>Court <b id="room-code"></b></button>
+    <div class="copy-menu room-menu" id="room-menu" hidden><button class="hud-pill room-pill" id="room-pill" aria-haspopup="menu" aria-expanded="false" hidden>Court <b id="room-code"></b><span class="copy-caret" aria-hidden="true"></span></button>
+      <div class="copy-drop" role="menu"><button class="copy-opt" role="menuitem" data-copy="play"><b>Player link</b><span>Joins the court to play</span></button><button class="copy-opt" role="menuitem" data-copy="watch"><b>Viewer link</b><span>Watches as a spectator</span></button></div></div>
     <span class="hud-pill" id="watchers" role="img" aria-label="0 watching" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg><b id="watch-n">0</b></span>
     <span class="hud-pill is-tag is-paused" id="paused-tag">Paused</span>
     <i class="corner-br"></i>
@@ -148,6 +149,7 @@
   <label class="set-row" id="set-name"><span>Name</span><input class="field" id="set-name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"></label>
   <div class="set-row" id="set-sens"><span>Sensitivity</span>
     <span class="stepper"><button class="btn btn-icon" id="btn-sens-less" aria-label="Less"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button><b id="set-sens-val">1</b><button class="btn btn-icon" id="btn-sens-more" aria-label="More"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg></button></span></div>
+  <div class="set-row set-pick" id="set-paddle" hidden><span>Paddle</span><span class="seg seg-sm" id="paddle-seg2" role="radiogroup" aria-label="Paddle"><button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone">Phone</button><button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod">AirPod</button></span></div>
   <button class="set-row set-switch" id="tog-airpod" role="switch" aria-checked="true"><span>Show AirPod</span><i></i></button>
   <button class="set-row set-switch" id="tog-stats" role="switch" aria-checked="false"><span>Show stats</span><i></i></button>
   <div class="set-row set-pick" id="set-move"><span>Move</span><span class="seg seg-sm" id="move-seg" role="radiogroup" aria-label="Move"><button class="seg-opt" role="radio" aria-checked="true" data-move="body">Body</button><button class="seg-opt" role="radio" aria-checked="false" data-move="auto">Auto</button></span><small id="move-note" hidden>Body needs a camera</small><span id="mode" hidden>Body</span></div>

@@ -526,3 +526,21 @@ Build log. What we tried, what broke, and how each problem was solved.
 - `test/serve.test.mjs` follows the new rules and checks a gentle serve from rest, a gentle swing back through the ball
   (instant), and wind-up away then a light stroke back through (one serve, at once, where the stroke aimed). Its myServe()
   now makes sure the serve is really there: an instant serve could leave a stale 'serving' state and start the next check early.
+
+## 41. Swap the phone for an AirPod at any time; the court pill drops down to an invite
+- "Once you choose to use phone as paddle, there doesn't seem to be any way to change to an AirPod after... add that. Also
+  for the copy court link button, make it so when you hover over it, it drops down, and then you can copy the spectator link
+  or playing link. When you copy it it'll come with a message like play against me in Poddle using an AirPod or watch me play."
+- Settings has a **Paddle: Phone | AirPod** row wherever a phone can be the paddle (hidden for spectators). Picking the other
+  one mid-game goes back to the set-up screen (the QR, or the Poddle Helper card) and calibrates the new paddle once it
+  answers; the other player sees you calibrating, as usual. The set-up screen's switch does the same (main.js pickPaddle).
+- A picked AirPod stays the paddle: a phone page left open used to take over again with its next sample; now it only does
+  that when nobody chose on purpose this visit. The phone's page is told to stand down (idle) when the AirPod takes over.
+- The HUD's **Court XXXX** pill is a drop-down like the share screen's Copy link: hover (or tap) for Player link / Viewer
+  link. Where there is no shareable link (localhost) it stays a plain label. Below 900 px wide it loses its caret so it
+  keeps its width beside the board.
+- Both copy menus put a line in front of the link: "Play against me in Poddle! Pickleball you swing with your phone or an
+  AirPod: <link>" and "Watch me play Poddle, pickleball with a phone or an AirPod as the paddle: <link>&watch=1". The toast
+  says Invite copied / Viewer link copied.
+- `test/pad-e2e.mjs` step 4b: mid-game, Settings -> AirPod goes to the set-up screen with the helper card and stays there
+  while the phone keeps swinging; Phone on the switch calibrates on the phone again.

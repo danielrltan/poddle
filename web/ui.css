@@ -561,6 +561,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 /* HUD: the room code, small, next to the hamburger. A click copies the link. */
 .room-pill{cursor:pointer;font-family:var(--font);gap:.375rem;padding:0 .75rem}
 .room-pill:hover,.room-pill:focus-visible{background:#fff;outline:0;box-shadow:var(--glow)}
+.room-menu .copy-drop{left:0;right:auto} .room-menu .copy-caret{margin:-.25rem 0 0 .125rem} .room-menu.no-link .copy-drop,.room-menu.no-link .copy-caret{display:none} .room-menu.no-link .room-pill{cursor:default}      /* the HUD's court pill: its choices drop to the right, from the top-left corner */
 
 /* narrow / tall windows: stack the tiles as wide bars */
 @media (max-aspect-ratio: 1/1){
@@ -583,6 +584,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
    the corners. Lights and room code stack in a column on the left, the webcam inset shrinks to the AirPod's width on the right. */
 @media (max-width: 900px){
   .corner{flex-direction:column;align-items:flex-start;flex-wrap:nowrap;max-width:none} .corner-br{display:none}
+  .room-menu .copy-caret{display:none}       /* the court pill keeps its old width beside the narrower board; hover and a tap still open it */
   .inset-cam{width:9rem} .inset-pod{top:calc(var(--edge) + 5.6875rem + .5rem)}       /* 5.6875rem = the smaller webcam frame's height */
   .scoreboard{width:min(41rem, calc(100vw - 2 * (10rem + var(--edge))))}
   .score-tab{flex:1 1 0;width:auto;min-width:0;gap:.375rem}
@@ -636,7 +638,7 @@ button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--lin
 .set-status b{flex:1;font-weight:700} .set-status em{font-style:normal;font-size:var(--t-xs);font-weight:800;letter-spacing:.06em;color:var(--ink-faint)}
 .set-status .is-ok em{color:var(--good-deep)} .set-status .is-wait em{color:var(--warn-deep)} .set-status .is-bad em{color:var(--bad-deep)}
 .set-note{margin:.375rem 0 0;padding:.5rem .875rem;border-radius:var(--r-md);background:#fff6e0;border:.09375rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-sm);font-weight:700;text-align:center}
-.settings.is-spectator #set-move,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}
+.settings.is-spectator #set-move,.settings.is-spectator #set-paddle,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}
 
 /* ==========================================================================================================
    SPECTATORS: view chips bottom-left, the split-screen divider, no key hints and no insets. And the seat-hold card.

@@ -98,6 +98,16 @@ await ph2.goto(`http://localhost:${G}/pad.html?k=${CODE}`); await sleep(600); aw
 s = await until(async () => { const v = await game(desk); return v.calibrated && v.phase === 'play' ? v : null; }, 30000, 'the phone comes back on a fresh page (its clock starts over) and calibrates again');
 ok(!!s, 'a reopened phone page calibrates and plays again');
 
+// ---- 4b. change your mind mid-game: the settings row swaps the phone for an AirPod (NOTES 41), and back on the set-up switch
+await until(async () => (await game(desk)).screen === 'hud', 6000, 'the court opens after All set'); await sleep(300); await desk.click('#btn-menu'); await sleep(300);
+let row = await desk.evaluate(() => { const r = document.getElementById('set-paddle'); return r.hidden || !r.getClientRects().length ? null : r.querySelector('[aria-checked="true"]').dataset.paddle; });
+ok(row === 'phone', `settings have a Paddle row, on ${row}`);
+await desk.screenshot({ path: `${root}test/ui-shots/pad-6-settings-paddle-1280x720.png` });
+await desk.click('#paddle-seg2 [data-paddle="airpod"]'); await sleep(1500); s = await game(desk);
+ok(s.screen === 'connect' && !s.calibrated && s.helper && !s.pair && s.swap === 'airpod' && s.art === 'airpod', `AirPod picked: back to the set-up screen with the helper card, and the phone still swinging does not take over (${s.screen}, swap ${s.swap}, helper ${s.helper})`);
+await desk.click('#paddle-seg [data-paddle="phone"]'); s = await until(async () => { const v = await game(desk); return v.screen === 'calibrate' && v.art === 'phone' ? v : null; }, 5000, 'Phone picked again: the open phone page calibrates');
+ok(!!s, 'and back to the phone on the set-up switch: calibration on the phone');
+
 // ---- 5. a wrong code, and no sensors
 const ph3 = (await (await launch()).pages())[0]; await ph3.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true }); watch(ph3, 'phone3');
 await ph3.goto(`http://localhost:${G}/pad.html`); await sleep(500); p = await phone(ph3); ok(p.view === 'code', 'no code in the link: the phone asks for it');

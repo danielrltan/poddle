@@ -263,23 +263,33 @@ let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE
 // Someone who played here before phones could be paddles (a name is saved, no choice yet) may have the helper running: it is
 // tried quietly behind the phone's QR, and the first AirPod sample makes the AirPod the paddle, with no click and no change for them.
 let tryBridge = !useAirpod && CAN_PHONE && ls.get('poddle.airpod') == null && !!ls.get('poddle.name');
+let chose = false;      // the player picked the paddle on the switch this visit: a phone page left open no longer takes over from the AirPod
 function openBridge() { if (!bridge) bridge = connect(BRIDGE, 'm', sample => onSample(sample, 'airpod')); }
-const padFx = (fx, n) => { if (padOn) game.send({ type: 'padfx', fx, n }); };      // the phone buzzes on my hits and says which step we are at
+const padFx = (fx, n) => { if (padOn && !useAirpod) game.send({ type: 'padfx', fx, n }); };      // the phone buzzes on my hits and says which step we are at
 const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 'play' : 'idle');
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
   const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
   ui.setPaddle(kind); pod.setKind(kind);
   ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
     foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.' });
+  ui.setSettings({ paddle: CAN_PHONE ? kind : null });
 }
-ui.onPaddleSwap(kind => { const want = kind === 'airpod'; if (want === useAirpod) return; useAirpod = want; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); });
+// Phone <-> AirPod: the set-up screen's switch, or the settings row at any time. Mid-game what was calibrated was the other
+// paddle, so it is back to the set-up screen (the QR, or the helper card) until the new one answers, then calibration.
+// Going to the AirPod, the phone's page is told to stand down first (padFx says nothing once the AirPod is the paddle).
+function pickPaddle(kind) {
+  const want = kind === 'airpod'; if (want === useAirpod) return; if (want) padFx('idle'); useAirpod = want; chose = true; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0');
+  if (phase === 'play' || phase === 'calibrate') { stats.calibrated = false; calibrating = true; src = ''; lastSample = -1e9; phase = 'connect'; ui.settings(false); screen('connect'); tellCal(true); }
+  showPair(); if (!useAirpod) padPhase();
+}
+ui.onPaddleSwap(pickPaddle);
 if (useAirpod || tryBridge) openBridge();
 showPair();
 if (CAN_PHONE && !useAirpod && !PHONE_SIZED) $('title-note').textContent = 'Nothing to install. Your phone is the paddle.';
 function onSample(sample, from) {
-  if (from === 'airpod' && (padOn || !useAirpod && !tryBridge)) return;      // a phone was scanned in (or chosen): it is the paddle, the AirPod in a pocket is not
+  if (from === 'airpod' && !useAirpod && (padOn || !tryBridge)) return;      // a phone was scanned in (or chosen): it is the paddle, the AirPod in a pocket is not
   if (from === 'airpod' && !useAirpod) { useAirpod = true; tryBridge = false; }      // a returning AirPod player's helper answered
-  if (from === 'phone' && useAirpod && CAN_PHONE) useAirpod = false;                  // a phone page that is still open took over: it is the paddle now, say so
+  if (from === 'phone' && useAirpod) { if (chose || !CAN_PHONE) return; useAirpod = false; }      // a phone page that is still open took over: it is the paddle now, say so. Unless the AirPod was picked on purpose
   if (!sample || !Array.isArray(sample.r)) return;
   // A phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: its replay may wait
   // longer when (only when) that happens (NOTES 35). The AirPod keeps its own limit.
@@ -447,9 +457,10 @@ ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the b
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: level => { if (pending) return; botWant = [0, 1, 2].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
-  start: () => { if (room && phase === 'lobby') begin(); }, back, copied: () => say('Link copied', null, 1600) });
+  start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600) });
 ui.onSettings({ open: () => { pause(true); setDim(); }, close: () => { pause(false); setDim(); }, sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, stats: setStats, recenter, leave, name: rename,
   move: m => { if (MODES.includes(m) && m !== mode && (m !== 'body' || body && body.ready)) setMode(m); },      // how you move is chosen here now, not on the court
+  paddle: pickPaddle,
   bot: level => { if ([0, 1, 2].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });

@@ -273,7 +273,7 @@ function needName() {                                      // a seat was asked f
 
 // ---------- settings panel (hamburger). A card, not a screen: inPlay() in main.js stays true and the rally goes on behind it ----------
 let setOpen = false, setH = {};
-export function onSettings(h) { setH = h || {}; }                                       // { open(), close(), sens(dir), airpod(on), stats(on), recenter(), leave(), name(text), move(mode), bot(level) }
+export function onSettings(h) { setH = h || {}; }                                       // { open(), close(), sens(dir), airpod(on), stats(on), recenter(), leave(), name(text), move(mode), paddle(kind), bot(level) }
 export function settings(open) {
   if (open === undefined) return setOpen;
   open = !!open && !slots.menu && !slots.overlay; if (open === setOpen) return setOpen;
@@ -300,6 +300,7 @@ export function setSettings(o = {}) {
   if ('canPause' in o) show('set-note', o.canPause === false);
   if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }      // no camera: Body cannot be picked, and the row says why
   if ('spectator' in o) $('settings')?.classList.toggle('is-spectator', !!o.spectator);
+  if ('paddle' in o) { show('set-paddle', !!o.paddle); for (const b of $('paddle-seg2')?.children || []) b.setAttribute('aria-checked', String(b.dataset.paddle === o.paddle)); }      // null: only an AirPod can be the paddle here, nothing to pick
 }
 export function setPaused(on) {                            // the rest is CSS: blur behind the open card, the "Paused" tag while it is closed
   if (on) document.body.dataset.paused = '1'; else delete document.body.dataset.paused;
@@ -313,6 +314,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-stats', 'stats']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
   on2('tog-full', 'click', () => fullscreen());
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
+  on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });      // phone <-> AirPod at any time, not only on the set-up screen
   on2('bot-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });
   on2('btn-recenter', 'click', () => call('recenter')); on2('btn-leave-room', 'click', () => call('leave'));
   // name: saved on Enter / blur. Empty puts the old one back. Esc cancels the edit and hands focus back to the card (main.js owns what Esc does next)
@@ -443,20 +445,25 @@ const getCode = () => boxes().map(b => b.value).join('');
 export function setPing(ms) { const el = $('ping-pill'); if (!el) return; el.hidden = !(ms > 0); if (!(ms > 0)) return; const r = Math.round(ms);
   el.dataset.bars = r < 60 ? 4 : r < 110 ? 3 : r < 180 ? 2 : 1; setText($('ping-ms'), r + ' ms'); el.title = 'Ping'; }
 export function setRoom(code, link = '') {
-  $('room-pill').hidden = !code; setText($('room-code'), code || ''); $('room-pill').title = link ? 'Copy link' : '';      // no link on localhost: promise nothing
+  $('room-pill').hidden = $('room-menu').hidden = !code; setText($('room-code'), code || ''); $('room-menu').classList.toggle('no-link', !link);      // no link on localhost: no drop-down, promise nothing
   for (const b of document.querySelectorAll('.screen:not(#screen-lobby) [data-back]')) b.hidden = !code;      // set-up screens: Back only when there is a lobby to go back to
   [...$('share-code').children].forEach((el, i) => setText(el, code ? code[i] : ''));
   $('share-row').hidden = !link; setText($('share-link'), link.replace(/^https?:\/\//, '')); $('share-link').dataset.href = link;
 }
 export function titleRoom(code, watch) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); setText($('title-room-spec'), watch ? '\u00a0as spectator' : ''); }     // opened from a shared link (&watch=1: 'as spectator')
+// What lands on the clipboard: a line to paste into a chat, then the link.
+const INVITE = { play: 'Play against me in Poddle! Pickleball you swing with your phone or an AirPod:', watch: 'Watch me play Poddle, pickleball with a phone or an AirPod as the paddle:' };
 async function copyLink(btn, watch) {      // watch: the viewer link (&watch=1), which opens the court as a spectator
   let href = $('share-link').dataset.href; if (!href) return;
   if (watch) { const u = new URL(href); u.searchParams.set('watch', '1'); href = u.href; }
+  href = INVITE[watch ? 'watch' : 'play'] + ' ' + href;
   try { await navigator.clipboard.writeText(href); } catch { const t = document.createElement('textarea'); t.value = href; t.style.cssText = 'position:fixed;opacity:0'; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch { /* nothing more to try */ } t.remove(); }
-  if (btn.id === 'btn-copy') { const l = $('copy-label'); setText(l, 'Copied'); clearTimeout(copyT); copyT = setTimeout(() => setText(l, 'Copy link'), 1500); } else on.copied && on.copied();
+  if (btn.id === 'btn-copy') { const l = $('copy-label'); setText(l, 'Copied'); clearTimeout(copyT); copyT = setTimeout(() => setText(l, 'Copy link'), 1500); } else on.copied && on.copied(watch);
 }
 let copyT = 0;
-const copyOpen = open => { $('copy-menu').classList.toggle('is-open', open); $('btn-copy').setAttribute('aria-expanded', open); };
+// Two copy menus, one way of working: the share screen's Copy link and the court pill in the HUD corner. Hover (or a tap) drops the choices.
+const COPY = [['copy-menu', 'btn-copy'], ['room-menu', 'room-pill']];
+const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.find(c => c[0] === m)[1]).setAttribute('aria-expanded', open); };
 {
   // no name, no seat: every choice on the home view waits for it (the field shakes and takes focus), and so does the last button of each view
   $('btn-quick').addEventListener('click', () => { if (!needName() && on.quick) on.quick(); });
@@ -473,12 +480,13 @@ const copyOpen = open => { $('copy-menu').classList.toggle('is-open', open); $('
   on2('btn-watch-no', 'click', () => askWatch(null));
   on2('ask-watch', 'keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); $(e.key === 'ArrowLeft' ? 'btn-watch-yes' : 'btn-watch-no').focus(); } });
   $('btn-share-go').addEventListener('click', () => on.start && on.start());
-  $('btn-copy').addEventListener('click', () => copyOpen(!$('copy-menu').classList.contains('is-open')));      // a touch screen has no hover: a tap opens the choices
-  $('copy-menu').addEventListener('click', e => { const o = e.target.closest('[data-copy]'); if (!o) return; copyLink($('btn-copy'), o.dataset.copy === 'watch'); copyOpen(false); if (o.matches(':focus-visible')) $('btn-copy').focus(); else o.blur(); });
-  $('copy-menu').addEventListener('keydown', e => { const os = [...document.querySelectorAll('.copy-opt')], i = os.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); os[i < 0 ? (e.key === 'ArrowDown' ? 0 : 1) : (i + 1) % 2].focus(); } else if (e.key === 'Escape') { copyOpen(false); $('btn-copy').blur(); } });
-  document.addEventListener('pointerdown', e => { if (!e.target.closest('#copy-menu')) copyOpen(false); });
-  $('room-pill').addEventListener('click', e => copyLink(e.currentTarget));
+  for (const [m, b] of COPY) {
+    $(b).addEventListener('click', () => { if (!$(m).classList.contains('no-link')) copyOpen(m, !$(m).classList.contains('is-open')); });      // a touch screen has no hover: a tap opens the choices
+    $(m).addEventListener('click', e => { const o = e.target.closest('[data-copy]'); if (!o) return; copyLink($(b), o.dataset.copy === 'watch'); copyOpen(m, false); if (o.matches(':focus-visible')) $(b).focus(); else o.blur(); });
+    $(m).addEventListener('keydown', e => { const os = [...$(m).querySelectorAll('.copy-opt')], i = os.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); os[i < 0 ? (e.key === 'ArrowDown' ? 0 : 1) : (i + 1) % 2].focus(); } else if (e.key === 'Escape') { copyOpen(m, false); $(b).blur(); } });
+  }
+  document.addEventListener('pointerdown', e => { for (const [m] of COPY) if (!e.target.closest('#' + m)) copyOpen(m, false); });
   for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => on.back && on.back());
   $('room-list').addEventListener('click', e => { const w = e.target.closest('.room-watch'), b = e.target.closest('button.room-row'); if (!w && !b || needName()) return;
     if (w) { if (on.watch) on.watch(w.dataset.watch); } else if (on.join) on.join(b.dataset.code); });
