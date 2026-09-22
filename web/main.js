@@ -228,7 +228,7 @@ const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostn
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
   clearFar(); clearTimeout(burstT); ui.confettiOff(); room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
-  ui.setSpectator(false); ui.emotesOff(); ui.hold(null); setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
+  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
@@ -416,9 +416,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'names') {
     const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) struck = false; drawNames(); showView();      // a seat changed hands: a fresh match
-    for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) say(`${names[i]} joined`, null, 2200);      // a human sat down (a changed name is not news)
+    for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) say(`${names[i]} is here to play`, null, 2600);      // a human sat down (a changed name is not news)
     return;
   }
+  if (m.type === 'watcher') { if (live() && !spec()) ui.watcherNote(cleanName(m.name)); return; }      // someone started watching you (the server tells only the players)
   if (m.type === 'emote') { if (live() && Number.isInteger(m.e)) ui.emote(m.e, cleanName(m.name)); return; }      // a spectator's reaction, players and spectators alike see it
   if (m.type === 'state') {
     state = m; frozen = !!m.paused; scene.setFrozen(frozen || holding);

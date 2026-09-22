@@ -394,6 +394,16 @@ export function emote(i, name) {
   body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only
   el.append(body); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), dur * 1000 + 500); layer.append(el);
 }
+// someone sat down in the stands: a small card top-right for a few seconds. Three at most; names go in as textContent only
+const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>';
+export function watcherNote(name) {
+  const box = $('notices'); if (!box) return;
+  while (box.childElementCount >= 3) box.firstElementChild.remove();
+  const el = document.createElement('div'), t = document.createElement('span'); el.className = 'notice'; el.innerHTML = EYE;
+  t.textContent = name ? `${name} is watching` : 'Someone is watching'; el.append(t); box.append(el);
+  setTimeout(() => { el.classList.add('is-out'); setTimeout(() => el.remove(), 400); }, 3600);
+}
+export function notesOff() { $('notices')?.replaceChildren(); }
 export function emotesOff() { const layer = $('emote-layer'); if (layer) layer.replaceChildren(); }     // out of the room: nothing carries over
 
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });

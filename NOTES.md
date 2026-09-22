@@ -1030,3 +1030,12 @@ Build log. What we tried, what broke, and how each problem was solved.
   from a collapse. Two of the first round's failures were the harness's fault, not the feature's: `page.evaluate`
   serialises its arguments as JSON, so a waveform passed as a function arrived as `undefined` and every spring test
   silently drove a still head. They cross as source text now.
+
+## 69. Who just arrived: "Sam is watching" top-right, "Sam is here to play" at the bottom
+
+Asked for: a small notice in the top-right corner when someone starts watching you, and the standard bottom banner when someone joins to play against you.
+
+- Server (`watch()` in server/game.js): a spectator sitting down sends `{ type: 'watcher', name }` to the room's players only (not to the stands, not to other courts). Each room keeps a set of cids it has announced, so a reload or a reconnect of the same tab is not announced twice. A nameless spectator comes through with `name: ''`.
+- Page: `ui.watcherNote(name)` puts a small white card with the eye icon (the watchers pill's) in the top-right corner, over the camera inset, for ~3.6 s; three at most stack, and `ui.notesOff()` clears them on the way back to the lobby. It says "Sam is watching", or "Someone is watching" with no name. Spectators never see these cards.
+- A player sitting down already raised the bottom toast; its copy changes from "Sam joined" to "Sam is here to play" (2.6 s instead of 2.2), so it reads differently from the watching card.
+- test/watcher.test.mjs (WATCHER_PORT, default 8355) covers the server side. test/menu.mjs and test/rooms-e2e.mjs expect the new copy; menu.mjs was already crashing at line 244 on main before this change.

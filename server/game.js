@@ -623,7 +623,12 @@ function createRoom(code, pub) {
       broadcast({ type: 'holdoff' }); console.log(`[${code}] side ${pl.side} is back`);
     }
   }
-  function watch(ws) { spectators.add(ws); ws.room = room; ws.pl = null; ws.spec = true; greet(ws, null); if (pub) lobbyChanged(); }
+  const seen = new Set();                                          // tabs (cid) whose arrival in the stands the players were told of: a reload or a reconnect is not news
+  function watch(ws) {
+    spectators.add(ws); ws.room = room; ws.pl = null; ws.spec = true; greet(ws, null); if (pub) lobbyChanged();
+    if (ws.cid && seen.has(ws.cid)) return; if (ws.cid) seen.add(ws.cid);
+    const s = JSON.stringify({ type: 'watcher', name: ws.name || '' }); for (const pl of players) if (pl.ws) put(pl.ws, s);   // the players get a small 'Sam is watching' in the top-right corner
+  }
   function emote(ws, e) {                                         // a spectator's reaction: everyone in the room sees it pop in from the side, with the sender's name
     if (!spectators.has(ws) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
     const ms = Date.now(); if (ms - (ws.emoteAt || 0) < EMOTE_GAP) return; ws.emoteAt = ms;

@@ -109,7 +109,7 @@ s = await until(e, s => s.rooms.some(r => r.startsWith(PUB)), 3000, 'e sees the 
 await toCourt(d); s = await until(d, s => s.them === 'Matt', 8000, 'alone on the court: Matt walks in'); ok(s.them === 'Matt' && /Rookie|Club|Pro/.test(s.themSub), `d plays "${s.them}" / "${s.themSub}" while it waits`);
 await toLobby(f); await f.click('#btn-quick'); s = await until(f, s => s.pill, 4000, 'f quick play seats it'); ok(s.pill === PUB && PUB !== CODE, `d and f share public court ${PUB} (f got ${s.pill})`);
 s = await until(e, s => s.rooms.some(r => /^\w{4}\d+-\d+/.test(r) && r.startsWith(PUB)), 3000, 'the full court stays on e’s list, with its score'); ok(s.rooms.some(r => r.startsWith(PUB + '0-0')), `e lists the full court by its score (NEW RULE: it can be watched): [${s.rooms}]`);
-s = await until(d, s => s.them === 'Fay' && s.themSub === 'Calibrating', 4000, 'd sees Fay calibrating'); ok(s.toast === 'Fay joined' || s.them === 'Fay', `d: "${s.them} / ${s.themSub}", toast "${s.toast}"`);
+s = await until(d, s => s.them === 'Fay' && s.themSub === 'Calibrating', 4000, 'd sees Fay calibrating'); ok(s.toast === 'Fay is here to play' || s.them === 'Fay', `d: "${s.them} / ${s.themSub}", toast "${s.toast}"`);
 await f.keyboard.press('KeyQ'); await sleep(200); await f.keyboard.press('KeyQ'); const leftAt = Date.now();
 s = await until(d, s => s.toast === 'Fay left', 3000, 'd gets the toast'); ok(s.toast === 'Fay left' && !s.result && !s.hold, `before a ball is struck a leaver just leaves: "${s.toast}"`);
 s = await until(d, s => s.them === 'Matt', 8000, 'the bot comes back for d'); ok(s.them === 'Matt', `d plays "${s.them}" again ${((Date.now() - leftAt) / 1000).toFixed(1)} s after f left`);

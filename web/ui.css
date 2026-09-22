@@ -708,6 +708,18 @@ body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none
 @media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade 3.2s linear forwards} .emote-pop > i,.emote-pop img{animation:none} @keyframes emote-fade{0%,80%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} }
 @media (max-width: 700px){ .emotes{bottom:calc(var(--edge) + 5.25rem)} .emote-btn{width:2.5rem;height:2.5rem} .emote-btn img{width:1.875rem;height:1.875rem} }      /* the view chips wrap to two rows here: the emotes sit above them */
 body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-events:none}
+
+/* notices: a small card in the top-right corner when someone starts watching you. It sits over the camera inset for a few seconds, then slides back out */
+.notices{position:fixed;top:var(--edge);right:var(--edge);z-index:calc(var(--z-hud) + 3);display:flex;flex-direction:column;align-items:flex-end;gap:.375rem;pointer-events:none}
+.notice{display:inline-flex;align-items:center;gap:.5rem;width:max-content;max-width:min(18rem, calc(100vw - 2 * var(--edge)));height:2.25rem;padding:0 .875rem 0 .625rem;border-radius:var(--r-pill);background:rgba(255,255,255,.95);border:.09375rem solid #fff;box-shadow:var(--sh-hud);
+  color:var(--ink-strong);font-size:var(--t-sm);font-weight:700;white-space:nowrap;animation:notice-in 420ms var(--ease-bounce) both}
+.notice span{overflow:hidden;text-overflow:ellipsis}
+.notice svg{flex:none;width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .notice svg circle{fill:var(--ink-soft);stroke:none}
+.notice.is-out{animation:notice-out 320ms var(--ease-soft) both}
+@keyframes notice-in{from{opacity:0;transform:translateX(1.5rem)} to{opacity:1;transform:none}}
+@keyframes notice-out{to{opacity:0;transform:translateX(1.5rem)}}
+@media (prefers-reduced-motion: reduce){ .notice,.notice.is-out{animation-duration:1ms} }
+body[data-overlay] .notices{opacity:0}
 .hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:var(--sh-3), var(--inner-hi);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;max-width:calc(100vw - 2 * var(--edge))}
 .hold-card .dots-wait{margin-right:.125rem} .hold-card .dots-wait i{margin-left:0;margin-right:.25rem}
