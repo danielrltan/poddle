@@ -721,3 +721,22 @@ Build log. What we tried, what broke, and how each problem was solved.
   now fills the whole screen with the hit's trail colour (72-90 % in the middle by power, full at the edges, plus a thicker
   edge ring), still added as light over the page. It peaks at 90-100 % in ~25 ms, holds at 55-85 % to a third of the way,
   then fades: 420-800 ms by power (a smash still flares twice, now over 900 ms). Colours and the `tint` recolour are unchanged.
+
+## 55. Lobs are lobs: a wide underhand lobs, a backhand slice never does
+- "Lobs aren't consistent. Sometimes I do a backhand slice and it lobs it super high. But when I actually lob it up with a
+  wide underhand, it sends a low arc smash." Both paddles, so the cause was shared.
+- Cause 1, wide underhand -> smash: main.js faded the lob out as the swing's axis turned 0.6 -> 1.0 rad (the "curved drive"
+  gate of docs/NEXT.md 2). A wide underhand curves (turn ~0.9), so its lob went to ~0.2, and full arm power made it a smash.
+- Cause 2, backhand slice -> lob: motion.js called a turn about the player's right axis "upward". Only true for a paddle
+  pointing ahead: in a backhand the arm points left, and the forearm roll that opens the face is a turn about that same
+  axis, so a roll-heavy chip read up 0.80 and flew 3-4 m high.
+- Fix, client: `lob` is now the upward share of the HAND's path (angular velocity x the paddle's pointer from calibration),
+  so a roll moves nothing and a pendulum reads ~0.9 however wide. The turn gate is gone; a roll-heavy stroke (|roll|
+  0.45 -> 0.75) is faded out instead, for a pointer that sits a little off the forearm.
+- Fix, server: a slice skids LOW (`SLICE.skid`, a touch quicker, instead of `slow` which floated soft spun shots to 2.4-2.65 m)
+  and never flies the lob's arc; a swing going clearly up is never a smash (`flat`, SMASH_UP); a clearly underhand swing
+  gets all of the lob's flight (`lofted`, LOB_ARC) instead of a 50/50 blend; the slice label is at 0.45 (27 % of real strokes).
+- Measured: `test/lobsynth.mjs` (synthetic strokes, AirPod and phone grips): wide underhand lob 5/5 lobs at 4.7-5.2 m (was
+  smash at 1.2 m); no backhand slice or chip lobs (a chip was up to 3/5). `test/lobdata.mjs` / kinds.mjs on the 143 real
+  swings: drive 48 %, slice 27 %, smash 24 %, lob 2 % (the same one deliberate lob); slice apex p50 1.97 -> 1.41 m.
+- slice.test's two "a slice floats" checks now ask the opposite: it crosses the net lower than a flat shot.

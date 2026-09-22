@@ -332,9 +332,12 @@ function onSample(sample, from) {
         const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.12) / 0.83)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 0.3) / 2.6));
         const amount = Math.max(roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
         const slice = amount * (way || 1);
-        // A lob is meant (docs/NEXT.md 2): a curved swing ends travelling upward without being an underhand, so the upward
-        // share fades out as the swing's axis turns 0.6 -> 1.0 rad. Of the recorded powered lobs only the deliberate one stays.
-        const g = Math.max(0, Math.min(1, ((e.turn || 0) - 0.6) / 0.4)), lob = e.lob * (1 - g * g * (3 - 2 * g));
+        // A lob is meant (docs/NEXT.md 2). motion.js measures it on the HAND's path now, so a curved low-to-high drive (it only ends
+        // going up) and a backhand's face-opening roll no longer read as scoops, and a wide underhand is no longer faded out by its curve
+        // (the old turn gate zeroed it, and at full power it went out a low smash). What stays: a stroke that turns mostly about the
+        // forward axis (|roll| 0.45 -> 0.75) is a wrist roll or a sideways sweep, not a pendulum; if the paddle's pointer is a little off
+        // the forearm, that roll leaks into the path. A pendulum underhand rolls 0.1-0.4 (recorded: the deliberate lob 0.39).
+        const k = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.45) / 0.3)), g = k * k * (3 - 2 * k), lob = e.lob * (1 - g);
         game.send({ type: 'swing', power: pw(e.power), raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
         unsettled = e.final ? null : { power: pw(e.power), raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated

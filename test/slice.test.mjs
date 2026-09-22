@@ -44,13 +44,13 @@ const row = (name, xs) => console.log(`${name} n=${xs.length}  kind ${[...new Se
 row('flat  ', F); row('half  ', M); row('sliced', S);
 ok(S.length >= 5 && F.length >= 5 && M.length >= 5, `enough rallies measured (${S.length} sliced, ${M.length} half, ${F.length} flat)`);
 ok(S.every(s => s.kind === 'slice' && Math.abs(s.spinHit - 0.9) < 1e-9) && F.every(s => s.kind !== 'slice' && !s.spinHit), "hit event: spin is the amount sent (0.9, not rounded up to 1), kind === 'slice' only for the sliced swings");
-ok(M.every(s => s.kind !== 'slice' && Math.abs(s.spinHit - 0.4) < 1e-9), `continuous: slice 0.4 flies with spin 0.4 and is not called a slice (that label starts above 0.5): ${[...new Set(M.map(s => s.kind + ' ' + s.spinHit))]}`);
-ok(avg(M, s => s.T) > avg(F, s => s.T) && avg(M, s => s.T) < avg(S, s => s.T) && avg(M, s => s.apex) < avg(F, s => s.apex) && avg(M, s => s.apex) > avg(S, s => s.apex) && avg(M, s => s.vAfter) < avg(F, s => s.vAfter) && avg(M, s => s.vAfter) > avg(S, s => s.vAfter),
-  'and the ball shows it: flight, bounce height and check-up all sit between flat and sliced');
+ok(M.every(s => s.kind !== 'slice' && Math.abs(s.spinHit - 0.4) < 1e-9), `continuous: slice 0.4 flies with spin 0.4 and is not called a slice (that label starts above SLICE.at 0.45): ${[...new Set(M.map(s => s.kind + ' ' + s.spinHit))]}`);
+ok(avg(M, s => s.net) < avg(F, s => s.net) && avg(M, s => s.net) > avg(S, s => s.net) && avg(M, s => s.apex) < avg(F, s => s.apex) && avg(M, s => s.apex) > avg(S, s => s.apex) && avg(M, s => s.vAfter) < avg(F, s => s.vAfter) && avg(M, s => s.vAfter) > avg(S, s => s.vAfter),
+  'and the ball shows it: height over the net, bounce height and check-up all sit between flat and sliced');
 ok(Math.abs(avg(S, s => Math.abs(s.bounce[2])) - avg(F, s => Math.abs(s.bounce[2]))) < 0.5, 'same landing depth within 0.5 m (power still sets depth)');
 ok(done.every(s => s.net > NET + 0.05), 'every one clears the net');
 ok(done.every(s => Math.abs(s.bounce[0]) <= 3.05 && Math.abs(s.bounce[2]) <= 6.7 && Math.abs(s.bounce[2]) > 0.1), 'every one lands in');
-ok(avg(S, s => s.T) > avg(F, s => s.T) * 1.15, 'sliced flight is clearly longer (floats)');
+ok(avg(S, s => s.net) < avg(F, s => s.net) - 0.08 && avg(S, s => s.T) < avg(F, s => s.T) * 1.1, 'sliced flight skids LOWER over the net and is no floatier (it used to float: T x1.3, and read as a lob)');
 ok(avg(S, s => s.apex) < avg(F, s => s.apex) * 0.7, 'first bounce stays clearly lower');
 ok(avg(S, s => s.vAfter) < avg(F, s => s.vAfter) * 0.65, 'and checks up: clearly slower after the bounce');
 ok(S.filter(s => s.returned).length >= S.length * 0.7, `receiver with server footwork returns most slices (${S.filter(s => s.returned).length}/${S.length})`);

@@ -4,7 +4,7 @@ import { MotionModel, qaxis, qmul, qrot } from '../web/motion.js';
 import fs from 'fs';
 const src = fs.readFileSync(new URL('../server/game.js', import.meta.url), 'utf8');
 const grab = name => { const i = src.indexOf('const ' + name + ' = '); return src.slice(i, src.indexOf('\n', i)); };
-const { underhand, sliced, shotKind } = new Function('const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));' + grab('underhand') + '\n' + grab('sliced') + '\n' + grab('hard') + '\n' + grab('shotKind') + '\nreturn { underhand, sliced, shotKind };')();
+const { underhand, sliced, shotKind } = new Function('const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));' + ['SLICE', 'SMASH', 'SMASH_UP', 'LOB_ARC', 'underhand', 'sliced', 'smooth', 'lofted', 'flat', 'hard', 'shotKind'].map(grab).join('\n') + '\nreturn { underhand, sliced, shotKind };')();
 const main = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8');
 const a0 = main.indexOf('const roll = Math.max('), a1 = main.indexOf("game.send({ type: 'swing'", a0); if (a0 < 0 || a1 < 0) throw new Error('web/main.js: the swing maths moved (anchors: "const roll = Math.max(" .. "game.send({ type: \'swing\'")');
 const clientOf = new Function('e', main.slice(a0, a1) + '; return { level: 0, roll, curve, amount, way, slice, lob };');   // the client's OWN spin maths and lob gate, as it sends them: nothing here is copied by hand

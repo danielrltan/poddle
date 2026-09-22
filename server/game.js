@@ -71,9 +71,12 @@ const BLOCK = { within: 5.0, x: 0.95, y: 0.8, front: 1.2, behind: 0.3, volley: 5
 const REACH_X = 1.0, REACH_Y = 0.5;          // extra metres of reach for a full-effort swing
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
-// Slice = backspin (flat, open paddle face). It floats: lift takes a share of gravity off and the same depth takes longer.
+// Slice = backspin (flat, open paddle face). It skids LOW: lift takes a share of gravity off, and the same depth is flown a little
+// QUICKER, so the arc tops out well under a flat ball's (lift 0.3 x skid 0.12 at full spin: 0.54 of the rise). It used to float
+// (T x1.3 on top of the lift): a soft spun tap climbed to 2.65 m for 1.56 s, a weak backhand slice to 2.4 m, and it read as a lob.
 // Then it bites: the first bounce stays low, loses most of its forward speed and kicks a little the way it was aimed.
-const SLICE = { lift: 0.3, slow: 0.3, up: 0.55, along: 0.45, kick: 3.4, clear: 0.15 };   // kick: sideways m/s the bounce throws the ball — a spinning ball does not come off the floor straight
+// lift is mirrored in web/scene.js SPUN (the client's coast() flies the same curve): change both or neither. skid is server-only.
+const SLICE = { lift: 0.3, skid: 0.12, up: 0.55, along: 0.45, kick: 3.4, clear: 0.15, at: 0.45 };   // kick: sideways m/s the bounce throws the ball — a spinning ball does not come off the floor straight. at: sliced() above this is CALLED a slice
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
 const SERVE_AHEAD = 0.55;                 // it wants to sit this far in front of the paddle
 const SERVE_DEAD = [0.4, 0.2, 0.35];      // x,y,z slack: move this far from it and it stays exactly where it is
@@ -130,6 +133,8 @@ const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one addr
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
 const SMASH = 0.76;                                            // n above this is a smash (27.3 rad/s)
+const SMASH_UP = [0.4, 0.55];                                  // lob (0..0.8) over which a hard swing stops being a smash: a smash comes DOWN or level through the ball. Recorded smashes send lob <= 0.27 (<= 0.45 with the reworked lob gate): called at 0.475, upward share 0.6
+const LOB_ARC = [0.25, 0.6];                                   // underhand() over which the flight turns from the drive's into the lob's: 0.8 of the way by 0.5, all of it by 0.6
 const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
 let clock = 0;                            // sim clock of the process. A room starts its own time from it and stops that while paused or holding a seat, so rooms agree until one of them pauses
 // A name is untrusted text that lands on other people's screens: strings only, no control, invisible or bidi characters, no angle brackets, 12 characters. '' = none given.
@@ -153,10 +158,18 @@ const underhand = lob => { const t = clamp((lob / 0.8 - 0.62) / 0.26, 0, 1); ret
 // how sliced? slice = the spin the client measured in the swing (wrist roll or a curved path), |slice| = how much, its sign = which way it breaks.
 // CONTINUOUS: every hit carries its own amount (a threshold made 76 % of real strokes exactly 0 and 16 % full, nothing between). A scoop is never much of a slice.
 const sliced = (slice, lob) => clamp(Math.abs(slice || 0), 0, 1) * (1 - 0.6 * underhand(lob));
+const smooth = (x, a, b) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+// how much of the lob's high, slow flight does it get? underhand() is a 50/50 blend at 0.5, and T blends LINEARLY while the
+// apex goes with T^2: a clearly underhand swing (u 0.5) topped out at ~2.3 m, a low arc. Steeper: 0.8 at u 0.5, 1 from 0.6.
+const lofted = lob => smooth(underhand(lob), LOB_ARC[0], LOB_ARC[1]);
+// how flat (level or downward) was it? 1 up to lob 0.4, 0 from 0.55 (upward share 0.69). Only a flat swing smashes or gets the smash's extra pace.
+const flat = lob => 1 - smooth(lob, SMASH_UP[0], SMASH_UP[1]);
 const hard = n => { const t = clamp((n - 0.45) / 0.25, 0, 1); return t * t * (3 - 2 * t); };   // 0 below n 0.45, 1 from 0.7: power beats spin (nothing in here uses it today; test/kinds.mjs still reads it)
 // smash: n 0.76 = 27.3 rad/s: it has to be earned (p90 of every recorded swing, twitches included; of his real strokes, power >= 9, one in four gets there).
-// 'slice' is the label for spin that READS as one (> 0.5). A twitch (n < 0.1) is a tap whatever the wrist did: 28 of the 41 recorded 'slices' were under 9 rad/s.
-const shotKind = (n, lob, slice) => (n > 0.76 && underhand(lob) <= 0.5 ? 'smash' : n < 0.1 && underhand(lob) <= 0.5 ? 'tap' : sliced(slice, lob) > 0.5 ? 'slice' : underhand(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n > 0.76 ? 'smash' : n < 0.1 ? 'tap' : 'drive');
+// 'slice' is the label for spin that READS as one (> SLICE.at 0.45: was 0.5, which left his forehand slice at 0.45-0.47 a 'drive'; 27 % of real strokes, test/kinds.mjs). A twitch (n < 0.1) is a tap whatever the wrist did: 28 of the 41 recorded 'slices' were under 9 rad/s.
+// A hard swing with a clear upward component is never a smash (it used to be whenever underhand() <= 0.5, i.e. upward share < 0.75):
+// flat() gates it. The lob label follows the flight: lofted() > 0.5 (u > 0.425) is what flies like a lob.
+const shotKind = (n, lob, slice) => (n > SMASH && flat(lob) > 0.5 ? 'smash' : n < 0.1 && lofted(lob) <= 0.5 ? 'tap' : sliced(slice, lob) > SLICE.at ? 'slice' : lofted(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n < 0.1 ? 'tap' : 'drive');
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
@@ -171,14 +184,17 @@ function solve(p, side, n, dir, lob, slice) {
   //   level swing      -> a drive: more power = deeper and flatter
   //   underhand scoop  -> the ball goes UP, and much softer: a gentle one is a dink that drops in the kitchen,
   //                       a big one is a lob that floats high and lands deep
-  const u = underhand(lob), nu = n < 0.2 ? n * 0.6 : lerp(0.45, 1, (n - 0.2) / 0.8);   // gentle = dink in the kitchen; anything more = a proper lob, deep and high                  // an underhand takes a lot of pace off
+  // What is CALLED a slice (shotKind: spin wins over lob) flies like one, never on the lob's arc: a scoop with that much spin
+  // (upward share 0.75, |roll| 0.5: live-play-1) went up 2.3 m for 1.3 s. The last 0.05 of spin under the label hands it over.
+  const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
+  const u = lofted(lob) * (1 - smooth(spin, SLICE.at - 0.05, SLICE.at)), nu = n < 0.2 ? n * 0.6 : lerp(0.45, 1, (n - 0.2) / 0.8);   // gentle = dink in the kitchen; anything more = a proper lob, deep and high. u: lofted(), not underhand(): past u 0.5 it IS a lob, not half of one
   const depth = lerp(lerp(2.6, 5.9, n), lerp(1.2, 6.0, nu), u);
   const tz = -s * Math.min(6.2, depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
-  const top = clamp((n - 0.76) / 0.24, 0, 1);                  // a smash is rewarded: above n 0.76 the drive gets faster still, 0.58 s -> 0.51 s at full power (where the net allows: see fly)
+  const top = clamp((n - 0.76) / 0.24, 0, 1) * flat(lob);      // a smash is rewarded: above n 0.76 the drive gets faster still, 0.58 s -> 0.51 s at full power (where the net allows: see fly). Only a level/downward swing: one going up is no smash
   let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)) - 0.07 * top * top * (3 - 2 * top), lerp(1.2, 1.95, nu), u);   // underhands always travel on a high, slow arc
-  const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
-  T *= 1 + SLICE.slow * spin * (1 - top);                      // same depth (power still sets it), slower and floatier. Not a smash: every swing carries some spin now (median 0.27 on his smashes) and the full slow-down made 3 of 16 recorded smashes SLOWER than a flat 27 rad/s drive
+  T *= 1 - SLICE.skid * spin * (1 - top) * (1 - u);            // same depth (power still sets it), a touch quicker and, with the lift, LOWER. Not a smash (its pace is already the net's limit) nor a lob (sliced() keeps some spin on a scoop: its arc stays the lob's)
+  T *= lerp(1, Math.sqrt(G / g), u);                           // ...exactly the lob's: the lift would take the top off it (4.63 m -> 4.48 m on his one real lob), so it hangs that much longer instead
   // From the baseline a flat drive is limited by the net, not by T, and fly()'s 0.05 s steps would hand the 0.07 s straight back (measured:
   // 0.73 s became 0.76 s). So a smash takes the exact fastest flight that clears: never slower than before, as fast as the net lets it be.
   const v = [0, 0, 0]; T = fly(v, px, py, pz, tx, tz, T, g, lerp(0.25, SLICE.clear, spin), top > 0 && !u);

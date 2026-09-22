@@ -85,6 +85,7 @@ export function qslerp(a, b, u) {
 // The pure kinematic arm: where the end of the forearm goes for a player-frame rotation P, relative to rest.
 export const xOf = (yaw, c = DEFAULTS) => c.X_SIN * Math.sin(clamp(yaw, -Math.PI / 2, Math.PI / 2));
 export function armOffset(P, arm = DEFAULTS.ARM) { return sub(qrot(P, arm), arm); }
+const handVel = (w, l) => cross(w, l);             // how a hand at the end of pointer l moves under angular velocity w (_track shadows cross)
 
 export class MotionModel {
   constructor(opts = {}) {
@@ -237,6 +238,9 @@ export class MotionModel {
     const rP = this._vecP(qrot(this.calib, s.r));                     // body-frame rate of P (P' = P * exp(rP dt / 2))
     const wP = this._vecP(qrot(qmul(this.yawFix, s.q), s.r));         // world angular velocity, player axes
     const tg = this._target(s.q); this.tilt = tg.pitch;
+    // The paddle's REAL pointer (the axis aimed at the screen in step 1; the resting pose is tipped up from it) and where its end is going.
+    // Rolling the forearm about its own axis moves the hand nowhere: only this says whether the PADDLE travels up.
+    const lh = this._vecP(qrot(qmul(qmul(this.yawFix, s.q), qconj(this.holdQ || this.calib)), this.B.F)), hv = handVel(wP, lh);
     const aimH = this.aimH || (this.aimH = []); aimH.push({ t, yaw: tg.yaw, pitch: tg.pitch }); while (aimH.length > 2 && aimH[1].t < t - 0.6) aimH.shift();   // where the hand pointed lately (serve: stroke or wind-up?)
 
     // Hand over from the old prediction to this sample's curve, starting from exactly what pose() shows right now.
@@ -268,9 +272,11 @@ export class MotionModel {
     }
     this.w2 = w1; this.w1 = wP;
     if (!sw && rate > c.TRIGGER && rate >= (this.lo == null ? 0 : this.lo + c.REARM_RISE)) { const m = (this.mvR && len(this.wB) >= c.ROM_IDLE ? this.mvR : this.mvI || this.mvR) || { t, ang: this.ang };   // mvR only when the hand really was moving before
-      sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), sent: false, fixed: false, eff: 0, sweep: 0, k: 1, from: (this.aimH.find(h => h.t >= m.t - 1e-4) || this.aimH[this.aimH.length - 1]) }; }
+      sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), hand: [0, 0, 0], sent: false, fixed: false, eff: 0, sweep: 0, k: 1, from: (this.aimH.find(h => h.t >= m.t - 1e-4) || this.aimH[this.aimH.length - 1]) }; }
     if (sw) {
-      if (!sw.fixed) sw.sum = add(sw.sum, mul(wP, rate));             // sweep direction, weighted by rate: the slow first samples are mostly noise
+      // sweep direction (and the hand's path), weighted by rate: the slow first samples are mostly noise. The hand's is not seeded with the
+      // two samples before the trigger: those are the end of the take-back, which for an underhand goes DOWN (a short lob read 0 with them).
+      if (!sw.fixed) { sw.sum = add(sw.sum, mul(wP, rate)); sw.hand = add(sw.hand, mul(hv, rate)); }
       // Curl: a straight swing keeps turning about one axis; a "C" shaped swing (or a rolling wrist) swings that axis
       // round as it goes. turn = how far the axis has wandered (rad), curl = which way (+ = curling to the player's right).
       if (!sw.fixed && rate > 5) { const u = mul(wP, 1 / rate);
@@ -297,8 +303,11 @@ export class MotionModel {
       // swing is heading back toward it (1) or away (-1). A wind-up leaves the resting aim; the stroke comes back through the ball.
       const aimed = () => { const f = sw.from, off = Math.hypot(f.yaw, f.pitch), vy = -sw.sum[1], vp = sw.sum[0], v = Math.hypot(vy, vp);
         return { off: off / DEG, back: off > 1e-6 && v > 1e-6 ? clamp(-(f.yaw * vy + f.pitch * vp) / (off * v), -1, 1) : 0 }; };
-      const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1),
-        roll: sw.sum[2] / n, turn: sw.turn || 0, curl: sw.curl || 0, ...aimed() }; };   // chop: downward share (an overhead)
+      // lob: the upward share of the HAND's path, not of the rotation axis. About +R was "upward" only for a paddle pointing ahead:
+      // a backhand slice points the arm left, and the forearm roll that opens its face is a turn about +R too (it read as a scoop,
+      // up 0.80, and flew 3-4 m high). A pendulum underhand still reads ~0.9 however wide it curves (the hanging arm's yaw moves it little).
+      const shot = () => { const n = len(sw.sum) || 1, nh = len(sw.hand) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.hand[1] / nh, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1),
+        roll: sw.sum[2] / n, turn: sw.turn || 0, curl: sw.curl || 0, ...aimed() }; };   // chop: downward share of the rotation (an overhead)
       const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
       // The real score needs the peak, and waiting for it is 150-300 ms of dead air. But the two movements part ways in
       // the first 40-60 ms: a flick takes off at 250-500 rad/s^2, an arm swing at 25-125. So a hard take-off is called
