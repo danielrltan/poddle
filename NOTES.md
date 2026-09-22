@@ -799,3 +799,20 @@ Build log. What we tried, what broke, and how each problem was solved.
   guard in scene.js keeps the two from both playing for one shot inside the server's 0.25 s re-aim window.
 - The sparks take hitLook's scale, the one the ring used to take, so the other end's smash still reads from across the
   court (it throws them as wide as its ring was) while mine stays close to the ball, 5 m from the lens.
+
+## 59. An X on the phone: held, it hangs the paddle up
+- "Can you make an X button on the phone, so when you're done playing per se you could just press and hold it to close the
+  tab." There was no way out of the paddle page: it held the screen awake and kept streaming until the tab was closed by hand.
+- A round X sits in the top corner of the paddle screen, out of the way of a hand gripping the phone and a 2.75 rem target.
+  It answers only to a press held for 0.7 s, filling as it goes, exactly like Calibrate again and Re-center (34): a gripped
+  phone has its screen pressed all rally long, so a tap must never end the session.
+- Held, it hangs up properly: the motion listeners come off, the wake lock is released (the screen may sleep again) and the
+  socket is closed for good — `started` is false first, so the reconnect in onclose does not fire. The computer is told its
+  paddle has gone (server padGone -> `pad: off`) exactly as if the tab had been closed.
+- Then it asks the tab to close itself. A page may only close a tab that a SCRIPT opened, and this one was opened by hand or
+  by scanning the code, so window.close() is very likely refused: the Paddle off screen is shown first and says "You can
+  close this tab now", with Be the paddle again to come straight back (start() over, sensors and socket and all).
+- `test/padquit.test.mjs`: the real pad.html in Chrome, the real server, a plain socket standing in for the computer's tab.
+  A tap is ignored; a hold reaches the Paddle off screen, the computer hears `pad: off`, and not one sample follows; Be the
+  paddle again brings the view, the samples and `pad: on` back. Note for whoever tests this by hand: a screenshot taken
+  mid-hold cancels the press, so a hold that spans one never completes — that is puppeteer, not the page.

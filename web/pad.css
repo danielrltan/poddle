@@ -14,7 +14,7 @@ main{min-height:100%;display:flex;flex-direction:column;align-items:center;justi
   radial-gradient(circle at 50% 52%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 22% 62%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 78% 54%,var(--ball-deep) 0 7%,transparent 8%),
   radial-gradient(circle at 34% 28%,#fbffa8,var(--ball) 58%,#c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35),0 .03em .06em rgba(40,80,110,.25)}
 .view{display:none;flex-direction:column;align-items:center;gap:1rem;width:100%;max-width:24rem}
-body[data-view="code"] [data-name="code"],body[data-view="start"] [data-name="start"],body[data-view="live"] [data-name="live"],body[data-view="nomotion"] [data-name="nomotion"],body[data-view="denied"] [data-name="denied"]{display:flex}
+body[data-view="code"] [data-name="code"],body[data-view="start"] [data-name="start"],body[data-view="live"] [data-name="live"],body[data-view="nomotion"] [data-name="nomotion"],body[data-view="denied"] [data-name="denied"],body[data-view="done"] [data-name="done"]{display:flex}
 h2{margin:0;font-size:1.625rem;font-weight:900;line-height:1.2;color:var(--ink-strong)}
 p{margin:0}
 b{font-weight:800;color:var(--ink-strong)}
@@ -42,6 +42,9 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
 .btn-hold.is-held::before{transform:scaleX(1);transition:transform .7s linear}
 .btn-hold.is-done{border-color:var(--good)}
 .btn-hold{isolation:isolate}.btn-hold::before{z-index:-1}
+/* The X that ends the session: in the corner, out of the way of a hand gripping the phone, and big enough to hit (2.75rem). */
+.btn-x{position:fixed;top:max(.75rem,env(safe-area-inset-top));right:max(.75rem,env(safe-area-inset-right));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5}
+.btn-x svg{width:1.15rem;height:1.15rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
 @media (prefers-reduced-motion:reduce){body{transition:none}}
 
 /* Always dark (NOTES 39): the phone is in your hand, near your eyes, while you watch the big screen. A bright page flashing

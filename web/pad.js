@@ -77,6 +77,27 @@ for (const [id, k] of [['btn-cal', 'c'], ['btn-center', 'r']]) { const b = $(id)
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, off);
   b.addEventListener('contextmenu', e => e.preventDefault()); }
 
+// ---------- done playing ----------
+// The X hangs up properly: the sensors are let go, the screen may sleep again and the socket is closed for good (started =
+// false, so onclose does not reconnect). The computer sees the paddle leave, as it would if the tab had gone.
+// A tab can only close itself when a script opened it, and this one was opened by hand or by scanning the code, so
+// window.close() is very likely refused: the 'done' view is shown first and says the last step out loud.
+function quit() {
+  started = false;
+  window.removeEventListener('deviceorientation', onOrientation); window.removeEventListener('devicemotion', onMotion);
+  if (lock) { try { lock.release(); } catch { /* already gone */ } lock = null; }
+  if (ws) { const s = ws; ws = null; try { s.close(); } catch { /* already closing */ } }
+  stats.open = stats.host = false;
+  view('done');
+  window.close();
+}
+{ const b = $('btn-quit'); let t = 0;
+  const off = () => { clearTimeout(t); b.classList.remove('is-held'); };
+  b.addEventListener('pointerdown', () => { off(); b.classList.add('is-held'); t = setTimeout(() => { off(); quit(); }, 700); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, off);
+  b.addEventListener('contextmenu', e => e.preventDefault()); }
+$('again').addEventListener('click', start);      // changed their mind, or hit it by accident: straight back to playing
+
 // ---------- what the tab says back ----------
 // The screen flash on a hit (the whole screen, brightest at the edges), in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (n stretched over 0.03..SMASH_N,
 // then white -> yellow -> orange -> red). Change one, change both.
