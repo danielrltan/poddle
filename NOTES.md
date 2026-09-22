@@ -507,3 +507,22 @@ Build log. What we tried, what broke, and how each problem was solved.
 - pad.html is always dark (not only when the phone is set to dark): near-black background, dim text, dark buttons, the
   swing ring and link colours toned down, the drawing recoloured, theme-color and color-scheme dark so the browser bars
   match. The flash on a hit is a dim olive instead of a bright yellow. The game on the computer is unchanged.
+
+## 40. Serving is forgiving: a light swing serves, and a real stroke serves at once
+- "Serving needs to be more forgiving; sometimes I am swinging lightly at the ball and nothing happens, this 'swing through'
+  thing is annoying. Make it responsive but not stubborn."
+- Why nothing happened: a serve needed a settled power of 11, and power is scored by arm travel (nothing below 35 deg, full
+  at 110), so a gentle 60 deg underhand swing peaking at 10 rad/s scored about 6, the floor every swing gets. Why it lagged:
+  anything under 17 was held 0.7 s in case it was the wind-up.
+- A serve now has its own, gentler measure: the larger of the rally power and the swing's raw peak rate, with full credit
+  from 45 deg of travel (none below 15). It needs 7. A 12 deg flick still does nothing.
+- motion.js now reports, with every swing, how far from the resting aim the hand was when the movement began (`off`, deg)
+  and whether the swing is heading back toward it (`back`, -1..1). A wind-up leaves the resting aim; the stroke comes back
+  through the ball. A swing that started 20+ deg off and heads back (0.3+) serves on its FIRST report; its settled report
+  re-aims the ball like any hit. So wind-up then stroke is instant, however lightly the stroke is swung.
+- A swing from rest may still be the wind-up, so it waits: 0.7 s if it is weak (under 10), 0.4 s if firmer, and 15+ goes at
+  once (was 17). The stroke after a wind-up usually comes back through the ball and replaces the held one immediately.
+- The hint after a while without a serve says "Swing at the ball to serve" (was "Swing through the ball to serve").
+- `test/serve.test.mjs` follows the new rules and checks a gentle serve from rest, a gentle swing back through the ball
+  (instant), and wind-up away then a light stroke back through (one serve, at once, where the stroke aimed). Its myServe()
+  now makes sure the serve is really there: an instant serve could leave a stale 'serving' state and start the next check early.

@@ -237,6 +237,7 @@ export class MotionModel {
     const rP = this._vecP(qrot(this.calib, s.r));                     // body-frame rate of P (P' = P * exp(rP dt / 2))
     const wP = this._vecP(qrot(qmul(this.yawFix, s.q), s.r));         // world angular velocity, player axes
     const tg = this._target(s.q); this.tilt = tg.pitch;
+    const aimH = this.aimH || (this.aimH = []); aimH.push({ t, yaw: tg.yaw, pitch: tg.pitch }); while (aimH.length > 2 && aimH[1].t < t - 0.6) aimH.shift();   // where the hand pointed lately (serve: stroke or wind-up?)
 
     // Hand over from the old prediction to this sample's curve, starting from exactly what pose() shows right now.
     const aPar = rate > 1e-6 ? dot(mul(sub(rP, L.rP), 1 / dt), mul(rP, 1 / rate)) : 0;
@@ -267,7 +268,7 @@ export class MotionModel {
     }
     this.w2 = w1; this.w1 = wP;
     if (!sw && rate > c.TRIGGER && rate >= (this.lo == null ? 0 : this.lo + c.REARM_RISE)) { const m = (this.mvR && len(this.wB) >= c.ROM_IDLE ? this.mvR : this.mvI || this.mvR) || { t, ang: this.ang };   // mvR only when the hand really was moving before
-      sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), sent: false, fixed: false, eff: 0, sweep: 0, k: 1 }; }
+      sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), sent: false, fixed: false, eff: 0, sweep: 0, k: 1, from: (this.aimH.find(h => h.t >= m.t - 1e-4) || this.aimH[this.aimH.length - 1]) }; }
     if (sw) {
       if (!sw.fixed) sw.sum = add(sw.sum, mul(wP, rate));             // sweep direction, weighted by rate: the slow first samples are mostly noise
       // Curl: a straight swing keeps turning about one axis; a "C" shaped swing (or a rolling wrist) swings that axis
@@ -292,8 +293,12 @@ export class MotionModel {
       // way. So rotation speed says almost nothing; how far and how long the hand travelled before the peak says it all.
       const credit = (rom, rise) => clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1) * clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1);
       const powerOf = (pk, rom, rise) => c.TAP + (c.POWER_MAX - c.TAP) * credit(rom, rise) * (0.8 + 0.2 * clamp(pk / 14, 0, 1));
+      // back / off (serves, NOTES 40): how far from the resting aim the hand was when this movement began (deg), and whether the
+      // swing is heading back toward it (1) or away (-1). A wind-up leaves the resting aim; the stroke comes back through the ball.
+      const aimed = () => { const f = sw.from, off = Math.hypot(f.yaw, f.pitch), vy = -sw.sum[1], vp = sw.sum[0], v = Math.hypot(vy, vp);
+        return { off: off / DEG, back: off > 1e-6 && v > 1e-6 ? clamp(-(f.yaw * vy + f.pitch * vp) / (off * v), -1, 1) : 0 }; };
       const shot = () => { const n = len(sw.sum) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.sum[0] / n, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1),
-        roll: sw.sum[2] / n, turn: sw.turn || 0, curl: sw.curl || 0 }; };   // chop: downward share (an overhead)
+        roll: sw.sum[2] / n, turn: sw.turn || 0, curl: sw.curl || 0, ...aimed() }; };   // chop: downward share (an overhead)
       const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
       // The real score needs the peak, and waiting for it is 150-300 ms of dead air. But the two movements part ways in
       // the first 40-60 ms: a flick takes off at 250-500 rad/s^2, an arm swing at 25-125. So a hard take-off is called
@@ -312,7 +317,7 @@ export class MotionModel {
         // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
         // never a smash, however fast it was.
         sw.eff = call(); Object.assign(sw, shot());
-        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, roll: sw.roll || 0, turn: sw.turn || 0, curl: sw.curl || 0, age, final: past });
+        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, roll: sw.roll || 0, turn: sw.turn || 0, curl: sw.curl || 0, back: sw.back, off: sw.off, age, final: past });
       } else if (sw.sent && !sw.fixed) {                              // the call moved, or the real peak is in and the call was off
         const eff = call(), sh = shot();
         // Once the peak is in, the settled score ALWAYS goes out (final: true), however little it moved: the server lets only a settled

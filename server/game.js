@@ -80,14 +80,22 @@ const SERVE_DEAD = [0.4, 0.2, 0.35];      // x,y,z slack: move this far from it 
 const SERVE_SETTLE = 0.4;                 // once it follows, it keeps drifting until it is back within this share of the slack
 const SERVE_FOLLOW = 3.5;                 // critically damped spring, rad/s: ~0.6 s to cover 63 % of a step, ~1.1 s for 90 %
 const SERVE_ZONE = { x: 0.9, y: 0.9, front: 1.4, behind: 0.5 };   // a serve has to meet the ball: tighter than the rally box
-const SERVE_POWER = 11;                   // swing power (rad/s scale: 6 = twitch/tap, 14+ = real stroke) needed to serve
+const SERVE_POWER = 7;                    // serve power needed (see servePower: a gentle swing counts; 6 = the floor every swing reports, so this is just 'more than a twitch')
+// NOTES 40: serving used to want a settled power of 11 and to hold anything under 17 for 0.7 s in case it was the wind-up. Rally power is scored by
+// arm travel (nothing below 35 deg, full at 110), so a light underhand serve scored ~3 and nothing happened, and a medium one waited. "Make it
+// responsive but not stubborn." A serve's power is now lenient (below), a swing that comes BACK through the ball strikes at once, and only a swing
+// from rest (which may be the wind-up) waits, briefly.
+const SERVE_ROM = [15, 45];              // deg of arm travel over which a serve earns its peak rate (the rally's scale is 35..110)
+const SERVE_BACK = { off: 20, back: 0.3 };  // started this far (deg) from the resting aim and heading back toward it: the stroke, not the wind-up
 // A serve is wound up first, and the wind-up is a swing too (30 recorded pairs: 0.4-0.9 s apart, 27 of 30 the other way, wind-up power median 7, p90 15, max 21).
 // The client reports a swing EARLY, on a bet that overshoots (recorded wind-ups: first called 30.4, settled 8.2; 32.3 > 8.0; 26.6 > 6.0), then sends
 // the settled power (final). Only a settled report decides a serve: the bets alone still served with 10 of 27 recorded wind-ups, settled ones with 2.
-const SERVE_SURE = 17;                    // SETTLED this hard is no wind-up: struck at once (settled wind-ups: median 6.9, p90 15.2, 2 of 31 reach 17)
+const SERVE_SURE = 15;                    // SETTLED this hard is no wind-up: struck at once (settled wind-ups: median 6.9, p90 15.2, 2 of 31 reach 17)
 const SERVE_WAIT = 0.3;                   // s a bet may wait for its settled report (it lands 60-280 ms later) before it is taken as it stands
 const SERVE_PREV = 1.2;                   // s: a swing this soon after another one IS the stroke, the one before was its wind-up (if it beats that one: as strong, or the other way)
 const SERVE_HOLD = 0.7;                   // s a lone middling swing waits for the real stroke to follow before it serves by itself
+const SERVE_HOLD_FIRM = 0.4;               // ...but a firmer one (10+) waits only this long: the wind-ups that settle there are few, and the stroke after a wind-up comes back through the ball and strikes at once anyway
+const SERVE_FIRM = 10;
 const SERVE_FLOOR = 0.35;                 // a legal soft serve still carries past the kitchen
 const REACH = 3.2;                        // no shot asks the receiver to get the paddle wider than this
 const PASSED = 5.5;                       // a bounced ball this far beyond the baseline is gone
@@ -579,13 +587,14 @@ function createRoom(code, pub) {
     if (a) { if (pw >= 0.9 * a.sw.power || d * a.sw.dir < 0) serveStrike(me, c); else me.servePending = a; return; }   // after a held swing: as strong, or the other way = the stroke, struck with THIS one, now. Weaker the same way changes nothing
     if (pw >= SERVE_SURE || c.born - c.prevAt < SERVE_PREV && (pw >= 0.9 * c.pvPow || d * c.pvDir < 0)) serveStrike(me, c);   // no wind-up is this hard; or the swing just before was the wind-up (any twitch used to count: now this one has to beat it)
   }                                                              // else: held until c.at in case it was a wind-up (step() strikes with it when nothing better came)
-  function serveSwing(me, fix, power, sw, final) {
+  function serveSwing(me, fix, power, sw, final, through) {
     const pend = me.servePending, own = fix && pend && pend.of === me.swAt;     // own: this corrects the very swing that is being held
+    if (through && power >= SERVE_POWER && !own) { me.swSaid = me.swAt; broadcast({ type: 'swung', side: me.side }); sw.power = power; serveStrike(me, { sw }); if (ball.serving == null) return; }   // came back through the ball: that is the stroke, struck on its first report (the settled one re-aims it, like any hit)
     if (power < SERVE_POWER) { if (own) me.servePending = pend.after; return; }   // a twitch, a flick, a quick step: nothing happens at all (and a held swing that settles as one is dropped: the bet said 30, the hand did 8)
     if (me.swSaid !== me.swAt) { me.swSaid = me.swAt; broadcast({ type: 'swung', side: me.side }); }   // animates at once, held or not; once per swing
     sw.power = power;
-    if (own) { pend.sw = sw; pend.final = final; }
-    else me.servePending = { sw, of: me.swAt, born: now, at: now + SERVE_HOLD, final, after: pend ? (pend.final ? pend : pend.after) : null, prevAt: me.swPrev, pvPow: me.pvPow, pvDir: me.pvDir };
+    if (own) { pend.sw = sw; pend.final = final; pend.at = pend.born + (power >= SERVE_FIRM ? SERVE_HOLD_FIRM : SERVE_HOLD); }
+    else me.servePending = { sw, of: me.swAt, born: now, at: now + (power >= SERVE_FIRM ? SERVE_HOLD_FIRM : SERVE_HOLD), final, after: pend ? (pend.final ? pend : pend.after) : null, prevAt: me.swPrev, pvPow: me.pvPow, pvDir: me.pvDir };
     if (final) serveDecide(me, me.servePending);
   }
 
@@ -615,7 +624,10 @@ function createRoom(code, pub) {
       const dir = clamp(num(m.dir, 0), -1, 1), lob = clamp(num(m.lob, 0), 0, 1), slice = clamp(num(m.slice, 0), -1, 1);   // signed spin, 0 when the client sends none
       if (!m.fix) { me.swPrev = me.swAt; me.pvPow = me.swPow; me.pvDir = me.swDir; me.swAt = now; }        // EVERY swing, twitches too: what came just before tells a serve's stroke from its wind-up
       me.swPow = num(m.power, 6); me.swDir = dir;                // its latest report: settled by the time the next swing asks
-      if (ball.live && ball.serving === me.side) return serveSwing(me, !!m.fix, me.swPow, { n: Math.max(pw, SERVE_FLOOR), dir, lob, slice, floor: SERVE_FLOOR }, final);   // my serve: only a real stroke that meets the ball counts
+      if (ball.live && ball.serving === me.side) {                // my serve: a real swing that meets the ball, gently measured (NOTES 40)
+        const sp = Math.max(me.swPow, num(m.raw, 0) * clamp((num(m.rom, 0) - SERVE_ROM[0]) / (SERVE_ROM[1] - SERVE_ROM[0]), 0, 1)), through = num(m.off, 0) >= SERVE_BACK.off && num(m.back, 0) >= SERVE_BACK.back;
+        return serveSwing(me, !!m.fix, clamp(sp, 0, 60), { n: Math.max(pw, SERVE_FLOOR), dir, lob, slice, floor: SERVE_FLOOR }, final, through);
+      }
       if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
         if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice });                     // hasn't met the ball yet: just correct it

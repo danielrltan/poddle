@@ -155,7 +155,7 @@ function serveCoach(m) {
   svFar = m.reach ? 0 : svFar || t;
   if (svSaid) return;
   if (svFar && t - svFar > 1500 && t - svT > 2800) { svSaid = true; say('Line up with the ball, then swing', null, 2200); }
-  else if (m.reach && t - svT > 4500) { svSaid = true; say('Swing through the ball to serve', null, 2200); }
+  else if (m.reach && t - svT > 4500) { svSaid = true; say('Swing at the ball to serve', null, 2200); }
 }
 
 // ---------- peak logger ----------
@@ -314,8 +314,8 @@ function onSample(sample, from) {
         // A lob is meant (docs/NEXT.md 2): a curved swing ends travelling upward without being an underhand, so the upward
         // share fades out as the swing's axis turns 0.6 -> 1.0 rad. Of the recorded powered lobs only the deliberate one stays.
         const g = Math.max(0, Math.min(1, ((e.turn || 0) - 0.6) / 0.4)), lob = e.lob * (1 - g * g * (3 - 2 * g));
-        game.send({ type: 'swing', power: pw(e.power), dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
-        unsettled = e.final ? null : { power: pw(e.power), dir: e.dir, lob, chop: e.chop, age: e.age, slice };
+        game.send({ type: 'swing', power: pw(e.power), raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
+        unsettled = e.final ? null : { power: pw(e.power), raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);
