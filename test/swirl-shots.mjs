@@ -1,4 +1,4 @@
-// Spin swirl + serve cue shots (NOTES.md 48). node test/swirl-shots.mjs [tag] [port]  -> test/ui-shots/swirl/<tag>-*.png (full 1280x720 + a 4x crop round the ball)
+// Spin swirl + serve cue shots (NOTES.md 51). node test/swirl-shots.mjs [tag] [port]  -> test/ui-shots/swirl/<tag>-*.png (full 1280x720 + a 4x crop round the ball)
 // LOOK at them. Drives test/scene-preview.html: a frozen rally at t, then either more rally with the ball's spin forced, or the ball hanging for a serve.
 import puppeteer from 'puppeteer-core';
 import { spawn } from 'node:child_process';

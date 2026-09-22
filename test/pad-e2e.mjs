@@ -100,7 +100,9 @@ s = await until(async () => { const v = await game(desk); return v.calibrated &&
 ok(!!s, 'a reopened phone page calibrates and plays again');
 
 // ---- 4b. change your mind mid-game: the settings row swaps the phone for an AirPod (NOTES 41), and back on the set-up switch
-await until(async () => (await game(desk)).screen === 'hud', 6000, 'the court opens after All set'); await sleep(300); await desk.click('#btn-menu'); await sleep(300);
+await until(async () => (await game(desk)).screen === 'hud', 6000, 'the court opens after All set'); await sleep(300);
+const openSettings = async () => { for (let i = 0; i < 5; i++) { await desk.click('#btn-menu').catch(() => {}); for (let t = 0; t < 6; t++) { await sleep(150); if (await desk.evaluate(() => !document.getElementById('settings').hidden)) return true; } } return ok(false, 'settings open'); };      // the court fades in: a click in its first moments can miss
+await openSettings();
 let row = await desk.evaluate(() => { const r = document.getElementById('set-paddle'); return r.hidden || !r.getClientRects().length ? null : r.querySelector('[aria-checked="true"]').dataset.paddle; });
 ok(row === 'phone', `settings have a Paddle row, on ${row}`);
 await desk.screenshot({ path: `${root}test/ui-shots/pad-6-settings-paddle-1280x720.png` });
@@ -112,7 +114,7 @@ const board = await desk.evaluate(() => document.body.dataset.screen);
 await desk.click('#screen-connect [data-back]'); s = await until(async () => { const v = await game(desk); return v.screen === 'hud' && v.calibrated && v.phase === 'play' ? v : null; }, 3000, 'Cancel: straight back to the court on the phone, still calibrated');
 ok(!!s && s.art === 'phone' && (await game(desk)).phase === 'play', `Cancel keeps the court and the phone's calibration (was ${board})`);
 ok(await back() === 'Back', 'and Back is Back again');
-await sleep(900); await desk.click('#btn-menu'); await sleep(400);
+await sleep(900); await openSettings();
 await desk.click('#paddle-seg2 [data-paddle="airpod"]'); await sleep(600);
 await desk.click('#paddle-seg [data-paddle="phone"]'); s = await until(async () => { const v = await game(desk); return v.screen === 'hud' && v.calibrated ? v : null; }, 3000, 'Phone on the set-up switch is Cancel too');
 ok(!!s, 'the set-up switch back to Phone also returns to the court');
