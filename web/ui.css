@@ -609,37 +609,48 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
    ========================================================================================================== */
 /* --set-top: ui.js measures it on open. Under the hamburger on a wide window; on a narrow one also under the room code and the scoreboard, which it would otherwise cover */
 .settings{--set-top:calc(var(--edge) + 3.25rem);position:fixed;left:var(--edge);top:var(--set-top);z-index:calc(var(--z-screen) - 1);width:min(23rem, calc(100vw - 2 * var(--edge)));max-height:calc(100vh - var(--set-top) - var(--edge));overflow-y:auto;
-  display:flex;flex-direction:column;gap:.375rem;padding:1rem 1rem 1.125rem;border-radius:var(--r-lg);border-width:.15625rem;text-align:left;outline:0;
+  display:flex;flex-direction:column;gap:.625rem;padding:.875rem .875rem .875rem;border-radius:var(--r-lg);border-width:.15625rem;text-align:left;outline:0;
   background:linear-gradient(180deg,rgba(246,250,252,.84),rgba(231,241,246,.74));box-shadow:var(--sh-3), inset 0 0 0 .125rem rgba(255,255,255,.9);animation:panel-in var(--d-med) var(--ease-out) both}
 /* Show stats is switched from this card, so the stats step out from under it while it is open: beside it, below the scoreboard */
 body[data-settings] .dev-panel{position:fixed;left:calc(var(--edge) + min(23rem, 100vw - 2 * var(--edge)) + .5rem);top:calc(var(--edge) + 4.75rem);max-width:calc(100vw - 2 * var(--edge))}
 .settings::before{display:none}
 body[data-paused] .settings{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}             /* paused: nothing to see through to */
 body[data-settings][data-paused] .glass{opacity:1;visibility:visible;transition-delay:0s}
-.settings h2{margin:0 0 .25rem .5rem;font-size:var(--t-lg);font-weight:800;letter-spacing:.03em;color:var(--ink-strong)}
+.settings h2{margin:0;font-size:var(--t-lg);font-weight:800;letter-spacing:.03em;color:var(--ink-strong)}
 body[data-paused] .settings h2{color:var(--warn-deep)}
-.set-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:3rem;width:100%;padding:0 .5rem 0 .875rem;border:.125rem solid transparent;border-radius:var(--r-md);background:rgba(255,255,255,.62);
+/* groups: a small caps label, then one white card of rows split by hairlines (a phone's settings, not a pile of pills) */
+.set-head{display:flex;flex-direction:column;align-items:flex-start;gap:.4375rem;padding:0 .375rem}
+.set-group{display:flex;flex-direction:column;gap:.25rem}
+.set-label{margin:0 0 0 .875rem;font-size:var(--t-xs);font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.set-list{display:flex;flex-direction:column;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1), inset 0 0 0 .0625rem rgba(255,255,255,.9);overflow:hidden}
+body[data-paused] .set-list{background:#fff}
+.set-list > .set-row + .set-row:not([hidden]){box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:2.75rem;width:100%;padding:0 .5rem 0 .875rem;border:.125rem solid transparent;border-radius:0;background:none;
   color:var(--ink-strong);font:700 var(--t-md)/1.2 var(--font);text-align:left}
-button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent} button.set-row:hover{background:#fff}
+button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent} button.set-row:hover{background:rgba(255,255,255,.9)}
+.set-list > :first-child{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)} .set-list > :last-child{border-bottom-left-radius:var(--r-md);border-bottom-right-radius:var(--r-md)}
 button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
-.set-row .field{width:11.5rem;height:2.375rem;padding:0 .875rem;font-size:var(--t-md);border-width:.125rem}
+.set-action{color:var(--link)} .set-action svg{width:1.25rem;height:1.25rem;margin-right:.375rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}      /* Re-center: a row that does a thing, so it reads as a link, not a setting */
+.set-row .field{width:11.5rem;height:2.25rem;padding:0 .875rem;font-size:var(--t-md);border-width:.125rem}
 .stepper{display:inline-flex;align-items:center;gap:.375rem} .stepper b{min-width:2rem;text-align:center;font-size:var(--t-lg);font-weight:800;font-variant-numeric:tabular-nums}
 .stepper .btn-icon{width:2.375rem;height:2.375rem;box-shadow:var(--sh-1), var(--inner-hi)} .stepper .btn-icon svg{width:1.25rem;height:1.25rem;stroke-width:3.25}
 /* switch: a track and a knob. Off = grey track, knob left; on = the outline blue, knob right, a tick of shape as well as colour */
 .set-switch i{flex:none;position:relative;width:3.25rem;height:1.875rem;border-radius:var(--r-pill);background:var(--sky-4);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3);transition:background var(--d-fast) linear}
 .set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform var(--d-fast) var(--ease-out)}
 .set-switch[aria-checked="true"] i{background:linear-gradient(180deg,var(--line),var(--line-deep))} .set-switch[aria-checked="true"] i::after{transform:translateX(1.375rem)}
-.settings > .btn{width:100%;height:2.875rem;margin:.125rem 0}
-.set-pick{flex-wrap:wrap;row-gap:.25rem;padding:.375rem .5rem .375rem .875rem} .set-pick small{flex-basis:100%;font-size:var(--t-xs);font-weight:700;color:var(--warn-deep)}      /* Move, Select difficulty: a small segmented control in the row */
+.settings > .btn{width:100%;height:2.875rem;margin:0}
+.set-pick{flex-wrap:wrap;row-gap:.25rem;padding:.4375rem .5rem .4375rem .875rem} .set-pick small{flex-basis:100%;font-size:var(--t-xs);font-weight:700;color:var(--warn-deep)}      /* Move, Difficulty: a small segmented control in the row */
 .seg-sm{padding:.1875rem;gap:.125rem;margin-left:auto} .seg-sm .seg-opt{height:2.125rem;min-width:0;padding:0 .75rem;font-size:var(--t-sm);border-width:.125rem} .seg-sm .seg-opt:disabled{opacity:.4;cursor:default}
-#set-bot{flex-direction:column;align-items:stretch} #set-bot .seg-sm{margin-left:0;justify-content:space-between} #set-bot .seg-opt{flex:1}
-#btn-leave-room{color:var(--bad-deep);border-color:#f3a3a3}
-.set-status{display:flex;flex-direction:column;gap:.125rem;list-style:none;margin:.375rem 0 0;padding:.5rem .875rem;border-radius:var(--r-md);background:rgba(255,255,255,.45)}
-.set-status li{display:flex;align-items:center;gap:.625rem;min-height:1.75rem;font-size:var(--t-sm);font-weight:700;color:var(--ink)}
-.set-status b{flex:1;font-weight:700} .set-status em{font-style:normal;font-size:var(--t-xs);font-weight:800;letter-spacing:.06em;color:var(--ink-faint)}
-.set-status .is-ok em{color:var(--good-deep)} .set-status .is-wait em{color:var(--warn-deep)} .set-status .is-bad em{color:var(--bad-deep)}
-.set-note{margin:.375rem 0 0;padding:.5rem .875rem;border-radius:var(--r-md);background:#fff6e0;border:.09375rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-sm);font-weight:700;text-align:center}
-.settings.is-spectator #set-move,.settings.is-spectator #set-paddle,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}
+.set-wide{padding:.4375rem .5rem} .set-wide .seg-sm{margin-left:0;flex:1} .set-wide .seg-opt{flex:1}      /* the paddle switch: the whole width, it is the group's first question */
+#btn-leave-room{color:var(--bad-deep);border-color:#f3a3a3;background:linear-gradient(180deg,#fff,#fff3f3)} #btn-leave-room:hover{background:#fff}
+/* the three statuses, at a glance in the head: a light and a name each; the state word is there for screen readers and on hover */
+.set-status{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:.25rem;list-style:none;margin:0;padding:0}
+.set-status li{display:flex;align-items:center;gap:.3125rem;height:1.625rem;padding:0 .5625rem 0 .4375rem;border-radius:var(--r-pill);background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 .0625rem rgba(40,80,110,.08);font-size:var(--t-xs);font-weight:800;color:var(--ink)}
+.set-status li[hidden]{display:none}
+.set-status b{font-weight:800} .set-status em{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.set-status .is-bad{background:#fff0f0;color:var(--bad-deep)} .set-status .is-wait{color:var(--warn-deep)}
+.set-note{margin:0;padding:.5rem .875rem;border-radius:var(--r-md);background:#fff6e0;border:.09375rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-sm);font-weight:700;text-align:center}
+.settings.is-spectator #grp-you,.settings.is-spectator #grp-paddle,.settings.is-spectator #grp-match,.settings.is-spectator #set-move,.settings.is-spectator #set-paddle,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}      /* watching: Screen, and the Game light */
 
 /* ==========================================================================================================
    SPECTATORS: view chips bottom-left, the split-screen divider, no key hints and no insets. And the seat-hold card.

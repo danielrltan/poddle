@@ -145,23 +145,32 @@
 
 <!-- ============================================== SETTINGS (a card under the hamburger, NOT a screen: play goes on behind it) ============================================== -->
 <div class="panel settings" id="settings" role="dialog" aria-labelledby="set-title" tabindex="-1" hidden>
-  <h2 id="set-title">Settings</h2>
-  <label class="set-row" id="set-name"><span>Name</span><input class="field" id="set-name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"></label>
-  <div class="set-row" id="set-sens"><span>Sensitivity</span>
-    <span class="stepper"><button class="btn btn-icon" id="btn-sens-less" aria-label="Less"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button><b id="set-sens-val">1</b><button class="btn btn-icon" id="btn-sens-more" aria-label="More"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg></button></span></div>
-  <div class="set-row set-pick" id="set-paddle" hidden><span>Paddle</span><span class="seg seg-sm" id="paddle-seg2" role="radiogroup" aria-label="Paddle"><button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone">Phone</button><button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod">AirPod</button></span></div>
-  <button class="set-row set-switch" id="tog-airpod" role="switch" aria-checked="true"><span>Show AirPod</span><i></i></button>
-  <button class="set-row set-switch" id="tog-stats" role="switch" aria-checked="false"><span>Show stats</span><i></i></button>
-  <div class="set-row set-pick" id="set-move"><span>Move</span><span class="seg seg-sm" id="move-seg" role="radiogroup" aria-label="Move"><button class="seg-opt" role="radio" aria-checked="true" data-move="body">Body</button><button class="seg-opt" role="radio" aria-checked="false" data-move="auto">Auto</button></span><small id="move-note" hidden>Body needs a camera</small><span id="mode" hidden>Body</span></div>
-  <div class="set-row set-pick" id="set-bot" hidden><span>Select difficulty</span><span class="seg seg-sm" id="bot-seg" role="radiogroup" aria-label="Select difficulty"><button class="seg-opt" role="radio" aria-checked="false" data-level="0">Rookie</button><button class="seg-opt" role="radio" aria-checked="true" data-level="1">Club</button><button class="seg-opt" role="radio" aria-checked="false" data-level="2">Pro</button></span></div>
-  <button class="btn btn-sm" id="btn-recenter">Re-center</button>
-  <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
-  <button class="btn btn-sm" id="btn-leave-room" hidden>Leave court</button>
+  <!-- grouped like a phone's settings: status at a glance in the head, then You, Paddle, Match, Screen, and leaving at the foot -->
+  <div class="set-head"><h2 id="set-title">Settings</h2>
   <ul class="set-status">
     <li class="is-wait" id="set-airpod"><span class="light"></span><b id="set-airpod-name">AirPod</b><em id="set-airpod-state">Waiting</em></li>
     <li class="is-wait" id="set-game"><span class="light"></span><b>Game</b><em id="set-game-state">Waiting</em></li>
     <li class="is-wait" id="set-camera"><span class="light"></span><b>Camera</b><em id="set-camera-state">Waiting</em></li>
-  </ul>
+  </ul></div>
+  <section class="set-group" id="grp-you" aria-label="You"><div class="set-list">
+    <label class="set-row" id="set-name"><span>Name</span><input class="field" id="set-name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"></label>
+  </div></section>
+  <section class="set-group" id="grp-paddle"><h3 class="set-label">Paddle</h3><div class="set-list">
+    <div class="set-row set-pick set-wide" id="set-paddle" hidden><span class="vh">Paddle</span><span class="seg seg-sm" id="paddle-seg2" role="radiogroup" aria-label="Paddle"><button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone">Phone</button><button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod">AirPod</button></span></div>
+    <div class="set-row" id="set-sens"><span>Sensitivity</span>
+    <span class="stepper"><button class="btn btn-icon" id="btn-sens-less" aria-label="Less"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button><b id="set-sens-val">1</b><button class="btn btn-icon" id="btn-sens-more" aria-label="More"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg></button></span></div>
+    <button class="set-row set-switch" id="tog-airpod" role="switch" aria-checked="true"><span>Show AirPod</span><i></i></button>
+    <button class="set-row set-action" id="btn-recenter"><span>Re-center</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></button>
+  </div></section>
+  <section class="set-group" id="grp-match"><h3 class="set-label">Match</h3><div class="set-list">
+    <div class="set-row set-pick" id="set-move"><span>Move</span><span class="seg seg-sm" id="move-seg" role="radiogroup" aria-label="Move"><button class="seg-opt" role="radio" aria-checked="true" data-move="body">Body</button><button class="seg-opt" role="radio" aria-checked="false" data-move="auto">Auto</button></span><small id="move-note" hidden>Body needs a camera</small><span id="mode" hidden>Body</span></div>
+    <div class="set-row set-pick" id="set-bot" hidden><span>Difficulty</span><span class="seg seg-sm" id="bot-seg" role="radiogroup" aria-label="Difficulty"><button class="seg-opt" role="radio" aria-checked="false" data-level="0">Rookie</button><button class="seg-opt" role="radio" aria-checked="true" data-level="1">Club</button><button class="seg-opt" role="radio" aria-checked="false" data-level="2">Pro</button></span></div>
+  </div></section>
+  <section class="set-group" id="grp-screen"><h3 class="set-label">Screen</h3><div class="set-list">
+    <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
+    <button class="set-row set-switch" id="tog-stats" role="switch" aria-checked="false"><span>Show stats</span><i></i></button>
+  </div></section>
+  <button class="btn btn-sm btn-danger" id="btn-leave-room" hidden>Leave court</button>
   <p class="set-note" id="set-note" hidden>Online games can’t pause</p>
 </div>
 

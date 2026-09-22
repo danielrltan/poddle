@@ -616,3 +616,15 @@ Build log. What we tried, what broke, and how each problem was solved.
   and is only as wide as they are (at most 9.5rem). Measured at 1280, 1100, 1000, 901, 900, 700, 600 and 481 px wide, it
   never reaches the scoreboard (at 1000 px it ends 46 px short). Below 480 px the board spans
   the full width under the corner, so the open menu covers its top edge, drawn above it.
+
+## 48. The settings card is grouped like a phone's settings
+- "The hamburger menu dropdown is a bit of a mess with all the new features. Develop a nicer UX and UI for it."
+- Before: eleven look-alike pills in one column, full-width buttons (Re-center, Leave court) between them, the status
+  lights at the very bottom, and "Select difficulty" squeezing Pro off the card's edge.
+- Now: the head has the title and the three status lights as small chips (the state word is read out and shows on
+  hover; a bad one turns red). Then groups, each a small caps label over one white card of rows split by hairlines:
+  (unlabelled) Name; **Paddle**: the Phone | AirPod switch across the full width, Sensitivity, Show phone/AirPod,
+  Re-center (a row with an icon, not a floating button); **Match**: Move, Difficulty (Rookie | Club | Pro, on one line);
+  **Screen**: Full screen, Show stats. Leave court sits at the foot in red. It fits a 1280x720 window without scrolling.
+- Spectators see Game only in the head and the Screen group (and Leave). Every id, handler and keyboard walk is as before;
+  the Tab order follows the groups. `test/ui-next.mjs` expects the new row and Tab order.

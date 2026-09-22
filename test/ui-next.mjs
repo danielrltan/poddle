@@ -65,7 +65,7 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
     hits: ['board', 'room-pill', 'btn-menu', 'keys'].filter(i => T.hit('settings', i)), glass: getComputedStyle(T.$('glass')).visibility, top: (() => { const b = T.box('settings'), e = document.elementFromPoint(b.l + b.w / 2, b.t + 20); return !!e && !!e.closest('#settings'); })(),
     alpha: getComputedStyle(T.$('settings')).backgroundImage, rows: [...document.querySelectorAll('#settings .set-row > span:first-child, #settings > .btn, #settings .set-status b')].filter(e => e.offsetParent).map(e => e.textContent).join('|'), current: __ui.currentScreen() + '/' + __ui.currentOverlay() }));
   ok(r.open === true && r.body === 'open' && r.exp === 'true' && J(r.calls) === J(['open']) && r.focusIn && r.focusTag !== 'INPUT', `${tag} hamburger opens the panel: open() once, aria-expanded, focus in the card and not in its name field (${J(r.calls)}, focus ${r.focusTag})`);
-  ok(r.rows === 'Name|Sensitivity|Show AirPod|Show stats|Move|Re-center|Full screen|Leave court|AirPod|Game|Camera' && r.title === 'Settings', `${tag} settings rows: ${r.rows}`);
+  ok(r.rows === 'AirPod|Game|Camera|Name|Sensitivity|Show AirPod|Re-center|Move|Full screen|Show stats|Leave court' && r.title === 'Settings', `${tag} settings rows: ${r.rows}`);
   ok(r.inside && !r.hits.length && r.top && r.glass === 'hidden' && /rgba/.test(r.alpha) && r.current === 'null/null', `${tag} live: the card is see-through, no blur, covers neither the scoreboard nor the room code (${r.hits}), and is no screen (${r.current})`);
   await pg.click('#btn-sens-more'); await pg.click('#btn-sens-less'); await pg.click('#tog-airpod'); await pg.click('#tog-stats'); await pg.click('#btn-recenter'); await pg.click('#btn-leave-room');
   r = await ev(pg, () => ({ calls: __calls.slice(1), air: T.$('tog-airpod').getAttribute('aria-checked'), stats: T.$('tog-stats').getAttribute('aria-checked') }));
@@ -82,7 +82,7 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
   // keyboard: Tab / arrows reach every control, focus is visible
   r = await ev(pg, async () => { const s = T.$('settings'); s.focus(); const seen = []; for (let i = 0; i < 9; i++) { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); } return null; });
   await ev(pg, () => T.$('settings').focus()); const walked = []; for (let i = 0; i < 10; i++) { await pg.keyboard.press('Tab'); walked.push(await ev(pg, () => document.activeElement.id)); }
-  ok(walked.join() === 'set-name-input,btn-sens-less,btn-sens-more,tog-airpod,tog-stats,,,btn-recenter,tog-full,btn-leave-room',      // (the two Move choices, Body and Auto, have no id)
+  ok(walked.join() === 'set-name-input,btn-sens-less,btn-sens-more,tog-airpod,btn-recenter,,,tog-full,tog-stats,btn-leave-room',      // (the two Move choices, Body and Auto, have no id)
      `${tag} Tab reaches every control in order (${walked})`);
   r = await ev(pg, () => { const b = T.$('tog-full'); b.focus(); return getComputedStyle(b).boxShadow !== 'none' || getComputedStyle(b).borderColor; }); ok(!!r, `${tag} a focused row shows it`);
   // outside click closes, once; settings(true/false) fire once per real change
