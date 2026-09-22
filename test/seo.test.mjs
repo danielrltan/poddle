@@ -17,7 +17,7 @@ try {
   const NOCACHE = 'no-cache', WEEK = 'public, max-age=604800';
   for (const [p, type, cache, file] of [['/', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/index.html', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/robots.txt', 'text/plain; charset=utf-8', NOCACHE, 'robots.txt'],
     ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'],
-    ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=4', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
+    ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=5', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
     ['/apple-touch-icon.png', 'image/png', WEEK, 'apple-touch-icon.png'], ['/icon-192.png', 'image/png', WEEK, 'icon-192.png'], ['/icon-512.png', 'image/png', WEEK, 'icon-512.png'],
     ['/main.js', 'text/javascript; charset=utf-8', NOCACHE, 'main.js'], ['/ui.css', 'text/css; charset=utf-8', NOCACHE, 'ui.css'], ['/vendor/three.min.js', 'text/javascript; charset=utf-8', 'public, max-age=86400', 'vendor/three.min.js']]) {
     if (!has(file)) { pending(`${p}: web/${file} is not yet rendered`); continue; }
@@ -75,7 +75,7 @@ try {
     ok(!/twitter:site|twitter:creator/.test(home), 'no invented Twitter handle');
     const at = h => h == null ? null : new URL(h, ORIGIN + '/').pathname;      // relative on purpose, like ui.css and main.js: test/ui-next.mjs serves this page from /web/, and the live page is only ever at /
     ok(at(one('link', 'rel', 'manifest', 'href')) === '/site.webmanifest' && at(one('link', 'rel', 'apple-touch-icon', 'href')) === '/apple-touch-icon.png' && attr('link', 'rel', 'icon', 'href').map(at).join() === '/favicon.svg,/favicon-32.png', `icons and manifest resolve to the site root: ${attr('link', 'rel', 'icon', 'href').map(at)}`);
-    const readable = [titles[0], d, ...Object.values(og), ...Object.values(tw)].join(' ').replaceAll('Play pickleball with your phone!', ''); /* the share card's line is the owner's own wording, quoted in the alt text */ ok(!/[–—…!]|\b(simply|just|please|seamless|room)\b/i.test(readable), 'voice: no long dash, ellipsis, exclamation mark, filler or "room" in the head copy'); }
+    const readable = [titles[0], d, ...Object.values(og), ...Object.values(tw)].join(' ').replaceAll('Play pickleball with your phone or AirPod!', ''); /* the share card's line is the owner's own wording, quoted in the alt text */ ok(!/[–—…!]|\b(simply|just|please|seamless|room)\b/i.test(readable), 'voice: no long dash, ellipsis, exclamation mark, filler or "room" in the head copy'); }
 
   console.log('structured data');
   { const blocks = [...home.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(m => m[1]); let parsed = []; try { parsed = blocks.map(b => JSON.parse(b)); } catch (e) { ok(false, 'JSON-LD does not parse: ' + e.message); }

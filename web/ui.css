@@ -657,17 +657,13 @@ body[data-role="spectator"] .keyhints,body[data-role="spectator"] #podwrap,body[
 body[data-role="spectator"][data-view="split"] #split-line{display:block}
 @media (max-aspect-ratio: 1/1){ #split-line{left:0;right:0;top:50%;bottom:auto;width:auto;height:2px;margin:-1px 0 0} }       /* taller than wide: scene.js stacks the two views (same test, w <= h), so the line lies across */
 body[data-role="spectator"] #ping-pill{display:none}                           /* the ping is shown while seated only (docs/NEXT.md 14g) */
-/* emotes: spectators get a row of Apple emoji bottom-right (where a player's key hints sit); a pick waits 5 s, the bar underneath runs it down.
+/* emotes: spectators get a row of Apple emoji bottom-right (where a player's key hints sit); no cooldown.
    Everyone in the court sees each one pop in from the right edge, drift up and fade, with the sender's name. */
 .emotes{display:none;position:fixed;right:var(--edge);bottom:var(--edge);z-index:var(--z-hud);gap:.125rem;padding:.25rem;border-radius:var(--r-pill);background:rgba(255,255,255,.9);border:.09375rem solid #fff;box-shadow:var(--sh-hud);transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
 body[data-role="spectator"] .emotes{display:flex}
 .emote-btn{display:grid;place-items:center;width:2.75rem;height:2.75rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce), opacity var(--d-fast)}
 .emote-btn img{width:2.125rem;height:2.125rem;pointer-events:none;user-select:none}
 .emote-btn:hover{transform:scale(1.18);background:var(--sky-2)} .emote-btn:active{transform:scale(.9)} .emote-btn:focus-visible{box-shadow:var(--glow)}
-.emote-btn:disabled{cursor:default;opacity:.4;transform:none;background:none}
-.emotes::after{content:"";position:absolute;left:1.25rem;right:1.25rem;bottom:.1875rem;height:.1875rem;border-radius:var(--r-pill);background:var(--line);transform-origin:left;transform:scaleX(0)}
-.emotes.is-cool::after{animation:emote-cool 5s linear forwards}
-@keyframes emote-cool{from{transform:scaleX(1)} to{transform:scaleX(0)}}
 body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none;transition-duration:140ms}
 .emote-layer{position:fixed;inset:0;z-index:var(--z-hud);pointer-events:none;overflow:hidden}
 /* a live-stream reaction: born just above the emote row in the bottom-right corner, it swells in, then floats up about half the

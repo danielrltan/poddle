@@ -589,3 +589,11 @@ Build log. What we tried, what broke, and how each problem was solved.
 - The share image's line is now "Play pickleball with your phone!" (og.jpg regenerated, ?v=4). The copied invites say
   "on any computer" instead of "or an AirPod". The non-https fallback no longer says "Poddle plays on a Mac".
 - `test/seo.test.mjs` now checks for the phone (and no AirPod in the titles) where it used to require AirPod.
+
+## 46. Spectator emotes have no cooldown; the share card says phone or AirPod
+- "For the emotes as spectator, remove the cool down." The 5 s wait, the disabled buttons and the bar that ran it down are
+  gone: tap as fast as you like. The server keeps only a 60 ms per-socket floor (EMOTE_GAP), faster than anyone taps, so a
+  script cannot flood a court; the pops on screen were already capped at eight. `test/emote.test.mjs` checks a second emote
+  a moment later arrives and a burst of 30 at once is dropped.
+- "For the share image you can make it say play pickleball with your phone or AirPod." og.jpg regenerated with
+  "Play pickleball with your phone or AirPod!" (alt text to match, ?v=5).

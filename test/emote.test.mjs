@@ -1,5 +1,5 @@
 // Spectator emotes: a spectator's pick reaches everyone in the court (players and spectators, the sender too) with its name,
-// one per socket per 5 s, only a valid index, only from a spectator, never into another court.   EMOTE_PORT=<port> moves the server.
+// with no cooldown a person can feel (60 ms per socket stops a flood), only a valid index, only from a spectator, never into another court.   EMOTE_PORT=<port> moves the server.
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
 const PORT = +process.env.EMOTE_PORT || 8350, root = new URL('..', import.meta.url).pathname;
@@ -25,17 +25,17 @@ ok(cat.room.role === 'spectator' && far.room.role === 'spectator', 'Cat, Dan and
 cat.send({ type: 'emote', e: 0 });
 await until(() => ann.emotes().length && dan.emotes().length && cat.emotes().length);
 ok([ann, cat, dan].every(c => c.emotes().length === 1 && c.emotes()[0].e === 0 && c.emotes()[0].name === 'Cat'), 'the player, the other spectator and the sender all get {e:0, name:Cat}');
-cat.send({ type: 'emote', e: 3 }); await wait(400);
-ok(ann.emotes().length === 1, 'a second emote inside 5 s is dropped');
-dan.send({ type: 'emote', e: 6 }); await until(() => ann.emotes().length === 2);
-ok(ann.emotes()[1]?.e === 6 && ann.emotes()[1]?.name === 'Dan', 'the cooldown is per spectator: Dan still gets through');
+await wait(120); cat.send({ type: 'emote', e: 3 }); await until(() => ann.emotes().length === 2);
+ok(ann.emotes()[1]?.e === 3, 'no cooldown: a second emote a moment later gets through');
+for (let i = 0; i < 30; i++) cat.send({ type: 'emote', e: 4 }); await wait(400);
+ok(ann.emotes().length < 6, `a script's burst of 30 at once is mostly dropped (${ann.emotes().length - 2} got through)`);
+const had = ann.emotes().length; await wait(100);
+dan.send({ type: 'emote', e: 6 }); await until(() => ann.emotes().length === had + 1);
+ok(ann.emotes()[had]?.e === 6 && ann.emotes()[had]?.name === 'Dan', 'Dan gets through too');
 for (const e of [7, -1, 1.5, '2', null]) far.send({ type: 'emote', e });
-ann.send({ type: 'emote', e: 1 }); await wait(400);
+const n = ann.emotes().length; ann.send({ type: 'emote', e: 1 }); await wait(400);
 ok(far.emotes().length === 0 && eve.emotes().length === 0, 'bad indexes are dropped');
-ok(ann.emotes().length === 2 && cat.emotes().length === 2, 'a player cannot emote');
+ok(ann.emotes().length === n, 'a player cannot emote');
 far.send({ type: 'emote', e: 5 }); await until(() => eve.emotes().length);
-ok(eve.emotes()[0]?.e === 5 && ann.emotes().length === 2, "Far's emote stays in Eve's court (and a bad one did not start Far's cooldown)");
-await wait(5000);
-cat.send({ type: 'emote', e: 2 }); await until(() => ann.emotes().length === 3);
-ok(ann.emotes()[2]?.e === 2, 'after 5 s Cat can emote again');
+ok(eve.emotes()[0]?.e === 5 && ann.emotes().length === n, "Far's emote stays in Eve's court");
 console.log(fails ? `EMOTE FAIL (${fails})` : 'EMOTE PASS'); process.exit(fails ? 1 : 0);
