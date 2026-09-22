@@ -501,3 +501,9 @@ Build log. What we tried, what broke, and how each problem was solved.
 - What changed is what we tell people: "edge up" in the calibration lead, the QR card, the phone's Start screen (with its
   own side-view drawing and an "edge up" arrow), the calibration drawing (an EDGE UP label, phone mode only) and how to
   play. The corner 3D phone is turned so its screen faces sideways, as it does in an edge-up hand.
+
+## 39. The phone page is dark
+- "Can you make the Poddle phone webapp dark mode? So that it's not distracting when you're swinging."
+- pad.html is always dark (not only when the phone is set to dark): near-black background, dim text, dark buttons, the
+  swing ring and link colours toned down, the drawing recoloured, theme-color and color-scheme dark so the browser bars
+  match. The flash on a hit is a dim olive instead of a bright yellow. The game on the computer is unchanged.

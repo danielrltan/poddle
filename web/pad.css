@@ -44,3 +44,25 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
 .btn-hold.is-done{border-color:var(--good)}
 .btn-hold{isolation:isolate}.btn-hold::before{z-index:-1}
 @media (prefers-reduced-motion:reduce){body{transition:none}}
+
+/* Always dark (NOTES 39): the phone is in your hand, near your eyes, while you watch the big screen. A bright page flashing
+   in the corner of your eye is a distraction, so everything is dim and low contrast except the one thing worth a glance. */
+:root{--ink:#9aa7b2;--ink-strong:#dfe7ee;--ink-soft:#76838e;--bg:#0b1116;--line:#2f9fca;--line-deep:#1a86b3;--line-soft:#274a5c;--link:#6cc6ec;--good:#2fae5f;--warn:#c98a1e;color-scheme:dark}
+body{background:var(--bg);background-image:none}
+body.is-hit{background-color:#1d2610}
+.logo-mark{filter:none;opacity:.85}
+.btn{background:#16212a;border-color:#2a4b5c;color:var(--ink-strong);box-shadow:none}
+.btn:active{background:#1c2a35}
+.btn-hold::before{background:#2a5a70}
+input{background:#121b22;border-color:#274a5c;color:var(--ink-strong)}
+input::placeholder{color:#3a4c58}
+.ring{background:#111a21;border-color:#23394a;box-shadow:none}
+.ring-fill{background:linear-gradient(180deg,#1f5f7d,#2f9fca);opacity:.6}
+body[data-link="on"] .ring{border-color:#23713f}
+body[data-link="wait"] .ring{border-color:#7a5716}
+.art rect[fill="#fff"]{fill:#1a2630}
+.art rect[fill="#eaf6fc"]{fill:#22364a}
+.art rect[fill="#fdf3ea"],.art path[fill="#fdf3ea"]{fill:#b9a592}
+.art g[stroke="#5b6670"]{stroke:#8795a1}
+.art rect[fill="#5b6670"]{fill:#8795a1}
+.art text{fill:var(--ink-strong)}
