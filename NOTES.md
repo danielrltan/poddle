@@ -780,3 +780,22 @@ Build log. What we tried, what broke, and how each problem was solved.
   the page, there is no upload of any kind, and a refused camera falls back to Auto (main.js setMode on !t.ready).
 - It sits on the connect screen, which is where the camera is asked for (main.js startCam on taking a seat), so it shows
   for both paddles: the phone and the AirPod cards differ above it, the status rows and this note are shared.
+
+## 58. A smash is shown once: when the call comes late, the ball catches fire instead of being struck again
+- "With the power swing that's purple, I sometimes see the hit effect twice." Two impacts, a beat apart, for one hit.
+- A bet never smashes (server/game.js, `test/bet.test.mjs`): the server calls a smash only on a SETTLED swing, and most
+  swings are struck on their early bet, so the call lands *after* the ball has gone. web/scene.js replayed the whole
+  flourish at the ball's position then — a ring opening, a bloom, a camera shake, 1-3 m down court, where nothing had been
+  struck. That is a second hit, and it was read as one. "Sometimes": a swing that settles BEFORE contact is called a smash
+  at the impact itself, and shows once.
+- Measured, not guessed. The real captures replayed through web/motion.js at the real server (`test/latesmash.mjs`): 13 of
+  13 smashes were struck as a drive or a slice and only called a smash 60-200 ms later, with the ball already 0.9-2.8 m
+  away. Watched in the real renderer through test/scene-preview.html, that late call opened a fifth ring, relit the bloom
+  from 0 to 0.78 and pushed the camera shake from 0.05 back up to 0.30 — brighter and harder than the impact it followed.
+- The late call now rides the ball: the same purple (or fire), 26 sparks off the ball and the trail at full flame, with no
+  ring, no bloom and no shake. It reads as the shot catching fire in flight, not as a second contact. This is the answer the
+  phone already gave — 'tint' recolours its glow for the settled swing and never buzzes or flashes a second time (NOTES 54).
+- A smash whose swing settled before contact still gets the full flourish at the impact, where it belongs, and a 0.3 s
+  guard in scene.js keeps the two from both playing for one shot inside the server's 0.25 s re-aim window.
+- The sparks take hitLook's scale, the one the ring used to take, so the other end's smash still reads from across the
+  court (it throws them as wide as its ring was) while mine stays close to the ball, 5 m from the lens.

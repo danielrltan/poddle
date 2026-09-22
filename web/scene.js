@@ -927,8 +927,17 @@ export function createScene(containerEl) {
   };
 
   // ---------- public API ----------
-  function smashFx(p, side, spin, rs, sk) { const purple = spin > 0.3; ring(p, false, 0.1 * rs, 2.6 * rs, 0.6, purple ? 0xb070ff : 0xff5a1f, 0.7); flashAt(p, 2.2);
-    burst(p, 1, 40, 9, purple ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0], -sgn(side) * 6); cam.shake = Math.max(cam.shake, sk === 1 ? 0.34 : sk ? 0.18 : 0); }
+  let smashAt = -9;                                       // when the last shot's smash was shown: it is shown ONCE, at the impact or in flight, never both
+  const smashHue = spin => (spin > 0.3 ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0]);      // purple with spin on it, fire without
+  function smashFx(p, side, spin, rs, sk) { smashAt = timeS; ring(p, false, 0.1 * rs, 2.6 * rs, 0.6, spin > 0.3 ? 0xb070ff : 0xff5a1f, 0.7); flashAt(p, 2.2);
+    burst(p, 1, 40, 9, smashHue(spin), -sgn(side) * 6); cam.shake = Math.max(cam.shake, sk === 1 ? 0.34 : sk ? 0.18 : 0); }
+  // Most smashes are only CALLED a smash after the ball has gone: the swing is struck on its early bet and the settled report
+  // follows 60-200 ms later (measured on the real captures: 13 of 13), by which time the ball is 1-3 m down court. Replaying the
+  // whole flourish out there - a ring opening, a bloom, a shake - was a second impact, and it read as one: the hit seen twice.
+  // The late call rides the ball instead, the way the phone recolours its glow rather than flashing again (pad.js 'tint'):
+  // the shot catches fire in flight. Same colours, no impact of its own. rs: hitLook's scale, so the other end's smash
+  // throws its sparks as wide as its ring used to and still reads from across the court; mine stays close to the ball.
+  function igniteFx(side, spin, rs) { smashAt = timeS; burst([ball.pos.x, ball.pos.y, ball.pos.z], 1, 26, 4.5 * rs, smashHue(spin), -sgn(side) * 3 * rs); }
   const hitLook = side => { const split = spectator && vName === 'split', mine = split || side === eyeSide();      // -> [ring scale, shake share]: mine, not mine, or none (two cameras, or the spectator's own hand on the camera)
     return [mine ? 0.6 : 1, menu ? 0 : spectator ? (split || vName === 'free' ? 0 : vName === 'pov' && mine ? 1 : 0.55) : mine ? 1 : 0.55]; };
   function onEvent(m) {
@@ -936,7 +945,7 @@ export function createScene(containerEl) {
     if (m.type === 'launch') {
       ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k;
       if (m.n != null && isFinite(m.n)) ball.power = clamp(+m.n, 0, 1);      // a re-aim: the hit went out on the early bet, this is the settled swing. The trail burns for THAT (a tap that was called 30 rad/s loses its flame)
-      if (m.kind === 'smash' && ball.seen) { const [rs, sk] = hitLook(m.by); smashFx([ball.pos.x, ball.pos.y, ball.pos.z], m.by, ball.spin, rs, sk); trail.glow = 1; }      // and only a settled swing is announced as a smash: here, up to 0.25 s after the hit
+      if (m.kind === 'smash' && ball.seen) { if (timeS - smashAt > 0.3) igniteFx(m.by, ball.spin, hitLook(m.by)[0]); trail.glow = 1; }      // the settled swing, up to 0.25 s after the hit: the ball takes fire (unless the impact itself was already called a smash)
       if (m.land && !menu) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
         marker.material.color.set(isMe(m.land[1] > 0 ? 0 : 1) ? 0xffd23a : 0xffffff); }      // yellow = coming to ME. A spectator has no me: always white
     } else if (m.type === 'hit') {
