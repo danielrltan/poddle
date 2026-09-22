@@ -970,3 +970,57 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Let go and it snaps back rather than unwinding: the transition lives only on `.is-held`, so removing the class has none.
   Completing turns the ring green (`is-done`), which matters because `window.close()` is usually refused and the button is
   still on screen behind the 'done' view.
+## 68. A whole body inferred from one number: the avatar crouches, lunges and goes up on its toes
+
+- Before this, the only thing a head did to a remote avatar was turn it: the Mii stood at exactly one height whatever the
+  player was doing, and every duck for a low ball or stretch for an overhead was invisible to the person opposite. The
+  paddle moved; the body it was attached to did not. All of the work is in `web/scene.js`'s `updatePads`, on the `!local`
+  branch, so it only ever dresses a remote seat, a bot, a spectated seat or the attract rally — never your own hands.
+- There is nothing new on the wire. `pd.pos.y` IS the head: in Body mode it is `bodytrack.js`'s `T.y()`, which returns
+  exactly 1.0 at the spot the player calibrated on, and every other source of y agrees with that baseline — `newPlayer`
+  starts at 1.0, and `runAuto`, `runBot` and the attract striker all recover to 1.0 between shots. So `STANCE.base = 1.0`
+  is the standing height for humans, bots and the title screen alike, with no per-seat calibration to carry and nothing
+  to drift. A slow-tracking baseline was the other candidate and is wrong: it fades a held ready crouch back to standing
+  after a few seconds, which is the one thing this is supposed to show.
+- Below the baseline the knees bend: the body sinks and squashes, leans forward at the waist, the stance widens and the
+  free arm drops out to balance it. Above it the heels come up. Past the top of a tiptoe it stops being a tiptoe, so the
+  rest of the height comes out of the body lengthening and the off hand reaching — otherwise everything above y = 1.28
+  looked identical, and an overhead is exactly when you want to see someone stretching.
+- A lunge is the crouch plus `pd.vx`: the foot in the direction of travel takes the step, the other trails, and the body
+  leans into it. The stagger is what reads, not the sink — the sink runs out of room almost immediately, because the
+  torso would be through the shoes long before a 0.7 m duck read as a squat on a legless Mii.
+- The bob is a spring driven by how FAST the head is moving, not by where it ended up, so a quick duck overshoots and
+  bounces back while a slow one of the same depth does not. That is what makes rapid crouching funny, and it needs
+  nothing to recognise a crouch first. Three dips inside a second each is then named as a taunt and played up with a
+  shoulder shimmy, because somebody was always going to do it.
+- Deliberately NOT filtered. `pd.pos.y` already carries a 20 Hz link and a 55 ms lerp, which passes a three-a-second bob
+  at about 70 % — just enough. Any smoothing here would have ironed it flat.
+- Two things had to move to make it work, and both are worth knowing about:
+  - The avatar's feet were direct children of its root, so sinking the root sank the shoes into the paint. Everything
+    above the ankles now hangs off an inner `upper` group, and the whole stance — the sink, the squash, the waist lean,
+    the extra roll into a lunge — is applied there. The root keeps its original small lean and roll untouched, so the
+    avatar at the baseline is pixel-for-pixel what it always was.
+  - The shoes are then put back on the court analytically: an ellipsoid long in z, on a body that leans and rolls, has a
+    lowest point that moves with all three, and a lunging foot is far enough out from the root that the roll alone
+    scuffed it several cm under. Solving for that point is also the only reason a tiptoe pivots on the toes instead of
+    the whole foot floating — lifting by the pitch angle's sine looked like a small jump. Measured: 4.6 mm of shoe under
+    the paint at the baseline and about 4.6 cm at full roll, both pre-existing and both now zero.
+- The head is held up through a crouch: `upper` leans at the waist, and the neck gives 80 % of that lean straight back.
+  The ball-tracking gaze is worked out in world terms (it now aims from where the crouch has actually left the head, not
+  from a fixed 1.6 m) but was being applied under a leaning parent, so a deep crouch had the avatar looking a good 20 deg
+  below the ball. The gaze is smoothed in its own field so the lean can be taken off it every frame without compounding.
+- The attract rally behind the menus IS affected, and this was checked rather than assumed. Its receiver runs to
+  `clamp(contactY - 0.28, 0.35, 1.7)`, which for the low balls after a bounce is the 0.35 floor, so over 30 s one of the
+  two is past a half-crouch about half the time and often all the way down. Nothing there changed — the paddle has always
+  waited at that height — but until now the body above it did not show it. Looked at: it reads as a low ready position
+  reaching for a ball that really is at ankle height, and it is consistent with where the paddle is drawn, which is the
+  thing that would look broken if the body and the paddle disagreed. The one frame worth a second opinion is a high lob,
+  where the receiver is already crouched at the contact height it is heading for while the ball is still up in the sky.
+- `node test/stance.mjs [port]` (8742) drives the real scene through `test/scene-preview.html` with the fake rally's
+  footwork switched off, so head height is the only thing moving, and measures what the avatar actually became off the
+  live scene graph in world metres: monotonic head height over y = 0.4 .. 2.2, no shoe or torso through the court at any
+  of them, the lunge mirrored correctly on both seats, and the spring and the taunt read at their PEAK rather than on the
+  last frame. Screenshots land in `test/ui-shots/stance/`; look at them, because none of those asserts can tell a crouch
+  from a collapse. Two of the first round's failures were the harness's fault, not the feature's: `page.evaluate`
+  serialises its arguments as JSON, so a waveform passed as a function arrived as `undefined` and every spring test
+  silently drove a still head. They cross as source text now.

@@ -181,7 +181,7 @@ function buildAvatar(side) {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.42, 6, 20), shirt); body.position.y = 0.74;
   const shorts = new THREE.Mesh(new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), dark); shorts.position.y = 0.55;
   const head = new THREE.Group(); head.position.y = 1.47;
-  const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [], eyes = [], mattFace = [];      // whites: kept (empty) for callers that loop over it
+  const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [], eyes = [], mattFace = [], feet = [];      // whites: kept (empty) for callers that loop over it
   const halfEye = new THREE.SphereGeometry(0.036, 16, 10, 0, Math.PI * 2, Math.PI * 0.44, Math.PI * 0.56);      // an eye with its top cut off flat
   head.add(new THREE.Mesh(new THREE.SphereGeometry(0.27, 28, 20), skin));
   const hairM = new THREE.MeshStandardMaterial({ color: COL.hair[side], roughness: 0.9 });
@@ -198,13 +198,15 @@ function buildAvatar(side) {
     const brow = new THREE.Mesh(new THREE.BoxGeometry(0.112, 0.03, 0.03), dark); brow.position.set(sx * 0.098, 0.068, -0.244); brow.rotation.set(0.26, sx * -0.36, sx * 0.07);
     for (const o of [mEye, mWhite, lidLine, brow]) { o.visible = false; head.add(o); mattFace.push(o); }
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), dark);
-    foot.scale.set(1, 0.6, 1.5); foot.position.set(sx * 0.15, 0.065, -0.04); g.add(foot);
+    foot.scale.set(1, 0.6, 1.5); foot.position.set(sx * 0.15, 0.065, -0.04); g.add(foot); feet.push(foot);
   }
   const offHand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), skin); offHand.position.set(-0.42, 0.85, -0.12);
-  g.add(body, shorts, head, offHand);
+  // Everything above the ankles hangs off `upper`, so a crouch can sink and squash the body while the feet stay on the
+  // court. Sinking the whole group instead would push the shoes through the paint.
+  const upper = new THREE.Group(); upper.add(body, shorts, head, offHand); g.add(upper);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.scale.setScalar(1.3);
-  g.userData = { head, body, offHand, skin, shirt, hairM, whites, hair, eyes, mattFace };
+  g.userData = { head, body, offHand, upper, feet, skin, shirt, hairM, whites, hair, eyes, mattFace };
   return g;
 }
 
@@ -214,6 +216,14 @@ const SWING = [[0, ...IDLE], [0.13, -64, 12, -30], [0.29, 72, 22, 38], [0.40, 62
 const SWING_CONTACT = 0.2;
 const FACE_C = 0.23 * PADDLE_SCALE, REACH_MAX = 0.4;      // grip -> face centre; how far a hit may tug the paddle toward the ball
 const BODY = [0.5, 0.68];                 // avatar centre, left of / behind the paddle base (player frame)
+// ---------- stance: a whole body inferred from one number, the height of the head ----------
+// Head height IS the paddle's y. bodytrack's T.y() returns exactly `base` at the spot the player calibrated on, and every
+// other source of y agrees: newPlayer starts at 1.0, and runAuto, runBot and the attract striker all recover to 1.0
+// between shots. So `base` is the standing baseline for humans, bots and the attract rally alike, with no per-seat
+// calibration to carry. Below it the knees bend; above it the player is up on their toes reaching for something.
+// The ranges are deliberately lopsided: y is clamped to 0.3..2.3, so a duck has 0.7 m to give and a stretch has 1.3 m,
+// but nobody stretches far before it stops being a stretch and becomes a reach.
+const STANCE = { base: 1.0, duck: 0.45, rise: 0.28, up: 0.8, sink: 0.17, toes: 0.115, lean: 0.34, squash: 0.11 };
 function swingEuler(t, out) {
   let i = 0; while (i < SWING.length - 2 && t > SWING[i + 1][0]) i++;
   const a = SWING[i], b = SWING[i + 1], k = ease(clamp((t - a[0]) / (b[0] - a[0]), 0, 1));
@@ -563,7 +573,9 @@ export function createScene(containerEl) {
     return { side, group, avatar, hand, forearm, tag, status: null, tagFor: null, ghost: 0, mats: [], handM: skinM, ghostM, sleeveM, has: false, init: false, bot: false, matt: false,      // bot: canned swing, no q. matt: Matt's look. Only the attract rally's side 0 has the first without the second
       tgt: { x: 0, y: 1, z: sgn(side) * 6.5, q: new THREE.Quaternion(), off: null },
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
-      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, cheer: 0, world: new THREE.Vector3() };
+      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
+      // stance: how far the head is off the baseline (duck / tip), the bob spring it is driving, and the dip counter behind the taunt
+      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0 } };
   });
   const casters = []; for (const pd of pads) for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.castShadow) casters.push(m); });
   // ---------- seat status (docs/NEXT.md 14a): calibrating / paused / away. The character and its paddle go pale and see-through, a tag floats over the head ----------
@@ -610,7 +622,7 @@ export function createScene(containerEl) {
     for (const pd of pads) { pd.avatar.visible = pd.has && pd.side !== eye; pd.forearm.visible = pd.has && pd.side === eye; placeTag(pd); }
     for (let i = 0; i < 2; i++) { const b = i !== hideBack, s = i !== hideSide; for (const o of backFence[i]) o.visible = b; for (const o of sideFence[i]) o.visible = s; }
   }
-  const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
+  const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vF = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
   const D2R = Math.PI / 180;
 
   function updatePads(dt) {
@@ -659,21 +671,72 @@ export function createScene(containerEl) {
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
       }
       if (!local) {                                             // Mii stands so its right shoulder is the arm pivot: the paddle sweeps around the body, not through it
-        const bx = pd.pos.x - s * BODY[0], bz = pd.pos.z + s * BODY[1], px = pd.bodyX;
+        const bx = pd.pos.x - s * BODY[0], bz = pd.pos.z + s * BODY[1], px = pd.bodyX, pz = pd.bodyZ;
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
+        pd.vz = lerp(pd.vz, (pd.bodyZ - pz) / Math.max(dt, 1e-3), damp(dt, 0.1));
         pd.cheer = Math.max(0, pd.cheer - dt);
         const hop = pd.cheer > 0 ? Math.abs(Math.sin(pd.cheer * 9)) * 0.28 : 0, run = Math.min(1, Math.abs(pd.vx) / 3);
-        const a = pd.avatar, u = a.userData;
+        const a = pd.avatar, u = a.userData, sd = pd.stance;
+        // ---------- read the body out of the head ----------
+        // pd.pos.y IS the head: in Body mode it is bodytrack's T.y(), and Auto and the bots drive the same number. Take it
+        // raw. It already carries a 20 Hz link and a 55 ms lerp, which is just slack enough to pass a three-a-second bob;
+        // another filter here would iron the bob flat, and the bob is half the point.
+        const dy = pd.pos.y - STANCE.base, duck = clamp(-dy / STANCE.duck, 0, 1), tip = clamp(dy / STANCE.rise, 0, 1);
+        const reach = clamp((dy - STANCE.rise) / STANCE.up, 0, 1);      // past a tiptoe it stops being one: the heels are already up, so the rest of the height has to come out of the body stretching for an overhead
+        const hdt = Math.min(dt, 0.033), vy = (pd.pos.y - sd.y0) / Math.max(dt, 1e-3); sd.y0 = pd.pos.y;
+        // A knee spring driven by how fast the head is travelling, not by where it ended up: drop fast and the body squashes
+        // past its resting crouch, rise fast and it stretches past standing. That overshoot is what makes a quick bob read
+        // as a bounce rather than a slider being dragged, and it needs nothing to recognise a bob first.
+        sd.springV = clamp(sd.springV + ((clamp(-vy * 0.055, -0.16, 0.16) - sd.spring) * 190 - sd.springV * 17) * hdt, -6, 6);
+        sd.spring = clamp(sd.spring + sd.springV * hdt, -0.2, 0.2);
+        // Down, up, down again, three times inside a second each: the oldest joke in multiplayer, and the one thing here
+        // worth naming. Everything above already animates it; the taunt only turns the volume up so it plainly landed.
+        if (!sd.low && duck > 0.5) { sd.low = true; sd.dips = timeS - sd.dipAt < 1 ? sd.dips + 1 : 1; sd.dipAt = timeS; if (sd.dips >= 3) sd.taunt = 1; }
+        else if (sd.low && duck < 0.2) sd.low = false;
+        sd.taunt = Math.max(0, sd.taunt - dt / 1.2);
+        sd.duck = duck; sd.tip = tip;
+        const lat = clamp(pd.vx * s / 2.6, -1, 1), fwd = clamp(-pd.vz * s / 1.8, -1, 1);      // player frame: + = to their own right, + = pressing toward the net
+        // ---------- wear it ----------
+        const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8), lift = tip * STANCE.toes + reach * 0.1;
         a.position.set(pd.bodyX, hop + Math.abs(Math.sin(timeS * 11)) * 0.05 * run, pd.bodyZ);
-        a.rotation.set(0, s > 0 ? 0 : Math.PI, 0); a.rotateZ(clamp(-pd.vx * s * 0.05, -0.22, 0.22)); a.rotateX(-0.06 - run * 0.08 - (pd.swingT >= 0 ? 0.1 : 0));
+        a.rotation.set(0, s > 0 ? 0 : Math.PI, 0);
+        a.rotateZ(clamp(-pd.vx * s * 0.05, -0.22, 0.22)); a.rotateX(-0.06 - run * 0.08 - (pd.swingT >= 0 ? 0.1 : 0));      // the body's old whole-of-it lean, unchanged: it carries the feet with it, so it has to stay small
+        if (sd.taunt > 0) a.rotateY(Math.sin(timeS * 25) * sd.taunt * 0.1);
+        // Everything the stance adds bends at the waist instead. A crouch's forward lean is three times the old one, and
+        // swung about the root it would put the shoes through the paint; hinged here it leaves them flat where they stand.
+        u.upper.rotation.set(-duck * STANCE.lean + tip * 0.07 - fwd * 0.1, 0, clamp(-pd.vx * s * 0.05, -0.22, 0.22) * duck * 0.9);
+        u.upper.position.y = lift - sink;
+        u.upper.scale.y = clamp(1 - duck * STANCE.squash + tip * 0.06 + reach * 0.14 - sd.spring * 0.5, 0.8, 1.35);
         u.body.scale.y = 1 + Math.sin(timeS * 2.4 + pd.side) * 0.018;
-        u.offHand.position.y = 0.85 + Math.sin(timeS * 2.4 + 1) * 0.02 + hop * 0.6;
-        if (ball.seen) {                                   // head tracks the ball
+        u.offHand.position.set(-0.42 - duck * 0.13, 0.85 + Math.sin(timeS * 2.4 + 1) * 0.02 + hop * 0.6 - duck * 0.1 + tip * 0.16 + reach * 0.2, -0.12 - duck * 0.12);      // the free arm drops out and forward to balance a crouch, and reaches up on the toes
+        // Feet: the stance widens as the knees bend, and the foot in the direction of travel takes the step while the other
+        // trails. That stagger is what separates a lunge from a squat — the sink cannot do it, because the shoes would be
+        // through the paint long before a 0.7 m duck read as one.
+        const step = lat * (0.07 + duck * 0.2), shuf = fwd * (0.05 + duck * 0.12);
+        for (let i = 0; i < 2; i++) {
+          const sx = i ? 1 : -1, f = u.feet[i], ld = sx * step >= 0;
+          f.position.set(sx * (0.15 + duck * 0.09) + step * (ld ? 1 : 0.3), 0.065, -0.04 - shuf + (ld ? -1 : 1) * Math.abs(step) * 0.3);
+          f.rotation.set(-tip * 0.55, step * 0.8, 0);                                        // on the toes the heels come up; a step turns the shoe to point the way
+          // and then the shoe is put back down on the paint. Its lowest point moves with all three of the ankle's tilt (the
+          // blob is long in z, so tipping it reaches further down), the body's roll and the body's lean, and a lunging foot
+          // is far enough out from the root that the roll alone would scuff it through the court. Solving for it here is
+          // also what makes a tiptoe pivot on the toes: without it the whole foot just floats, and it reads as a small jump.
+          vF.set(f.position.x, f.position.y, f.position.z).applyQuaternion(a.quaternion);
+          f.position.y += Math.max(0, Math.hypot(0.066 * Math.cos(f.rotation.x), 0.165 * Math.sin(f.rotation.x)) - vF.y);
+        }
+        if (ball.seen) {                                   // head tracks the ball, from wherever the crouch has actually left it
+          const hy = a.position.y + (u.upper.position.y + u.head.position.y * u.upper.scale.y) * 1.3;
           const dx = (ballMesh.position.x - pd.bodyX) * s, dz = Math.max(0.5, (pd.bodyZ - ballMesh.position.z) * s);
           u.head.rotation.y = lerp(u.head.rotation.y, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12));
-          u.head.rotation.x = lerp(u.head.rotation.x, clamp(Math.atan2(ballMesh.position.y - 1.6, dz + 2) * 0.8, -0.3, 0.5), damp(dt, 0.12));
+          sd.gaze = lerp(sd.gaze, clamp(Math.atan2(ballMesh.position.y - hy, dz + 2) * 0.8, -0.3, 0.5), damp(dt, 0.12));
         }
+        // A crouch bends at the waist, and the neck gives most of it straight back: nobody drops into a ready position and
+        // stares at their own shoes. Without this the deep crouch turned the face away from the camera entirely and the
+        // player opposite was reading the top of a head. The gaze is smoothed on its own so the lean can be taken off it
+        // every frame without the correction compounding into the lerp.
+        u.head.rotation.x = clamp(sd.gaze - u.upper.rotation.x * 0.8, -0.35, 0.75);
+        u.head.rotation.z = sd.taunt > 0 ? Math.sin(timeS * 25 + 1) * sd.taunt * 0.16 : lerp(u.head.rotation.z, 0, damp(dt, 0.15));
       }
       // bots: start the wind-up just before the ball arrives so contact lands mid-sweep
       if (pd.bot && pd.swingT < 0 && !frozen && !at.on && ball.live && ball.lastBy !== pd.side && ball.vel.z * s > 0.5) {      // attract times its own swings; a paused ball is not arriving
