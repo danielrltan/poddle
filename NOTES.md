@@ -740,3 +740,31 @@ Build log. What we tried, what broke, and how each problem was solved.
   smash at 1.2 m); no backhand slice or chip lobs (a chip was up to 3/5). `test/lobdata.mjs` / kinds.mjs on the 143 real
   swings: drive 48 %, slice 27 %, smash 24 %, lob 2 % (the same one deliberate lob); slice apex p50 1.97 -> 1.41 m.
 - slice.test's two "a slice floats" checks now ask the opposite: it crosses the net lower than a flat shot.
+
+## 56. The kitchen is forgiving: hold the paddle up to block, push to send it back deeper
+- "I need to make kitchen gameplay more forgiving... if you want to block balls lightly, when closer to the kitchen, the game
+  should let users just hold up their paddle and let balls bounce off of it to block it. Then, if they add a bit of a push
+  to it, it should scale accordingly. I find kitchen gameplay is a bit tricky right now as it's hard to get out of it."
+- Cause: near the net every swing under n 0.4 was clamped to exactly n 0.12 and a fixed pop (lands 3.00 m), then jumped to a
+  full drive at 0.40 (3.92 m). A push of 7 rad/s and one of 17 did the same thing, so no amount of pushing got you out of the
+  kitchen and the rally sat in a block/dink loop. The held-paddle block was a fixed n 0.06 whatever the ball was doing.
+- Fix: one continuous curve (`blockShot`, PUSH). A paddle held still returns 1.6 m of a dead ball and 1.9 m of a fast one
+  (pace you give back, like a real reset block); push and the landing walks smoothly out to the drive's own depth, meeting
+  it exactly at n 0.45 (measured seam gap 1 mm, largest step 3 cm per 0.005 of n, never backwards: /private/tmp curve.mjs).
+  `solve()` takes an optional `blk` that moves only where the ball lands; the arc stays the ordinary one for that power.
+- The curve fades out over the last 1.2 m before BLOCK.volley and for a real scoop, so dinks, lobs and baseline play are
+  untouched. After the bounce it only applies within 3.6 m of the net, where a volley would have been.
+- Held-paddle block: the box grows the closer you stand (the full swing box at the kitchen line, never smaller than before)
+  and the ball is met AT the paddle, not 1.2 m in front of it — firing early used to steal the swing already on its way.
+  A push that lands within 0.2 s of a held block now counts as that block's push instead of being lost.
+- Static movement counts: the phone reports the hand's rate (`r`) with every paddle update at 20 Hz, so a shove under the
+  swing trigger (7.5 rad/s) still pushes the ball back. Measured: held still 1.60 m, shoved 2.43 m, no swing either time.
+- A block may now be corrected like any other shot, but only by a SETTLED report (its own window, 0.35 s and 0.3 m from the
+  net): an early report overshoots badly (called 30, settled 8), so at the net it strikes soft and the settled one raises it.
+  Without that, ramping the power would have fired deep balls nobody hit.
+- Getting out: your own lean is no longer a place you are stuck in. A ball that lands well behind where you stand takes most
+  of the lean back off (Z_PUSHED), so a deep return pulls you out of the kitchen; a short one leaves you there.
+- `test/push.test.mjs`: pushes at 6/10/14/18/24 rad/s land 1.95 / 2.51 / 3.21 / 3.97 / 4.72 m (block, punch, drive); a held
+  paddle blocks with no swing at all; a bet of 33 settling at 8 stays short and one settling at 30 still lands deep; a push
+  at 8 keeps the opponent 4.1 m from the net and one at 24 drives them to 7.1 m, out of reach of a held-up paddle. A player
+  leaning right in at 2.8 m meets a dink 2.6 m from the net and a deep drive 7.1 m out: walked in, but not stuck there.

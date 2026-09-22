@@ -66,8 +66,17 @@ const FIX_WINDOW = 0.25;                  // s after a hit that a corrected powe
 const FIX_EASE = 0.1;                     // s that re-aim is spread over: the ball bends onto the new path, it never kinks
 const CONTACT = 0.25;                     // a stroke meets the ball this far in front of the paddle
 const Z_ASSIST = 0.9;                      // share of the forward/back footwork the game does for a player who walks themselves
+const Z_PUSHED = 0.85;                     // most of a player's own lean a deep ball can take back off: you get pushed out of the kitchen, but never yanked all the way home by one shot
 const BLOCK_ON = process.env.BLOCK !== '0';   // scripted tests with a parked paddle turn the net block off
-const BLOCK = { within: 5.0, x: 0.95, y: 0.8, front: 1.2, behind: 0.3, volley: 5.2 };   // up at the net a paddle simply held in the ball's path taps it back
+// Up at the net a paddle simply held in the ball's path taps it back. The box grows the closer to the net you stand (near:
+// at the kitchen line it is the full swing box), and the ball is met at the paddle, not a metre in front of it: firing early
+// stole the swing that was already on its way. run: held blocks in a row before the box shrinks back (nobody parks a paddle and rallies forever).
+const BLOCK = { within: 5.0, x: 0.95, y: 0.8, front: 0.5, behind: 0.3, volley: 5.2, near: { x: 1.3, y: 1.05, behind: 0.45 }, run: 3 };
+// Near the net, block -> nudge -> punch -> drive is ONE curve, not a step and a cliff (it used to clamp every swing under
+// n 0.4 to exactly n 0.12 and then jump to a full drive). A paddle held still returns held[0] m of the incoming ball,
+// held[1] m when it arrives at spd[1] and there is pace to give back; push, and the landing walks smoothly out to the
+// drive's own depth at full. Above full the shot is the ordinary one, so the two meet exactly.
+const PUSH = { full: 0.45, bet: 0.2, fix: 0.35, gate: 0.3, late: 0.2, nudge: 0.18, rate: 7.5, bounce: 3.6, fade: 1.2, name: 0.14, floor: [0.03, 0.12], held: [1.6, 1.9], spd: [6, 20] };
 const REACH_X = 1.0, REACH_Y = 0.5;          // extra metres of reach for a full-effort swing
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
@@ -148,7 +157,7 @@ const secsTo = ms => Math.max(0, Math.ceil((ms - Date.now()) / 1000));
 function put(ws, s) { if (!ws || ws.readyState !== 1) return; if (ws.bufferedAmount > BUF_MAX) return ws.terminate(); ws.send(s); }
 
 function newPlayer(ws, side) {
-  return { ws, side, x: 0, y: 1.0, z: sgn(side) * HIT_LINE, zT: sgn(side) * HIT_LINE, q: [0, 0, 0, 1], swing: null, lunge: null, contact: null, react: 0, err: 0, bot: !ws, swAt: -Infinity, swPrev: -Infinity, swPow: 0, swDir: 0, pvPow: 0, pvDir: 0, servePending: null };   // sw*: my latest swing (when, and its last reported power and dir), swPrev / pv*: the one before it
+  return { ws, side, x: 0, y: 1.0, z: sgn(side) * HIT_LINE, zT: sgn(side) * HIT_LINE, q: [0, 0, 0, 1], swing: null, lunge: null, contact: null, react: 0, err: 0, bot: !ws, hit: null, blockRun: 0, rate: 0, swAt: -Infinity, swPrev: -Infinity, swPow: 0, swDir: 0, pvPow: 0, pvDir: 0, servePending: null };   // sw*: my latest swing (when, and its last reported power and dir), swPrev / pv*: the one before it
 }
 
 // Ballistic solve: pick where the ball should land, find the velocity that gets it there
@@ -170,6 +179,16 @@ const hard = n => { const t = clamp((n - 0.45) / 0.25, 0, 1); return t * t * (3 
 // A hard swing with a clear upward component is never a smash (it used to be whenever underhand() <= 0.5, i.e. upward share < 0.75):
 // flat() gates it. The lob label follows the flight: lofted() > 0.5 (u > 0.425) is what flies like a lob.
 const shotKind = (n, lob, slice) => (n > SMASH && flat(lob) > 0.5 ? 'smash' : n < 0.1 && lofted(lob) <= 0.5 ? 'tap' : sliced(slice, lob) > SLICE.at ? 'slice' : lofted(lob) > 0.5 ? (n < 0.2 ? 'dink' : 'lob') : n < 0.1 ? 'tap' : 'drive');
+// The near-net curve. n is the swing (0 = a paddle held still), spd = how fast the ball is coming in: a hard ball rebounds
+// off a still paddle deeper than a dead one does, the way a real reset block does. Returns the power the shot goes out at
+// (the trail, the haptics and the label all read it) and where it lands. At n = PUSH.full both meet the level drive exactly.
+const depthOf = n => lerp(2.6, 5.9, n);                         // a level drive's landing depth, the curve's far end
+function blockShot(n, spd) {
+  const k = clamp((spd - PUSH.spd[0]) / (PUSH.spd[1] - PUSH.spd[0]), 0, 1);     // how much pace there is to give back
+  const t = Math.pow(clamp(n, 0, PUSH.full) / PUSH.full, 1.2);                  // slightly concave: the first bit of push shows
+  return { n: lerp(lerp(PUSH.floor[0], PUSH.floor[1], k), PUSH.full, t), depth: lerp(lerp(PUSH.held[0], PUSH.held[1], k), depthOf(PUSH.full), t) };
+}
+const pushKind = n => (n < PUSH.name ? 'block' : 'punch');      // what the player is told they just played
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
@@ -177,7 +196,9 @@ function bounceV(v, spin, kick) {
   v[0] = v[0] * al + kick; v[2] *= al;
 }
 
-function solve(p, side, n, dir, lob, slice) {
+// blk (near the net): { depth, w } — blend the block curve's landing w of the way in. The flight is the ordinary one for
+// this power, so nothing about the arc jumps: only where it comes down moves.
+function solve(p, side, n, dir, lob, slice, blk) {
   const s = sgn(side);
   let tx = s * clamp(dir * 2.4, -2.5, 2.5);
   // The stroke decides the shot, the way it does on a real court:
@@ -189,7 +210,7 @@ function solve(p, side, n, dir, lob, slice) {
   const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
   const u = lofted(lob) * (1 - smooth(spin, SLICE.at - 0.05, SLICE.at)), nu = n < 0.2 ? n * 0.6 : lerp(0.45, 1, (n - 0.2) / 0.8);   // gentle = dink in the kitchen; anything more = a proper lob, deep and high. u: lofted(), not underhand(): past u 0.5 it IS a lob, not half of one
   const depth = lerp(lerp(2.6, 5.9, n), lerp(1.2, 6.0, nu), u);
-  const tz = -s * Math.min(6.2, depth);
+  const tz = -s * Math.min(6.2, blk ? lerp(depth, blk.depth, blk.w) : depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
   const top = clamp((n - 0.76) / 0.24, 0, 1) * flat(lob);      // a smash is rewarded: above n 0.76 the drive gets faster still, 0.58 s -> 0.51 s at full power (where the net allows: see fly). Only a level/downward swing: one going up is no smash
   let T = lerp(lerp(1.2, 0.58, Math.pow(n, 0.85)) - 0.07 * top * top * (3 - 2 * top), lerp(1.2, 1.95, nu), u);   // underhands always travel on a high, slow arc
@@ -244,8 +265,8 @@ function createRoom(code, pub) {
   let namesSent = '';
   function tellNames(skip) { const n = names(), s = JSON.stringify(n); if (s !== namesSent) { namesSent = s; broadcast({ type: 'names', names: n }, skip); } }   // whenever a seat changes hands (skip: whoever just read them in their welcome)
 
-  function launch(side, n, dir, lob, hit, slice) {
-    const sol = solve(ball.p, side, n, dir, lob, slice);
+  function launch(side, n, dir, lob, hit, slice, blk) {
+    const sol = solve(ball.p, side, n, dir, lob, slice, blk);
     ball.p[1] = Math.max(ball.p[1], R);
     ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
     planFootwork(1 - side);
@@ -254,8 +275,8 @@ function createRoom(code, pub) {
   }
 
   // A corrected power arrived just after the hit. Never swap the velocity: steer onto the new landing spot over FIX_EASE.
-  function reaim(side, n, dir, lob, slice, kind) {
-    const sol = solve(ball.p, side, n, dir, lob, slice);
+  function reaim(side, n, dir, lob, slice, kind, blk) {
+    const sol = solve(ball.p, side, n, dir, lob, slice, blk);
     ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(FIX_EASE / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
     ball.spin = sol.spin; ball.kick = sol.kick;
     planFootwork(1 - side, sol.v);
@@ -295,7 +316,7 @@ function createRoom(code, pub) {
 
   function reset(by) {
     const s = sgn(by), pl = bySide(by);
-    for (const p of players) p.swing = p.lunge = p.servePending = null;
+    for (const p of players) { p.swing = p.lunge = p.servePending = p.hit = null; p.blockRun = 0; }   // a fresh point: nothing left to correct, and the held-paddle box is forgiving again
     ball.live = true; ball.bounces = 0; ball.spin = 0;          // the last rally's slice must not ride on the hanging ball (clients drew its spin streaks on the serve)
     if (SWING_SERVE && pl) {                                     // the ball floats in front of the server until they swing at it
       ball.serving = by; ball.lastHit = 1 - by;
@@ -329,14 +350,35 @@ function createRoom(code, pub) {
     const s = sgn(pl.side), ahead = -(ball.p[2] - pl.z) * s;
     return Math.abs(ball.p[0] - pl.x) < SERVE_ZONE.x && Math.abs(ball.p[1] - pl.y) < SERVE_ZONE.y && ahead > -SERVE_ZONE.behind && ahead < SERVE_ZONE.front;
   }
+  // How much of the near-net curve this contact gets: all of it for a paddle simply held up, fading out over the last
+  // PUSH.fade metres before BLOCK.volley, and fading out for a real scoop so a dink stays a dink. A serve is never shaped.
+  function blockWeight(pl, sw) {
+    if (sw.held) return 1;
+    if (ball.serving != null || sw.floor) return 0;
+    if (ball.bounces > 0 && Math.abs(pl.z) > PUSH.bounce) return 0;   // after the bounce only right up at the net, where a volley would have been
+    return clamp((BLOCK.volley - Math.abs(pl.z)) / PUSH.fade, 0, 1) * (1 - smooth(underhand(sw.lob), 0.15, 0.5));
+  }
   function strike(pl, sw) {
-    // A ball taken out of the air up near the net with a short, soft stroke is a block: it just pops back over, soft and short.
-    if (!sw.kind && ball.serving == null && ball.bounces === 0 && Math.abs(pl.z) <= BLOCK.volley && sw.n < 0.4 && underhand(sw.lob) < 0.5)
-      sw = { ...sw, kind: 'block', n: Math.min(sw.n, 0.12), lob: 0.55 };
-    const kind = sw.kind || shotKind(sw.n, sw.lob, sw.slice);
-    pl.swing = null; pl.hit = sw.kind ? null : { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind };   // a swing (not a block) may still be corrected (floor: a serve's correction keeps the serve floor)
+    // Near the net the whole range is one curve: hold the paddle up and the ball comes off it, add a push and the return
+    // walks out with it. An early report (a bet) overshoots badly, so at the net it strikes soft and the settled one raises it.
+    const w = blockWeight(pl, sw), bet = sw.final === false;
+    const nIn = w >= 0.5 && bet ? Math.min(sw.n, PUSH.bet) : sw.n;   // only where the shot really is block-shaped: out at the edge it is a drive, and a drive's bet is corrected the usual way
+    const spd = sw.spd != null ? sw.spd : Math.hypot(ball.v[0], ball.v[1], ball.v[2]);
+    const push = w > 0 && nIn < PUSH.full ? blockShot(nIn, spd) : null;
+    const n = push ? lerp(nIn, push.n, w) : nIn, blk = push ? { depth: push.depth, w } : null;
+    const kind = sw.kind || (push && w >= 0.5 ? pushKind(n) : shotKind(n, sw.lob, sw.slice));
+    // a block may be corrected too now (its own window: see fixBlock). floor: a serve's correction keeps the serve floor
+    pl.swing = null; pl.hit = { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind, blk: push ? { w, spd } : null, held: !!sw.held };
     pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
-    launch(pl.side, sw.n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n: sw.n, kind }, sw.slice);
+    launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind }, sw.slice, blk);
+  }
+  // The settled report for a shot that was struck on the near-net curve: put it where that power belongs on the same curve.
+  function fixBlock(pl, n, dir, lob, slice) {
+    const h = pl.hit, w = h.blk.w, full = n >= PUSH.full;
+    const b = full ? null : blockShot(n, h.blk.spd);
+    const out = b ? lerp(n, b.n, w) : n, kind = b && w >= 0.5 ? pushKind(out) : shotKind(n, lob, slice), changed = kind !== h.kind;
+    Object.assign(h, { n, dir, lob, slice, kind, held: false });
+    reaim(pl.side, out, dir, lob, slice, changed ? kind : undefined, b ? { depth: b.depth, w } : null);
   }
 
   // a fresh pair (human+human or human+bot): clean score, first serve
@@ -625,6 +667,7 @@ function createRoom(code, pub) {
       me.ready = true; me.cal = false;                           // a paddle is only ever sent by a calibrated client
       me.auto = !!m.auto;                                        // auto: the server runs you to the ball, you just swing
       me.autoY = !!m.autoY;
+      me.rate = clamp(num(m.r, 0), 0, 60);                       // how fast the hand is turning right now, even with no swing to report: a shove into a held-paddle block
       me.ownZ = Number.isFinite(m.z) ? clamp(m.z, Z_NEAR, Z_FAR + 0.4) : null;   // camera depth: distance from the net, chosen by the player                                      // autoY: you move sideways yourself, the game handles paddle height
       if (!me.auto) me.x = clamp(num(m.x, me.x), -X_LIMIT, X_LIMIT);
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
@@ -646,18 +689,28 @@ function createRoom(code, pub) {
       }
       if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
-        if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice });                     // hasn't met the ball yet: just correct it
-        else if (me.hit && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
+        if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice, final });              // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power)
+        // A shot struck on the near-net curve: only the SETTLED report may move it along that curve, never another bet.
+        else if (me.hit && me.hit.blk && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) fixBlock(me, pw, dir, lob, slice);
+        else if (me.hit && !me.hit.blk && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
           && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
           const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
           Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side
         }
         return;
       }
+      me.blockRun = 0;                                             // a swing, however small: the held-paddle box is forgiving again
+      // The paddle already met the ball a moment ago and blocked it: this push IS that block's push, so it re-aims it
+      // along the same curve instead of being lost. A bet waits for its settled report, and the window runs from here.
+      if (me.hit && me.hit.blk && me.hit.held && now - me.hit.at < PUSH.late && ball.live && ball.lastHit === me.side) {
+        me.hit.held = false; me.hit.at = now;
+        if (final) fixBlock(me, pw, dir, lob, slice);
+        return;
+      }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
         from: now - clamp((num(m.age, 0) + clamp(num(m.net, 0), 0, 250)) / 1000, 0, LAG_MAX),   // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness), and `net` = the round trip: the player saw the ball half a trip ago and the swing took the other half to get here
         n: pw,                                                     // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
-        dir, lob, slice, why: null, best: Infinity };
+        dir, lob, slice, final, why: null, best: Infinity };   // final: an early report is a bet, and near the net it strikes soft until it settles
       broadcast({ type: 'swung', side: me.side });
       tryHit(me);                                                // ball already there: struck NOW, not on the next tick
     }
@@ -704,7 +757,10 @@ function createRoom(code, pub) {
         // kitchen must never be unreachable); your own lean on the AirPod (ownZ, 6.5 = neutral) adds the rest, either way.
         const sd = sgn(pl.side), incoming = ball.live && ball.serving == null && ball.lastHit !== pl.side;
         const assist = incoming ? lerp(HIT_LINE, pl.zT * sd, Z_ASSIST) : HIT_LINE;
-        const want = clamp(assist + (pl.ownZ - HIT_LINE), Z_NEAR, Z_FAR + 0.4);
+        // Your own lean adds to the game's run. But a lean is a place you walked to, not a place you are stuck in: a ball
+        // that lands well behind where you are standing takes the lean back off, so a deep return gets you out of the kitchen.
+        const lean = pl.ownZ - HIT_LINE, deep = incoming ? Z_PUSHED * smooth(pl.zT * sd - pl.ownZ, 1.5, 4.0) : 0;
+        const want = clamp(assist + lean * (1 - deep), Z_NEAR, Z_FAR + 0.4);
         pl.z += clamp(sd * want - pl.z, -FOOT_SPEED * DT, FOOT_SPEED * DT); continue;
       }
       const home = !ball.live || ball.serving != null || ball.lastHit === pl.side;   // nobody wanders off while a serve is hanging
@@ -737,8 +793,16 @@ function createRoom(code, pub) {
     for (const pl of players) {
       if (!BLOCK_ON || pl.bot || pl.auto || pl.swing || !ball.live || ball.serving != null || ball.lastHit === pl.side) continue;
       const z = inZone(pl);
-      if (Math.abs(pl.z) <= BLOCK.within && Math.abs(z.dx) < BLOCK.x && Math.abs(z.dy) < BLOCK.y && z.ahead < BLOCK.front && z.ahead > -BLOCK.behind)
-        strike(pl, { n: 0.06, dir: clamp(-pl.x * sgn(pl.side) / 3, -0.6, 0.6), lob: 0.6, kind: 'block' });
+      // The box grows the closer to the net you are, and shrinks back to the old one once a paddle has been parked there
+      // for BLOCK.run balls in a row: holding it up is meant to be forgiving, not a way to win a rally standing still.
+      const grow = pl.blockRun >= BLOCK.run ? 0 : clamp((BLOCK.within - Math.abs(pl.z)) / (BLOCK.within - Z_NEAR), 0, 1);
+      const bx = lerp(BLOCK.x, BLOCK.near.x, grow), by = lerp(BLOCK.y, BLOCK.near.y, grow), bb = lerp(BLOCK.behind, BLOCK.near.behind, grow);
+      if (Math.abs(pl.z) <= BLOCK.within && Math.abs(z.dx) < bx && Math.abs(z.dy) < by && z.ahead < BLOCK.front && z.ahead > -bb) {
+        pl.blockRun = (pl.blockRun || 0) + 1;
+        // Even with no swing to report, the hand is not always still: a shove under the swing trigger pushes the ball back deeper.
+        const n = clamp((pl.rate || 0) / PUSH.rate, 0, 1) * PUSH.nudge;
+        strike(pl, { n, dir: clamp(-pl.x * sgn(pl.side) / 3, -0.6, 0.6), lob: 0, held: true, spd: Math.hypot(ball.v[0], ball.v[1], ball.v[2]) });
+      }
     }
 
     // contact (see tryHit); the paddle lunges to the ball

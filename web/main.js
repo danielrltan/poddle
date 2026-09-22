@@ -461,7 +461,9 @@ const net = (() => {
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
   if (calibrating || !seated() || spec()) return;
   const p = model.pose(performance.now());
-  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: bodyX * s(), y: bodyY, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.Pd });
+  // r: how fast the hand is turning right now. Below the swing trigger nothing is ever reported, so without it a shove
+  // into a held-up paddle at the net would be invisible: with it, a still paddle blocks and a push sends the ball deeper.
+  if (p.calibrated) game.send({ type: 'paddle', auto: autoNow(), autoY: mode === 'auto', x: bodyX * s(), y: bodyY, z: usingBody() && !autoNow() ? bodyZ : undefined, q: p.Pd, r: Math.round((p.rate || 0) * 10) / 10 });
 }, 50);
 
 // ---------- input ----------
