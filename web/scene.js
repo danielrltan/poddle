@@ -880,12 +880,15 @@ export function createScene(containerEl) {
   }
 
   // ---------- WebAudio, no assets ----------
-  let ac = null, master = null, noiseBuf = null;
+  // The output device is the player's to choose (NOTES 60): an AirPod in one ear is a paddle, not a speaker, so the game
+  // can be sent to the laptop's speakers instead. `muted` is kept here because master does not exist until the first gesture.
+  let ac = null, master = null, noiseBuf = null, muted = false;
+  const GAIN = 0.7;
   function unlockAudio() {
     try {
       if (!ac) {
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-        ac = new AC(); master = ac.createGain(); master.gain.value = 0.7;
+        ac = new AC(); master = ac.createGain(); master.gain.value = muted ? 0 : GAIN;
         const comp = ac.createDynamicsCompressor(); master.connect(comp); comp.connect(ac.destination);
         noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
         const d = noiseBuf.getChannelData(0), r = rng(5); for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1;
@@ -1141,6 +1144,18 @@ export function createScene(containerEl) {
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize,
+    // Sound. setSink takes a deviceId ('' = the system default) and resolves false when that device is gone, so the panel
+    // can fall back instead of naming a speaker nothing is coming out of.
+    // devices() is empty until the page holds a media grant: Chrome blanks BOTH the id and the label of every audio output
+    // until then (measured on Chrome 153). Poddle already asks for the camera, and that grant is enough — no microphone.
+    audio: {
+      canSwitch: () => !!(window.AudioContext && AudioContext.prototype.setSinkId),
+      devices: () => !navigator.mediaDevices?.enumerateDevices ? Promise.resolve([])
+        : navigator.mediaDevices.enumerateDevices().then(ds => ds.filter(d => d.kind === 'audiooutput' && d.deviceId && d.label).map(d => ({ id: d.deviceId, label: d.label })), () => []),
+      onDevicesChanged(fn) { try { navigator.mediaDevices?.addEventListener?.('devicechange', fn); } catch { /* not everywhere */ } },
+      setMute(on) { muted = !!on; if (master) master.gain.value = muted ? 0 : GAIN; },
+      setSink(id) { unlockAudio(); return !ac || typeof ac.setSinkId !== 'function' ? Promise.resolve(false) : ac.setSinkId(id || '').then(() => true, () => false); },
+    },
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at,               // test harness only
       view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }) },
   };

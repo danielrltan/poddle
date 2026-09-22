@@ -816,3 +816,33 @@ Build log. What we tried, what broke, and how each problem was solved.
   A tap is ignored; a hold reaches the Paddle off screen, the computer hears `pad: off`, and not one sample follows; Be the
   paddle again brings the view, the samples and `pad: on` back. Note for whoever tests this by hand: a screenshot taken
   mid-hold cancels the press, so a hold that spans one never completes — that is puppeteer, not the page.
+## 60. The game's sound can leave the AirPod: a Sound group in Settings with an Output row
+- "In settings can you make it so that if users wanna hear audio but are using AirPods they can change audio output? So
+  they could have the game's audio streaming out of speakers." An AirPod in one ear is a *paddle* here, not a speaker, so
+  macOS still routes system audio to it and the game arrives in the ear that is busy being swung around.
+- New `Sound` group between Match and Screen: a `Sound` switch (mutes `master`, the gain that was hard-coded at 0.7) and
+  an `Output` row, a plain `<select>` of the player's audio outputs. Choosing one calls `AudioContext.setSinkId`.
+- What was measured, on Chrome 153, before any of this was written (the first attempt got all three wrong):
+  - `navigator.mediaDevices.selectAudioOutput` is **undefined** — even with `--enable-experimental-web-platform-features`.
+    A native device picker is not available, so the list has to be ours.
+  - `AudioContext.prototype.setSinkId` **is** there, so the sound can genuinely be moved per page.
+  - `enumerateDevices()` blanks BOTH the id and the label of every audio output until the page holds a media grant.
+    A **camera** grant is enough — a microphone is NOT needed, which matters because asking for a mic so someone can
+    change speakers would be absurd. Poddle already asks for the camera for Body mode, so for anyone playing in Body
+    there is no new permission prompt at all.
+- So the Output row appears only when `canSwitch()` (setSinkId exists) AND the browser will name the devices. Otherwise a
+  hint says which of the two is missing — "this browser can't move the game's sound" vs "allow the camera and your
+  speakers will be listed here" — rather than leaving a dead control on screen. Gated on capability, never on the paddle
+  being an AirPod: a phone-paddle player can have AirPods in just as easily.
+- The list is re-read every time the card opens, when the body tracker gets the camera, and on `devicechange`, so an
+  AirPod connecting mid-match shows up. It is rebuilt only when it really changed, never under an open list.
+- The AudioContext only exists from the first gesture on, so a kept device is applied in `unlock()`, not at load. A device
+  that has since been unplugged rejects `setSinkId` (verified: a bogus id resolves false) and `forgetSink()` drops it with
+  a toast, rather than leaving the row naming a speaker nothing is playing out of.
+- Kept in `poddle.settings` as `sound` / `sink`, both left out while they are the default, so a player who never opens
+  these rows saves the same object as before.
+- ui.js's arrow-key walk now includes `select`, but yields the arrows to a focused one: on the Output row Up/Down belong
+  to the list and Tab leaves it.
+- Device names are the system's text and go in with `textContent` only; test/ui-next.mjs checks a hostile one stays text.
+  The tests pin the group with `setSettings({ sinkWhy: 'browser' })` so the panel's shape never depends on whether the
+  test browser happens to expose the devices.

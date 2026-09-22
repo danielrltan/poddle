@@ -20,7 +20,7 @@ function watchPage(pg, tag) { pg.on('pageerror', e => errs.push(`[${tag}] PAGEER
 async function mock(tag, screen, w, h, extra = '') { const pg = await browser.newPage(); await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 }); watchPage(pg, tag);
   await pg.goto(`http://127.0.0.1:${W}/test/ui-mock.html?screen=${screen}${extra}`); await pg.waitForFunction(() => document.title.startsWith('ready')); await pg.evaluate(() => document.fonts.ready); await sleep(450);
   await pg.evaluate(() => { window.__calls = []; const rec = (k) => (...a) => window.__calls.push([k, ...a]); const ui = window.__ui;
-    ui.onSettings({ open: rec('open'), close: rec('close'), sens: rec('sens'), airpod: rec('airpod'), stats: rec('stats'), recenter: rec('recenter'), leave: rec('leave'), name: rec('name') });
+    ui.onSettings({ open: rec('open'), close: rec('close'), sens: rec('sens'), airpod: rec('airpod'), stats: rec('stats'), recenter: rec('recenter'), leave: rec('leave'), name: rec('name'), sound: rec('sound'), sink: rec('sink') });
     ui.onLobby({ quick: rec('quick'), create: rec('create'), join: rec('join'), watch: rec('watch'), bot: rec('bot'), start: rec('start'), back: rec('back'), copied: rec('copied') });
     ui.onView(rec('view')); ui.onRematch(rec('vote'));
     // helpers the checks share. seen = in the render tree and not faded out. hit = do two boxes touch
@@ -61,12 +61,27 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
 
   // ---------- 3.2 settings ----------
   await pg.click('#btn-menu'); await sleep(350);
+  await ev(pg, () => __ui.setSettings({ sinkWhy: 'browser' }));      // pin the Sound group: whether THIS browser can move audio is not what the row list is about
   r = await ev(pg, () => ({ open: __ui.settings(), body: document.body.dataset.settings, exp: T.$('btn-menu').getAttribute('aria-expanded'), calls: __calls.map(c => c[0]), focusIn: T.$('settings').contains(document.activeElement), focusTag: document.activeElement.tagName, title: T.$('set-title').textContent, inside: T.inside('settings'),
     hits: ['board', 'room-pill', 'btn-menu', 'keys'].filter(i => T.hit('settings', i)), glass: getComputedStyle(T.$('glass')).visibility, top: (() => { const b = T.box('settings'), e = document.elementFromPoint(b.l + b.w / 2, b.t + 20); return !!e && !!e.closest('#settings'); })(),
     alpha: getComputedStyle(T.$('settings')).backgroundImage, rows: [...document.querySelectorAll('#settings .set-row > span:first-child, #settings > .btn, #settings .set-status b')].filter(e => e.offsetParent).map(e => e.textContent).join('|'), current: __ui.currentScreen() + '/' + __ui.currentOverlay() }));
   ok(r.open === true && r.body === 'open' && r.exp === 'true' && J(r.calls) === J(['open']) && r.focusIn && r.focusTag !== 'INPUT', `${tag} hamburger opens the panel: open() once, aria-expanded, focus in the card and not in its name field (${J(r.calls)}, focus ${r.focusTag})`);
-  ok(r.rows === 'AirPod|Game|Camera|Name|Sensitivity|Show AirPod|Re-center|Move|Full screen|Leave court' && r.title === 'Settings', `${tag} settings rows: ${r.rows}`);
+  ok(r.rows === 'AirPod|Game|Camera|Name|Sensitivity|Show AirPod|Re-center|Move|Sound|Full screen|Leave court' && r.title === 'Settings', `${tag} settings rows: ${r.rows}`);
   ok(r.inside && !r.hits.length && r.top && r.glass === 'hidden' && /rgba/.test(r.alpha) && r.current === 'null/null', `${tag} live: the card is see-through, no blur, covers neither the scoreboard nor the room code (${r.hits}), and is no screen (${r.current})`);
+  // Sound (NOTES 60): the Output row is there only where the browser can actually move the audio, otherwise a hint saying where to go. Its own `snd`: `r` is still read below
+  const DEVS = [{ id: '', label: 'System default' }, { id: 'spk', label: 'MacBook Pro Speakers' }, { id: 'pods', label: 'Daniel’s AirPods' }];
+  const snd = await ev(pg, devs => { const sel = () => T.$('set-sink-sel'), state = o => { __ui.setSettings(o); return [T.seen('set-sink'), T.seen('sink-hint'), T.$('sink-hint').textContent.slice(0, 22), [...sel().options].map(x => x.textContent).join('/'), sel().value]; };
+    const out = { browser: state({ sinkWhy: 'browser', sinks: devs }), nogrant: state({ sinkWhy: 'devices', sinks: [devs[0]] }), listed: state({ sinkWhy: '', sinks: devs, sink: 'pods' }) };
+    // the row must report the player's pick, not flip itself: ui.js only ever hands the value to main.js
+    T.clear(); sel().value = 'spk'; sel().dispatchEvent(new Event('change', { bubbles: true })); out.chose = T.calls('sink').map(c => c[1]); out.stillPods = sel().value;
+    out.evil = (() => { __ui.setSettings({ sinkWhy: '', sinks: [{ id: 'x', label: '<img src=x onerror="window.__xss=1">' }] }); return [sel().querySelectorAll('img').length, !window.__xss, sel().options[0].textContent.slice(0, 9)]; })();
+    __ui.setSettings({ sinkWhy: 'browser' }); return out; }, DEVS);
+  ok(J(snd.browser.slice(0, 3)) === J([false, true, 'This browser can’t mov']) && J(snd.nogrant.slice(0, 3)) === J([false, true, 'Allow the camera and y']),
+     `${tag} Sound: no Output row without setSinkId or without named devices, and the hint says which (${J(snd.browser.slice(0, 3))} / ${J(snd.nogrant.slice(0, 3))})`);
+  ok(snd.listed[0] === true && !snd.listed[1] && snd.listed[3] === 'System default/MacBook Pro Speakers/Daniel’s AirPods' && snd.listed[4] === 'pods',
+     `${tag} Sound: the Output row lists every named device and shows the chosen one (${snd.listed[3]} = ${snd.listed[4]})`);
+  ok(J(snd.chose) === J(['spk']) && snd.stillPods === 'spk', `${tag} Sound: choosing an output hands the deviceId to main.js (${J(snd.chose)})`);
+  ok(snd.evil[0] === 0 && snd.evil[1] === true && snd.evil[2] === '<img src=', `${tag} a hostile device name is text, never markup (${J(snd.evil)})`);
   await pg.click('#btn-sens-more'); await pg.click('#btn-sens-less'); await pg.click('#tog-airpod'); await pg.click('#btn-recenter'); await pg.click('#btn-leave-room');
   r = await ev(pg, () => ({ calls: __calls.slice(1), air: T.$('tog-airpod').getAttribute('aria-checked') }));
   ok(J(r.calls) === J([['sens', 1], ['sens', -1], ['airpod', false], ['recenter'], ['leave']]) && r.air === 'true', `${tag} rows call main.js with the NEW value and flip nothing themselves (${J(r.calls)})`);
@@ -82,7 +97,7 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
   // keyboard: Tab / arrows reach every control, focus is visible
   r = await ev(pg, async () => { const s = T.$('settings'); s.focus(); const seen = []; for (let i = 0; i < 9; i++) { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); } return null; });
   await ev(pg, () => T.$('settings').focus()); const walked = []; for (let i = 0; i < 10; i++) { await pg.keyboard.press('Tab'); walked.push(await ev(pg, () => document.activeElement.id)); }
-  ok(walked.join() === 'set-name-input,btn-sens-less,btn-sens-more,tog-airpod,btn-recenter,,,tog-full,btn-leave-room,',      // (the two Move choices, Body and Auto, have no id)
+  ok(walked.join() === 'set-name-input,btn-sens-less,btn-sens-more,tog-airpod,btn-recenter,,,tog-sound,tog-full,btn-leave-room',      // (the two Move choices, Body and Auto, have no id)
      `${tag} Tab reaches every control in order (${walked})`);
   r = await ev(pg, () => { const b = T.$('tog-full'); b.focus(); return getComputedStyle(b).boxShadow !== 'none' || getComputedStyle(b).borderColor; }); ok(!!r, `${tag} a focused row shows it`);
   // outside click closes, once; settings(true/false) fire once per real change

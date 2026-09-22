@@ -50,7 +50,7 @@ const ls = { get(k) { try { return localStorage.getItem(k); } catch { return nul
 const cleanName = t => { const n = [...String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
 const myName = () => cleanName(ui.playerName()) || cleanName(ls.get('poddle.name'));      // the lobby field; what was kept last time when the field is not there
 const nameOf = i => names[i] || (state && state.paddles[i] && state.paddles[i].bot ? 'Matt' : i ? 'Player 2' : 'Player 1');
-const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, reach }
+const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, reach, sound, sink, sinkName }
 // body: webcam tracks where you actually stand. auto: server runs you to the ball. (Aim, the wrist's angle moving you, is gone: NOTES 33.)
 const MODES = ['body', 'auto'], MODE_TEXT = { body: 'Body: step to move, tilt the AirPod to walk', auto: 'Auto: the game runs, you swing' }, MODE_NAME = { body: 'Body', auto: 'Auto' };
 let bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
@@ -62,6 +62,7 @@ function startCam() {                              // the webcam is asked for wh
   if (camOn || qs.get('cam') === '0') return; camOn = true;
   createBodyTracker($('camv'), $('camc')).then(t => {
     body = t; ui.setCamera(t.ready); if (Number.isFinite(prefs.reach)) t.reach = Math.max(0.08, Math.min(0.42, prefs.reach)); syncSettings();
+    loadSinks();                                   // the camera grant is what makes Chrome name the audio outputs: the list only exists from here on
     if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('auto', !inPlay()); return; }       // quiet on the set-up screens: nobody asked yet
     if (stats.calibrated) { const c = setInterval(() => { if (t.seen()) { clearInterval(c); t.center(); } }, 100); }      // calibration finished before the camera was up: centre on the first sight of the player instead
   });
@@ -117,16 +118,31 @@ function setView(name, flip) {                     // flip: asked for by the vie
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
 let showPod = prefs.airpod !== false, showStats = false;      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
-const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach }));
+// Sound (NOTES 60). sinkId is a deviceId the browser gave us for THIS origin; sinks is what it is willing to name right now.
+let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? prefs.sink : '', sinks = [];
+// sound / sink are left out while they are the default, so a player who never opens the Sound rows keeps the same saved object as before
+const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, sink: sinkId || undefined }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
-function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready) }); }
+function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready),
+  sound: soundOn, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks], sinkWhy: !scene.audio.canSwitch() ? 'browser' : !sinks.length ? 'devices' : '' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
   if (!body) return;
   body.reach = Math.max(0.08, Math.min(0.42, body.reach - dir * 0.03)); if (!quiet) say(`Range: step ${(body.reach * 100).toFixed(0)}% of the view to reach the sideline`);
   savePrefs(); syncSettings();
 }
 const show = ui.show;
+function setSound(on) { soundOn = !!on; scene.audio.setMute(!soundOn); if (soundOn) unlock(); savePrefs(); syncSettings(); }
+function forgetSink(why) { sinkId = ''; scene.audio.setSink(''); savePrefs(); syncSettings(); if (why) say(why, null, 2600); }      // the device went away: back to wherever the system points, and the row must stop naming it
+const loadSinks = () => scene.audio.devices().then(ds => { sinks = ds; syncSettings(); });      // empty until the page holds a media grant: Chrome will not name an output device before that
+function pickSink(id) {
+  unlock();                                        // the AudioContext has to exist before it can be pointed anywhere
+  scene.audio.setSink(id).then(ok => {
+    if (!ok) return forgetSink('Couldn’t use that output');
+    sinkId = id || ''; savePrefs(); syncSettings();
+    const d = sinks.find(x => x.id === sinkId); say(sinkId ? `Sound: ${d ? d.label : 'that output'}` : 'Sound: system default', null, 2000);
+  });
+}
 function setPod(on) { showPod = !!on; show('podwrap', showPod); savePrefs(); syncSettings(); }
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
 function recenter() { model.recenter(); if (body) body.center(); say('Re-centered'); }
@@ -468,16 +484,19 @@ setInterval(() => {                               // 20Hz: tell the server where
 
 // ---------- input ----------
 let unlocked = false;
-const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); } };
+// The AudioContext only exists from the first gesture on, so the kept output is applied HERE, not at load. A device that has
+// since been unplugged rejects: drop it rather than let the panel name a speaker nothing is playing out of.
+const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That output is gone: back to the system default'); }); } };
+scene.audio.onDevicesChanged(loadSinks);           // an AirPod connecting mid-match changes the list under the open card
 addEventListener('pointerdown', () => { unlock(); play(); });
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: level => { if (pending) return; botWant = [0, 1, 2].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600) });
-ui.onSettings({ open: () => { pause(true); setDim(); }, close: () => { pause(false); setDim(); }, sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, stats: setStats, recenter, leave, name: rename,
+ui.onSettings({ open: () => { pause(true); setDim(); loadSinks(); }, close: () => { pause(false); setDim(); },      // the device list is re-read every time the card opens: headphones come and go sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, stats: setStats, recenter, leave, name: rename,
   move: m => { if (MODES.includes(m) && m !== mode && (m !== 'body' || body && body.ready)) setMode(m); },      // how you move is chosen here now, not on the court
-  paddle: pickPaddle,
+  paddle: pickPaddle, sound: setSound, sink: pickSink,
   bot: level => { if ([0, 1, 2].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });

@@ -166,6 +166,12 @@
     <div class="set-row set-pick" id="set-move"><span>Move</span><span class="seg seg-sm" id="move-seg" role="radiogroup" aria-label="Move"><button class="seg-opt" role="radio" aria-checked="true" data-move="body">Body</button><button class="seg-opt" role="radio" aria-checked="false" data-move="auto">Auto</button></span><small id="move-note" hidden>Body needs a camera</small><span id="mode" hidden>Body</span></div>
     <div class="set-row set-pick" id="set-bot" hidden><span>Difficulty</span><span class="seg seg-sm" id="bot-seg" role="radiogroup" aria-label="Difficulty"><button class="seg-opt" role="radio" aria-checked="false" data-level="0">Rookie</button><button class="seg-opt" role="radio" aria-checked="true" data-level="1">Club</button><button class="seg-opt" role="radio" aria-checked="false" data-level="2">Pro</button></span></div>
   </div></section>
+  <section class="set-group" id="grp-sound"><h3 class="set-label">Sound</h3><div class="set-list">
+    <button class="set-row set-switch" id="tog-sound" role="switch" aria-checked="true"><span>Sound</span><i></i></button>
+    <!-- an AirPod in your ear is the paddle, not the speaker: send the game to the laptop instead. The browser's own picker, so no microphone is ever asked for -->
+    <label class="set-row set-pickdev" id="set-sink" hidden><span>Output</span><select class="field" id="set-sink-sel"></select></label>
+    <p class="set-hint" id="sink-hint" hidden></p>
+  </div></section>
   <section class="set-group" id="grp-screen"><h3 class="set-label">Screen</h3><div class="set-list">
     <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
   </div></section>
