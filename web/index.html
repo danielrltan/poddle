@@ -271,6 +271,10 @@
   <div class="menu-body">
     <div class="panel panel-mid" data-fit>
       <h2 class="t-title" id="connect-title" style="margin-bottom:1.5rem">Grab your paddle</h2>
+      <div class="seg seg-paddle" id="paddle-seg" role="radiogroup" aria-label="Your paddle" hidden>
+        <button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 5.5h3"/><path d="M11 18.5h2"/></svg>Phone</button>
+        <button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3.5a4.5 4.5 0 0 1 4.3 5.9l-.6 1.6V19a1.8 1.8 0 0 1-3.6 0v-7.8A4.5 4.5 0 0 1 9.5 3.5Z"/><circle cx="8.6" cy="7.6" r="1"/></svg>AirPod</button>
+      </div>
       <div class="pad-pair" id="pad-pair" hidden>
         <div class="pad-qr" id="pad-qr" role="img" aria-label="QR code that opens the paddle page on your phone"></div>
         <div class="pad-how">
@@ -294,7 +298,7 @@
       </ul>
     </div>
   </div>
-  <footer class="menu-foot"><span id="connect-foot"><span id="connect-foot-text">Still waiting? Open Poddle Helper on this Mac.</span> <button class="foot-link foot-btn" id="btn-paddle-swap" hidden></button></span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+  <footer class="menu-foot"><span id="connect-foot"><span id="connect-foot-text">Still waiting? Open Poddle Helper on this Mac.</span></span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CALIBRATE ============================================== -->
@@ -309,10 +313,11 @@
         <!-- one drawing, two poses: #art-hold (level) and #art-tilt (tipped up about the wrist) -->
         <svg viewBox="0 -4 470 240" aria-hidden="true">
           <defs>
-            <g id="grip-face"><path class="art-ghost" d="M186 150c0-16 8-28 22-37 20-13 44-21 68-21 34 0 54 24 54 58s-20 58-54 58c-24 0-48-8-68-21-14-9-22-21-22-37Z"/></g>
+            <g id="grip-face" style="visibility:var(--pod,visible)"><path class="art-ghost" d="M186 150c0-16 8-28 22-37 20-13 44-21 68-21 34 0 54 24 54 58s-20 58-54 58c-24 0-48-8-68-21-14-9-22-21-22-37Z"/></g>
             <g id="grip-hand">
-              <rect class="art-fill" x="116" y="141" width="40" height="18" rx="9"/>
-              <ellipse class="art-fill" cx="166" cy="146" rx="21" ry="25"/><circle cx="175" cy="140" r="5" fill="#5b6670"/>
+              <g style="visibility:var(--pod,visible)"><rect class="art-fill" x="116" y="141" width="40" height="18" rx="9"/>
+              <ellipse class="art-fill" cx="166" cy="146" rx="21" ry="25"/><circle cx="175" cy="140" r="5" fill="#5b6670"/></g>
+              <g style="visibility:var(--phone,hidden)"><rect class="art-fill" x="64" y="127" width="206" height="46" rx="11"/><rect x="74" y="134" width="186" height="32" rx="5" fill="#eaf6fc"/><rect x="249" y="143" width="5" height="14" rx="2.5" fill="#5b6670"/></g>
               <rect class="art-skin" x="58" y="112" width="74" height="80" rx="26"/>
               <rect class="art-skin" x="66" y="126" width="17" height="56" rx="8.5"/><rect class="art-skin" x="83" y="124" width="17" height="60" rx="8.5"/><rect class="art-skin" x="100" y="124" width="17" height="58" rx="8.5"/><rect class="art-skin" x="117" y="127" width="16" height="52" rx="8"/>
               <rect class="art-skin" x="74" y="104" width="70" height="22" rx="11" transform="rotate(-6 74 115)"/>
@@ -322,7 +327,7 @@
           <path class="art-skin" d="M-14 126H66V184H-14"/>
           <g id="art-hold">
             <use href="#grip-face"/><use href="#grip-hand"/>
-            <path class="art-faint" d="M342 150H436"/>
+            <path class="art-faint" style="visibility:var(--pod,visible)" d="M342 150H436"/><path class="art-faint" style="visibility:var(--phone,hidden)" d="M286 150H436"/>
           </g>
           <g id="art-tilt" hidden>
             <g opacity=".28"><use href="#grip-hand"/></g>

@@ -474,3 +474,18 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Tests: `test/seo.test.mjs` checks the download's headers once the zip exists, and waits (not fails) on it until then.
   `test/pad-e2e.mjs` checks the card and its download link show after "Playing with an AirPod?" and hide in phone mode,
   and screenshots AirPod mode at 1280x720 and 600x900.
+
+## 37. Phone or AirPod is a choice you can see, and the phone gets its own drawings
+- "Make the phone mode more accessible. In the connecting screen, have that as a visible mode to select from instead of
+  hiding it as a hyperlink at the bottom. And if you're using a phone, make the connection diagrams different and display
+  that rather than an AirPod in the hand."
+- The set-up screen opens with a big **Phone | AirPod** switch (icons, the same `.seg` as elsewhere) where the title was;
+  the footer link is gone. It only shows where a phone can pair (the https site). Picking one is remembered, as before.
+  Arrow keys move between the two. Taking the title's place keeps the AirPod card inside 1280x720 with room to spare.
+- With a phone: calibration draws the fist round a phone, top end toward the screen, in both poses (the drawing's
+  parts pick themselves through `--pod` / `--phone` custom properties, which reach inside the SVG `<use>` copies); the
+  corner 3D view is a phone (rounded slab, dark glass, camera bump; `podview.setKind`); the settings row says Show phone.
+- The words and drawings follow the choice; a phone page that is still open and sends motion makes the phone the choice.
+- Also fixed: a comment in 35's main.js change had swallowed the rest of its line, so a returning AirPod player's choice
+  was not saved and the screen did not refresh when the paddle changed hands.
+- `test/pad-e2e.mjs` presses the switch (and an arrow key), checks the drawing, the Show phone label and the helper card.

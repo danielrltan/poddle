@@ -34,7 +34,7 @@ const playPhone = track => {                        // runs in the phone page: f
       window.dispatchEvent(new DeviceMotionEvent('devicemotion', { rotationRate: { alpha: rz, beta: rx, gamma: ry }, acceleration: { x: ax, y: ay, z: az }, interval: 16 })); window.__played++; } }, 4); };
 const game = pg => pg.evaluate(() => { const t = id => document.getElementById(id), s = window.__stats, vis = el => !!el && !el.hidden && el.getClientRects().length > 0;
   return { screen: document.body.dataset.screen, phase: s.phase, calibrated: s.calibrated, swings: s.swings, myHits: s.myHits, hits: s.hits, pad: !!s.pad, errors: s.errors, note: t('title-note').textContent, title: t('connect-title').textContent,
-    pair: vis(t('pad-pair')), helper: vis(t('pad-helper')), get: vis(t('pad-get')) ? t('pad-get').getAttribute('href') + (t('pad-get').hasAttribute('download') ? ' download' : '') : null, qr: !!t('pad-qr').querySelector('svg path, svg rect'), code: t('pad-code').textContent, foot: t('connect-foot-text').textContent, swap: vis(t('btn-paddle-swap')) ? t('btn-paddle-swap').textContent : null,
+    pair: vis(t('pad-pair')), helper: vis(t('pad-helper')), get: vis(t('pad-get')) ? t('pad-get').getAttribute('href') + (t('pad-get').hasAttribute('download') ? ' download' : '') : null, qr: !!t('pad-qr').querySelector('svg path, svg rect'), code: t('pad-code').textContent, foot: t('connect-foot-text').textContent, swap: vis(t('paddle-seg')) ? t('paddle-seg').querySelector('[aria-checked="true"]').dataset.paddle : null, titleShown: vis(t('connect-title')), art: t('calart').classList.contains('is-phone') ? 'phone' : 'airpod', tog: t('tog-airpod').textContent.trim(), podPhone: !!window.__podKind && window.__podKind(),
     row: t('row-airpod-name').textContent + ': ' + t('row-airpod-text').textContent, lamp: t('set-airpod').className, lead: t('calp').textContent, toast: t('toast').classList.contains('on') ? t('toast').textContent.trim() : null }; });
 const phone = pg => pg.evaluate(() => { const p = window.__pad, t = id => document.getElementById(id); return { view: p.view, host: p.host, open: p.open, sent: p.sent, naming: p.naming, head: t('live-h').textContent, link: document.body.dataset.link, played: window.__played || 0 }; });
 
@@ -52,12 +52,12 @@ await desk.click('#btn-start'); await sleep(400); await desk.evaluate(() => docu
 await desk.click('#btn-bot'); await sleep(300); await desk.click('#btn-bot-0');
 s = await until(async () => { const v = await game(desk); return v.screen === 'connect' && v.qr ? v : null; }, 5000, 'Play a bot -> the set-up screen with a QR code');
 ok(s && s.pair && s.title === 'Grab your paddle' && /^[A-HJ-NP-Z2-9]{6}$/.test(s.code), `set-up screen: "${s && s.title}", code ${s && s.code}`);
-ok(s && /^Phone: Scan the code/.test(s.row) && s.foot === 'Nothing to install.' && s.swap === 'Playing with an AirPod?', `row "${s && s.row}", footer "${s && s.foot}" + "${s && s.swap}"`);
+ok(s && /^Phone: Scan the code/.test(s.row) && s.foot === 'Nothing to install.' && s.swap === 'phone' && !s.titleShown && s.tog === 'Show phone', `row "${s && s.row}", footer "${s && s.foot}", the Phone | AirPod switch on ${s && s.swap} in place of the title, settings say "${s && s.tog}"`);
 ok(s && !s.helper, 'phone mode: no Poddle Helper card');
 await sleep(400); await desk.screenshot({ path: `${root}test/ui-shots/pad-1-setup-1280x720.png` });
 const CODE = s.code;
-await desk.click('#btn-paddle-swap'); await sleep(200); s = await game(desk);
-ok(!s.pair && s.title === 'Connect your AirPod' && /^AirPod: Open Poddle Helper, then take one AirPod out/.test(s.row) && s.swap === 'Use your phone instead', `the AirPod way is one press away: "${s.title}", "${s.row}", "${s.swap}"`);
+await desk.click('#paddle-seg [data-paddle="airpod"]'); await sleep(200); s = await game(desk);
+ok(!s.pair && /^AirPod: Open Poddle Helper, then take one AirPod out/.test(s.row) && s.swap === 'airpod' && s.art === 'airpod' && s.tog === 'Show AirPod', `the AirPod is one press away on the switch: "${s.row}", switch on ${s.swap}, drawing ${s.art}`);
 ok(s.helper && s.get === '/download/Poddle-Helper.zip download', `AirPod mode: the Poddle Helper card and its download (${s.get})`);
 const fits = () => desk.evaluate(() => { const p = document.querySelector('#screen-connect [data-fit]'), r = p.getBoundingClientRect(), f = document.querySelector('#screen-connect .menu-foot').getBoundingClientRect(), c = document.getElementById('pad-helper').getBoundingClientRect();
   return { ok: r.top >= 0 && r.bottom <= f.top + 1 && c.left >= r.left - 1 && c.right <= r.right + 1 && p.scrollHeight <= p.clientHeight + 1 && p.scrollWidth <= p.clientWidth + 1, box: [r.top, r.bottom, f.top].map(Math.round).join(' ') }; });
@@ -66,7 +66,7 @@ await desk.screenshot({ path: `${root}test/ui-shots/pad-1b-setup-airpod-1280x720
 await desk.setViewport({ width: 600, height: 900 }); await sleep(400); fit = await fits(); ok(fit.ok, `and at 600x900 (${fit.box})`);
 await desk.screenshot({ path: `${root}test/ui-shots/pad-1c-setup-airpod-600x900.png` });
 await desk.setViewport({ width: 1280, height: 720 }); await sleep(300);
-await desk.click('#btn-paddle-swap'); await sleep(200); s = await game(desk); ok(s.pair && !s.helper && s.title === 'Grab your paddle', 'and back to the phone, the helper card gone');
+await desk.focus('#paddle-seg [data-paddle="airpod"]'); await desk.keyboard.press('ArrowLeft'); await sleep(200); s = await game(desk); ok(s.pair && !s.helper && s.swap === 'phone' && s.art === 'phone', 'and back to the phone with an arrow key, the helper card gone, the phone drawing back');
 
 // ---- 2. the phone: opens the link in the QR, taps Start
 const ph = (await (await launch()).pages())[0]; await ph.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }); watch(ph, 'phone');
@@ -79,7 +79,7 @@ ok(p && p.link === 'on', `phone: ${JSON.stringify(p)}`);
 
 // ---- 3. the game calibrates on the phone's motion and plays
 s = await until(async () => { const v = await game(desk); return v.screen === 'calibrate' ? v : null; }, 5000, 'the game starts calibrating by itself');
-ok(s && /Hold the phone/.test(s.lead), `calibration speaks of the phone: "${s && s.lead}"`);
+ok(s && /Hold the phone/.test(s.lead) && s.art === 'phone', `calibration speaks of and draws the phone: "${s && s.lead}", drawing ${s && s.art}`);
 p = await phone(ph); ok(/Follow the steps/.test(p.head), `the phone says "${p.head}"`);
 await sleep(1500); await desk.screenshot({ path: `${root}test/ui-shots/pad-3-calibrate-1280x720.png` });
 s = await until(async () => { const v = await game(desk); return v.calibrated && v.phase === 'play' ? v : null; }, 25000, 'calibrated on phone samples');

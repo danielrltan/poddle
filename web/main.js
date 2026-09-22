@@ -267,20 +267,23 @@ function openBridge() { if (!bridge) bridge = connect(BRIDGE, 'm', sample => onS
 const padFx = (fx, n) => { if (padOn) game.send({ type: 'padfx', fx, n }); };      // the phone buzzes on my hits and says which step we are at
 const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 'play' : 'idle');
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
-  const phone = CAN_PHONE && !useAirpod;
-  ui.setPaddle(src || (phone ? 'phone' : 'airpod'));
-  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod',
-    foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.', swap: !CAN_PHONE ? '' : phone ? 'Playing with an AirPod?' : 'Use your phone instead' });
+  const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
+  ui.setPaddle(kind); pod.setKind(kind);
+  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
+    foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.' });
 }
-ui.onPaddleSwap(() => { useAirpod = !useAirpod; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); });
+ui.onPaddleSwap(kind => { const want = kind === 'airpod'; if (want === useAirpod) return; useAirpod = want; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); });
 if (useAirpod || tryBridge) openBridge();
 showPair();
 if (CAN_PHONE && !useAirpod && !PHONE_SIZED) $('title-note').textContent = 'Nothing to install. Your phone is the paddle.';
 function onSample(sample, from) {
   if (from === 'airpod' && (padOn || !useAirpod && !tryBridge)) return;      // a phone was scanned in (or chosen): it is the paddle, the AirPod in a pocket is not
   if (from === 'airpod' && !useAirpod) { useAirpod = true; tryBridge = false; }      // a returning AirPod player's helper answered
+  if (from === 'phone' && useAirpod && CAN_PHONE) useAirpod = false;                  // a phone page that is still open took over: it is the paddle now, say so
   if (!sample || !Array.isArray(sample.r)) return;
-  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER;      // a phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: let the replay wait longer when (only when) that happens (NOTES 35) if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
+  // A phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: its replay may wait
+  // longer when (only when) that happens (NOTES 35). The AirPod keeps its own limit.
+  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
     if (stats.calibrated) { stats.calibrated = false; if (phase === 'play') startCal(); } else if (phase === 'calibrate') startCal(); }
   if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if (phase === 'play' || phase === 'calibrate') startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero
   lastT = sample.t;

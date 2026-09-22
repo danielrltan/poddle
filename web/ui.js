@@ -133,16 +133,19 @@ export function setPaddle(kind) {
   if (!PADDLE[kind] || kind === paddle) return; paddle = kind; const P = PADDLE[kind];
   ROW.airpod.wait = P.wait; ROW.airpod.bad = P.bad; LOST.airpod = P.lost; LEAD.hold = P.hold; LEAD.tilt = P.tilt;
   setText($('row-airpod-name'), P.name); setText($('set-airpod-name'), P.name);
+  $('calart')?.classList.toggle('is-phone', kind === 'phone');                                  // the calibration drawing: a phone in the fist, not a bud
+  const tog = $('tog-airpod')?.querySelector('span'); setText(tog, kind === 'phone' ? 'Show phone' : 'Show AirPod');
   const v = status.airpod; if (v) { status.airpod = null; setStatus({ airpod: v }); }      // the row says its line again, in the new words
 }
 export const paddleKind = () => paddle;
 // The set-up screen's phone block: the QR (drawn here, no image fetched), the code to type instead, and the footer's way over
-// to the other paddle. o = { show, url, code, title, foot, swap }.
+// to the other paddle. o = { show, url, code, title, foot, choose, mode }.
 let qrFor = '';
 export function padPair(o) {
   const box = $('pad-pair'); if (!box) return;
-  box.hidden = !o.show; helperCard(); setText($('connect-title'), o.title || ''); setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
-  const sw = $('btn-paddle-swap'); if (sw) { sw.hidden = !o.swap; setText(sw, o.swap || ''); }
+  box.hidden = !o.show; helperCard(); setText($('connect-title'), o.title || '');
+  const seg = $('paddle-seg'); if (seg) { seg.hidden = !o.choose; $('connect-title').hidden = !!o.choose;      // where a phone can pair, the switch is the heading
+    for (const b of seg.querySelectorAll('[data-paddle]')) b.setAttribute('aria-checked', String(b.dataset.paddle === o.mode)); } setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
   if (o.show && o.url && qrFor !== o.url) { qrFor = o.url;
     import('./vendor/qrcode.mjs').then(({ default: qrcode }) => { const q = qrcode(0, 'M'); q.addData(o.url); q.make(); $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true'); })
       .catch(() => { qrFor = ''; }); }
@@ -150,7 +153,12 @@ export function padPair(o) {
 // The AirPod's block (NOTES 36): where the phone's code would be, Poddle Helper to download, until the AirPod answers.
 // setPaddle has already been told which paddle it is, and a phone that scanned in makes it 'phone', so no word from main.js.
 function helperCard() { const h = $('pad-helper'); if (h) h.hidden = paddle !== 'airpod' || !$('pad-pair')?.hidden || status.airpod === 'ok'; }
-export function onPaddleSwap(fn) { const sw = $('btn-paddle-swap'); if (sw) sw.addEventListener('click', e => { e.stopPropagation(); fn(); }); }
+export function onPaddleSwap(fn) {                                                           // fn('phone' | 'airpod'): a press on the switch, or an arrow key inside it
+  const seg = $('paddle-seg'); if (!seg) return;
+  seg.addEventListener('click', e => { const b = e.target.closest('[data-paddle]'); if (!b) return; e.stopPropagation(); fn(b.dataset.paddle); });
+  seg.addEventListener('keydown', e => { if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return; e.preventDefault(); e.stopPropagation();
+    const on = seg.querySelector('[aria-checked="true"]'), other = [...seg.querySelectorAll('[data-paddle]')].find(b => b !== on); if (other) { other.focus(); fn(other.dataset.paddle); } });
+}
 const ROW = {
   airpod: { ok: '', wait: 'Open Poddle Helper, then take one AirPod out and hold it.', bad: 'Signal lost. Check Poddle Helper is open and the AirPod is connected to this Mac.' },
   game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
