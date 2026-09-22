@@ -162,7 +162,7 @@ export function onPaddleSwap(fn) {                                              
 const ROW = {
   airpod: { ok: '', wait: 'Open Poddle Helper, then take one AirPod out and hold it.', bad: 'Signal lost. Check Poddle Helper is open and the AirPod is connected to this Mac.' },
   game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
-  camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera when the browser asks.', bad: 'No camera. The game moves you.', off: 'No camera. The game moves you.' },
+  camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera so stepping moves you on court.', bad: 'No camera. The game moves you.', off: 'No camera. The game moves you.' },
 };
 const STATE_WORD = { ok: 'Ready', wait: 'Waiting', bad: 'Problem', off: 'Off' };
 const LOST = { airpod: 'AirPod signal lost', game: 'Reconnecting to the game' };

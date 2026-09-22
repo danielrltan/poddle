@@ -768,3 +768,15 @@ Build log. What we tried, what broke, and how each problem was solved.
   paddle blocks with no swing at all; a bet of 33 settling at 8 stays short and one settling at 30 still lands deep; a push
   at 8 keeps the opponent 4.1 m from the net and one at 24 drives them to 7.1 m, out of reach of a held-up paddle. A player
   leaning right in at 2.8 m meets a dink 2.6 m from the net and a deep drive 7.1 m out: walked in, but not stuck there.
+
+## 57. The set-up screen says what the camera is for
+- "Can you also add a camera disclaimer? It doesn't say why camera is necessary, it just asks for perms." The browser's
+  permission prompt was the first and only mention of it.
+- The Camera status row now reads "Allow the camera so stepping moves you on court" instead of "Allow the camera when the
+  browser asks", and a line under the three status rows (the same `pad-alt` note the AirPod card uses for Poddle Helper)
+  says what it is for and what happens to the video: the game sees where you stand so you move by stepping, it watches for
+  you in the frame and nothing else, the video is read on this Mac and never recorded, saved or sent anywhere, and saying
+  no just means the game runs you to the ball. All true: bodytrack.js reads the frames with the bundled MediaPipe wasm in
+  the page, there is no upload of any kind, and a refused camera falls back to Auto (main.js setMode on !t.ready).
+- It sits on the connect screen, which is where the camera is asked for (main.js startCam on taking a seat), so it shows
+  for both paddles: the phone and the AirPod cards differ above it, the status rows and this note are shared.
