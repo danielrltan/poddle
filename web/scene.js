@@ -94,6 +94,12 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = t => t * t * (3 - 2 * t);
 const sgn = side => (side === 0 ? 1 : -1);
 const damp = (dt, tau) => 1 - Math.exp(-dt / tau);
+// The trail's heat: n -> 0..1 along white -> yellow -> orange -> red. Real swings sit low (live captures, settled n: median 0.06, p75 0.27,
+// p90 0.61), so the ramp is stretched over n 0.03..SMASH_N with a gamma: 0.15 is yellow, 0.35 amber, 0.55 deep orange, red is a smash.
+// web/pad.js trailRGB is this same ramp (the phone's edge glow): change one, change both.
+const trailHeat = n => Math.pow(clamp((n - 0.03) / (SMASH_N - 0.03), 0, 1), 0.7);
+function trailRamp(t, out) { const u = 3 * t;                // -> out = [r, g, b], 0..1
+  out[0] = 1; out[1] = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2); out[2] = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2); return out; }
 function rng(seed) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
 function canvasTex(w, h, draw) {
@@ -415,13 +421,18 @@ export function createScene(containerEl) {
   const at = { on: false, t: 0, rnd: null, by: 0, p: [0, 1, 0], v: [0, 0, 0], t0: 0, spin: 0, kick: 0, n: 0, hitAt: 0, hitP: [0, 1, 0], swung: false,
     run: [0, 1].map(() => ({ from: [0, 1, 0], to: [0, 1, 0], t0: 0, t1: 1, bh: false })), stats: { shots: 0, late: 0, out: 0, net: 9, gap: 0 } };
 
-  const TRAIL_N = 22, trail = { pts: [], acc: 0, glow: 0 };
-  const trailGeo = new THREE.BufferGeometry();
-  trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 6), 3));
-  trailGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 6), 3));
-  { const idx = []; for (let i = 0; i < TRAIL_N - 1; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2); trailGeo.setIndex(idx); }
-  const trailMesh = new THREE.Mesh(trailGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-  trailMesh.frustumCulled = false; scene.add(trailMesh);
+  // Two ribbons: a wide additive halo (the glow) and a narrower core drawn with normal blending over it. Light added to a bright court or sky
+  // can only whiten it, so the halo alone read the same pale yellow at every power (and its smash came out LIGHTER than a drive); the core
+  // puts the real colour on top, so orange and red survive on the court and against the sky.
+  const TRAIL_N = 22, trail = { pts: [], acc: 0, glow: 0 }, trailC = [0, 0, 0];
+  const ribbon = (name, alpha, blending, order) => { const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 6), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TRAIL_N * (alpha ? 8 : 6)), alpha ? 4 : 3));
+    const idx = []; for (let i = 0; i < TRAIL_N - 1; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2); g.setIndex(idx);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    m.name = name; m.frustumCulled = false; m.renderOrder = order; scene.add(m); return m; };
+  const trailMesh = ribbon('trail', false, THREE.AdditiveBlending, 1), trailGeo = trailMesh.geometry;
+  const coreMesh = ribbon('trailCore', true, THREE.NormalBlending, 2), coreGeo = coreMesh.geometry;
 
   // ---------- fx pools: rings, sparks, landing marker ----------
   const ringTex = canvasTex(128, 128, (c) => { c.strokeStyle = '#fff'; c.lineWidth = 9; c.beginPath(); c.arc(64, 64, 54, 0, 7); c.stroke(); });
@@ -685,31 +696,30 @@ export function createScene(containerEl) {
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
     b.cool += ((b.live && !b.held ? b.spin : 0) - b.cool) * damp(dt, 0.08);
-    b.hot = (b.hot || 0) + ((b.live ? b.power || 0 : 0) - (b.hot || 0)) * damp(dt, 0.05);
+    b.hot = (b.hot || 0) + ((b.live ? b.power || 0 : 0) - (b.hot || 0)) * damp(dt, 0.05);      // a hit sets it outright (onEvent); this only glides a re-aim, and cools it when the rally is over
     if (b.live && b.hot > SMASH_N) { b.ember = (b.ember || 0) + dt;      // embers and the fat flame are the smash's own (they started at n 0.55-0.6, the OLD smash line: drives at 21-27 rad/s wore them too)
-      if (b.ember > 0.028) { b.ember = 0; burst([b.pos.x, b.pos.y, b.pos.z], 0.2, 3, 1.6, b.cool > 0.3 ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0]); } }
-    trail.glow = Math.max(b.live ? 0.16 + 0.6 * Math.max(b.cool, b.hot || 0) : 0, trail.glow - dt * 1.6); trail.acc += dt;
+      if (b.ember > 0.028) { b.ember = 0; burst([b.pos.x, b.pos.y, b.pos.z], 0.2, 3, 1.6, [0xff5a1f, 0xffb340, 0xfff0a0]); } }
+    trail.glow = Math.max(b.live ? 0.55 + 0.35 * trailHeat(b.hot) : 0, trail.glow - dt * 1.6); trail.acc += dt;
     if (trail.acc >= 1 / 90) { trail.acc = 0; trail.pts.unshift(b.pos.clone()); if (trail.pts.length > TRAIL_N) trail.pts.pop(); }
   }
+  const lin = c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);   // vertex colours are linear (the renderer writes sRGB): unconverted, the ramp's orange drew as pale amber and its red as salmon
   function drawTrail() {                                   // after the camera is posed (twice a frame in split: each half gets a ribbon that faces ITS camera)
-    const b = ball; if (!trailMesh.visible) return;
-    const P = trailGeo.attributes.position.array, C = trailGeo.attributes.color.array, n = trail.pts.length;
+    const b = ball; coreMesh.visible = trailMesh.visible; if (!trailMesh.visible) return;
+    const P = trailGeo.attributes.position.array, C = trailGeo.attributes.color.array, PC = coreGeo.attributes.position.array, CC = coreGeo.attributes.color.array, n = trail.pts.length;
+    // one colour per shot, the heat of its power: white tap -> yellow -> orange -> red smash (trailHeat spreads the powers people really swing over it)
+    const h = b.hot || 0, t = trailHeat(h), fire = Math.max(0, (h - SMASH_N) / (1 - SMASH_N)), c = trailRamp(t, trailC), boost = 1 + 0.9 * fire;   // fire: 0 below smash power, 1 at full
+    const r = lin(c[0]), g = lin(c[1]), bl = lin(c[2]), core = clamp(0.35 + 0.65 * trail.glow, 0, 1);
     for (let i = 0; i < TRAIL_N; i++) {
       const p = trail.pts[Math.min(i, n - 1)] || b.pos, q = trail.pts[Math.min(i + 1, n - 1)] || p, f = i < n ? 1 - i / TRAIL_N : 0;
-      vA.subVectors(p, q); vB.subVectors(camera.position, p); vA.cross(vB);
-      const fire = Math.max(0, ((b.hot || 0) - SMASH_N) / (1 - SMASH_N));   // 0 below smash power, 1 at full. (The white -> yellow -> orange tint below stays continuous in power)
-      if (vA.lengthSq() < 1e-10) vA.set(0, 0, 0); else vA.normalize().multiplyScalar(BALL_R * (0.7 + 1.5 * fire * (0.75 + 0.25 * Math.sin(timeS * 47 + i * 1.9))) * f);   // a smash drags a fat, licking flame
-      P[i * 6] = p.x + vA.x; P[i * 6 + 1] = p.y + vA.y; P[i * 6 + 2] = p.z + vA.z; P[i * 6 + 3] = p.x - vA.x; P[i * 6 + 4] = p.y - vA.y; P[i * 6 + 5] = p.z - vA.z;
-      // the trail is an intensity scale: white tap -> yellow -> orange -> red smash (continuous in power); a slice pulls it icy blue
-      const a = f * f * trail.glow, h = b.hot || 0, u = h * 3;
-      const hg = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2), hb = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2);
-      let cr = a * lerp(1, 0.3, b.cool), cg = a * lerp(hg, 0.85, b.cool), cb = a * lerp(hb, 1, b.cool);
-      const pm = Math.min(1, Math.min(fire * 1.4, b.cool * 1.8));                      // a smash WITH spin burns purple
-      cr = lerp(cr, a * 0.78, pm); cg = lerp(cg, a * 0.22, pm); cb = lerp(cb, a * 1.0, pm);
-      const boost = 1 + 0.9 * fire; cr *= boost; cg *= boost; cb *= boost;
-      for (let j = 0; j < 6; j += 3) { C[i * 6 + j] = cr; C[i * 6 + j + 1] = cg; C[i * 6 + j + 2] = cb; }
+      vA.subVectors(p, q); vB.subVectors(camera.position, p); vA.cross(vB); if (vA.lengthSq() < 1e-10) vA.set(0, 0, 0); else vA.normalize();
+      const lick = fire * (0.75 + 0.25 * Math.sin(timeS * 47 + i * 1.9)), wh = BALL_R * (0.85 + 0.6 * t + 1.5 * lick) * f, wc = BALL_R * (0.42 + 0.3 * t + 0.9 * lick) * f;   // harder = wider; a smash drags a fat, licking flame
+      P[i * 6] = p.x + vA.x * wh; P[i * 6 + 1] = p.y + vA.y * wh; P[i * 6 + 2] = p.z + vA.z * wh; P[i * 6 + 3] = p.x - vA.x * wh; P[i * 6 + 4] = p.y - vA.y * wh; P[i * 6 + 5] = p.z - vA.z * wh;
+      PC[i * 6] = p.x + vA.x * wc; PC[i * 6 + 1] = p.y + vA.y * wc; PC[i * 6 + 2] = p.z + vA.z * wc; PC[i * 6 + 3] = p.x - vA.x * wc; PC[i * 6 + 4] = p.y - vA.y * wc; PC[i * 6 + 5] = p.z - vA.z * wc;
+      const a = f * f * trail.glow * 0.7 * boost, ac = Math.pow(f, 1.2) * core;     // halo: added light, soft; core: the colour itself, over whatever is behind it
+      for (let j = 0; j < 2; j++) { const k = i * 6 + j * 3, kc = i * 8 + j * 4;
+        C[k] = r * a; C[k + 1] = g * a; C[k + 2] = bl * a; CC[kc] = r; CC[kc + 1] = g; CC[kc + 2] = bl; CC[kc + 3] = ac; }
     }
-    trailGeo.attributes.position.needsUpdate = trailGeo.attributes.color.needsUpdate = true;
+    trailGeo.attributes.position.needsUpdate = trailGeo.attributes.color.needsUpdate = coreGeo.attributes.position.needsUpdate = coreGeo.attributes.color.needsUpdate = true;
   }
 
   function faceFx() { for (const r of rings) if (r.m.visible && !r.flat) r.m.quaternion.copy(camera.quaternion); }      // per camera, like the trail
@@ -899,10 +909,10 @@ export function createScene(containerEl) {
       ring(p, false, 0.05 * rs, (1.0 + n * 1.3) * rs, 0.5, tmpC.set(0xffd23a).lerp(tmpD.set(0x9fe3ff), sp), 0.55);
       burst(p, n, 22 + Math.round(n * 30), 3.6 + n * 6.5, [tmpC.set(0xfff6b0).lerp(tmpD.set(0xbfe9ff), sp).getHex(), tmpC.set(0xffd23a).lerp(tmpD.set(0x5ad1ff), sp).getHex(), 0xffffff], -sgn(m.side) * (2.5 + n * 4));
       cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * sk);
-      flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = n;
+      flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = ball.hot = n;      // the trail takes this shot's colour at once, not eased up from the last one
       if (m.kind === 'smash') smashFx(p, m.side, m.spin, rs, sk);
       ball.spin = clamp(+m.spin || 0, 0, 1);
-      trail.glow = 0.55 + 0.45 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
+      trail.glow = 0.8 + 0.2 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
         ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now());
         ball.bounces = 0; ball.kick = +m.k || 0; ball.held = false; }
@@ -969,7 +979,7 @@ export function createScene(containerEl) {
     }
     coast(aP, aV, from, v, best, spin, 0, kick);
     Object.assign(at, { by, p: [from[0], from[1], from[2]], v, t0, spin, kick, n: [0.5, 0.12, 0.3][arc] + r() * 0.1, hitAt: t0 + best, hitP: [aP.x, aP.y, aP.z], swung: false });
-    ball.spin = spin; ball.power = at.n; ball.lastBy = by; trail.glow = Math.max(trail.glow, 0.45 + 0.4 * at.n);
+    ball.spin = spin; ball.power = ball.hot = at.n; ball.lastBy = by; trail.glow = Math.max(trail.glow, 0.45 + 0.4 * at.n);
     st.shots++; st.net = Math.min(st.net, over); if (Math.abs(tx) > court.halfW - 0.399 || Math.abs(tz) > court.halfL - 0.399 || over < 0.25) st.out++;
     const go = (side, to, a, b, bh) => { const t = pads[side].tgt; Object.assign(at.run[side], { from: [t.x, t.y, t.z], to, t0: a, t1: b, bh }); };
     const bh = r() < 0.35;                                  // the paddle waits beside the ball: a touch inside it for a forehand, well outside for a backhand (the hit's reach closes the rest)
