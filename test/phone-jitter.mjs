@@ -16,7 +16,7 @@ import { MotionModel, qrot } from '../web/motion.js';
 const DEG = Math.PI / 180, G = 9.80665;
 function toEuler(q) { const R = [qrot(q, [1, 0, 0]), qrot(q, [0, 1, 0]), qrot(q, [0, 0, 1])], m = (r, c) => R[c][r];
   return [Math.atan2(-m(0, 1), m(1, 1)) / DEG, Math.asin(Math.max(-1, Math.min(1, m(2, 1)))) / DEG, Math.atan2(-m(2, 0), m(2, 2)) / DEG]; }
-const q1 = v => Math.round(v * 10) / 10;
+let q1 = v => Math.round(v * 10) / 10;
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 // picked up with hardly a turn (the realistic case), calibrated, then 8 s of slow repositioning sweeps, then 4 s held still
@@ -25,8 +25,9 @@ const SWEEP = []; for (let i = 0; i < 4; i++) SWEEP.push({ T: 1.0, axis: [0, 1, 
 const SCRIPT = [...PICKUP, ...CALIBRATE, { T: 1.0 }, ...SWEEP, { T: 4.0 }];
 const T_END = SCRIPT.reduce((a, s) => a + s.T, 0), T_SWEEP = T_END - 4.0 - 8.0, T_HOLD = T_END - 4.0;
 
-export function run({ naming = 'zxy', net = 'quiet', seed = 3, pad = new PadMotion(naming) } = {}) {
-  const syn = makeSynth({ heading: 70, grip: [0.9, 0.2, -0.3, 1.2], script: SCRIPT, rateHz: 1000, gyroNoise: 0.004, seed, t0: 0 });
+export function run({ naming = 'zxy', net = 'quiet', seed = 3, pad = new PadMotion(naming), grip = [0.9, 0.2, -0.3, 1.2], script = SCRIPT, round = true } = {}) {
+  const syn = makeSynth({ heading: 70, grip, script, rateHz: 1000, gyroNoise: 0.004, seed, t0: 0 });
+  q1 = round ? v => Math.round(v * 10) / 10 : v => v;
   const truth = []; for (let i = 0; i <= T_END * 1000; i++) truth.push(syn.next());
   const at = t => truth[Math.min(truth.length - 1, Math.max(0, Math.round(t * 1000)))];
   const rnd = rng(seed * 7 + 1), ev = [];
@@ -69,11 +70,13 @@ export function run({ naming = 'zxy', net = 'quiet', seed = 3, pad = new PadMoti
 import { pathToFileURL } from 'node:url';
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   let bad = 0;
-  for (const naming of ['zxy', 'xyz']) for (const net of ['quiet', 'wifi']) for (const seed of [3, 4, 5, 6, 7]) {
-    const r = run({ naming, net, seed });
+  // grips: the default odd one, and the one the game asks for (NOTES 38): edge up, screen facing sideways, top end toward the screen
+  const GRIPS = { odd: [0.9, 0.2, -0.3, 1.2], edgeUp: [1, 1, 1, -2 * Math.PI / 3] };
+  for (const [gname, grip] of Object.entries(GRIPS)) for (const naming of ['zxy', 'xyz']) for (const net of ['quiet', 'wifi']) for (const seed of (gname === 'odd' ? [3, 4, 5, 6, 7] : [3, 4, 5])) {
+    const r = run({ naming, net, seed, grip });
     const ok = r.calibrated && r.flips === 0 && r.naming.startsWith(naming) && r.naming.endsWith('+') && r.rough < 15 && r.walks === 0 && r.resets === 0;
     if (!ok) bad++;
-    console.log(`${ok ? 'ok  ' : 'BAD '} ${naming === 'zxy' ? 'Chrome' : 'Safari'} ${net.padEnd(5)} seed ${seed}: calibrated ${r.calibrated ? 'y' : 'N'}  flips ${r.flips}  naming ${r.naming}${r.lock ? '' : '?'}  rough ${r.rough.toFixed(0)}%  tiltSD ${r.tiltSD.toFixed(2)}°  walks ${r.walks}  resets ${r.resets}  delay ${(r.D * 1000).toFixed(0)} ms`);
+    console.log(`${ok ? 'ok  ' : 'BAD '} ${gname.padEnd(6)} ${naming === 'zxy' ? 'Chrome' : 'Safari'} ${net.padEnd(5)} seed ${seed}: calibrated ${r.calibrated ? 'y' : 'N'}  flips ${r.flips}  naming ${r.naming}${r.lock ? '' : '?'}  rough ${r.rough.toFixed(0)}%  tiltSD ${r.tiltSD.toFixed(2)}°  walks ${r.walks}  resets ${r.resets}  delay ${(r.D * 1000).toFixed(0)} ms`);
   }
   console.log(bad ? `\nPHONE JITTER: ${bad} bad` : '\nPHONE JITTER PASS'); process.exit(bad ? 1 : 0);
 }

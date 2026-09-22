@@ -489,3 +489,15 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Also fixed: a comment in 35's main.js change had swallowed the rest of its line, so a returning AirPod player's choice
   was not saved and the screen did not refresh when the paddle changed hands.
 - `test/pad-e2e.mjs` presses the switch (and an arrow key), checks the drawing, the Show phone label and the helper card.
+
+## 38. Hold the phone edge up
+- "It makes most sense to hold your phone with the edges up rather than screen up. Can you adjust the calibration for
+  that? Tell users to hold side up."
+- The calibration itself needed no change: the hold and the tip teach the game whatever grip you use (test/phone-jitter.mjs
+  now also plays an edge-up grip, top end toward the screen, and it calibrates and tracks like any other: 4 % rough on a
+  quiet network, 8 % on bursty wifi, and 5 % tipped to 88 deg, so the browser's angle rounding near vertical costs little).
+  (An exactly vertical synthetic phone looked bad, 47 %: that was the test's own angle extraction at precisely 90.000 deg,
+  which a real sensor never reports; 0.1 deg off it is exact.)
+- What changed is what we tell people: "edge up" in the calibration lead, the QR card, the phone's Start screen (with its
+  own side-view drawing and an "edge up" arrow), the calibration drawing (an EDGE UP label, phone mode only) and how to
+  play. The corner 3D phone is turned so its screen faces sideways, as it does in an edge-up hand.
