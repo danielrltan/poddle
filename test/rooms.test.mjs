@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import WebSocket from 'ws';
 import http from 'http';
 const PORT = +process.env.ROOMS_PORT || 8300, PORT2 = PORT + 1, PORT3 = PORT + 2, root = new URL('..', import.meta.url).pathname;
+const READY_S = 3;                                              // server/game.js: the count into a match's first serve (test/countdown.test.mjs owns it; here it only moves the clock)
 const up = (port, env) => spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: port, ...env }, stdio: 'ignore' });
 const procs = [up(PORT, {}), up(PORT2, { ROOM_CAP: '2', ROOM_TTL: '2' }),                   // the second one only for the cap and the closing of empty rooms
   up(PORT3, { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', PAUSE_S: '3', CAL_S: '5' })];       // the third: a match is 2 points, and the four countdowns are short enough to sit through
@@ -162,7 +163,9 @@ ok(r1c.room.code !== code && await until(() => r2.n.left === 1 && r1b.closed), '
 console.log('the serve waits for a player who is still calibrating');
 const g1 = await make(false), g2 = await joined(g1.room.code); play(g1); await wait(2500);
 ok(g1.st && !g1.st.live && g1.st.score.join() === '0,0' && g1.st.paddles[1].wait === true && !g1.st.paddles[0].wait, `no paddle message from the second human yet: no ball in 2.5 s, their paddle says wait (${JSON.stringify(g1.st.paddles[1].wait)})`);
-park(g2); ok(await until(() => g1.st.live && !g1.st.paddles[1].wait, 3000), 'their first paddle message: the serve comes');      // not `serving === 0`: the scripted server strikes the moment the ball hangs, often between two polls
+park(g2); const gAt = Date.now();                                 // their first paddle message: the count into the match starts HERE, and the ball follows it
+ok(await until(() => g1.n.countdown >= 1, 1500) && !g1.st.live, 'their first paddle message: counted in, still no ball');
+ok(await until(() => g1.st.live && !g1.st.paddles[1].wait, (READY_S + 3) * 1000) && Date.now() - gAt > READY_S * 1000 - 600, `and the serve comes after the count, ${((Date.now() - gAt) / 1000).toFixed(1)} s in`);      // not `serving === 0`: the scripted server strikes the moment the ball hangs, often between two polls
 
 console.log('names');
 const nest = n => '['.repeat(n) + ']'.repeat(n);
@@ -195,7 +198,7 @@ const sLobby = await inLobby();
 const sp1 = await watching(sCode.toLowerCase(), 'lobby=1&cid=sp1');
 ok(sp1.room && sp1.room.role === 'spectator' && sp1.room.code === sCode && sp1.welcome.side === null && sp1.welcome.role === 'spectator' && JSON.stringify(sp1.welcome.names) === '["Sue","Sam"]' && sp1.welcome.court && sp1.types().startsWith('lobby,room,welcome,botinfo'),
   `watch: room (role spectator), welcome side null with the names and the court (${sp1.types()})`);
-ok(await until(() => sp1.n.state > 30 && sp1.st.watchers === 1 && sA.st.watchers === 1) && await until(() => sp1.n.hit >= 2 && sp1.n.serve >= 1, 6000), `the state stream and every event reach it (${sp1.n.hit} hits); state.watchers is 1 for spectator and players alike`);
+ok(await until(() => sp1.n.state > 30 && sp1.st.watchers === 1 && sA.st.watchers === 1) && await until(() => sp1.n.hit >= 2 && sp1.n.serve >= 1, 12000), `the state stream and every event reach it (${sp1.n.hit} hits); state.watchers is 1 for spectator and players alike`);   // the first serve is counted in (READY_S), so a rally starts a few seconds after the seats fill
 ok(await until(() => { const r = sLobby.listed(sCode); return r && r.players === 2 && !r.open && r.watch === 7 && r.watchers === 1 && r.live === true; }, 2500), `the lobby list shows it: ${JSON.stringify(sLobby.listed(sCode))}`);
 for (const m of [{ type: 'swing', power: 30 }, { type: 'paddle', x: 1 }, { type: 'bot' }, { type: 'pause', on: true }, { type: 'rematch', yes: false }, { type: 'create', public: true }, { type: 'quick' }, { type: 'join', code: sCode }]) sp1.send(m);
 sp1.send({ type: 'ping', c: 3 }); await until(() => sp1.got('pong', m => m.c === 3).length);

@@ -56,7 +56,7 @@
 <script type="module">
   // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
   const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
-  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
+  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
     'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full'];
   // extra params: &bg=court|grass (flat ground under the HUD) · &name=<player name> · &opp=<opponent> (try a hostile one) · &idle=1 · &freeze=1
   if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
@@ -92,6 +92,7 @@
       'calibrate-settle': () => cal({ stage: 'tilt', progress: .5, ok: true, msg: 'Good. Now hold it how you’ll play.' }),
       'hud': () => hud(),
       'hud-stats': () => { hud(); ui.toggle('dev'); ui.setStat('pw', '12.4'); ui.setStat('px', '0.8'); ui.setStat('py', '1.1'); ui.setStat('pkmax', '31.2'); ui.setStat('sw', 14); ui.setStat('pkavg', '19.6'); ui.setStat('pklist', '22 (96°) · × (31°) · 30 (128°) · 17 (74°) · 26 (110°)'); },
+      'hud-countdown': () => { hud(0, 0, 0); ui.setServe(null); ui.countdown(+qs.get('left') || 3); },      // the count into a match: no score, no rally, nothing in play yet
       'hud-callout': () => { hud(7, 5, 5); ui.callout(qs.get('kind') || 'smash', qs.get('them') === '1'); },
       'hud-point-you': () => { hud(8, 5, 0); ui.pointBanner(true); },
       'hud-point-enemy': () => { hud(7, 6, 0); ui.pointBanner(false); },

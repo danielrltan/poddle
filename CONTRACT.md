@@ -67,6 +67,7 @@ Then at any time, with d = q * calib^-1 (world-frame delta):
   hit     {side, n, p}         n = 0..1 power.  pop sound, burst, paddle lunge
   swung   {side}               someone started a swing (animate bots/opponent)
   bounce  {p}    serve {by}    point {winner, why, score}
+  countdown {left}             seconds to a MATCH's first serve, once a second (3, 2, 1, 0): show it, big. Nothing is in play yet
   whiff   {why: 'early'|'late'|'left'|'right'|'high'|'low'}   only to the player who missed
 Rendering rule: a paddle belonging to side k with player-frame rotation P has world rotation P for side 0 and
 T*P*T^-1 for side 1, where T = 180 deg about Y. Camera sits behind the local player's baseline looking at the net.

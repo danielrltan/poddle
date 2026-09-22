@@ -440,8 +440,9 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (m.reason) { if (live()) say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said) say(`Matt · ${botLevel}`, null, 1400);
     return;
   }
-  if (m.type === 'left') { const who = lastOpp || nameOf(1 - side); clearFar(); ui.setServe(null); if (live() && !spec()) say(`${who} left`, null, 2200); return; }      // only before a match has started now; mid-match it is a hold or a forfeit
-  if (m.type === 'match' || m.type === 'matchover') { struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false; if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
+  if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
+  if (m.type === 'left') { ui.countdown(0); const who = lastOpp || nameOf(1 - side); clearFar(); ui.setServe(null); if (live() && !spec()) say(`${who} left`, null, 2200); return; }      // only before a match has started now; mid-match it is a hold or a forfeit
+  if (m.type === 'match' || m.type === 'matchover') { ui.countdown(0); struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false; if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
   if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
   if (m.type === 'rematchon') { over = null; struck = false; if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
   if (m.type === 'hold') { holding = true; scene.setFrozen(true); setPaused(false); if (live()) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // their wifi dropped: the seat is held, the ball waits where it is
@@ -450,7 +451,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'wait') { if (live() && !holding) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // the serve waits for a seat that is calibrating mid-match: the last 30 s of its minute are counted down, then it forfeits
   if (m.type === 'waitoff') { if (!holding) ui.hold(null); return; }
   if (m.type === 'hit') { struck = true; stats.hits++; if (m.side === side && !spec()) { stats.myHits++; padFx('hit', m.n); } rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
-  if (m.type === 'serve') { over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
+  if (m.type === 'serve') { ui.countdown(0); over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
     if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve!', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && !m.final && live()) {

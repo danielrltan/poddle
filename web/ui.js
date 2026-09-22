@@ -60,6 +60,13 @@ export function pointBanner(won, name = '', side) {
   $('banner-text').textContent = mine ? 'Your point' : name ? `${name} scores` : 'Their point';
   b.classList.toggle('is-me', blue); b.classList.toggle('is-them', !blue); restart(b, 'show');
 }
+// The count into a match: n = whole seconds left, 0 or null = gone. Each new number pops once (server/game.js 'countdown').
+export function countdown(n) {
+  const el = $('count'), b = $('count-n'); if (!el || !b) return;
+  if (!n) { el.hidden = true; b.textContent = b.dataset.text = ''; return; }
+  const t = String(n); el.hidden = false;
+  if (b.textContent !== t) { b.textContent = b.dataset.text = t; restart(el, 'tick'); }
+}
 let toastT;
 export function toast(text, ms = 1200) {
   const el = $('toast'), b = document.body; el.textContent = text; el.classList.add('on'); b.classList.add('has-toast');     // .has-toast: the key strip yields the bottom band

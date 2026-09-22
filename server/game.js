@@ -131,6 +131,7 @@ const BOTS = [
 ];
 const AUTOBOT = process.env.AUTOBOT !== '0';                   // tests turn off auto-join and (in LOCAL) seat takeover
 const SWING_SERVE = process.env.SWING_SERVE != null ? process.env.SWING_SERVE !== '0' : AUTOBOT;   // off in tests
+const READY_S = process.env.READY_S != null ? +process.env.READY_S : (AUTOBOT ? 3 : 0);   // s counted down (3, 2, 1) before the FIRST serve of a match, once both seats are ready: a match no longer starts the instant an opponent sits down. Off in tests (like SWING_SERVE), which measure rallies and would just wait: test/countdown.test.mjs and test/rooms.test.mjs keep it on
 const WIN_AT = process.env.WIN_AT != null ? +process.env.WIN_AT : (AUTOBOT ? 11 : 0);   // first to 11, win by 2 (off in tests)
 const WIN_BY = process.env.WIN_BY != null ? +process.env.WIN_BY : 2;                  // tests only: a browser test needs a match that is SURE to end (two scripted players can trade points at deuce for ever)
 const REVIVE_S = process.env.REVIVE_S != null ? +process.env.REVIVE_S : 120;   // s after this process starts during which a returning tab may bring its court back (see revive())
@@ -257,6 +258,7 @@ function createRoom(code, pub) {
   const ball = { spin: 0, kick: 0, aim: null, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
   const score = [0, 0]; let revived = null;
   let server = 0, serveAt = Infinity, tick = 0;     // who serves next; when (sim time); steps taken
+  let counting = null;                              // the count into a new match: { until (sim time), said (the last whole second told) }
 
   function send(pl, msg) { put(pl.ws, JSON.stringify(msg)); }
   function broadcast(msg, skip) { const s = JSON.stringify(msg); for (const pl of players) if (pl.ws !== skip) put(pl.ws, s); for (const ws of spectators) put(ws, s); }
@@ -386,6 +388,7 @@ function createRoom(code, pub) {
   function startMatch(first) {
     score[0] = score[1] = 0; if (revived) { score[0] = revived[0]; score[1] = revived[1]; revived = null; }      // a court brought back after a restart carries its score
     server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
+    counting = READY_S > 0 ? { until: Infinity, said: -1 } : null;   // armed: it starts counting once the room is whole and both seats are ready (countdown())
     if (pub) lobbyChanged();
   }
 
@@ -393,7 +396,7 @@ function createRoom(code, pub) {
   const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, rematchBy: secsTo(over.until), names: over.names });   // names: as they were when it ended (a forfeit has emptied a seat by now)
   const voteMsg = () => ({ type: 'rematch', votes: over.votes, left: secsTo(over.until) });
   function endMatch(winner, forfeit, nm) {
-    ball.live = false; ball.serving = null; serveAt = Infinity; for (const pl of players) pl.swing = pl.servePending = null;
+    ball.live = false; ball.serving = null; serveAt = Infinity; counting = null; for (const pl of players) pl.swing = pl.servePending = null;
     over = { winner, forfeit, names: nm || names(), until: Date.now() + (LEGACY ? 5 : REMATCH_S) * 1000,
       votes: [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? true : null) : false; }) };      // Matt always wants another; a seat that was forfeited cannot
     if (LEGACY) newMatchAt = now + 5;                            // LOCAL: a new match after 5 s whatever anyone says (test/e2e.mjs lives there)
@@ -436,6 +439,23 @@ function createRoom(code, pub) {
     broadcast({ type: 'holdoff' }); endMatch(1 - sd, true, nm);
   }
   const heldBy = cid => (cid && hold && players.find(p => !p.bot && !p.ws && p.cid === cid)) || null;
+
+  // ---------- the count into a new match ----------
+  // A match used to put a ball in play the moment the room was whole: an opponent sat down, or the last seat finished
+  // calibrating, and the serve went out while the player still had the paddle by their side. Now the first serve of a match
+  // waits for a count of three, and the count only runs while the room IS whole: it starts over if a seat leaves or goes back
+  // to calibrating, so nobody is counted in while they are not there. A seat that stalls is still handled by slowSeat, whose
+  // window runs from serveAt as it always did - the count sits after it, not instead of it.
+  // -> true while the serve must wait.
+  function countdown() {
+    if (!counting) return false;
+    if (ball.live || over || hold || paused || players.length !== 2 || !players.every(ready) || now < serveAt) { counting.until = Infinity; return true; }
+    if (counting.until === Infinity) counting.until = now + READY_S;
+    const left = clamp(Math.ceil(counting.until - now - 1e-9), 0, Math.ceil(READY_S));   // -1e-9: (now + READY_S) - now can come back an ulp OVER READY_S and count "4" into a count of three
+    if (left !== counting.said) { counting.said = left; broadcast({ type: 'countdown', left }); }
+    if (now < counting.until) return true;
+    counting = null; return false;                               // counted in: the serve goes on this very tick
+  }
 
   // ---------- a seat that says it is calibrating mid-match holds the next serve. Not for ever: {type:'status',cal:true} and then silence kept a court at
   // 'serving null' for good, the honest player could not pause and his only way out was a forfeit LOSS. CAL_S, the last 30 s counted down to everyone, then the
@@ -525,7 +545,7 @@ function createRoom(code, pub) {
   }
   function removeBot() {
     const i = players.findIndex(p => p.bot);
-    if (i >= 0) { players.splice(i, 1); ball.live = false; serveAt = Infinity; broadcast(botInfo()); }
+    if (i >= 0) { players.splice(i, 1); ball.live = false; serveAt = Infinity; counting = null; broadcast(botInfo()); }
   }
   // B key: alone -> join now; already playing the bot -> next difficulty; two humans -> say why not.
   function botRequest(from, level) {
@@ -629,7 +649,8 @@ function createRoom(code, pub) {
     players.splice(i, 1);
     if (paused) resume();                                        // the pauser went
     if (over) { over = null; newMatchAt = Infinity; broadcast({ type: 'rematchon' }); }   // LOCAL: no vote to wait for
-    removeBot(); ball.live = false; ball.serving = null; serveAt = Infinity;
+    removeBot(); ball.live = false; ball.serving = null; serveAt = Infinity; counting = null;
+    score[0] = score[1] = 0; started = false; revived = null;    // somebody LEFT: that match is over, so the score goes now rather than lingering on the board until the next one starts. A seat that only dropped is held instead (startHold), and keeps its score for the 15 s it may come back in
     botJoinAt = AUTOBOT && humans().length === 1 ? now + 2.5 : Infinity;   // whoever is left gets the bot back
     broadcast({ type: 'left' }); tellNames();
     if (!humans().length) sendOff();
@@ -745,7 +766,8 @@ function createRoom(code, pub) {
   function sim() {
     if (now >= botJoinAt) { botJoinAt = Infinity; addBot(); }
     if (now >= newMatchAt) { newMatchAt = Infinity; over = null; broadcast({ type: 'rematchon' }); if (players.length === 2) startMatch(1 - firstServe); }   // LOCAL only
-    if (!ball.live && now >= serveAt && players.every(ready)) { serveAt = Infinity; if (players.length === 2) reset(server); }   // the serve waits for a human who is still calibrating
+    const counted = !countdown();                                // every tick: the count into a new match starts over if the room comes apart while it runs
+    if (!ball.live && counted && now >= serveAt && players.every(ready)) { serveAt = Infinity; if (players.length === 2) reset(server); }   // the serve waits for a human who is still calibrating, and then for the count
 
     for (const pl of players) {
       if (pl.bot) runBot(pl, DT); else if (pl.auto || pl.autoY) runAuto(pl, DT);

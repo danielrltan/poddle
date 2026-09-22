@@ -122,6 +122,14 @@ Add `.pop` to `.score-num` / `#rally` when the value changes (450ms; the score p
 scoreboard. Add `.show` to play (`--d-banner` 1900ms: drop in 0–17%, hold, lift out 84–100%; easing is per keyframe, the animation itself is
 `linear`). Small on purpose; darker fills (`#2a86ea→#0f5cc0`, `#ee6c25→#c0400a`) so the white text passes contrast.
 
+### Match countdown — `.countdown`
+`<div class="countdown" id="count" role="status" hidden><b id="count-n" data-text="3">3</b><span>Get ready</span></div>` — **`data-text`
+must equal the number** (the lettering is the callout's: gradient `::after` clipped to the text, one white `::before` outline). The number
+is `--t-callout × 1.75`, tabular, the pill under it is the banner tag's fill so the two read as one family.
+**Position: `top:23%`** — over the far end of the court, the number across the backdrop banner and the pill clear of the net. Nothing is in
+play under it: it only ever shows before a match's first serve. `ui.countdown(n)` sets it (0 or null hides) and replays `.tick`
+(`count-pop` 1s) on each new number, so the count reads as one pop a second. Hidden off the HUD screen and behind any overlay.
+
 ### Shot callout — `.callout`
 `<div class="callout-layer"><div class="callout" id="callout" data-text="Smash">Smash</div></div>` — **`data-text` must equal
 the text** (both layers are pseudo-elements that read it). Glossy colour-filled rounded letters (`::after`, gradient clipped to the text),

@@ -913,3 +913,25 @@ Build log. What we tried, what broke, and how each problem was solved.
   The handler object is now one key per line, with a comment saying why it must stay that way.
 - Lesson recorded: a probe that stubs the very thing being measured proves nothing. Both of 60's central claims were wrong
   in the same way, and both looked verified.
+
+## 65. A match is counted in, and a leaver takes the score with them
+- "Can you also add a countdown when a user joins so that the game doesn't insta start" — and, straight after, "whenever
+  someone leaves and joins, the scores need to get reset."
+- The insta-start was worse than it looked. `startMatch` set the serve 0.8 s out, but the serve itself waits for every seat
+  to be ready (a seat is ready once it has sent a paddle message), and by the time the second player finished calibrating
+  that 0.8 s was long gone — so the ball went out on the very tick they became ready, before they had the paddle up.
+- So the count runs from when the room is WHOLE, not from when someone sat down: `countdown()` holds the first serve of a
+  match for READY_S (3 s), and starts over if the room comes apart while it runs (a seat leaves, goes back to calibrating,
+  pauses or is held). `{type:'countdown', left}` goes out once a second, 3 · 2 · 1 · 0, and the HUD shows it big over the
+  far court (`.countdown`, docs/ui-spec.md). A seat that stalls for good is still handled by slowSeat, whose window runs
+  from serveAt as it always did: the count sits after it, not instead of it.
+- `Math.ceil(until - now)` counted "4" into a count of three about one run in three: `(now + 3) - now` comes back an ulp
+  over 3. It is clamped and nudged by 1e-9 now (test/countdown.test.mjs caught it, four runs in a row).
+- Off in tests by default (`AUTOBOT ? 3 : 0`, the same shape as SWING_SERVE): the measuring tests drive rallies and would
+  only wait. test/push.test.mjs proved why — it averages where the opponent stands over every hit in a 9 s window, and
+  three seconds of counting cut the rally sample enough to move the answer from 4.4 m to 5.5 m and fail. Nothing about the
+  push had changed. test/countdown.test.mjs and test/rooms.test.mjs keep it on and own the behaviour.
+- The score: a board only ever cleared when the NEXT match started, so whoever was left sat looking at the old one (and,
+  with the bot 2.5 s away, brought it to Matt). Now a real leave clears it at once — score, `started` and any revived score
+  go with the leaver. A seat that only DROPPED is not a leaver: it is held for 15 s and keeps its score for the reconnect,
+  as it always has (the point in play is replayed). Reconnecting inside that window is coming back, not joining.
