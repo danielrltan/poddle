@@ -274,9 +274,11 @@ function needName() {                                      // a seat was asked f
 // ---------- settings panel (hamburger). A card, not a screen: inPlay() in main.js stays true and the rally goes on behind it ----------
 let setOpen = false, setH = {}, sinkSig = '';
 // Why the Output row is not there. browser: no AudioContext.setSinkId (Safari, Firefox). devices: it could move the sound,
-// but the page holds no media grant yet, so Chrome blanks every device id and name (the camera grant is enough to fill them).
+// but the browser will not name a single audio device until the page holds MICROPHONE permission — measured, and a camera
+// grant does NOT do it (NOTES 64). denied: they said no, and only the browser's own site settings can undo that.
 const SINK_HINT = { browser: 'This browser can’t move the game’s sound. Choose your speakers in System Settings › Sound.',
-  devices: 'Allow the camera and your speakers will be listed here. Or choose them in System Settings › Sound.' };
+  devices: 'Your browser only names your speakers once this page has audio permission. Nothing is recorded — the microphone is released the moment the list is read.',
+  denied: 'Audio permission is blocked, so your speakers can’t be listed. Allow it for this site in your browser, or choose them in System Settings › Sound.' };
 export function onSettings(h) { setH = h || {}; }                                       // { open(), close(), sens(dir), airpod(on), stats(on), recenter(), leave(), name(text), move(mode), paddle(kind), bot(level), sound(on), sink() }
 export function settings(open) {
   if (open === undefined) return setOpen;
@@ -301,7 +303,8 @@ export function setSettings(o = {}) {
   for (const [key, id] of [['airpod', 'tog-airpod'], ['sound', 'tog-sound']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
   // Output: the row shows only when the sound can actually be moved AND the browser is willing to name the devices.
   // Otherwise the hint says which of the two is missing, rather than leaving a dead control on screen.
-  if ('sinkWhy' in o) { show('set-sink', !o.sinkWhy); show('sink-hint', !!o.sinkWhy); if (o.sinkWhy) setText($('sink-hint'), SINK_HINT[o.sinkWhy] || SINK_HINT.browser); }
+  if ('sinkWhy' in o) { show('set-sink', !o.sinkWhy); show('sink-hint', !!o.sinkWhy); if (o.sinkWhy) setText($('sink-hint'), SINK_HINT[o.sinkWhy] || SINK_HINT.browser);
+    show('btn-find-sinks', o.sinkWhy === 'devices'); }      // only 'devices' is fixable from here: a button that asks, once
   if ('sinks' in o) { const s = $('set-sink-sel'), sig = JSON.stringify(o.sinks);           // rebuilt only when the devices really changed: never under the player's finger while the list is open
     if (s && sig !== sinkSig) { sinkSig = sig; const keep = s.value;
       s.replaceChildren(...(o.sinks || []).map(d => { const op = document.createElement('option'); op.value = d.id; op.textContent = d.label; return op; }));      // device names are the system's text: textContent only
@@ -325,6 +328,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('btn-sens-less', 'click', () => call('sens', -1)); on2('btn-sens-more', 'click', () => call('sens', 1));
   for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-sound', 'sound']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
   on2('set-sink-sel', 'change', e => call('sink', e.currentTarget.value));      // main.js answers with setSettings: if the device refuses, the row goes back by itself
+  on2('btn-find-sinks', 'click', () => call('findSinks'));
   on2('tog-full', 'click', () => fullscreen());
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
   on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });      // phone <-> AirPod at any time, not only on the set-up screen

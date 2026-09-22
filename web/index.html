@@ -168,9 +168,12 @@
   </div></section>
   <section class="set-group" id="grp-sound"><h3 class="set-label">Sound</h3><div class="set-list">
     <button class="set-row set-switch" id="tog-sound" role="switch" aria-checked="true"><span>Sound</span><i></i></button>
-    <!-- an AirPod in your ear is the paddle, not the speaker: send the game to the laptop instead. The browser's own picker, so no microphone is ever asked for -->
+    <!-- an AirPod in your ear is the paddle, not the speaker: send the game to the laptop instead.
+         The browser will not name an audio device until the page holds MICROPHONE permission (camera is not enough, NOTES 64),
+         so the list is opt-in behind a button and the copy says exactly why. -->
     <label class="set-row set-pickdev" id="set-sink" hidden><span>Output</span><select class="field" id="set-sink-sel"></select></label>
     <p class="set-hint" id="sink-hint" hidden></p>
+    <button class="set-row set-action" id="btn-find-sinks" hidden><span>Find my speakers</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6l-5 4H3Z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></button>
   </div></section>
   <section class="set-group" id="grp-screen"><h3 class="set-label">Screen</h3><div class="set-list">
     <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>

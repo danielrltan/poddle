@@ -890,3 +890,26 @@ Build log. What we tried, what broke, and how each problem was solved.
   after, 0 of 24 bent more than once and the kink is 0.13 (p90 0.37). Every hit is still re-aimed once, and the landing
   still moves as far (p50 0.8 m): that is the settled swing being honoured, not a bug.
 - bet, serve, push, kitchen, slice and deep tests pass; server.test.mjs fails the same way on main (teleport timing under load).
+
+## 64. The Sound output list needs MICROPHONE permission, not the camera; and a comment that ate six handlers
+- "It says to enable the camera so I did, but no sound devices were detected anyway and so I couldn't change sound output."
+- Cause 1, the wrong permission. 60 claimed a camera grant was enough to make the browser name audio devices. It is not.
+  That claim came from a probe run with `--use-fake-device-for-media-stream`, and the fake devices are not subject to the
+  real gating, so the probe passed while real hardware never would. Measured again on real devices, Chrome 153:
+  - no grant: one audiooutput with a blank id AND a blank label;
+  - camera granted and the camera actually opened: still blank;
+  - microphone granted: real ids and real names ("Default - MacBook Pro Speakers (Built-in)").
+  So the Output row could never populate for anybody. Shipped and deployed that way.
+- Fix: the list is opt-in behind a `Find my speakers` row that calls `getUserMedia({ audio: true })`, stops the track the
+  instant the permission lands, then re-reads the devices. We want the permission, never the audio; nothing is recorded.
+  The hint above it says exactly that, and a refusal gets its own `denied` wording pointing at the browser's site settings.
+- A throw from getUserMedia is NOT taken as refusal: with no microphone, or a busy one, the permission can still have
+  landed, and the permission is all the list needs. The device list is the judge — `sinkDenied = !sinks.length`.
+- `Find my speakers` shows only where asking can still help: not without setSinkId, not after a refusal, not once listed.
+- Cause 2, unrelated and worse. The end-of-line comment added to `ui.onSettings({ ... })` in 60 swallowed the rest of that
+  line, which held `sens`, `airpod`, `stats`, `recenter`, `leave` and `name`. Sensitivity, Show AirPod, Re-center, Leave
+  court and the Name field were dead on the live site from that deploy until now. `node --check` cannot see this, and the
+  menu.mjs checks that would have caught it were already red for other reasons, so nothing flagged it.
+  The handler object is now one key per line, with a comment saying why it must stay that way.
+- Lesson recorded: a probe that stubs the very thing being measured proves nothing. Both of 60's central claims were wrong
+  in the same way, and both looked verified.

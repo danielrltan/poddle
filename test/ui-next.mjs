@@ -71,13 +71,16 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
   // Sound (NOTES 60): the Output row is there only where the browser can actually move the audio, otherwise a hint saying where to go. Its own `snd`: `r` is still read below
   const DEVS = [{ id: '', label: 'System default' }, { id: 'spk', label: 'MacBook Pro Speakers' }, { id: 'pods', label: 'Daniel’s AirPods' }];
   const snd = await ev(pg, devs => { const sel = () => T.$('set-sink-sel'), state = o => { __ui.setSettings(o); return [T.seen('set-sink'), T.seen('sink-hint'), T.$('sink-hint').textContent.slice(0, 22), [...sel().options].map(x => x.textContent).join('/'), sel().value]; };
-    const out = { browser: state({ sinkWhy: 'browser', sinks: devs }), nogrant: state({ sinkWhy: 'devices', sinks: [devs[0]] }), listed: state({ sinkWhy: '', sinks: devs, sink: 'pods' }) };
+    const out = { browser: state({ sinkWhy: 'browser', sinks: devs }), nogrant: state({ sinkWhy: 'devices', sinks: [devs[0]] }), denied: state({ sinkWhy: 'denied', sinks: [devs[0]] }), listed: state({ sinkWhy: '', sinks: devs, sink: 'pods' }) };
+    // "Find my speakers" is offered ONLY where asking can still help: not in a browser that cannot switch, not after a refusal, not once they are listed
+    out.askBtn = ['browser', 'devices', 'denied', ''].map(w => { __ui.setSettings({ sinkWhy: w, sinks: w === '' ? devs : [devs[0]] }); return T.seen('btn-find-sinks'); });
     // the row must report the player's pick, not flip itself: ui.js only ever hands the value to main.js
     T.clear(); sel().value = 'spk'; sel().dispatchEvent(new Event('change', { bubbles: true })); out.chose = T.calls('sink').map(c => c[1]); out.stillPods = sel().value;
     out.evil = (() => { __ui.setSettings({ sinkWhy: '', sinks: [{ id: 'x', label: '<img src=x onerror="window.__xss=1">' }] }); return [sel().querySelectorAll('img').length, !window.__xss, sel().options[0].textContent.slice(0, 9)]; })();
     __ui.setSettings({ sinkWhy: 'browser' }); return out; }, DEVS);
-  ok(J(snd.browser.slice(0, 3)) === J([false, true, 'This browser can’t mov']) && J(snd.nogrant.slice(0, 3)) === J([false, true, 'Allow the camera and y']),
-     `${tag} Sound: no Output row without setSinkId or without named devices, and the hint says which (${J(snd.browser.slice(0, 3))} / ${J(snd.nogrant.slice(0, 3))})`);
+  ok(J(snd.browser.slice(0, 3)) === J([false, true, 'This browser can’t mov']) && J(snd.nogrant.slice(0, 3)) === J([false, true, 'Your browser only name']) && J(snd.denied.slice(0, 3)) === J([false, true, 'Audio permission is bl']),
+     `${tag} Sound: no Output row without setSinkId, without named devices, or after a refusal, and the hint says which (${J(snd.browser.slice(0, 3))} / ${J(snd.nogrant.slice(0, 3))} / ${J(snd.denied.slice(0, 3))})`);
+  ok(J(snd.askBtn) === J([false, true, false, false]), `${tag} Sound: "Find my speakers" only where asking can still help (browser/devices/denied/listed = ${J(snd.askBtn)})`);
   ok(snd.listed[0] === true && !snd.listed[1] && snd.listed[3] === 'System default/MacBook Pro Speakers/Daniel’s AirPods' && snd.listed[4] === 'pods',
      `${tag} Sound: the Output row lists every named device and shows the chosen one (${snd.listed[3]} = ${snd.listed[4]})`);
   ok(J(snd.chose) === J(['spk']) && snd.stillPods === 'spk', `${tag} Sound: choosing an output hands the deviceId to main.js (${J(snd.chose)})`);
