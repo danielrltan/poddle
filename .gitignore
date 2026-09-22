@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 motion/motion
 test/shots/
 data/live-capture.jsonl
