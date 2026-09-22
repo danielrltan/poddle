@@ -58,8 +58,9 @@ AirPod's motion to the game. It is open source in its own repo:
 [danielrltan/poddle-helper](https://github.com/danielrltan/poddle-helper). It reads only headphone motion and sends it only
 to the Poddle page in your browser on the same Mac (127.0.0.1:8787); it never connects to the internet itself.
 
-1. Unzip it and open **Poddle Helper.app**. It is not signed with an Apple Developer ID, so the first time go to
-   System Settings → Privacy & Security → **Open Anyway** (on macOS 14, right-click → Open also works).
+1. Unzip it and open **Poddle Helper.app**. It is not signed with an Apple Developer ID yet, so the first time macOS says it
+   "could not verify" the app: press **Done** (not Move to Trash), then System Settings → Privacy & Security →
+   **Open Anyway** (on macOS 14, right-click → Open also works).
 2. Allow **Motion & Fitness** when it asks.
 3. Needs macOS 14+ and AirPods Pro / 3 / 4 / Max connected to the Mac **as the audio output**. Turn **off** *Automatic Ear
    Detection* (Settings → Bluetooth → AirPods ⓘ) so motion keeps streaming out of your ear. Leave the other AirPod in its case.
