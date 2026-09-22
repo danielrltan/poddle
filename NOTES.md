@@ -846,3 +846,15 @@ Build log. What we tried, what broke, and how each problem was solved.
 - Device names are the system's text and go in with `textContent` only; test/ui-next.mjs checks a hostile one stays text.
   The tests pin the group with `setSettings({ sinkWhy: 'browser' })` so the panel's shape never depends on whether the
   test browser happens to expose the devices.
+
+## 61. The X moves off the corner, to the bottom of the middle (supersedes the placement in 59)
+- "Can you put it in 3/4 middle of the screen to bottom? Shouldn't be corner in case you press it when holding phone." Right:
+  a hand wrapped round a phone rests on the corners, so the one button that ends the session was under a palm all rally.
+- It is now pinned to the middle of the screen near the bottom (1.25 rem above the home bar, `env(safe-area-inset-bottom)`),
+  the same place on every phone. Nothing else is down there: the live view carries 5.5 rem of bottom padding to keep clear of it.
+- Two placements were measured and thrown away first. Fixed at 75% of the height sat ON the "Press and hold a button" line
+  at 390x844 and on the Calibrate again / Re-center row at 360x640. Last in the flow instead put it at y 667 on a 640-tall
+  screen: off the bottom of the page.
+- Short screens (`max-height:760px`: a small phone, or any phone in landscape) now tighten the live view — smaller ring,
+  smaller gaps — so the whole thing including the X fits with no scrolling. Measured after: 390x844 content ends at 646 with
+  the X at 780-824; 360x640 content ends at 540 with the X at 576-620; scrollHeight equals the window on both, no overlaps.

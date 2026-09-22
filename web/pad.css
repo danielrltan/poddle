@@ -42,8 +42,13 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
 .btn-hold.is-held::before{transform:scaleX(1);transition:transform .7s linear}
 .btn-hold.is-done{border-color:var(--good)}
 .btn-hold{isolation:isolate}.btn-hold::before{z-index:-1}
-/* The X that ends the session: in the corner, out of the way of a hand gripping the phone, and big enough to hit (2.75rem). */
-.btn-x{position:fixed;top:max(.75rem,env(safe-area-inset-top));right:max(.75rem,env(safe-area-inset-right));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5}
+/* The X that ends the session: low and down the MIDDLE, never in a corner — a hand wrapped round the phone rests on the
+   corners, and this must not sit under a palm all rally. Pinned near the bottom (clear of the home bar) so it is in the
+   same place on every phone, with the live view padded to match so nothing is ever under it. 2.75rem: a real target. */
+.btn-x{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + env(safe-area-inset-bottom));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5}
+[data-name="live"]{padding-bottom:5.5rem}
+/* A short phone (or one in landscape): tighten the live view so everything, the X included, still fits without scrolling. */
+@media (max-height:760px){[data-name="live"]{gap:.6rem;padding-bottom:4.5rem}[data-name="live"] .ring{width:8.5rem;height:8.5rem}[data-name="live"] .ring b{font-size:1.25rem}}
 .btn-x svg{width:1.15rem;height:1.15rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
 @media (prefers-reduced-motion:reduce){body{transition:none}}
 

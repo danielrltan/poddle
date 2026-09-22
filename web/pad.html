@@ -41,8 +41,6 @@
   </section>
 
   <section class="view" data-name="live">
-    <!-- done playing: held, not tapped, like the other two (a gripped phone gets its screen pressed all rally long) -->
-    <button class="btn-x btn-hold" id="btn-quit" aria-label="Done playing: press and hold to stop the paddle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <div class="ring" id="ring"><div class="ring-fill" id="ring-fill"></div><b id="ring-word">Ready</b></div>
     <h2 id="live-h">Looking for your computer</h2>
     <p id="live-p">Keep this page open. Watch the computer, not the phone.</p>
@@ -53,6 +51,9 @@
     <p class="note">Press and hold a button to use it.</p>
     <p class="note" id="live-note"></p>
     <p class="note" id="live-stats"></p>
+    <!-- done playing: low and centred, never in a corner (a hand wrapped round the phone rests there), and held, not
+         tapped, like the other two buttons -->
+    <button class="btn-x btn-hold" id="btn-quit" aria-label="Done playing: press and hold to stop the paddle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </section>
 
   <section class="view" data-name="done">
