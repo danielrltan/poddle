@@ -63,7 +63,8 @@ const STANCE = 0.3;                       // stand this far behind the predicted
 const SWING_WINDOW = 0.32;                // s a swing stays "live" waiting for the ball
 const LAG_MAX = 0.3;                     // s a swing may be back-dated by its reported age
 const FIX_WINDOW = 0.25;                  // s after a hit that a corrected power may still re-aim the ball
-const FIX_EASE = 0.1;                     // s that re-aim is spread over: the ball bends onto the new path, it never kinks
+const FIX_EASE = 0.1;                     // s that re-aim is spread over at the least: the ball bends onto the new path, it never kinks
+const FIX_SHARE = 0.5, FIX_EASE_MAX = 0.45; // ...and at most over this share of what is left of the flight (s, capped): bent in 0.1 s it read as a second hit (NOTES 63)
 const CONTACT = 0.25;                     // a stroke meets the ball this far in front of the paddle
 const Z_ASSIST = 0.9;                      // share of the forward/back footwork the game does for a player who walks themselves
 const Z_PUSHED = 0.85;                     // most of a player's own lean a deep ball can take back off: you get pushed out of the kitchen, but never yanked all the way home by one shot
@@ -277,7 +278,7 @@ function createRoom(code, pub) {
   // A corrected power arrived just after the hit. Never swap the velocity: steer onto the new landing spot over FIX_EASE.
   function reaim(side, n, dir, lob, slice, kind, blk) {
     const sol = solve(ball.p, side, n, dir, lob, slice, blk);
-    ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(FIX_EASE / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
+    ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
     ball.spin = sol.spin; ball.kick = sol.kick;
     planFootwork(1 - side, sol.v);
     broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
@@ -692,10 +693,10 @@ function createRoom(code, pub) {
         if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice, final });              // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power)
         // A shot struck on the near-net curve: only the SETTLED report may move it along that curve, never another bet.
         else if (me.hit && me.hit.blk && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) fixBlock(me, pw, dir, lob, slice);
-        else if (me.hit && !me.hit.blk && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
+        else if (me.hit && !me.hit.blk && final && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
           && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
           const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
-          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side
+          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
         }
         return;
       }

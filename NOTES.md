@@ -870,3 +870,23 @@ Build log. What we tried, what broke, and how each problem was solved.
   straight onto the Calibrate again / Re-center row (measured at 844x390 and 740x360). Below that height it goes back into
   the flow as the last thing in the view: no overlap, but it is under the fold and reached by scrolling. This page already
   overflowed when turned sideways (587 px of content in 390), so that is not new — it is just not fixed here either.
+
+## 63. A hit bends the ball once, gently: only the settled swing re-aims it, over half the rest of the flight
+- "It'll sometimes register two hits, causing the ball to literally change trajectory mid air." Not a second contact: the
+  re-aim. Every swing is struck on its early report (the bet, web/motion.js), and the reports after it re-aim the ball
+  (`reaim`, server/game.js). NOTES 58 took away the second *flourish* a late smash call played; the ball's own bend stayed.
+- Two things made the bend read as another hit. Every report after contact re-aimed, not just the settled one: motion.js
+  sends up to three `swingFix`es per swing (a bet, a moved call or two, then the settled one), so one shot could bend two or
+  three times. And each bend took 0.1 s (`FIX_EASE`), so a ball that left at drive pace and settled as a tap braked like it
+  had been struck again.
+- Now only the SETTLED report re-aims a struck ball, the way a blocked ball already worked. The in-between reports still correct
+  a swing that has not met the ball yet. The bend runs over half of what is left of the flight (`FIX_SHARE`, 0.1 - 0.45 s),
+  so it curves onto the new line instead of kinking. The landing is still exact: easeAim re-solves every tick.
+- A gentler bet was tried on paper first and thrown out: in the real captures (live-play-1 and -3, 74 scored swings, every one
+  struck on a bet) the bet misses the settled power by 0.22 - 0.26 of n at the median whatever it is capped at (0.3 - 0.76),
+  and in both directions (38 over, 30 under). There is no conservative bet; only the bend itself can be tamed.
+- Measured (`test/reaim.mjs`: the real captures through the real motion.js at the real server, 90 s each):
+  before, 7 of 27 hits bent more than once and the sharpest kink per hit was 0.39 m/s between two packets (p50, p90 0.89);
+  after, 0 of 24 bent more than once and the kink is 0.13 (p90 0.37). Every hit is still re-aimed once, and the landing
+  still moves as far (p50 0.8 m): that is the settled swing being honoured, not a bug.
+- bet, serve, push, kitchen, slice and deep tests pass; server.test.mjs fails the same way on main (teleport timing under load).
