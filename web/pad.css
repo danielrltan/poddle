@@ -66,3 +66,4 @@ body[data-link="wait"] .ring{border-color:#7a5716}
 .art g[stroke="#5b6670"]{stroke:#8795a1}
 .art rect[fill="#5b6670"]{fill:#8795a1}
 .art text{fill:var(--ink-strong)}
+.art .cam-plate{fill:#22364a;stroke:#8795a1} .art .cam-lens{fill:#8795a1} .art .cam-glass{fill:#0d141a} .art .cam-flash{fill:#8a7f55;stroke:#8795a1}      /* the camera bar, dark like the rest */

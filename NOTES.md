@@ -566,3 +566,12 @@ Build log. What we tried, what broke, and how each problem was solved.
   about a real phone's proportions) instead of the edge-on 206 x 46 slab. The camera bar runs across the top end, the one
   pointing at the screen: three lenses in a triangle, a flash and a sensor dot, like an iPhone 17 Pro. The fist grips the
   bottom end; the "Edge up" arrow moved above the taller phone. Both poses (hold, tip up) use it; the AirPod drawing is unchanged.
+
+## 44. The phone's own Start screen gets the new drawing; the lenses sit where an iPhone 17 Pro's do
+- "The diagram is not updated on the phone itself. Also the lenses on the phone are arranged wrong: the two circles should
+  be at the end of the back plate of the camera."
+- The camera bar now runs the phone's full width across the top end. Held edge up and seen from the side, the three lenses
+  make their triangle at one end of it (two side by side along the phone, the third below between them) and the flash and
+  the sensor dot sit together at the far end, as on the real phone.
+- pad.html's Start screen draws the same back of the phone (camera bar, lenses, flash) instead of the old edge-on slab,
+  in its dark colours (pad.css .cam-*); the "edge up" arrow moved above the taller phone.
