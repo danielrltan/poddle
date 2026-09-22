@@ -78,7 +78,7 @@ for (const [id, k] of [['btn-cal', 'c'], ['btn-center', 'r']]) { const b = $(id)
   b.addEventListener('contextmenu', e => e.preventDefault()); }
 
 // ---------- what the tab says back ----------
-// The edge glow on a hit, in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (n stretched over 0.03..SMASH_N,
+// The screen flash on a hit (the whole screen, brightest at the edges), in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (n stretched over 0.03..SMASH_N,
 // then white -> yellow -> orange -> red). Change one, change both.
 const SMASH_N = 0.76, lerp = (a, b, t) => a + (b - a) * t;
 function trailRGB(n) { const u = 3 * Math.pow(Math.max(0, Math.min(1, (n - 0.03) / (SMASH_N - 0.03))), 0.7);
@@ -91,8 +91,8 @@ function glow(n, fresh) {
   el.style.setProperty('--c', trailRGB(n)); el.style.setProperty('--n', n.toFixed(2)); if (!fresh) return;
   glowAt = performance.now(); if (glowAnim) glowAnim.cancel();
   const smash = n >= SMASH_N;      // a smash flares twice
-  glowAnim = el.animate(smash ? [{ opacity: 0 }, { opacity: 1, offset: 0.04 }, { opacity: 0.35, offset: 0.3 }, { opacity: 0.95, offset: 0.38 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0.85 + 0.15 * n, offset: 0.06 }, { opacity: 0 }],
-    { duration: smash ? 800 : 380 + 320 * n, easing: 'cubic-bezier(.2,.7,.3,1)' });
+  glowAnim = el.animate(smash ? [{ opacity: 0 }, { opacity: 1, offset: 0.04 }, { opacity: 0.35, offset: 0.3 }, { opacity: 0.95, offset: 0.38 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0.9 + 0.1 * n, offset: 0.05 }, { opacity: 0.55 + 0.3 * n, offset: 0.3 }, { opacity: 0 }],
+    { duration: smash ? 900 : 420 + 380 * n, easing: 'cubic-bezier(.2,.7,.3,1)' });
 }
 window.__glow = glow;      // test/pad-glow shots
 const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '' };

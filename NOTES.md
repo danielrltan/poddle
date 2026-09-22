@@ -715,3 +715,9 @@ Build log. What we tried, what broke, and how each problem was solved.
   anticlockwise ring, the way it really turns. A real slice's kick adds the turn for the receiver: clockwise = kicks right,
   anticlockwise = left, with the sweep up as well. Wildness and speed still scale with |D|.
 - Serve cue: five of the old white arcs (0.8 rad each, evenly spaced) instead of three.
+
+## 54. A hit floods the whole phone screen with the trail's colour
+- "Make the phone screen flash intensity more dramatic, like let's do entire screen colour actually." The `#glow` layer (47)
+  now fills the whole screen with the hit's trail colour (72-90 % in the middle by power, full at the edges, plus a thicker
+  edge ring), still added as light over the page. It peaks at 90-100 % in ~25 ms, holds at 55-85 % to a third of the way,
+  then fades: 420-800 ms by power (a smash still flares twice, now over 900 ms). Colours and the `tint` recolour are unchanged.
