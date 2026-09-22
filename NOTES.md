@@ -557,3 +557,12 @@ Build log. What we tried, what broke, and how each problem was solved.
   or you leave the court, Back is Back again (main.js undo / cancelSwap, ui.backLabel).
 - `test/pad-e2e.mjs` 4b: Cancel reads Cancel, returns to the court still calibrated on the phone, then Back is Back; the
   set-up switch back to Phone does the same.
+
+## 43. The calibration drawing shows the phone's back, not a thin bar
+- "Can you make the phone diagram calibration better? Why is it so compressed? Make it so the back of the phone is facing
+  the diagram, so you can see like an iPhone 17 camera pointing towards it, the entire back of the phone since you're
+  supposed to hold it sides up."
+- Held edge up, the side view looks straight at the phone's broad face, so the drawing now shows the whole back (202 x 92,
+  about a real phone's proportions) instead of the edge-on 206 x 46 slab. The camera bar runs across the top end, the one
+  pointing at the screen: three lenses in a triangle, a flash and a sensor dot, like an iPhone 17 Pro. The fist grips the
+  bottom end; the "Edge up" arrow moved above the taller phone. Both poses (hold, tip up) use it; the AirPod drawing is unchanged.

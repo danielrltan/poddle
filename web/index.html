@@ -319,7 +319,13 @@
             <g id="grip-hand">
               <g style="visibility:var(--pod,visible)"><rect class="art-fill" x="116" y="141" width="40" height="18" rx="9"/>
               <ellipse class="art-fill" cx="166" cy="146" rx="21" ry="25"/><circle cx="175" cy="140" r="5" fill="#5b6670"/></g>
-              <g style="visibility:var(--phone,hidden)"><rect class="art-fill" x="64" y="127" width="206" height="46" rx="11"/><rect x="74" y="134" width="186" height="32" rx="5" fill="#eaf6fc"/><rect x="249" y="143" width="5" height="14" rx="2.5" fill="#5b6670"/></g>
+              <g style="visibility:var(--phone,hidden)"><!-- held edge up: we see the phone's whole back, top end toward the screen, the camera bar across that end -->
+                <rect class="art-fill" x="62" y="104" width="202" height="92" rx="18"/><path d="M76 112h60" stroke="#eaf6fc" stroke-width="4" stroke-linecap="round"/>
+                <rect x="204" y="111" width="50" height="78" rx="13" fill="#e4ebf0" stroke="#5b6670" stroke-width="3.5"/>
+                <g fill="#5b6670"><circle cx="220" cy="128" r="10"/><circle cx="220" cy="153" r="10"/><circle cx="240" cy="140.5" r="10"/></g>
+                <g fill="#2c3640"><circle cx="220" cy="128" r="5"/><circle cx="220" cy="153" r="5"/><circle cx="240" cy="140.5" r="5"/></g>
+                <g fill="#fff" opacity=".8"><circle cx="218" cy="126" r="1.6"/><circle cx="218" cy="151" r="1.6"/><circle cx="238" cy="138.5" r="1.6"/></g>
+                <circle cx="240" cy="172" r="4.5" fill="#f6e7b0" stroke="#5b6670" stroke-width="2"/><circle cx="222" cy="175" r="3.5" fill="#5b6670"/></g>
               <rect class="art-skin" x="58" y="112" width="74" height="80" rx="26"/>
               <rect class="art-skin" x="66" y="126" width="17" height="56" rx="8.5"/><rect class="art-skin" x="83" y="124" width="17" height="60" rx="8.5"/><rect class="art-skin" x="100" y="124" width="17" height="58" rx="8.5"/><rect class="art-skin" x="117" y="127" width="16" height="52" rx="8"/>
               <rect class="art-skin" x="74" y="104" width="70" height="22" rx="11" transform="rotate(-6 74 115)"/>
@@ -329,7 +335,7 @@
           <path class="art-skin" d="M-14 126H66V184H-14"/>
           <g id="art-hold">
             <use href="#grip-face"/><use href="#grip-hand"/>
-            <path class="art-faint" style="visibility:var(--pod,visible)" d="M342 150H436"/><g style="visibility:var(--phone,hidden)"><path class="art-accent" d="M196 118V92M186 102l10-10 10 10"/><text x="214" y="108" style="text-anchor:start">Edge up</text></g><path class="art-faint" style="visibility:var(--phone,hidden)" d="M286 150H436"/>
+            <path class="art-faint" style="visibility:var(--pod,visible)" d="M342 150H436"/><g style="visibility:var(--phone,hidden)"><path class="art-accent" d="M176 96V70M166 80l10-10 10 10"/><text x="194" y="86" style="text-anchor:start">Edge up</text></g><path class="art-faint" style="visibility:var(--phone,hidden)" d="M282 150H436"/>
           </g>
           <g id="art-tilt" hidden>
             <g opacity=".28"><use href="#grip-hand"/></g>
