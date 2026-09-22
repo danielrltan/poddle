@@ -847,14 +847,10 @@ Build log. What we tried, what broke, and how each problem was solved.
   The tests pin the group with `setSettings({ sinkWhy: 'browser' })` so the panel's shape never depends on whether the
   test browser happens to expose the devices.
 
-## 61. The X moves off the corner, to the bottom of the middle (supersedes the placement in 59)
-- "Can you put it in 3/4 middle of the screen to bottom? Shouldn't be corner in case you press it when holding phone." Right:
-  a hand wrapped round a phone rests on the corners, so the one button that ends the session was under a palm all rally.
-- It is now pinned to the middle of the screen near the bottom (1.25 rem above the home bar, `env(safe-area-inset-bottom)`),
-  the same place on every phone. Nothing else is down there: the live view carries 5.5 rem of bottom padding to keep clear of it.
-- Two placements were measured and thrown away first. Fixed at 75% of the height sat ON the "Press and hold a button" line
-  at 390x844 and on the Calibrate again / Re-center row at 360x640. Last in the flow instead put it at y 667 on a 640-tall
-  screen: off the bottom of the page.
-- Short screens (`max-height:760px`: a small phone, or any phone in landscape) now tighten the live view — smaller ring,
-  smaller gaps — so the whole thing including the X fits with no scrolling. Measured after: 390x844 content ends at 646 with
-  the X at 780-824; 360x640 content ends at 540 with the X at 576-620; scrollHeight equals the window on both, no overlaps.
+## 61. The landing marker is white on both sides
+- "Can you make the ball drop signal on my side white instead of yellow?"
+- The marker was `0xffd23a` when the ball was coming to YOU and white when it was going to the other side (a spectator, on
+  nobody's side, always got white). It is now white wherever it lands.
+- So the marker no longer says whose side the ball is heading for. That was the one thing the colour carried, and it is
+  redundant: the marker is already drawn at the spot, on one side of the net or the other, in a 3-D view from your end.
+- One line in scene.js's `launch` handler. Nothing reads the marker's colour, in the game or in the tests.

@@ -950,7 +950,7 @@ export function createScene(containerEl) {
       if (m.n != null && isFinite(m.n)) ball.power = clamp(+m.n, 0, 1);      // a re-aim: the hit went out on the early bet, this is the settled swing. The trail burns for THAT (a tap that was called 30 rad/s loses its flame)
       if (m.kind === 'smash' && ball.seen) { if (timeS - smashAt > 0.3) igniteFx(m.by, ball.spin, hitLook(m.by)[0]); trail.glow = 1; }      // the settled swing, up to 0.25 s after the hit: the ball takes fire (unless the impact itself was already called a smash)
       if (m.land && !menu) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
-        marker.material.color.set(isMe(m.land[1] > 0 ? 0 : 1) ? 0xffd23a : 0xffffff); }      // yellow = coming to ME. A spectator has no me: always white
+        marker.material.color.set(0xffffff); }      // white wherever it lands: the yellow for "coming to ME" read as a warning against the court's own yellows (NOTES 61)
     } else if (m.type === 'hit') {
       const n = clamp(+m.n || 0, 0, 1), p = m.p || ball.p, pd = pads[m.side], [rs, sk] = hitLook(m.side);      // rs: the local hit is 5 m from the lens, keep the ring off the ball (in split every hit is near one of the two lenses)
       // impact: three rings, a flash, twice the sparks, a harder shake and a ball that swells for a beat
