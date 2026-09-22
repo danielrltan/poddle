@@ -1,6 +1,6 @@
 // Glue: AirPod bridge -> MotionModel -> scene + game server.
 import { MotionModel, qrot } from './motion.js';
-import { createScene } from './scene.js';
+import { createScene, shownN } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
 import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
@@ -295,7 +295,8 @@ let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE
 let tryBridge = !useAirpod && CAN_PHONE && ls.get('poddle.airpod') == null && !!ls.get('poddle.name');
 let chose = false, undo = null;      // undo: a swap made mid-game, until the new paddle is calibrated. Cancel (the Back button) puts the old one back      // the player picked the paddle on the switch this visit: a phone page left open no longer takes over from the AirPod
 function openBridge() { if (!bridge) bridge = connect(BRIDGE, 'm', sample => onSample(sample, 'airpod')); }
-const padFx = (fx, n) => { if (padOn && !useAirpod) game.send({ type: 'padfx', fx, n }); };      // the phone buzzes on my hits and says which step we are at
+let myKind = null, myBet = null;      // my last hit's kind (a re-aim names it only when it changed) and its bet-fallback timer
+const padFx = (fx, n, b) => { if (padOn && !useAirpod) game.send({ type: 'padfx', fx, n, b }); };      // the phone buzzes on my hits and says which step we are at
 const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 'play' : 'idle');
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
   const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
@@ -451,14 +452,17 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'paused') { if (m.refused) ui.setSettings({ canPause: false }); else { setPaused(!!m.on); scene.setFrozen(!!m.on || holding); } return; }
   if (m.type === 'wait') { if (live() && !holding) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // the serve waits for a seat that is calibrating mid-match: the last 30 s of its minute are counted down, then it forfeits
   if (m.type === 'waitoff') { if (!holding) ui.hold(null); return; }
-  if (m.type === 'hit') { struck = true; stats.hits++; if (m.side === side && !spec()) { stats.myHits++; padFx('hit', m.n); } rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
+  if (m.type === 'hit') { struck = true; stats.hits++; clearTimeout(myBet); myBet = null;
+    if (m.side === side && !spec()) { stats.myHits++; myKind = m.kind || 'drive'; const n = +m.n || 0;      // the glow shows what scene.js's trail shows (shownN: a lob white, a bet pale); the buzz keeps the stroke's force
+      padFx('hit', shownN(m.bet ? Math.min(n, 0.3) : n, myKind), n); if (m.bet) myBet = setTimeout(() => { myBet = null; padFx('tint', shownN(n, myKind)); }, 300); }      // no settled re-aim in 0.3 s: it flies at the bet
+    rally++; ui.setRally(rally); }   // the shot's name only, and only for my own hits
   if (m.type === 'serve') { ui.countdown(0); over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
     if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve!', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && !m.final && live()) {
     if (spec()) ui.pointBanner(null, nameOf(m.winner === 1 ? 1 : 0), m.winner === 1 ? 1 : 0);
     else { const won = m.winner === side; ui.pointBanner(won, nameOf(m.winner === 1 ? 1 : 0)); if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); } }      // "Your point!" / "<name> scores", nothing else
-  if (m.type === 'launch' && m.by === side && m.n != null && !spec()) padFx('tint', m.n);      // my hit re-aimed on the settled swing: the phone's glow takes that power's colour
+  if (m.type === 'launch' && m.by === side && m.n != null && !spec()) { if (m.kind) myKind = m.kind; clearTimeout(myBet); myBet = null; padFx('tint', shownN(+m.n || 0, myKind)); }      // my hit re-aimed on the settled swing: the phone's glow takes that power's colour
   if (SCENE_EVENTS.includes(m.type)) scene.onEvent(m);           // anything else: ignored, no throw
 }, () => { if (pending && !room) game.send(pending); });       // the request made while the socket was down
 

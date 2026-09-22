@@ -1039,3 +1039,80 @@ Asked for: a small notice in the top-right corner when someone starts watching y
 - Page: `ui.watcherNote(name)` puts a small white card with the eye icon (the watchers pill's) in the top-right corner, over the camera inset, for ~3.6 s; three at most stack, and `ui.notesOff()` clears them on the way back to the lobby. It says "Sam is watching", or "Someone is watching" with no name. Spectators never see these cards.
 - A player sitting down already raised the bottom toast; its copy changes from "Sam joined" to "Sam is here to play" (2.6 s instead of 2.2), so it reads differently from the watching card.
 - test/watcher.test.mjs (WATCHER_PORT, default 8355) covers the server side. test/menu.mjs and test/rooms-e2e.mjs expect the new copy; menu.mjs was already crashing at line 244 on main before this change.
+
+## 70. A lob burns white, only a smash burns red, and a bet no longer flashes red
+- "Big lobs report a red streak ... lobs should be plain white ... a lot of shots being classified as red." The trail's colour
+  was a function of n alone, and `kind` (sent on every hit) was only used for the smash flourish. A hard scoop is a lob at high n
+  (live-play-3: 27 rad/s, n 0.75, kind 'lob'), so it burned red and, past 0.76, wore the embers, the fat flame and the phone's
+  double flare too.
+- Why so much red, measured on data/*.jsonl (63 real strokes at >= 9 rad/s, through motion.js and the client gate):
+  - The BET. Every swing is struck on its first report, capped at SMASH (game.js), and trailHeat(0.76) was pure red: 60% of real
+    hits flashed full red at impact, on screen and on the phone. The phone's `n >= SMASH_N` also gave every one of them the
+    smash's double flare.
+  - The ramp reached red at n 0.59, below the smash line: settled strokes were 37% red, 8 of those 23 not smashes.
+- Now the colour is the SHOT's, not the swing's: `shownN(n, kind)` (scene.js, used by main.js for the phone) is 0 for a lob or
+  dink (rgb 255,255,255), n for a smash, and min(n, SMASH_N) for everything else. Only a smash can pass SMASH_N, and the red,
+  the embers and the flame all key on that line. Bots and the title demo's lob-ish arc follow the same rule.
+- New ramp (scene.js trailHeat = pad.js trailRGB, checked equal for n 0..1): below SMASH_N it stops at orange, `0.70 *
+  ((n - 0.06) / 0.70)^0.8`: 0.18 cream, 0.30 pale yellow, 0.52 amber, 0.76 deep orange (u 2.1, 255,118,30). A smash steps up
+  past it so the line is visible (graded to red: see below). Every red is a real smash (was: 37% red, 0 pale).
+- The bet: the hit now says `bet: 1`, and the client shows it at min(n, 0.3), pale yellow. The settled re-aim's launch sets
+  the real colour (it carries n and kind); if none comes in 0.3 s the ball really flies at the bet, so the display falls back
+  to the bet's own shown n. The phone does the same with a 300 ms timer in main.js and a 'tint'. Its tint gate was a fixed
+  300 ms after the flash, which dropped every late tint (0.3 s + two hops); it now recolours while the flash is still running.
+- The phone's double flare is strict `n > SMASH_N` now. The buzz keeps the stroke's force: the padfx relay carries `b`, the raw
+  n, beside the shown n, so a hard lob buzzes hard and glows white. A human's smash only ever reaches the phone as a 'tint' (the
+  flash went out on the bet, pale), and a tint used to just recolour: no human smash ever double-flared. Now a tint past SMASH_N
+  cancels the running flash and starts the smash flare, once (`glowAnim.smash`), with no second buzz.
+- Red graded inside the smash band. Stepping every smash straight to u 2.6 (255,68,24) left 24% of strokes red, because every
+  smash was red. SMASH stays 0.76 (pace, labels, flourish unchanged); the colour runs `0.8 + 0.2 f^2`, f = (n - 0.76) / 0.19:
+  orange-red 255,89,27 just over the line (the capped drive is 255,118,30), 255,57,23 at n 0.9, pure red 255,31,20 from
+  SMASH_RED 0.95 (scene.js and pad.js). Replayed data/*.jsonl (63 settled strokes >= 9 rad/s, client lob/slice maths, chop
+  bonus, shotKind, shownN), by u: white/pale 42%, yellow-amber 29%, orange 6%, orange-red 10%, red (u >= 2.85) 14%. Most
+  smashes really are at full power (chop adds 0.2: 11 of 15 at n >= 0.9), so fewer reds than this means raising SMASH itself.
+- test/trail-shots.mjs gained three rows: a lob at n 0.9 (white), a bet re-aimed to 0.2 (pale), a bet left alone (falls back
+  to orange). bet, reaim, kitchen and pad tests pass; server.test.mjs fails the same way on an untouched HEAD copy (teleport
+  timing and scoring under load).
+
+## 71. The hardest flat drives curl in the air, on purpose
+- "For the hardest shots possible, they need to curve in the air. I know there's a bug like that right now, but I want you to
+  try to make it intentional, only for the harder shots." The "bug" is 63's re-aim bend: a hit struck on the bet and bent onto
+  the settled swing. It is kept exactly as 63 tamed it (FIX_SHARE 0.5, 0.1-0.45 s, settled report only): it is still what
+  honours the real power (landing moved p50 0.8 m). The curl is a separate thing, and from above it is a smooth bow, never a kink.
+- What it is: a constant sideways pull c (m/s^2) until the first bounce, a second gravity lying on its side (CURVE in game.js).
+  Everything stays closed form: solve() starts the ball `c T / 2` wide of its line (`v[0] = (tx - px) / T - c T / 2`), and the
+  pull brings it back onto the same marker at T. The bow is `c T^2 / 8` at mid-flight. sim() adds it exactly per tick
+  (`v += c dt; p += v dt - c dt^2 / 2`), planFootwork the same at 120 Hz, and web/scene.js coast() adds `c t^2 / 2`. c rides on
+  the hit, launch and state packets (`c`, only while it is non-zero and before the bounce), so the client has no copy of CURVE.
+- Who curls: `w = smooth(n, 0.8, 0.97) * flat(lob) * (1 - lofted) * curl`, c = w * min(24, 8 * 0.6 / T^2): a bow of 0.6 m at
+  full power, nothing at n 0.8, 0.13 / 0.38 / 0.58 m at n 0.85 / 0.9 / 0.95. About the top 10% of real settled swings (captures:
+  p90 0.79). Never: a lob or scoop, a serve (sw.floor, and every auto-serve / reset launch passes curl 0), a bet (it is capped
+  at SMASH and passes curl 0 anyway: CURVE.from is its own number so moving SMASH for the colours can never make a bet curl),
+  a block or punch (n < PUSH.full). Every prediction (tests, badwifi) calls solve() with curl 0 unless it asks for it.
+- Which way: in toward the middle, a banana (it leaves wide and hooks back). A real slice curls the way its bounce will kick,
+  a ball aimed at the middle bends away from the hitter's side, else the forehand way. Deterministic: the server's c is the
+  only one. Hooking in also slows it sideways at the bounce, and the REACH clamp in solve() counts the extra c T / 2.
+- A human curls LATE. Every real swing is struck on its bet and the settled report comes ~100 ms after, so a hard human drive
+  starts curling at the re-aim, and easeAim() eases onto the curled path over 63's same share (its target just carries the
+  `c T / 2` offset from where the ball is). Sized like a struck ball (bow 0.6 over the flight LEFT) the ease ate most of it:
+  0.26 m from contact at full power, one ball-width, less than half a bot's and weaker than the accidental re-aim bend. So
+  reaim() asks solve() for CURVE.late (2) x the bow, capped at CURVE.lateMax (30 m/s^2, inside solve's min so the REACH clamp
+  sees it). An x-only model of the ease (bet straight for 100 ms, then easeAim's equal shares) picked it: late 2 gives about 0.40-0.57
+  m from contact over 0.6-1.1 s flights. Holding the pull off until the ease ends gave a bigger bow for the same c but a 45-80
+  m/s^2 spike on the last ease tick. Measured live (test/curve.test.mjs): bot-style final full-power drive bow 0.58-0.60 m; a bet
+  settled at full power bow 0.50 m from the baseline, 0.47-0.63 m from 3 m, lands within 0.09 m. The shape is the physics of
+  bending a ball into a C from its current velocity and still landing on the spot: the ease swings it out, the pull hooks it in.
+- Kink on the real captures (test/reaim.mjs, live-play-1, now subtracting the curl's own steady pull): straight hits p50
+  0.13 / p90 0.37 m/s, curled hits p50 0.79, max 1.05 (4 of 16 hits; bow p50 0.46, max 0.65 m). That is the price of the late
+  bow: at late 1 the curled hits were p50 0.43, max 0.92 with bow p50 0.24.
+- The client: coast()'s prediction between every pair of live packets is within 1.3 cm on curled shots (the ease is not in
+  coast), and no packet steps over 0.3 m. test/coast.test.mjs flies curled launches too; badwifi's rally uses them.
+- Bots: always final, so they curl from contact. Only Pro can (power 0.45-0.95): about 30% of its drives, bows 0-0.58 m on
+  the ramp above (never the full 0.6, which needs n 0.97). Club (0.25-0.65) and Rookie (0.10-0.40) never curl.
+- Knobs: CURVE.bow (0.6) for everything, CURVE.late (2) / lateMax (30) for a human's re-aimed curl only. Lower late for a
+  softer flick (1.5 is about 0.37 m from contact).
+- test/curve.test.mjs: in process, 750 full-power launches from everywhere curl (bow >= 0.6 m), land within 0.08 m sideways,
+  keep the top of the bounce inside 3.25 (the late curl too, c <= lateMax); no curl for n 0.79, a lob, a serve, a block; it
+  hooks inward and grows with n. Live: the above (a bet settled at full power bows >= 0.45 m from contact), plus a full-power
+  lob and a power-20 drive never carry c. "On the marker" live is sideways < 0.12 m and < 0.3 m in all: the 60 Hz sim sees the
+  landing a tick late, up to ~0.25 m along a fast drive whether it curls or not, and a 0.2 m limit failed ~5% of finals.

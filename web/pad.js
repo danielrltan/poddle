@@ -99,26 +99,27 @@ function quit() {
 $('again').addEventListener('click', start);      // changed their mind, or hit it by accident: straight back to playing
 
 // ---------- what the tab says back ----------
-// The screen flash on a hit (the whole screen, brightest at the edges), in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (n stretched over 0.03..SMASH_N,
-// then white -> yellow -> orange -> red). Change one, change both.
-const SMASH_N = 0.76, lerp = (a, b, t) => a + (b - a) * t;
-function trailRGB(n) { const u = 3 * Math.pow(Math.max(0, Math.min(1, (n - 0.03) / (SMASH_N - 0.03))), 0.7);
+// The screen flash on a hit (the whole screen, brightest at the edges), in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (white -> yellow ->
+// orange up to SMASH_N, red only past it; n is already scene.js shownN, so a lob comes in as 0 = white). Change one, change both.
+const SMASH_N = 0.76, SMASH_RED = 0.95, lerp = (a, b, t) => a + (b - a) * t, cl = v => Math.max(0, Math.min(1, v));
+function trailRGB(n) { const u = 3 * (n > SMASH_N ? 0.8 + 0.2 * Math.pow(cl((n - SMASH_N) / (SMASH_RED - SMASH_N)), 2) : 0.70 * Math.pow(cl((n - 0.06) / (SMASH_N - 0.06)), 0.8));
   const g = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2), b = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2);
   return `rgb(255 ${Math.round(g * 255)} ${Math.round(b * 255)})`; }
 let glowAnim = null, glowAt = -1e9;
 function glow(n, fresh) {
   const el = $('glow'); if (!el || !el.animate) return; n = Math.max(0, Math.min(1, n));
-  if (!fresh && performance.now() - glowAt > 300) return;      // a late recolour after the flash has gone: nothing to show
-  el.style.setProperty('--c', trailRGB(n)); el.style.setProperty('--n', n.toFixed(2)); if (!fresh) return;
+  if (!fresh && !(glowAnim && glowAnim.playState === 'running')) return;      // a late recolour after the flash has gone: nothing to show (a bet's tint comes 0.3 s + two hops after it: a fixed 300 ms dropped them all)
+  el.style.setProperty('--c', trailRGB(n)); el.style.setProperty('--n', n.toFixed(2));
+  const smash = n > SMASH_N;      // a smash flares twice (strict: every bet and every capped drive sits at exactly SMASH_N, and 60% of real swings double-flared)
+  if (!fresh && !(smash && !glowAnim.smash)) return;      // a human's smash is only ever a tint (the flash went out on the bet, pale): it restarts as the smash's flare, once, no second buzz
   glowAt = performance.now(); if (glowAnim) glowAnim.cancel();
-  const smash = n >= SMASH_N;      // a smash flares twice
   glowAnim = el.animate(smash ? [{ opacity: 0 }, { opacity: 1, offset: 0.04 }, { opacity: 0.35, offset: 0.3 }, { opacity: 0.95, offset: 0.38 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0.9 + 0.1 * n, offset: 0.05 }, { opacity: 0.55 + 0.3 * n, offset: 0.3 }, { opacity: 0 }],
-    { duration: smash ? 900 : 420 + 380 * n, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    { duration: smash ? 900 : 420 + 380 * n, easing: 'cubic-bezier(.2,.7,.3,1)' }); glowAnim.smash = smash;
 }
 window.__glow = glow;      // test/pad-glow shots
 const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '' };
 function fx(m) {
-  if (m.fx === 'hit') { try { navigator.vibrate && navigator.vibrate(20 + Math.round(50 * (m.n || 0))); } catch { /* no buzzer (iOS) */ }
+  if (m.fx === 'hit') { try { navigator.vibrate && navigator.vibrate(20 + Math.round(50 * (m.b != null ? m.b : m.n || 0))); } catch { /* no buzzer (iOS) */ }
     glow(m.n || 0, true); }
   else if (m.fx === 'tint') glow(m.n || 0, false);      // the settled swing, a moment after the hit went out on the early guess: recolour, no second buzz
   else if (m.fx === 'point') { try { navigator.vibrate && navigator.vibrate([30, 60, 30]); } catch { /* same */ } }

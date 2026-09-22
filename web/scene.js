@@ -6,21 +6,22 @@ const G = 9.81, BALL_R = 0.11;
 // ---------- riding out a bad connection ----------
 // The server owns the ball. Between packets the client only has to know where that ball is NOW, and between hits a ball
 // is pure physics, so every client works out the same answer. coast() is the server's own flight (spin-lightened
-// gravity, the first bounce with its spin and sideways kick), in closed form, for up to COAST_MAX seconds with no news.
+// gravity, a hard drive's sideways curl until the first bounce, the first bounce with its spin and sideways kick), in closed
+// form, for up to COAST_MAX seconds with no news. The curl c (m/s^2) is the server's own number, sent on hit/launch/state.
 // The next packet or hit event is the truth again; nothing here decides a hit, a bounce call or a point.
 const COAST_MAX = 0.6;
 const FLOOR = { up: 0.7, along: 0.78 }, SPUN = { lift: 0.3, up: 0.55, along: 0.45 };       // = BOUNCE / SLICE in server/game.js
 // coast(), but it will not carry the ball through the far player. With no news for over 100 ms and the ball arriving at
 // their paddle (farZ, signed), the likeliest truth is that they are hitting it: wait there for the packet. Guessing wrong
 // costs a short pause at the baseline; flying on costs a ball metres behind them that then has to come all the way back.
-export function coastTo(outP, outV, p, v, age, spin, bounces, kick, farZ) {
-  coast(outP, outV, p, v, age, spin, bounces, kick);
+export function coastTo(outP, outV, p, v, age, spin, bounces, kick, farZ, curl = 0) {
+  coast(outP, outV, p, v, age, spin, bounces, kick, curl);
   const s = Math.sign(farZ);
   if (age <= 0.1 || !s || v[2] * s <= 0 || outP.z * s < farZ * s) return;
   let lo = 0.1, hi = age;
-  coast(outP, outV, p, v, lo, spin, bounces, kick); if (outP.z * s >= farZ * s) return;      // already there in the last packet's own 100 ms
-  for (let i = 0; i < 10; i++) { const mid = (lo + hi) / 2; coast(outP, outV, p, v, mid, spin, bounces, kick); if (outP.z * s < farZ * s) lo = mid; else hi = mid; }
-  coast(outP, outV, p, v, lo, spin, bounces, kick);
+  coast(outP, outV, p, v, lo, spin, bounces, kick, curl); if (outP.z * s >= farZ * s) return;      // already there in the last packet's own 100 ms
+  for (let i = 0; i < 10; i++) { const mid = (lo + hi) / 2; coast(outP, outV, p, v, mid, spin, bounces, kick, curl); if (outP.z * s < farZ * s) lo = mid; else hi = mid; }
+  coast(outP, outV, p, v, lo, spin, bounces, kick, curl);
 }
 
 // A ball hanging for the serve is not falling: the server floats it after the server's hand and sends its real drift as
@@ -47,12 +48,12 @@ export function serverClock() {
       return Math.max(arrived - COAST_MAX * 1000, t * 1000 + m);
     } };
 }
-export function coast(outP, outV, p, v, t, spin, bounces, kick) {
+export function coast(outP, outV, p, v, t, spin, bounces, kick, curl = 0) {
   let x = p[0], y = p[1], z = p[2], vx = v[0], vy = v[1], vz = v[2], b = bounces;
   for (let i = 0; i < 2 && t > 0; i++) {
     const g = b ? G : G * (1 - SPUN.lift * spin), disc = vy * vy + 2 * g * Math.max(0, y - BALL_R), tf = (vy + Math.sqrt(disc)) / g;    // time until it reaches the floor
-    const step = Math.min(t, tf);
-    x += vx * step; z += vz * step; y += vy * step - 0.5 * g * step * step; vy -= g * step; t -= step;
+    const step = Math.min(t, tf), a = b ? 0 : curl;          // the curl pulls sideways until the first bounce (server/game.js CURVE), exactly as the sim does
+    x += vx * step + 0.5 * a * step * step; vx += a * step; z += vz * step; y += vy * step - 0.5 * g * step * step; vy -= g * step; t -= step;
     if (step < tf) break;
     y = BALL_R;
     if (b) { vx = vy = vz = 0; break; }                    // a second bounce ends the rally; that call is the server's: wait on the floor
@@ -62,7 +63,11 @@ export function coast(outP, outV, p, v, t, spin, bounces, kick) {
   outP.set(x, Math.max(BALL_R, y), z); outV.set(vx, vy, vz);
 }
 
-const SMASH_N = 0.76;                     // = SMASH in server/game.js: n above this is a smash
+const SMASH_N = 0.76, SMASH_RED = 0.95;  // SMASH_N = SMASH in server/game.js: n above this is a smash. SMASH_RED: where its trail turns pure red
+// The power the trail SHOWS (NOTES 70): a lob or dink is a soft shot however hard the scoop, so it burns white; only a called smash may pass
+// SMASH_N, which the red, the embers and the flame all key on (a hard flat drive tops out at orange). main.js sends the phone the same value.
+export const shownN = (n, kind) => kind === 'lob' || kind === 'dink' ? 0 : kind === 'smash' ? n : Math.min(n, SMASH_N);
+const BET_SHOW = 0.3;                     // a hit struck on the early bet shows pale yellow until the settled swing (or 0.3 s of silence) says what it was: 60% of real bets sit at the 0.76 cap
 const PADDLE_SCALE = 1.6;                 // Wii-sized so it reads from 5 m behind
 const VIEW_PARALLAX = 1;                  // head-coupled camera strength: 0 = locked-off, 1 = full
 const VIEW = { x: 1.7, y: 0.45, back: 2.2, tau: 0.22 };   // eye travel (m) at viewer = 1: sideways, up, drift back; follow time (s)
@@ -94,10 +99,13 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = t => t * t * (3 - 2 * t);
 const sgn = side => (side === 0 ? 1 : -1);
 const damp = (dt, tau) => 1 - Math.exp(-dt / tau);
-// The trail's heat: n -> 0..1 along white -> yellow -> orange -> red. Real swings sit low (live captures, settled n: median 0.06, p75 0.27,
-// p90 0.61), so the ramp is stretched over n 0.03..SMASH_N with a gamma: 0.15 is yellow, 0.35 amber, 0.55 deep orange, red is a smash.
-// web/pad.js trailRGB is this same ramp (the phone's edge glow): change one, change both.
-const trailHeat = n => Math.pow(clamp((n - 0.03) / (SMASH_N - 0.03), 0, 1), 0.7);
+// The trail's heat: n -> 0..1 along white -> yellow -> orange -> red (u = 3*heat). Real strokes (data/*.jsonl, 63 at >= 9 rad/s, settled n:
+// p25 0.25, median 0.44, p75 0.79) used to hit red at n 0.59, so 37% burned red and 8 of those 23 were not smashes. Now below SMASH_N the ramp
+// stops at orange (0.18 cream, 0.30 pale yellow, 0.52 amber, 0.76 -> u 2.1 deep orange). A smash steps over into orange-red (u 2.4, 255,89,27)
+// and only burns pure red near full power (u^2 ramp to 3.0 at SMASH_RED 0.95; n 0.9 is 255,57,23): stepping straight to u 2.6 put every smash
+// in the red and kept it at 24% of strokes. Settled strokes now (u bands): white/pale 42%, yellow-amber 29%, orange 6%, orange-red 10% (the
+// lighter smashes), red 14%. Lobs never get here (shownN). web/pad.js trailRGB is this same ramp.
+const trailHeat = n => n > SMASH_N ? 0.8 + 0.2 * Math.pow(clamp((n - SMASH_N) / (SMASH_RED - SMASH_N), 0, 1), 2) : 0.70 * Math.pow(clamp((n - 0.06) / (SMASH_N - 0.06), 0, 1), 0.8);
 function trailRamp(t, out) { const u = 3 * t;                // -> out = [r, g, b], 0..1
   out[0] = 1; out[1] = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2); out[2] = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2); return out; }
 function rng(seed) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -458,7 +466,7 @@ export function createScene(containerEl) {
   const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new THREE.Vector3(0, 1, 0), vel: new THREE.Vector3(), lastBy: -1,
     spin: 0, cool: 0, pulse: 0,                                      // backspin of a sliced ball (0..1) and the trail tint easing toward it
     core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false,
-    bounces: 0, kick: 0, held: false };                              // what coast() needs beyond p and v; they ride on the state packet
+    bounces: 0, kick: 0, curl: 0, held: false };                              // what coast() needs beyond p and v; they ride on the state packet
   const clock = serverClock(), madeAt = clock.madeAt;   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
   // attract: the endless rally behind the menus (docs/NEXT.md 11). All of it lives here: no server, no score, no sound.
   const at = { on: false, t: 0, rnd: null, by: 0, p: [0, 1, 0], v: [0, 0, 0], t0: 0, spin: 0, kick: 0, n: 0, hitAt: 0, hitP: [0, 1, 0], swung: false,
@@ -760,7 +768,7 @@ export function createScene(containerEl) {
     else if (b.live) {
       const age = clamp((now - b.stamp) / 1000, 0, b.held ? HOVER_MAX : COAST_MAX), far = pads[1 - localSide];
       if (b.held) hover(vA, b.vel, b.p, b.v, age);
-      else coastTo(vA, b.vel, b.p, b.v, age, b.spin, b.bounces, b.kick, far && far.has ? far.pos.z : 0);
+      else coastTo(vA, b.vel, b.p, b.v, age, b.spin, b.bounces, b.kick, far && far.has ? far.pos.z : 0, b.curl);
       if (b.blend) {                                       // a hit moved the truth (a late swing meets the ball where it WAS): the drawn ball takes the new
         b.blend = false; b.err.copy(b.pos).sub(vA);        // velocity on this frame and slides onto the new path, instead of teleporting
         const e = b.err.length(); if (e > 5) b.snap = true; else { b.core.copy(vA); b.errT = 0; b.errDur = clamp(0.08 + 0.05 * e, 0.08, 0.18); }
@@ -797,6 +805,7 @@ export function createScene(containerEl) {
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
     b.cool += ((b.live && !b.held ? b.spin : 0) - b.cool) * damp(dt, 0.08);
+    if (b.betN != null && timeS > b.betUntil) { b.power = b.betN; b.betN = null; }      // no settled re-aim came: the ball really flies at the bet, show it
     b.hot = (b.hot || 0) + ((b.live ? b.power || 0 : 0) - (b.hot || 0)) * damp(dt, 0.05);      // a hit sets it outright (onEvent); this only glides a re-aim, and cools it when the rally is over
     if (b.live && b.hot > SMASH_N) { b.ember = (b.ember || 0) + dt;      // embers and the fat flame are the smash's own (they started at n 0.55-0.6, the OLD smash line: drives at 21-27 rad/s wore them too)
       if (b.ember > 0.028) { b.ember = 0; burst([b.pos.x, b.pos.y, b.pos.z], 0.2, 3, 1.6, [0xff5a1f, 0xffb340, 0xfff0a0]); } }
@@ -1009,8 +1018,9 @@ export function createScene(containerEl) {
   function onEvent(m) {
     if (!m || !m.type || at.on) return;
     if (m.type === 'launch') {
-      ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k;
-      if (m.n != null && isFinite(m.n)) ball.power = clamp(+m.n, 0, 1);      // a re-aim: the hit went out on the early bet, this is the settled swing. The trail burns for THAT (a tap that was called 30 rad/s loses its flame)
+      ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k; if (isFinite(m.c)) ball.curl = +m.c;      // c: a settled hard swing starts curling from here (the next state packet carries it too)
+      if (m.kind) ball.kind = m.kind;      // before the power: a re-aim into a smash (or into a lob) is shown as one
+      if (m.n != null && isFinite(m.n)) { ball.power = shownN(clamp(+m.n, 0, 1), ball.kind); ball.betN = null; }      // a re-aim: the hit went out on the early bet, this is the settled swing. The trail burns for THAT (a tap that was called 30 rad/s loses its flame)
       if (m.kind === 'smash' && ball.seen) { if (timeS - smashAt > 0.3) igniteFx(m.by, ball.spin, hitLook(m.by)[0]); trail.glow = 1; }      // the settled swing, up to 0.25 s after the hit: the ball takes fire (unless the impact itself was already called a smash)
       if (m.land && !menu) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
         marker.material.color.set(0xffffff); }      // white wherever it lands: the yellow for "coming to ME" read as a warning against the court's own yellows (NOTES 61)
@@ -1022,13 +1032,15 @@ export function createScene(containerEl) {
       ring(p, false, 0.05 * rs, (1.0 + n * 1.3) * rs, 0.5, tmpC.set(0xffd23a).lerp(tmpD.set(0x9fe3ff), sp), 0.55);
       burst(p, n, 22 + Math.round(n * 30), 3.6 + n * 6.5, [tmpC.set(0xfff6b0).lerp(tmpD.set(0xbfe9ff), sp).getHex(), tmpC.set(0xffd23a).lerp(tmpD.set(0x5ad1ff), sp).getHex(), 0xffffff], -sgn(m.side) * (2.5 + n * 4));
       cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * sk);
-      flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = ball.hot = n;      // the trail takes this shot's colour at once, not eased up from the last one
+      ball.kind = m.kind || 'drive'; ball.betN = m.bet ? shownN(n, ball.kind) : null; ball.betUntil = timeS + 0.3;
+      const shown = shownN(m.bet ? Math.min(n, BET_SHOW) : n, ball.kind);      // ring, shake and pock stay on n (the stroke's force); the colour is the shot's
+      flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = ball.hot = shown;      // the trail takes this shot's colour at once, not eased up from the last one
       if (m.kind === 'smash') smashFx(p, m.side, m.spin, rs, sk);
       ball.spin = clamp(+m.spin || 0, 0, 1);
-      trail.glow = 0.8 + 0.2 * n; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
+      trail.glow = 0.8 + 0.2 * shown; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
         ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now());
-        ball.bounces = 0; ball.kick = +m.k || 0; ball.held = false; }
+        ball.bounces = 0; ball.kick = +m.k || 0; ball.curl = +m.c || 0; ball.held = false; }
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
       sfx.pock(n, p[0]); if (m.spin > 0.12 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.2 * Math.min(1, m.spin) ** 1.5, 0.11, 0.004);   // spin hisses off the face, as loud as there is spin: 0.5 -> 0.07, 0.8 -> 0.14, 1 -> 0.2
     } else if (m.type === 'swung') {
@@ -1042,7 +1054,7 @@ export function createScene(containerEl) {
       burst([p[0], 0.06, p[2]], 0, 5, 1.2, [0xd8e6f5, 0xffffff]);
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       sfx.bounce(p[0]);
-    } else if (m.type === 'serve') { ball.snap = true; ball.spin = 0; ball.power = 0; trail.glow = 0.35; }
+    } else if (m.type === 'serve') { ball.snap = true; ball.spin = 0; ball.curl = 0; ball.power = 0; ball.kind = ball.betN = null; trail.glow = 0.35; }
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }
@@ -1065,7 +1077,7 @@ export function createScene(containerEl) {
     if (!p || !v || at.on) return;                         // m optional: the state packet itself ({ t, b, k, serving }), for the clock and for coast()
     if (isFinite(spin) && spin != null) ball.spin = clamp(+spin, 0, 1);
     if (live && !ball.live) ball.snap = true;
-    if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.held = m.serving != null; }
+    if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.curl = +m.c || 0; ball.held = m.serving != null; }
     ball.p = p; ball.v = v; ball.live = !!live; ball.ext = tMs != null; ball.stamp = tMs == null ? madeAt(m ? +m.t : NaN, performance.now()) : tMs;
     if (live) ball.seen = true;
   }
@@ -1092,7 +1104,8 @@ export function createScene(containerEl) {
     }
     coast(aP, aV, from, v, best, spin, 0, kick);
     Object.assign(at, { by, p: [from[0], from[1], from[2]], v, t0, spin, kick, n: [0.5, 0.12, 0.3][arc] + r() * 0.1, hitAt: t0 + best, hitP: [aP.x, aP.y, aP.z], swung: false });
-    ball.spin = spin; ball.power = ball.hot = at.n; ball.lastBy = by; trail.glow = Math.max(trail.glow, 0.45 + 0.4 * at.n);
+    const shown = arc === 2 ? 0 : at.n;      // the demo's lobs burn white like the real ones
+    ball.spin = spin; ball.power = ball.hot = shown; ball.lastBy = by; trail.glow = Math.max(trail.glow, 0.45 + 0.4 * shown);
     st.shots++; st.net = Math.min(st.net, over); if (Math.abs(tx) > court.halfW - 0.399 || Math.abs(tz) > court.halfL - 0.399 || over < 0.25) st.out++;
     const go = (side, to, a, b, bh) => { const t = pads[side].tgt; Object.assign(at.run[side], { from: [t.x, t.y, t.z], to, t0: a, t1: b, bh }); };
     const bh = r() < 0.35;                                  // the paddle waits beside the ball: a touch inside it for a forehand, well outside for a backhand (the hit's reach closes the rest)

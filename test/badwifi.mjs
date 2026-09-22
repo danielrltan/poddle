@@ -15,20 +15,21 @@ const DT = 1 / 60, V = () => ({ x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; thi
 const packets = []; let t = 0;
 { let side = 0, p = [1, 0.9, 6.2], sol = S.solve(p, side, 0.5, 0.2, 0.1, 0), v = [...sol.v], b = 0, shot = 0;
   while (packets.length < 60 * 180) {
-    packets.push({ t, p: [...p], v: [...v], b, spin: sol.spin, kick: sol.kick, shot, to: 1 - side });
-    v[1] -= (b ? S.G : S.gOf(sol.spin)) * DT; for (let i = 0; i < 3; i++) p[i] += v[i] * DT;
+    packets.push({ t, p: [...p], v: [...v], b, spin: sol.spin, kick: sol.kick, curl: b ? 0 : sol.curl, shot, to: 1 - side });
+    const c = b ? 0 : sol.curl; v[0] += c * DT;                                    // a hard flat drive curls until it bounces (NOTES 71), exactly as sim() flies it
+    v[1] -= (b ? S.G : S.gOf(sol.spin)) * DT; for (let i = 0; i < 3; i++) p[i] += v[i] * DT; p[0] -= 0.5 * c * DT * DT;
     if (p[1] < S.R) { p[1] = S.R; if (b) S.bounceV(v, 0, 0); else S.bounceV(v, sol.spin, sol.kick); b++; }
     t += DT;
     const rs = side === 0 ? -1 : 1;                                                 // the receiver's end
     if (p[2] * rs >= 6.2 || b >= 2) {                                               // it got there: hit it back
       side = 1 - side; shot++; b = 0; p[0] = Math.max(-3, Math.min(3, p[0])); p[1] = Math.max(0.5, Math.min(1.6, p[1]));
-      sol = S.solve(p, side, 0.2 + rnd() * 0.8, rnd() * 2 - 1, rnd() < 0.2 ? 0.8 : 0.1, rnd() < 0.3 ? rnd() * 2 - 1 : 0); v = [...sol.v];
+      sol = S.solve(p, side, 0.2 + rnd() * 0.8, rnd() * 2 - 1, rnd() < 0.2 ? 0.8 : 0.1, rnd() < 0.3 ? rnd() * 2 - 1 : 0, null, 1); v = [...sol.v];
     }
   }
 }
 const _P = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, _V = { set() {} };
 const truthAt = ts => { const i = Math.max(0, Math.min(packets.length - 1, Math.floor(ts / DT + 1e-9))), q = packets[i];     // between ticks: the same flight, continued
-  coast(_P, _V, q.p, q.v, Math.max(0, ts - q.t), q.spin, q.b, q.kick); return { p: [_P.x, _P.y, _P.z], v: q.v, to: q.to, shot: q.shot }; };
+  coast(_P, _V, q.p, q.v, Math.max(0, ts - q.t), q.spin, q.b, q.kick, q.curl); return { p: [_P.x, _P.y, _P.z], v: q.v, to: q.to, shot: q.shot }; };
 
 function run(name, loss, stallMin, stallMax, jitter, every = 1) {
   const BASE = 30, FAR = -6.2; seed = 777;                          // the viewer is side 0 (z > 0); the other player stands at z = -6.2
@@ -43,7 +44,7 @@ function run(name, loss, stallMin, stallMax, jitter, every = 1) {
     const tr = truthAt((T - BASE) / 1000), q = latest, dir = Math.sign(q.v[2]) || 1, draw = {};
     { const age = Math.min(0.1, Math.max(0, (T - stampOld) / 1000));                                   // OLD: fresh on arrival, 100 ms of straight line plus gravity, then stop
       draw.old = [q.p[0] + q.v[0] * age, Math.max(0.11, q.p[1] + q.v[1] * age - 0.5 * 9.81 * age * age), q.p[2] + q.v[2] * age]; if (T - stampOld > 100) frozen.old++; }
-    { const age = Math.min(0.6, Math.max(0, (T - stampNew) / 1000)); coastTo(P, Vv, q.p, q.v, age, q.spin, q.b, q.kick, FAR); draw.neu = [P.x, P.y, P.z]; if (T - stampNew > 600) frozen.neu++; }
+    { const age = Math.min(0.6, Math.max(0, (T - stampNew) / 1000)); coastTo(P, Vv, q.p, q.v, age, q.spin, q.b, q.kick, FAR, q.curl); draw.neu = [P.x, P.y, P.z]; if (T - stampNew > 600) frozen.neu++; }
     for (const k of K) {
       const d = draw[k], e = Math.hypot(d[0] - tr.p[0], d[1] - tr.p[1], d[2] - tr.p[2]); err[k].push(e);
       if (tr.to === 0 && tr.p[2] > 0) inc[k].push(e);                                                   // coming at me, on my half: what I time my swing on

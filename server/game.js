@@ -87,6 +87,15 @@ const BOUNCE = { up: 0.7, along: 0.78 };
 // Then it bites: the first bounce stays low, loses most of its forward speed and kicks a little the way it was aimed.
 // lift is mirrored in web/scene.js SPUN (the client's coast() flies the same curve): change both or neither. skid is server-only.
 const SLICE = { lift: 0.3, skid: 0.12, up: 0.55, along: 0.45, kick: 3.4, clear: 0.15, at: 0.45 };   // kick: sideways m/s the bounce throws the ball — a spinning ball does not come off the floor straight. at: sliced() above this is CALLED a slice
+// Curl: the hardest flat drives bend in the air (NOTES 71). A constant sideways pull until the first bounce, like a second gravity
+// lying on its side, so every flight stays closed form: solve() starts the ball c T / 2 wide of its line and the bow brings it back
+// onto the marker, c T^2 / 8 off the chord at mid-flight. Sized for a bow of `bow` m (c = 8 bow / T^2, at most max m/s^2), smoothly
+// from n `from` to `full`. Its own threshold on purpose: SMASH and the trail colours may move, and a bet (capped at SMASH) never curls.
+// c rides on the hit / launch / state packets as `c`, so web/scene.js coast() needs no copy of these numbers.
+// late: a human's shot only starts curling at the settled re-aim (~100 ms in), and easeAim() spends half of what is left swinging it out
+// wide, so sized like a struck ball its bow from contact was 0.26 m at full power (one ball-width). reaim() asks for `late` x the bow,
+// capped at lateMax: ~0.45-0.5 m from contact over a 0.7-0.9 s flight. The ease's outward push is the price (reaim.mjs kink, NOTES 71).
+const CURVE = { from: 0.8, full: 0.97, bow: 0.6, max: 24, late: 2, lateMax: 30 };
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
 const SERVE_AHEAD = 0.55;                 // it wants to sit this far in front of the paddle
 const SERVE_DEAD = [0.4, 0.2, 0.35];      // x,y,z slack: move this far from it and it stays exactly where it is
@@ -200,7 +209,7 @@ function bounceV(v, spin, kick) {
 
 // blk (near the net): { depth, w } — blend the block curve's landing w of the way in. The flight is the ordinary one for
 // this power, so nothing about the arc jumps: only where it comes down moves.
-function solve(p, side, n, dir, lob, slice, blk) {
+function solve(p, side, n, dir, lob, slice, blk, curl = 0) {   // curl: 1 lets a hard flat drive bend (a struck, settled swing); serves, bets and every prediction pass 0
   const s = sgn(side);
   let tx = s * clamp(dir * 2.4, -2.5, 2.5);
   // The stroke decides the shot, the way it does on a real court:
@@ -222,10 +231,17 @@ function solve(p, side, n, dir, lob, slice, blk) {
   // 0.73 s became 0.76 s). So a smash takes the exact fastest flight that clears: never slower than before, as fast as the net lets it be.
   const v = [0, 0, 0]; T = fly(v, px, py, pz, tx, tz, T, g, lerp(0.25, SLICE.clear, spin), top > 0 && !u);
   // wide balls keep drifting after the bounce; pull the target in so the top of the bounce stays within REACH
-  const ta = lerp(BOUNCE.up, SLICE.up, spin) * (g * T - v[1]) / G, k = lerp(BOUNCE.along, SLICE.along, spin) * ta / T, xc = tx + (tx - px) * k + kick * ta;
-  const late = Math.abs(v[0]) * DT;                            // the 60 Hz sim lands up to a tick after this closed form, a tick further out: fast wide drives topped out at 3.27 m (test/server.test.mjs sweep allows 3.25)
-  if (Math.abs(xc) + late > REACH) { tx = (Math.sign(xc) * (REACH - late) - kick * ta + px * k) / (1 + k); v[0] = (tx - px) / T; }
-  return { v, land: [tx, tz], T, spin, kick };
+  // curl: a lob, a slice-lifted float or a soft drive never bends. It hooks in toward the middle (a banana: it leaves wide and comes back):
+  // a real slice bends the way it will kick, a ball to the middle away from the hitter's side, else the forehand way. Deterministic, so
+  // the server's c is the only one there is. Curling inward also slows the ball sideways at the bounce, which only helps REACH below.
+  const w = smooth(n, CURVE.from, CURVE.full) * flat(lob) * (1 - u) * Math.min(curl, 1);   // curl > 1 (reaim's CURVE.late) scales the bow, not the ramp
+  const cs = spin > SLICE.at && kick ? Math.sign(kick) : Math.abs(tx) >= 0.4 ? -Math.sign(tx) : Math.abs(px) >= 0.2 ? -Math.sign(px) : s;
+  const c = w > 0 ? cs * w * Math.min(curl > 1 ? CURVE.lateMax : CURVE.max, 8 * CURVE.bow * curl / (T * T)) : 0;   // inside the cap, so the REACH clamp below sees the real c T / 2
+  v[0] -= 0.5 * c * T;                                         // starts wide of its line and the pull hooks it back onto the marker exactly at T
+  const ta = lerp(BOUNCE.up, SLICE.up, spin) * (g * T - v[1]) / G, al = lerp(BOUNCE.along, SLICE.along, spin), k = al * ta / T, xc = tx + (tx - px) * k + (kick + al * c * T / 2) * ta;   // it lands moving (tx - px) / T + c T / 2 sideways
+  const late = Math.max(Math.abs(v[0]), Math.abs(v[0] + c * T)) * DT;   // the 60 Hz sim lands up to a tick after this closed form, a tick further out: fast wide drives topped out at 3.27 m (test/server.test.mjs sweep allows 3.25)
+  if (Math.abs(xc) + late > REACH) { tx = (Math.sign(xc) * (REACH - late) - (kick + al * c * T / 2) * ta + px * k) / (1 + k); v[0] = (tx - px) / T - 0.5 * c * T; }
+  return { v, land: [tx, tz], T, spin, kick, curl: c };
 }
 
 // the velocity (into v) that lands on (tx, tz) T seconds from now; T grows until the ball clears the net. Returns T.
@@ -255,7 +271,7 @@ function createRoom(code, pub) {
   let now = clock;                          // ROOM time: state.t, hit.t and every timer in here. It stands still while paused or holding a seat, so serveBy, swing windows and the bot freeze for free
   let started = false, firstServe = 0;      // has a ball been struck in this match (before that a leaver just leaves); who served first (the next match alternates)
   let over = null, hold = null, paused = null, slow = null;   // over: { winner, forfeit, votes, until, names }  hold: { side, until, said }  paused: { by, until }  slow: { side, until, said } a seat calibrating mid-match   (until = wall clock ms)
-  const ball = { spin: 0, kick: 0, aim: null, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
+  const ball = { spin: 0, kick: 0, curl: 0, aim: null, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
   const score = [0, 0]; let revived = null;
   let server = 0, serveAt = Infinity, tick = 0;     // who serves next; when (sim time); steps taken
   let counting = null;                              // the count into a new match: { until (sim time), said (the last whole second told) }
@@ -268,27 +284,31 @@ function createRoom(code, pub) {
   let namesSent = '';
   function tellNames(skip) { const n = names(), s = JSON.stringify(n); if (s !== namesSent) { namesSent = s; broadcast({ type: 'names', names: n }, skip); } }   // whenever a seat changes hands (skip: whoever just read them in their welcome)
 
-  function launch(side, n, dir, lob, hit, slice, blk) {
-    const sol = solve(ball.p, side, n, dir, lob, slice, blk);
+  function launch(side, n, dir, lob, hit, slice, blk, curl = 0) {     // curl: only strike() passes 1 (see solve)
+    const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
     ball.p[1] = Math.max(ball.p[1], R);
-    ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
+    ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
     planFootwork(1 - side);
-    if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
-    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin });
+    if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
+    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, c: sol.curl });
   }
 
   // A corrected power arrived just after the hit. Never swap the velocity: steer onto the new landing spot over FIX_EASE.
-  function reaim(side, n, dir, lob, slice, kind, blk) {
-    const sol = solve(ball.p, side, n, dir, lob, slice, blk);
+  // curl: the settled swing is the first that may bend it (a bet never does), so a hard one curls from here: easeAim brings the
+  // velocity onto the curled path over the same share of the flight, and the pull runs from now. Sized CURVE.late x the flight that is
+  // left: the ease eats most of a bow sized to it alone, and the one that shows is the bow from contact.
+  function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
+    const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl && CURVE.late);
     ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
-    ball.spin = sol.spin; ball.kick = sol.kick;
+    ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl;
     planFootwork(1 - side, sol.v);
-    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
+    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick, c: sol.curl, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
   }
   const aimV = [0, 0, 0];
   function easeAim() {
     const a = ball.aim;
     a.T = fly(aimV, ball.p[0], Math.max(ball.p[1], R), ball.p[2], a.land[0], a.land[1], Math.max(a.T, 0.1), gOf(ball.spin), a.clear);
+    aimV[0] -= 0.5 * ball.curl * a.T;                                         // the curl's own offset, from here: the last share still lands on the marker
     for (let i = 0; i < 3; i++) ball.v[i] += (aimV[i] - ball.v[i]) / a.k;   // equal shares: the last one lands exactly on the solution
     a.T -= DT;
     if (--a.k <= 0) { ball.aim = null; planFootwork(1 - a.side); }
@@ -311,7 +331,9 @@ function createRoom(code, pub) {
     const p = [...ball.p], v = [...(vel || ball.v)]; let bounced = false;
     pl.zT = s * HIT_LINE; pl.contact = null; pl.botSwung = false; pl.react = now + 0.3; pl.err = (Math.random() - 0.5) * 0.6;     // react/err: bot only
     for (let t = 0; t < 4; t += 1 / 120) {
-      v[1] -= (bounced ? G : gOf(ball.spin)) / 120; for (let i = 0; i < 3; i++) p[i] += v[i] / 120;
+      const c = bounced ? 0 : ball.curl;
+      v[0] += c / 120; v[1] -= (bounced ? G : gOf(ball.spin)) / 120; for (let i = 0; i < 3; i++) p[i] += v[i] / 120;
+      p[0] -= 0.5 * c / 14400;                                   // the curl, exactly as sim() flies it
       if (p[1] < R) { if (bounced) break; p[1] = R; bounceV(v, ball.spin, ball.kick); bounced = true; }
       if (bounced && (v[1] <= 0 || p[2] * s >= Z_FAR - STANCE)) { pl.zT = s * clamp(p[2] * s + STANCE, Z_NEAR, Z_FAR); pl.contact = [p[0], p[1]]; break; }
     }
@@ -320,7 +342,7 @@ function createRoom(code, pub) {
   function reset(by) {
     const s = sgn(by), pl = bySide(by);
     for (const p of players) { p.swing = p.lunge = p.servePending = p.hit = null; p.blockRun = 0; }   // a fresh point: nothing left to correct, and the held-paddle box is forgiving again
-    ball.live = true; ball.bounces = 0; ball.spin = 0;          // the last rally's slice must not ride on the hanging ball (clients drew its spin streaks on the serve)
+    ball.live = true; ball.bounces = 0; ball.spin = 0; ball.curl = 0;          // the last rally's slice must not ride on the hanging ball (clients drew its spin streaks on the serve)
     if (SWING_SERVE && pl) {                                     // the ball floats in front of the server until they swing at it
       ball.serving = by; ball.lastHit = 1 - by;
       ball.hang = serveSpot(pl); ball.hv = [0, 0, 0]; ball.drag = [false, false, false]; hangBall(0);
@@ -365,7 +387,7 @@ function createRoom(code, pub) {
     // Near the net the whole range is one curve: hold the paddle up and the ball comes off it, add a push and the return
     // walks out with it. The ball ALWAYS leaves at the power of the swing that struck it, first report or settled: a swing
     // is the one thing that may never wait (NOTES 64). A settled report that disagrees bends it after, as for any other shot.
-    const w = blockWeight(pl, sw);
+    const w = blockWeight(pl, sw), bet = sw.final === false;   // bet: struck on the first report, the settled one may still bend it
     const spd = sw.spd != null ? sw.spd : Math.hypot(ball.v[0], ball.v[1], ball.v[2]);
     const push = w > 0 && sw.n < PUSH.full ? blockShot(sw.n, spd) : null;
     const n = push ? lerp(sw.n, push.n, w) : sw.n, blk = push ? { depth: push.depth, w } : null;
@@ -373,7 +395,7 @@ function createRoom(code, pub) {
     // a block may be corrected too now (its own window: see fixBlock). floor: a serve's correction keeps the serve floor
     pl.swing = null; pl.hit = { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind, blk: push ? { w, spd } : null, near: w, spd, held: !!sw.held };
     pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
-    launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind }, sw.slice, blk);
+    launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind, bet: bet ? 1 : undefined }, sw.slice, blk, sw.floor || bet ? 0 : 1);      // bet: the client shows it cool until the settled swing (or its absence) says what it was
   }
   // The settled report for a shot that was struck on the near-net curve: put it where that power belongs on the same curve.
   function fixBlock(pl, n, dir, lob, slice) {
@@ -381,7 +403,7 @@ function createRoom(code, pub) {
     const b = w > 0 && n < PUSH.full ? blockShot(n, h.spd) : null;
     const out = b ? lerp(n, b.n, w) : n, kind = b && w >= 0.5 ? pushKind(out) : shotKind(n, lob, slice), changed = kind !== h.kind;
     Object.assign(h, { n, dir, lob, slice, kind, held: false, blk: b ? { w, spd: h.spd } : null });
-    reaim(pl.side, out, dir, lob, slice, changed ? kind : undefined, b ? { depth: b.depth, w } : null);
+    reaim(pl.side, out, dir, lob, slice, changed ? kind : undefined, b ? { depth: b.depth, w } : null, h.floor ? 0 : 1);   // settled: a hard one from up here curls too (a push under PUSH.full never can)
   }
 
   // a fresh pair (human+human or human+bot): clean score, first serve
@@ -724,7 +746,7 @@ function createRoom(code, pub) {
         else if (me.hit && !me.hit.near && final && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
           && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
           const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
-          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
+          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined, undefined, me.hit.floor ? 0 : 1);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
         }
         return;
       }
@@ -757,7 +779,7 @@ function createRoom(code, pub) {
     const paddles = [null, null];
     for (const pl of players) paddles[pl.side] = { x: pl.x, y: pl.y, z: pl.z, q: pl.q, bot: pl.bot, wait: ready(pl) ? undefined : true, status: statusOf(pl) || undefined };   // wait: still calibrating. status: 'calibrating' | 'paused' | 'away' (both only sent while set)
     const srv = ball.live && ball.serving != null && bySide(ball.serving);
-    const packet = JSON.stringify({ type: 'state', t: now, p: ball.p, v: ball.v, spin: ball.spin, b: ball.bounces, k: ball.kick, live: ball.live, serving: ball.serving, reach: srv ? serveReach(srv) : false, score, paddles,
+    const packet = JSON.stringify({ type: 'state', t: now, p: ball.p, v: ball.v, spin: ball.spin, b: ball.bounces, k: ball.kick, c: ball.curl && !ball.bounces ? ball.curl : undefined, live: ball.live, serving: ball.serving, reach: srv ? serveReach(srv) : false, score, paddles,
       watchers: spectators.size, paused: frozen || undefined });   // reach: the server could serve it right now. paused (only sent while true): t stands still, by a pause or a held seat; late joiners see it too
     tick++;
     for (const pl of players) if (pl.ws) stateTo(pl.ws, packet);
@@ -813,8 +835,10 @@ function createRoom(code, pub) {
       }
     } else if (ball.live) {
       if (ball.aim) easeAim();
-      ball.v[1] -= (ball.bounces ? G : gOf(ball.spin)) * DT;
+      const c = ball.bounces ? 0 : ball.curl;
+      ball.v[0] += c * DT; ball.v[1] -= (ball.bounces ? G : gOf(ball.spin)) * DT;
       for (let i = 0; i < 3; i++) ball.p[i] += ball.v[i] * DT;
+      ball.p[0] -= 0.5 * c * DT * DT;                            // exact for a constant pull: the same x as solve()'s and coast()'s closed form, tick for tick
       remember();
     }
 
@@ -999,7 +1023,7 @@ wss.on('connection', (ws, req) => {
     if (ws.pad && m.type !== 'ping') return padMessage(ws, m);
     if (m.type === 'ping') return tell(ws, { type: 'pong', c: Number.isFinite(m.c) ? m.c : 0, t: ws.room ? ws.room.time() : clock });   // the client times the round trip itself (in the lobby too). c is echoed only as a number
     if (m.type === 'net') return void (ws.every = num(m.hz, 60) <= 30 ? 2 : 1);   // a struggling link asks for half the state packets; it is the link's, so it follows the socket from room to room
-    if (m.type === 'padfx') { const p = ws.padCode && pads.get(ws.padCode); if (p && PAD_FX.has(m.fx)) tell(p, { type: 'fx', fx: m.fx, n: clamp(num(m.n, 0), 0, 1) }); return; }
+    if (m.type === 'padfx') { const p = ws.padCode && pads.get(ws.padCode); if (p && PAD_FX.has(m.fx)) tell(p, { type: 'fx', fx: m.fx, n: clamp(num(m.n, 0), 0, 1), b: m.b != null ? clamp(num(m.b, 0), 0, 1) : undefined }); return; }      // b: the stroke's force for the buzz, n the colour it shows (a hard lob buzzes hard and glows white)
     if (m.type === 'padcode') return padHost(ws, String(m.code || ''));
     if (typeof m.name === 'string') ws.name = cleanName(m.name);   // rides on quick / create / join / watch / name. Strings only, like every other field
     if (ws.room) {
@@ -1045,4 +1069,4 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (going) retu
   for (const ws of wss.clients) { try { if (ws.readyState === 1) ws.send('{"type":"restart"}'); } catch { /* it is leaving anyway */ } }
   setTimeout(() => process.exit(0), 50); });                      // the frames are handed to the kernel within a tick and it sends them after we are gone; any longer and a test that restarts on the same port finds it taken
 
-module.exports = { COURT, ZONE, BOUNCE, SLICE, G, R, PASSED, solve, shotKind, bounceV, gOf };   // test/server.test.mjs sweeps solve() directly
+module.exports = { COURT, ZONE, BOUNCE, SLICE, CURVE, G, R, PASSED, solve, shotKind, bounceV, gOf, flat, smooth };   // test/server.test.mjs sweeps solve() directly
