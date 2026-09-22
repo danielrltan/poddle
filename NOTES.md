@@ -993,13 +993,19 @@ Build log. What we tried, what broke, and how each problem was solved.
   bounces back while a slow one of the same depth does not. That is what makes rapid crouching funny, and it needs
   nothing to recognise a crouch first. Three dips inside a second each is then named as a taunt and played up with a
   shoulder shimmy, because somebody was always going to do it.
-- Deliberately NOT filtered. `pd.pos.y` already carries a 20 Hz link and a 55 ms lerp, which passes a three-a-second bob
-  at about 70 % — just enough. Any smoothing here would have ironed it flat.
+- Deliberately NOT filtered here, because there is already plenty upstream and none of it is ours to undo: bodytrack's
+  one-euro filter on the raw face y, main.js's 0.085 s smooth-damp before the 20 Hz send, and scene.js's own 55 ms lerp
+  on arrival. The 55 ms lerp alone passes a three-a-second bob at about 70 %; the END-TO-END figure, from a real head in
+  front of a real camera to a drawn avatar, has NOT been measured — `stance.mjs` drives `pd.pos.y` directly and so skips
+  the first two entirely. If a fast bob turns out mushy on a real camera, the slack is in one of those two, not here.
+  What is certain is only that adding another filter at this end would have made it worse.
 - Two things had to move to make it work, and both are worth knowing about:
   - The avatar's feet were direct children of its root, so sinking the root sank the shoes into the paint. Everything
     above the ankles now hangs off an inner `upper` group, and the whole stance — the sink, the squash, the waist lean,
-    the extra roll into a lunge — is applied there. The root keeps its original small lean and roll untouched, so the
-    avatar at the baseline is pixel-for-pixel what it always was.
+    the extra roll into a lunge — is applied there. The root keeps its original small lean and roll untouched, so a
+    standing avatar is within a few mm of what it always was — not identical, though: the ground clamp lifts the feet
+    4.5 mm out of the paint, and aiming the gaze from the real head height instead of a hardcoded 1.6 m tips a standing
+    head a couple of degrees further down when the ball is close.
   - The shoes are then put back on the court analytically: an ellipsoid long in z, on a body that leans and rolls, has a
     lowest point that moves with all three, and a lunging foot is far enough out from the root that the roll alone
     scuffed it several cm under. Solving for that point is also the only reason a tiptoe pivots on the toes instead of
