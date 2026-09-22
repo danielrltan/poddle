@@ -77,7 +77,7 @@ const BLOCK = { within: 5.0, x: 0.95, y: 0.8, front: 0.5, behind: 0.3, volley: 5
 // n 0.4 to exactly n 0.12 and then jump to a full drive). A paddle held still returns held[0] m of the incoming ball,
 // held[1] m when it arrives at spd[1] and there is pace to give back; push, and the landing walks smoothly out to the
 // drive's own depth at full. Above full the shot is the ordinary one, so the two meet exactly.
-const PUSH = { full: 0.45, bet: 0.2, fix: 0.35, gate: 0.3, late: 0.2, nudge: 0.18, rate: 7.5, bounce: 3.6, fade: 1.2, name: 0.14, floor: [0.03, 0.12], held: [1.6, 1.9], spd: [6, 20] };
+const PUSH = { full: 0.45, fix: 0.35, gate: 0.3, late: 0.2, nudge: 0.18, rate: 7.5, bounce: 3.6, fade: 1.2, name: 0.14, floor: [0.03, 0.12], held: [1.6, 1.9], spd: [6, 20] };
 const REACH_X = 1.0, REACH_Y = 0.5;          // extra metres of reach for a full-effort swing
 const ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 };   // contact box around the paddle
 const BOUNCE = { up: 0.7, along: 0.78 };
@@ -363,24 +363,24 @@ function createRoom(code, pub) {
   }
   function strike(pl, sw) {
     // Near the net the whole range is one curve: hold the paddle up and the ball comes off it, add a push and the return
-    // walks out with it. An early report (a bet) overshoots badly, so at the net it strikes soft and the settled one raises it.
-    const w = blockWeight(pl, sw), bet = sw.final === false;
-    const nIn = w >= 0.5 && bet ? Math.min(sw.n, PUSH.bet) : sw.n;   // only where the shot really is block-shaped: out at the edge it is a drive, and a drive's bet is corrected the usual way
+    // walks out with it. The ball ALWAYS leaves at the power of the swing that struck it, first report or settled: a swing
+    // is the one thing that may never wait (NOTES 64). A settled report that disagrees bends it after, as for any other shot.
+    const w = blockWeight(pl, sw);
     const spd = sw.spd != null ? sw.spd : Math.hypot(ball.v[0], ball.v[1], ball.v[2]);
-    const push = w > 0 && nIn < PUSH.full ? blockShot(nIn, spd) : null;
-    const n = push ? lerp(nIn, push.n, w) : nIn, blk = push ? { depth: push.depth, w } : null;
+    const push = w > 0 && sw.n < PUSH.full ? blockShot(sw.n, spd) : null;
+    const n = push ? lerp(sw.n, push.n, w) : sw.n, blk = push ? { depth: push.depth, w } : null;
     const kind = sw.kind || (push && w >= 0.5 ? pushKind(n) : shotKind(n, sw.lob, sw.slice));
     // a block may be corrected too now (its own window: see fixBlock). floor: a serve's correction keeps the serve floor
-    pl.swing = null; pl.hit = { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind, blk: push ? { w, spd } : null, held: !!sw.held };
+    pl.swing = null; pl.hit = { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind, blk: push ? { w, spd } : null, near: w, spd, held: !!sw.held };
     pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
     launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind }, sw.slice, blk);
   }
   // The settled report for a shot that was struck on the near-net curve: put it where that power belongs on the same curve.
   function fixBlock(pl, n, dir, lob, slice) {
-    const h = pl.hit, w = h.blk.w, full = n >= PUSH.full;
-    const b = full ? null : blockShot(n, h.blk.spd);
+    const h = pl.hit, w = h.near || 0;
+    const b = w > 0 && n < PUSH.full ? blockShot(n, h.spd) : null;
     const out = b ? lerp(n, b.n, w) : n, kind = b && w >= 0.5 ? pushKind(out) : shotKind(n, lob, slice), changed = kind !== h.kind;
-    Object.assign(h, { n, dir, lob, slice, kind, held: false });
+    Object.assign(h, { n, dir, lob, slice, kind, held: false, blk: b ? { w, spd: h.spd } : null });
     reaim(pl.side, out, dir, lob, slice, changed ? kind : undefined, b ? { depth: b.depth, w } : null);
   }
 
@@ -713,8 +713,10 @@ function createRoom(code, pub) {
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
         if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice, final });              // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power)
         // A shot struck on the near-net curve: only the SETTLED report may move it along that curve, never another bet.
-        else if (me.hit && me.hit.blk && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) fixBlock(me, pw, dir, lob, slice);
-        else if (me.hit && !me.hit.blk && final && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
+        // Struck near the net: the ball is already away at the swing's own power, and only a SETTLED report may bend it.
+        // Its gate is the near one (PUSH.gate): from up there the ball passes the rally gate of 1 m before any report lands.
+        else if (me.hit && me.hit.near > 0 && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) fixBlock(me, pw, dir, lob, slice);
+        else if (me.hit && !me.hit.near && final && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
           && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
           const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
           Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)

@@ -13,7 +13,7 @@ function player(o) {
   const ws = new WebSocket('ws://localhost:' + PORT), P = { ws, side: null, shots: [], ws0: null, ...o }; let cool = 0;
   ws.on('message', raw => { const m = JSON.parse(raw);
     if (m.type === 'welcome') P.side = m.side;
-    if (m.type === 'hit' && m.side === P.side) P.shots.push({ kind: m.kind, n: m.n, land: null, at: Date.now() });
+    if (m.type === 'hit' && m.side === P.side) P.shots.push({ kind: m.kind, n: m.n, hitN: m.n, land: null, at: Date.now() });
     if (m.type === 'launch' && m.by === P.side) { const s = P.shots[P.shots.length - 1]; if (s) { s.land = -m.land[1] * (P.side === 0 ? 1 : -1); if (m.kind) s.kind = m.kind; if (m.n != null) s.n = m.n; } }
     if (m.type !== 'state' || P.side == null) return;
     const me = m.paddles[P.side], s = P.side === 0 ? 1 : -1, mine = m.live && m.v[2] * s > 0;
@@ -57,17 +57,19 @@ for (const h of held) console.log(`       held paddle, hand at ${h.rate} rad/s -
 ok(held[0].n >= 2, `a paddle held up with no swing blocks the ball back (${held[0].n} blocks, ${held[0].kinds.join('/')})`);
 ok(held[1].land > held[0].land + 0.2, `a shove into it, still under the swing trigger, sends it deeper: ${held[0].land.toFixed(2)} -> ${held[1].land.toFixed(2)} m`);
 
-// ---- 3. an early report that overshoots never fires a deep ball on its own; the settled one still counts ----
-for (const [bet, settled, want] of [[33, 8, 'soft'], [33, 30, 'deep']]) {
+// ---- 3. the swing NEVER waits: the ball leaves at the power of the swing that struck it, and the settled report bends
+// it afterwards. A first report that overshoots used to be struck soft and raised later, which read as lag on every swing.
+for (const [bet, settled, deeper] of [[33, 30, true], [33, 8, false]]) {
   const A = feed(), B = player({ lean: 2.8, at: 1.2, swing: ws => {
     ws.send(JSON.stringify({ type: 'swing', power: bet, dir: 0, lob: 0.1, age: 80, final: false }));
     setTimeout(() => ws.send(JSON.stringify({ type: 'swing', power: settled, dir: 0, lob: 0.1, fix: true, final: true })), 150);
   } });
   await wait(9000);
-  const ls = land(B), hit = B.shots.filter(s => s.land != null);
-  const struck = avg(hit.map(s => s.land));
-  if (want === 'soft') ok(hit.length > 0 && ls.every(l => l < 3.2), `bet ${bet} settling at ${settled}: stays short, ${ls.map(l => l.toFixed(2)).join(', ')} m`);
-  else ok(hit.length > 0 && struck > 3.2, `bet ${bet} settling at ${settled}: the settled push still lands deep, ${struck.toFixed(2)} m`);
+  const hit = B.shots.filter(s => s.land != null);
+  const struckAt = avg(B.shots.map(s => s.hitN).filter(n => n != null));      // the power the ball actually LEFT at
+  ok(hit.length > 0 && struckAt > 0.6, `a first report of ${bet} strikes at once and at its own power: n ${struckAt.toFixed(2)} on the hit (never held back)`);
+  const landed = avg(hit.map(s => s.land));
+  ok(deeper ? landed > 3.2 : landed < 4.6, `settling at ${settled}: the landing follows, ${landed.toFixed(2)} m`);
   A.ws.close(); B.ws.close(); await wait(400);
 }
 

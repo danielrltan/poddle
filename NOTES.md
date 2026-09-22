@@ -935,3 +935,18 @@ Build log. What we tried, what broke, and how each problem was solved.
   with the bot 2.5 s away, brought it to Matt). Now a real leave clears it at once — score, `started` and any revived score
   go with the leaver. A seat that only DROPPED is not a leaver: it is held for 15 s and keeps its score for the reconnect,
   as it always has (the point in play is replayed). Reconnecting inside that window is coming back, not joining.
+
+## 66. A swing never waits: the ball leaves at the power of the swing that struck it (fixes the lag 56 introduced)
+- "Holy shit there's such a delay now to each swing. Surely you can come up with a solution that doesn't impose any delay on
+  the swing. You can't compromise a key mechanic like that."
+- Cause, mine, from 56: a swing struck near the net on the client's FIRST report (a bet, which overshoots: called 30, settles
+  8) was clamped to n 0.2 and only raised to its real power when the settled report arrived. 63 then stretched that bend from
+  0.1 s to half the remaining flight. Measured on the live rules: a real 30 rad/s swing at the net left at 6.4 m/s and took
+  750-780 ms to reach full speed. Every near-net swing felt like mush, and after 56 that is where the rally lives.
+- Fix: strike() no longer caps anything. The ball leaves at the power of the swing that struck it, first report or settled,
+  exactly as everywhere else in the game. Measured after: it leaves at full speed within 15-18 ms, one tick.
+- The correction still happens, because it is the only part allowed to be late: a SETTLED report that disagrees bends the
+  ball afterwards (63's gentle bend). A near-net hit now uses the near gate (PUSH.gate 0.3 m, PUSH.fix 0.35 s) instead of the
+  rally gate of 1 m, which from 2.8 m out the ball passes before any report can land — without that the over-read ones could
+  never be pulled back. Measured: a bet of 33 settling at 30 lands 5.43 m, the same bet settling at 8 lands 2.20 m.
+- The lesson, which is worth keeping: a swing is the one thing that may never wait for a better answer. Correct it after.
