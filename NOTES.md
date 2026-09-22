@@ -597,3 +597,15 @@ Build log. What we tried, what broke, and how each problem was solved.
   a moment later arrives and a burst of 30 at once is dropped.
 - "For the share image you can make it say play pickleball with your phone or AirPod." og.jpg regenerated with
   "Play pickleball with your phone or AirPod!" (alt text to match, ?v=5).
+
+## 47. The phone's edges flare on a hit, in the ball trail's colour
+- "On the phone, when a hit is registered, make the screen edges glow / flash briefly, responsive and flashy, in the colour
+  of the ball trail for the strength of the hit."
+- pad.html has a full-screen `#glow` layer: a thick inset edge ring, a wide soft inner glow and a vignette, added as light
+  (`mix-blend-mode: plus-lighter`, like the trail's additive ribbon) so colours stay clean on the dark page. Its colour is
+  the trail's own ramp for the hit's power (scene.js drawTrail without the slice/smash-spin tints): near-white tap, yellow,
+  orange, red smash. Harder hits are wider and last longer (380-700 ms); a smash (n >= 0.76) flares twice over 800 ms.
+  It lights in about 25 ms (Web Animations, no class toggles), together with the buzz. The old whole-page olive flash is gone.
+- A hit goes out on the early guess and the settled swing can re-aim it within 0.25 s: the tab then sends `tint` (a new
+  padfx, allowed by the server) and the glow still on screen changes to the settled power's colour, with no second buzz.
+- `test/pad-e2e.mjs` checks my hit set the glow's colour.

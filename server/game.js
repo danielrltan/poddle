@@ -849,7 +849,7 @@ function quick(ws) {
 // MotionModel an AirPod would. The code is the tab's, not ours: after a restart both sides come back and find each other
 // again with nothing remembered here. A phone is no player: it is in no lobby and no room, and counts nowhere.
 const PAD_CODE = /^[A-HJ-NP-Z2-9]{6}$/, padHosts = new Map(), pads = new Map();      // code -> the tab's socket / the phone's socket
-const PAD_FX = new Set(['hit', 'point', 'cal', 'play', 'idle']);                     // what a tab may tell its phone (a buzz on contact, which step calibration is at)
+const PAD_FX = new Set(['hit', 'tint', 'point', 'cal', 'play', 'idle']);                     // what a tab may tell its phone (a buzz on contact, which step calibration is at)
 const vec = (v, n) => Array.isArray(v) && v.length === n && v.every(Number.isFinite);
 function padHost(ws, code) {                                   // a tab says which code its phone will use
   if (!PAD_CODE.test(code)) return;

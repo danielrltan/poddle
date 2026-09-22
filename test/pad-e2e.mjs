@@ -85,6 +85,7 @@ await sleep(1500); await desk.screenshot({ path: `${root}test/ui-shots/pad-3-cal
 s = await until(async () => { const v = await game(desk); return v.calibrated && v.phase === 'play' ? v : null; }, 25000, 'calibrated on phone samples');
 s = await until(async () => { const v = await game(desk); return v.swings >= 3 && v.myHits >= 1 ? v : null; }, 60000, 'swings are called and one connects');
 ok(s, `playing: ${s && s.swings} swings, ${s && s.myHits} of my hits, ${s && s.hits} hits in all`);
+const gl = await ph.evaluate(() => getComputedStyle(document.getElementById('glow')).getPropertyValue('--c').trim()); ok(/^rgb\(255 \d+ \d+\)$/.test(gl), `my hit flared the phone's edges in the trail colour (${gl})`);
 p = await phone(ph); ok(p.naming === 'zxy' && p.head === 'Swing!', `phone found the z,x,y naming (${p.naming}) and says "${p.head}"`);
 await ph.screenshot({ path: `${root}test/ui-shots/pad-4-phone-live-390x844.png` }); await desk.screenshot({ path: `${root}test/ui-shots/pad-4-court-1280x720.png` });
 

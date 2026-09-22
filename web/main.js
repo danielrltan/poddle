@@ -425,6 +425,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'point' && !m.final && live()) {
     if (spec()) ui.pointBanner(null, nameOf(m.winner === 1 ? 1 : 0), m.winner === 1 ? 1 : 0);
     else { const won = m.winner === side; ui.pointBanner(won, nameOf(m.winner === 1 ? 1 : 0)); if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); } }      // "Your point!" / "<name> scores", nothing else
+  if (m.type === 'launch' && m.by === side && m.n != null && !spec()) padFx('tint', m.n);      // my hit re-aimed on the settled swing: the phone's glow takes that power's colour
   if (SCENE_EVENTS.includes(m.type)) scene.onEvent(m);           // anything else: ignored, no throw
 }, () => { if (pending && !room) game.send(pending); });       // the request made while the socket was down
 

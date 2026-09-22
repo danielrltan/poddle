@@ -78,10 +78,27 @@ for (const [id, k] of [['btn-cal', 'c'], ['btn-center', 'r']]) { const b = $(id)
   b.addEventListener('contextmenu', e => e.preventDefault()); }
 
 // ---------- what the tab says back ----------
+// The edge glow on a hit, in the trail's colour for that power (the same ramp as scene.js drawTrail, before slice and smash tints).
+const SMASH_N = 0.76, lerp = (a, b, t) => a + (b - a) * t;
+function trailRGB(n) { const u = 3 * Math.max(0, Math.min(1, n));
+  const g = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2), b = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2);
+  return `rgb(255 ${Math.round(g * 255)} ${Math.round(b * 255)})`; }
+let glowAnim = null, glowAt = -1e9;
+function glow(n, fresh) {
+  const el = $('glow'); if (!el || !el.animate) return; n = Math.max(0, Math.min(1, n));
+  if (!fresh && performance.now() - glowAt > 300) return;      // a late recolour after the flash has gone: nothing to show
+  el.style.setProperty('--c', trailRGB(n)); el.style.setProperty('--n', n.toFixed(2)); if (!fresh) return;
+  glowAt = performance.now(); if (glowAnim) glowAnim.cancel();
+  const smash = n >= SMASH_N;      // a smash flares twice
+  glowAnim = el.animate(smash ? [{ opacity: 0 }, { opacity: 1, offset: 0.04 }, { opacity: 0.35, offset: 0.3 }, { opacity: 0.95, offset: 0.38 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0.85 + 0.15 * n, offset: 0.06 }, { opacity: 0 }],
+    { duration: smash ? 800 : 380 + 320 * n, easing: 'cubic-bezier(.2,.7,.3,1)' });
+}
+window.__glow = glow;      // test/pad-glow shots
 const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '' };
 function fx(m) {
   if (m.fx === 'hit') { try { navigator.vibrate && navigator.vibrate(20 + Math.round(50 * (m.n || 0))); } catch { /* no buzzer (iOS) */ }
-    document.body.classList.add('is-hit'); setTimeout(() => document.body.classList.remove('is-hit'), 140); }
+    glow(m.n || 0, true); }
+  else if (m.fx === 'tint') glow(m.n || 0, false);      // the settled swing, a moment after the hit went out on the early guess: recolour, no second buzz
   else if (m.fx === 'point') { try { navigator.vibrate && navigator.vibrate([30, 60, 30]); } catch { /* same */ } }
   else if (m.fx in FX_TEXT) { fxText = FX_TEXT[m.fx]; render(); }
 }
