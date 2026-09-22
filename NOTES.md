@@ -609,3 +609,10 @@ Build log. What we tried, what broke, and how each problem was solved.
 - A hit goes out on the early guess and the settled swing can re-aim it within 0.25 s: the tab then sends `tint` (a new
   padfx, allowed by the server) and the glow still on screen changes to the settled power's colour, with no second buzz.
 - `test/pad-e2e.mjs` checks my hit set the glow's colour.
+
+## 48. The court pill's menu is short enough to stay off the scoreboard
+- "The copy drop-down for the court code still clips into the left side scoreboard. You need to shorten the dropdown."
+- The HUD's court menu shows the two names only (Player link, Viewer link; the share screen's menu keeps its second lines)
+  and is only as wide as they are (at most 9.5rem). Measured at 1280, 1100, 1000, 901, 900, 700, 600 and 481 px wide, it
+  never reaches the scoreboard (at 1000 px it ends 46 px short). Below 480 px the board spans
+  the full width under the corner, so the open menu covers its top edge, drawn above it.
