@@ -699,3 +699,19 @@ Build log. What we tried, what broke, and how each problem was solved.
   and the HUD court pill's) lead each choice with an icon in the outline blue: a paddle for Player link, the watchers
   pill's eye for Viewer link. The pill's menu keeps names on one line and still ends before the "You" tab (measured
   1440 to 700 px wide: 19 px clear at 901 px, the tightest).
+
+## 53. The spin swirl is a true billboard; the serve cue has five arcs (supersedes the tilt in 51)
+- "You made the mistake of making it not a billboard, so it's hard to see the spin orientation as its edge is facing the
+  player." The swirl now lies flat in the screen of every camera and every draw (split view too). It still shows the real
+  spin w = up x D from the bounce (51), split into what can be seen from that camera:
+  - the part of w along the view is the TURN: anticlockwise or clockwise, as the ball really turns on this screen. Which way
+    has hysteresis (0.15) and is kept per draw, so a pure backspin seen from behind cannot flicker;
+  - the part across the view is how the ball's FACE moves on screen (w x toward-camera). The half of the ring that runs that
+    way stays bright and the other half fades to 10 % (a uniform set per draw, in a shader patch on the swirl's material),
+    so the wisps visibly sweep that way up one side of the ball. There is no sweep seen along the axis, and a full one across
+    it (from 35 % to 80 % across).
+- What each view shows (test/swirl-shots.mjs): receiving backspin, the wisps sweep UP the side of the ball (its face rolls up
+  and away, so it checks up); hitting it away, they sweep DOWN. From broadcast a backspin ball is a plain clockwise or
+  anticlockwise ring, the way it really turns. A real slice's kick adds the turn for the receiver: clockwise = kicks right,
+  anticlockwise = left, with the sweep up as well. Wildness and speed still scale with |D|.
+- Serve cue: five of the old white arcs (0.8 rad each, evenly spaced) instead of three.

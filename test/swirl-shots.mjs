@@ -30,12 +30,14 @@ async function shot(name, query, what, frames = 40) {
     const fx = d.scene.children.find(o => o.isMesh && o.geometry.attributes.color && o.geometry.attributes.color.itemSize === 4);
     if (what[0] === 'spin' && fx && fx.visible) {            // each draw of the frame (split view draws two, moving the one camera between them): the head's angle round the ball on that draw's screen
       const R = d.renderer, real = R.render.bind(R), P = fx.geometry.attributes.position, head = new THREE.Vector3(P.getX(1), P.getY(1), 0); let angs = [];
-      R.render = (scn, cam) => { real(scn, cam); const w = head.clone().applyMatrix4(fx.matrixWorld).project(cam), c = fx.position.clone().project(cam), toCam = cam.position.clone().sub(d.ball.pos).normalize(); angs.push([Math.atan2(w.y - c.y, (w.x - c.x) * cam.aspect), toCam]); };
+      R.render = (scn, cam) => { real(scn, cam); const w = head.clone().applyMatrix4(fx.matrixWorld).project(cam), c = fx.position.clone().project(cam), toCam = cam.position.clone().sub(d.ball.pos).normalize(); const u = fx.material.userData.sweep.value; angs.push([Math.atan2(w.y - c.y, (w.x - c.x) * cam.aspect), toCam, [u.x, u.y, u.z]]); };
       const frame = () => { angs = []; ms += 1000 / 60; F.step(1 / 60); F.push(ms); d.ball.spin = what[1]; d.ball.kick = what[2] || 0; d.ball.bounces = F.ball.bounces; sc.render(ms); return angs; };
       const A = frame(), B = frame(); R.render = real;
       const b = d.ball, cut = (0.45 - 0.78) * b.spin, D = new THREE.Vector3(b.vel.x * cut + b.kick, 0, b.vel.z * cut), axis = new THREE.Vector3(0, 1, 0).cross(D).normalize();
       out.push({ D: D.toArray().map(x => +x.toFixed(2)), draws: A.map(([a0, toCam], i) => { let da = B[i][0] - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
-        return { screenTurn: da > 0 ? 'anticlockwise' : 'clockwise', deg: +(da * 180 / Math.PI).toFixed(1), axisDotCam: +axis.dot(toCam).toFixed(2) }; }) }); }
+        const sw = A[i][2], sg = da > 0 ? 1 : -1, face = [-sw[1] * sg, sw[0] * sg], dir = Math.abs(face[0]) > Math.abs(face[1]) ? (face[0] > 0 ? 'right' : 'left') : face[1] > 0 ? 'up' : 'down';
+        return { screenTurn: da > 0 ? 'anticlockwise' : 'clockwise', deg: +(da * 180 / Math.PI).toFixed(1), axisDotCam: +axis.dot(toCam).toFixed(2), sweep: sw[2] > 0.1 ? dir + ' ' + sw[2].toFixed(2) : 'none' }; }) }); }
+    { const v2 = d.ball.pos.clone().project(d.camera); out[0] = (v2.x + 1) * 640; out[1] = (1 - v2.y) * 360; }   // where it is on the frame left up (after the two extra frames)
     if (what[0] === 'none') out.push({ swirl: !!(fx && fx.visible), spin: d.attract.spin, kick: d.attract.kick });
     return out; }, what, frames, +/t=([\d.]+)/.exec(query)[1]);
   await page.screenshot({ path: `${dir}${tag}-${name}.png` });
