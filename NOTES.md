@@ -575,3 +575,17 @@ Build log. What we tried, what broke, and how each problem was solved.
   the sensor dot sit together at the far end, as on the real phone.
 - pad.html's Start screen draws the same back of the phone (camera bar, lenses, flash) instead of the old edge-on slab,
   in its dark colours (pad.css .cam-*); the "edge up" arrow moved above the taller phone.
+
+## 45. The words say any computer and any phone; the AirPod is an extra, not the point
+- "Can you update the copy writing to reflect that this can work on non-iOS devices, phone is required if so? Remove any
+  text that implies exclusivity for Mac and AirPod / iOS devices."
+- Title, meta and share-card text lead with the phone: "Poddle | Pickleball You Swing With Your Phone", "Poddle: Pickleball
+  You Play With Your Phone", "Any computer, any phone, nothing to install". The title screen's tag is "Phone pickleball"
+  (was AirPod pickleball); its footer "Any computer, any phone, nothing to install: scan a code and your phone is the paddle"
+  (the "AirPods work too, on a Mac" line is gone from it). JSON-LD, noscript, manifest and README say Windows, macOS,
+  ChromeOS or Linux, with an iPhone or an Android phone; the AirPod stays, clearly as the Mac-only option.
+- How to play: What you need names Windows, Mac, Chromebook, Linux or iPad and iPhone or Android; the platform FAQ adds
+  Linux and says only the AirPod option needs a Mac. The AirPod section itself still says it needs a Mac, because it does.
+- The share image's line is now "Play pickleball with your phone!" (og.jpg regenerated, ?v=4). The copied invites say
+  "on any computer" instead of "or an AirPod". The non-https fallback no longer says "Poddle plays on a Mac".
+- `test/seo.test.mjs` now checks for the phone (and no AirPod in the titles) where it used to require AirPod.

@@ -30,7 +30,7 @@ ui.setServerAddress(GAME);
 const CAN_PHONE = HOSTED && location.protocol === 'https:' || qs.get('padtest') === '1';
 const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 600;
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
-else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'Poddle plays on a Mac. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
+else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
 const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 

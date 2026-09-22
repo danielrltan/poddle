@@ -1,6 +1,6 @@
 # Poddle 🏓
 
-**Wii-Sports-style pickleball where the controller is your phone, or an AirPod.**
+**Wii-Sports-style pickleball where the controller is your phone: any computer, iPhone or Android. On a Mac, an AirPod works too.**
 
 Open https://poddleball.com on a computer, scan the code with your phone, and swing it like a paddle: nothing to install.
 Play a friend online or the built-in bot.

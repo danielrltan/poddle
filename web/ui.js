@@ -453,7 +453,7 @@ export function setRoom(code, link = '') {
 export function backLabel(text) { for (const t of document.querySelectorAll('.screen .back-text')) setText(t, text); }      // 'Cancel' while a paddle swap mid-game can still be undone
 export function titleRoom(code, watch) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); setText($('title-room-spec'), watch ? '\u00a0as spectator' : ''); }     // opened from a shared link (&watch=1: 'as spectator')
 // What lands on the clipboard: a line to paste into a chat, then the link.
-const INVITE = { play: 'Play against me in Poddle! Pickleball you swing with your phone or an AirPod:', watch: 'Watch me play Poddle, pickleball with a phone or an AirPod as the paddle:' };
+const INVITE = { play: 'Play against me in Poddle! Pickleball you swing with your phone, on any computer:', watch: 'Watch me play Poddle, pickleball with your phone as the paddle:' };
 async function copyLink(btn, watch) {      // watch: the viewer link (&watch=1), which opens the court as a spectator
   let href = $('share-link').dataset.href; if (!href) return;
   if (watch) { const u = new URL(href); u.searchParams.set('watch', '1'); href = u.href; }

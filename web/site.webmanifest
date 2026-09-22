@@ -1,7 +1,7 @@
 {
-  "name": "Poddle: AirPod pickleball",
+  "name": "Poddle: phone pickleball",
   "short_name": "Poddle",
-  "description": "Poddle is a browser pickleball game where one AirPod in your hand is the paddle. Play friends online, play Matt the bot, or watch a match.",
+  "description": "Poddle is a browser pickleball game where your phone is the paddle, on any computer. Play friends online, play Matt the bot, or watch a match.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

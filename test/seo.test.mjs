@@ -17,7 +17,7 @@ try {
   const NOCACHE = 'no-cache', WEEK = 'public, max-age=604800';
   for (const [p, type, cache, file] of [['/', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/index.html', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/robots.txt', 'text/plain; charset=utf-8', NOCACHE, 'robots.txt'],
     ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'],
-    ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=3', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
+    ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=4', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
     ['/apple-touch-icon.png', 'image/png', WEEK, 'apple-touch-icon.png'], ['/icon-192.png', 'image/png', WEEK, 'icon-192.png'], ['/icon-512.png', 'image/png', WEEK, 'icon-512.png'],
     ['/main.js', 'text/javascript; charset=utf-8', NOCACHE, 'main.js'], ['/ui.css', 'text/css; charset=utf-8', NOCACHE, 'ui.css'], ['/vendor/three.min.js', 'text/javascript; charset=utf-8', 'public, max-age=86400', 'vendor/three.min.js']]) {
     if (!has(file)) { pending(`${p}: web/${file} is not yet rendered`); continue; }
@@ -56,8 +56,8 @@ try {
   console.log('home page head');
   const home = (await req('/')).body.toString(), attr = (tag, k, v, want = 'content') => { const m = [...home.matchAll(new RegExp(`<${tag}\\b[^>]*\\b${k}="${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`, 'g'))]; return m.map(x => (x[0].match(new RegExp(`\\b${want}="([^"]*)"`)) || [])[1]); };
   const one = (tag, k, v, want) => { const a = attr(tag, k, v, want); return a.length === 1 ? a[0] : null; };
-  { const titles = [...home.matchAll(/<title>([^<]*)<\/title>/g)].map(m => m[1]); ok(titles.length === 1 && titles[0].length >= 10 && titles[0].length <= 60 && /Poddle/.test(titles[0]) && /AirPod/.test(titles[0]), `one <title>, ${titles[0] && titles[0].length} chars: ${titles[0]}`);
-    const d = one('meta', 'name', 'description'); ok(d && d.length >= 70 && d.length <= 160 && /AirPod/.test(d) && /friends/.test(d), `one meta description, ${d && d.length} chars (70 to 160), says AirPod and friends`);
+  { const titles = [...home.matchAll(/<title>([^<]*)<\/title>/g)].map(m => m[1]); ok(titles.length === 1 && titles[0].length >= 10 && titles[0].length <= 60 && /Poddle/.test(titles[0]) && /phone/i.test(titles[0]) && !/AirPod/.test(titles[0]), `one <title>, ${titles[0] && titles[0].length} chars: ${titles[0]}`);
+    const d = one('meta', 'name', 'description'); ok(d && d.length >= 70 && d.length <= 160 && /phone/.test(d) && /any computer/i.test(d) && /friends/.test(d), `one meta description, ${d && d.length} chars (70 to 160), says phone, any computer and friends`);
     ok(one('link', 'rel', 'canonical', 'href') === ORIGIN + '/', `one canonical: ${attr('link', 'rel', 'canonical', 'href')}`);
     const robots = one('meta', 'name', 'robots'); ok(robots && /\bindex\b/.test(robots) && !/noindex/.test(robots), `meta robots: ${robots}`);
     ok(!home.includes('data:,'), 'the empty data: favicon is gone');
@@ -69,13 +69,13 @@ try {
     const img = /^https:\/\/poddleball\.com\/og\.jpg\?v=\d+$/; ok(img.test(og['og:image']) && og['og:image:secure_url'] === og['og:image'] && tw['twitter:image'] === og['og:image'], `share image is one absolute https URL with ?v=: ${og['og:image']}`);
     ok(og['og:image:width'] === '1200' && og['og:image:height'] === '630' && og['og:image:type'] === 'image/jpeg', 'og:image is declared 1200x630 image/jpeg');
     ok((og['og:title'] || '').length <= 60 && (og['og:description'] || '').length <= 110 && og['og:title'] === tw['twitter:title'] && og['og:description'] === tw['twitter:description'], `og:title ${(og['og:title'] || '').length} chars, og:description ${(og['og:description'] || '').length} chars, Twitter says the same`);
-    ok(/phone/.test(og['og:description'] || '') && /AirPod/.test(og['og:description'] || '') && /friends/.test(og['og:description'] || '') && og['og:title'] !== 'Poddle: your AirPod is the paddle', 'the card says phone, AirPod and friends, and its title does not repeat the line in the picture');
-    ok(/AirPod/.test(og['og:image:alt'] || ''), 'the image alt mentions the AirPod that is in the picture');
+    ok(/phone/.test(og['og:description'] || '') && !/AirPod/.test(og['og:title'] || '') && /friends/.test(og['og:description'] || '') && og['og:title'] !== 'Poddle: your AirPod is the paddle', 'the card says phone, AirPod and friends, and its title does not repeat the line in the picture');
+    ok(/with your phone/.test(og['og:image:alt'] || ''), 'the image alt quotes the card\'s line about the phone');
     ok((og['og:image:alt'] || '').length >= 20 && og['og:image:alt'].length <= 200 && og['og:image:alt'] === tw['twitter:image:alt'] && !/PENDING/.test(og['og:image:alt']), `image alt, ${(og['og:image:alt'] || '').length} chars: ${og['og:image:alt']}`);
     ok(!/twitter:site|twitter:creator/.test(home), 'no invented Twitter handle');
     const at = h => h == null ? null : new URL(h, ORIGIN + '/').pathname;      // relative on purpose, like ui.css and main.js: test/ui-next.mjs serves this page from /web/, and the live page is only ever at /
     ok(at(one('link', 'rel', 'manifest', 'href')) === '/site.webmanifest' && at(one('link', 'rel', 'apple-touch-icon', 'href')) === '/apple-touch-icon.png' && attr('link', 'rel', 'icon', 'href').map(at).join() === '/favicon.svg,/favicon-32.png', `icons and manifest resolve to the site root: ${attr('link', 'rel', 'icon', 'href').map(at)}`);
-    const readable = [titles[0], d, ...Object.values(og), ...Object.values(tw)].join(' ').replaceAll('Play pickleball using an AirPod!', ''); /* the share card's line is the owner's own wording, quoted in the alt text */ ok(!/[–—…!]|\b(simply|just|please|seamless|room)\b/i.test(readable), 'voice: no long dash, ellipsis, exclamation mark, filler or "room" in the head copy'); }
+    const readable = [titles[0], d, ...Object.values(og), ...Object.values(tw)].join(' ').replaceAll('Play pickleball with your phone!', ''); /* the share card's line is the owner's own wording, quoted in the alt text */ ok(!/[–—…!]|\b(simply|just|please|seamless|room)\b/i.test(readable), 'voice: no long dash, ellipsis, exclamation mark, filler or "room" in the head copy'); }
 
   console.log('structured data');
   { const blocks = [...home.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(m => m[1]); let parsed = []; try { parsed = blocks.map(b => JSON.parse(b)); } catch (e) { ok(false, 'JSON-LD does not parse: ' + e.message); }
@@ -92,7 +92,7 @@ try {
     const body = home.replace(/<noscript>[\s\S]*?<\/noscript>/g, ''), h1 = [...body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map(m => m[1].replace(/<[^>]+>/g, '').trim());
     const title = (body.match(/<section[^>]*id="screen-title"[\s\S]*?<\/section>/) || [''])[0], th1 = [...title.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map(m => m[1].replace(/<[^>]+>/g, ''));
     ok(th1.length === 1 && th1[0] === 'Poddle' && h1.length === 1, `one <h1> outside noscript, on the title screen, and its text is "${th1[0]}"${h1.length > 1 ? ' (others: ' + h1.slice(1).join(', ') + ')' : ''}`);
-    ok(/AirPod pickleball/.test(title) && /Nothing to install/.test(title) && (title.match(/<a\b[^>]*href="\/how-to-play\.html"[^>]*>How to play<\/a>/g) || []).length === 1, 'the title screen says AirPod pickleball, what you need, and links How to play');
+    ok(/Phone pickleball/.test(title) && /nothing to install/i.test(title) && (title.match(/<a\b[^>]*href="\/how-to-play\.html"[^>]*>How to play<\/a>/g) || []).length === 1, 'the title screen says Phone pickleball, what you need, and links How to play');
     ok(!/First to 11/.test(title), 'the title screen does not say First to 11'); }
 
   console.log('robots.txt, sitemap.xml');
