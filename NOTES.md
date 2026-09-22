@@ -628,3 +628,38 @@ Build log. What we tried, what broke, and how each problem was solved.
   **Screen**: Full screen, Show stats. Leave court sits at the foot in red. It fits a 1280x720 window without scrolling.
 - Spectators see Game only in the head and the Screen group (and Leave). Every id, handler and keyboard walk is as before;
   the Tab order follows the groups. `test/ui-next.mjs` expects the new row and Tab order.
+
+## 49. The ball trail's colour reads, and varies, with the hit's power; the slice's blue is gone
+- "Ball trail colours weren't really that visible / variable as I thought. It helps players visualize ball strength. I'm also
+  thinking of getting rid of the blue trail since we already have the spinning indicator on the ball itself."
+- Measured, not guessed (`node test/trail-shots.mjs <tag>`: the real scene at n 0.15 / 0.35 / 0.55 / 0.75 / 0.95, from the
+  player's end and the broadcast camera; it prints the colour the trail leaves on its pixels and how far it moved from the
+  power before). Four causes:
+  - The ramp was never entered. White -> yellow took n 0 - 0.33, orange 0.67, red 1.0; the swings in the live captures (every
+    detected movement, `test/real.mjs` on data/live-play-*.jsonl, 94 of them, twitches and wind-ups included) settle at median
+    n 0.06, p75 0.27, p90 0.61. Nearly everything drew white to pale yellow.
+  - Vertex colours are linear and the renderer writes sRGB, so the ramp was lifted on the way out: its orange (1, 0.5, 0.12)
+    drew as rgb(255 188 97), its red as a salmon rgb(255 97 79). (The phone's edge glow, NOTES 47, used the ramp as sRGB: it
+    never matched the screen.)
+  - Additive light can only whiten a bright court or sky. From the broadcast camera the trail's pixels were rgb(136 202 148)
+    at n 0.15 and rgb(173 203 125) at 0.75: 7-10 units apart per step of 0.2, green flat at 202-212 the whole way. From the
+    player's end the green channel sat at 181-192 from 0.15 to 0.95, and the smash's x1.9 boost drew it LIGHTER than a drive.
+  - Thin and faint: half-width 0.7 ball radii at every power (only the smash flame was wider), alpha f^2 x glow, and glow
+    settled to 0.16 + 0.6 x power a quarter second after the hit.
+- The fix (scene.js, trail setup and drawTrail):
+  - `trailHeat(n)`: the ramp is stretched over n 0.03 - 0.76 (SMASH_N) with a 0.7 gamma. 0.15 is yellow, 0.35 amber, 0.55
+    deep orange, a smash red. Red now means smash; the flame, embers and extra width above 0.76 are unchanged.
+  - Two ribbons: the old additive one is the soft halo (0.85 - 1.45 ball radii, wider for harder hits), and a core on top
+    (0.42 - 0.72) with normal blending carries the colour itself, so orange and red survive on the court and the sky. The
+    colours are converted to linear first.
+  - The colour is the shot's own at once: a hit sets the heat outright (it used to ease up from the last shot's over 50 ms,
+    a fifth of the 0.24 s ribbon); only a re-aim still glides. The hit lights the trail at 0.8 - 1.0 and it settles at
+    0.55 - 0.9 by heat while live, not 0.16 (so the flash at the hit is a smaller step than before: the trail stays lit instead).
+  - After: broadcast green 217 -> 187 -> 151 -> 117 -> 119 (tap to smash), the player's end 207 -> 178 -> 137 -> 98 -> 98;
+    the 0.75 and 0.95 shots are both red and differ by the flame (the trail covers 761 vs 1240 px).
+- No spin in the trail any more: the icy blue a slice pulled it to, the purple of a smash with spin and the purple embers are
+  gone; the trail and its embers follow power only. The spin streaks on the ball show the slice (checked: `SPIN=0.8 node
+  test/trail-shots.mjs spin`, the white arcs still read around the ball over the new core). (The smash's own ring and
+  burst still turn purple with spin; that is the impact, not the trail.)
+- pad.js `trailRGB` is the same heat and ramp, so the phone's edges flare in the colour the screen draws (pad-e2e's hit went
+  from rgb(255 224 74) to rgb(255 160 45)).

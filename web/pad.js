@@ -78,9 +78,10 @@ for (const [id, k] of [['btn-cal', 'c'], ['btn-center', 'r']]) { const b = $(id)
   b.addEventListener('contextmenu', e => e.preventDefault()); }
 
 // ---------- what the tab says back ----------
-// The edge glow on a hit, in the trail's colour for that power (the same ramp as scene.js drawTrail, before slice and smash tints).
+// The edge glow on a hit, in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (n stretched over 0.03..SMASH_N,
+// then white -> yellow -> orange -> red). Change one, change both.
 const SMASH_N = 0.76, lerp = (a, b, t) => a + (b - a) * t;
-function trailRGB(n) { const u = 3 * Math.max(0, Math.min(1, n));
+function trailRGB(n) { const u = 3 * Math.pow(Math.max(0, Math.min(1, (n - 0.03) / (SMASH_N - 0.03))), 0.7);
   const g = u < 1 ? lerp(1, 0.9, u) : u < 2 ? lerp(0.9, 0.5, u - 1) : lerp(0.5, 0.12, u - 2), b = u < 1 ? lerp(1, 0.3, u) : u < 2 ? lerp(0.3, 0.12, u - 1) : lerp(0.12, 0.08, u - 2);
   return `rgb(255 ${Math.round(g * 255)} ${Math.round(b * 255)})`; }
 let glowAnim = null, glowAt = -1e9;
