@@ -176,7 +176,7 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
 function screen(name) { ui.showScreen(name); scene.setMenu(!!name); }      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
 function openCourt() { screen(null); if (over) showOver(); padPhase(); }
-function startCal() { calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(true); padPhase(); }
+function startCal() { if (undo) undo.kept = false; calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(true); padPhase(); }
 function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal: on }); }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
@@ -198,6 +198,7 @@ function request(m) {                               // one lobby request at a ti
 function setUrl(code, watch) { const u = new URL(location.href), q = u.searchParams; q.delete('room'); if (code) q.set('court', code); else q.delete('court'); if (code && watch) q.set('watch', '1'); else q.delete('watch'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room, in the same role
 const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?court=${code}`;      // a localhost link is no use to a friend
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
+  if (undo) { undo = null; ui.backLabel('Back'); }
   clearFar(); clearTimeout(burstT); ui.confettiOff(); room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.hold(null); setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
@@ -209,6 +210,7 @@ function toLobby(msg) {                            // out of a room, back to the
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
   if (phase === 'lobby') { const v = ui.lobbyView(); if (room) { game.send({ type: 'leave' }); toLobby(); } else if (v !== 'home') ui.lobbyView('home'); else { phase = 'title'; screen('title'); } }
+  else if (undo && (phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court
   else if (phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }
 }
 function refreshStatus() {
@@ -263,7 +265,7 @@ let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE
 // Someone who played here before phones could be paddles (a name is saved, no choice yet) may have the helper running: it is
 // tried quietly behind the phone's QR, and the first AirPod sample makes the AirPod the paddle, with no click and no change for them.
 let tryBridge = !useAirpod && CAN_PHONE && ls.get('poddle.airpod') == null && !!ls.get('poddle.name');
-let chose = false;      // the player picked the paddle on the switch this visit: a phone page left open no longer takes over from the AirPod
+let chose = false, undo = null;      // undo: a swap made mid-game, until the new paddle is calibrated. Cancel (the Back button) puts the old one back      // the player picked the paddle on the switch this visit: a phone page left open no longer takes over from the AirPod
 function openBridge() { if (!bridge) bridge = connect(BRIDGE, 'm', sample => onSample(sample, 'airpod')); }
 const padFx = (fx, n) => { if (padOn && !useAirpod) game.send({ type: 'padfx', fx, n }); };      // the phone buzzes on my hits and says which step we are at
 const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 'play' : 'idle');
@@ -278,9 +280,18 @@ function showPair() {                              // the set-up screen offers t
 // paddle, so it is back to the set-up screen (the QR, or the helper card) until the new one answers, then calibration.
 // Going to the AirPod, the phone's page is told to stand down first (padFx says nothing once the AirPod is the paddle).
 function pickPaddle(kind) {
-  const want = kind === 'airpod'; if (want === useAirpod) return; if (want) padFx('idle'); useAirpod = want; chose = true; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0');
-  if (phase === 'play' || phase === 'calibrate') { stats.calibrated = false; calibrating = true; src = ''; lastSample = -1e9; phase = 'connect'; ui.settings(false); screen('connect'); tellCal(true); }
-  showPair(); if (!useAirpod) padPhase();
+  const want = kind === 'airpod'; if (want === useAirpod) return; if (undo && undo.airpod === want) return cancelSwap();      // the switch back to where it was = Cancel
+  const mid = phase === 'play' || phase === 'calibrate';
+  if (phase === 'play' && !undo) { undo = { airpod: useAirpod, kept: stats.calibrated }; ui.backLabel('Cancel'); }
+  setPaddleTo(want);
+  if (mid) { stats.calibrated = false; calibrating = true; lastSample = -1e9; phase = 'connect'; ui.settings(false); screen('connect'); tellCal(true); }
+}
+function setPaddleTo(want) { if (want) padFx('idle'); useAirpod = want; chose = true; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); if (!useAirpod) padPhase(); }
+// Cancel: the old paddle again. If the new one never started calibrating, the old calibration is untouched: straight back to the court.
+function cancelSwap() {
+  const u = undo; undo = null; ui.backLabel('Back'); if (!u) return; setPaddleTo(u.airpod); lastSample = performance.now();      // the old paddle was live a moment ago: no 'signal lost' flash while its next sample arrives
+  if (u.kept) { stats.calibrated = true; calibrating = false; phase = 'play'; tellCal(false); openCourt(); }
+  else { stats.calibrated = false; phase = 'connect'; screen('connect'); }      // its next sample calibrates it again
 }
 ui.onPaddleSwap(pickPaddle);
 if (useAirpod || tryBridge) openBridge();
@@ -305,7 +316,7 @@ function onSample(sample, from) {
   if (phase === 'connect') startCal();                              //  begins, so a bud lying on the desk cannot calibrate itself.
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
-    else if (e.type === 'calibrated') { calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(false);
+    else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(false);
       // 'All set' arrives in this same batch: hold the green card long enough to be read, then open the court
       setTimeout(() => { if (phase !== 'play') return; openCourt();
         setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve!', null, 2600); }, 380); }, 900); }     // after the fade

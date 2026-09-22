@@ -561,6 +561,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 /* HUD: the room code, small, next to the hamburger. A click copies the link. */
 .room-pill{cursor:pointer;font-family:var(--font);gap:.375rem;padding:0 .75rem}
 .room-pill:hover,.room-pill:focus-visible{background:#fff;outline:0;box-shadow:var(--glow)}
+.corner:has(.room-menu:hover),.corner:has(.room-menu.is-open),.corner:has(.room-menu :focus-visible){z-index:calc(var(--z-hud) + 4)}      /* its drop-down opens over the scoreboard, not under it */
 .room-menu .copy-drop{left:0;right:auto} .room-menu .copy-caret{margin:-.25rem 0 0 .125rem} .room-menu.no-link .copy-drop,.room-menu.no-link .copy-caret{display:none} .room-menu.no-link .room-pill{cursor:default}      /* the HUD's court pill: its choices drop to the right, from the top-left corner */
 
 /* narrow / tall windows: stack the tiles as wide bars */

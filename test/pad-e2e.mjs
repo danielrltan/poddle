@@ -105,8 +105,16 @@ ok(row === 'phone', `settings have a Paddle row, on ${row}`);
 await desk.screenshot({ path: `${root}test/ui-shots/pad-6-settings-paddle-1280x720.png` });
 await desk.click('#paddle-seg2 [data-paddle="airpod"]'); await sleep(1500); s = await game(desk);
 ok(s.screen === 'connect' && !s.calibrated && s.helper && !s.pair && s.swap === 'airpod' && s.art === 'airpod', `AirPod picked: back to the set-up screen with the helper card, and the phone still swinging does not take over (${s.screen}, swap ${s.swap}, helper ${s.helper})`);
-await desk.click('#paddle-seg [data-paddle="phone"]'); s = await until(async () => { const v = await game(desk); return v.screen === 'calibrate' && v.art === 'phone' ? v : null; }, 5000, 'Phone picked again: the open phone page calibrates');
-ok(!!s, 'and back to the phone on the set-up switch: calibration on the phone');
+const back = () => desk.evaluate(() => { const b = document.querySelector('#screen-connect [data-back]'); return b.hidden ? null : b.textContent.trim(); });
+ok(await back() === 'Cancel', `the set-up screen's Back reads Cancel (${await back()})`);
+const board = await desk.evaluate(() => document.body.dataset.screen);
+await desk.click('#screen-connect [data-back]'); s = await until(async () => { const v = await game(desk); return v.screen === 'hud' && v.calibrated && v.phase === 'play' ? v : null; }, 3000, 'Cancel: straight back to the court on the phone, still calibrated');
+ok(!!s && s.art === 'phone' && (await game(desk)).phase === 'play', `Cancel keeps the court and the phone's calibration (was ${board})`);
+ok(await back() === 'Back', 'and Back is Back again');
+await sleep(900); await desk.click('#btn-menu'); await sleep(400);
+await desk.click('#paddle-seg2 [data-paddle="airpod"]'); await sleep(600);
+await desk.click('#paddle-seg [data-paddle="phone"]'); s = await until(async () => { const v = await game(desk); return v.screen === 'hud' && v.calibrated ? v : null; }, 3000, 'Phone on the set-up switch is Cancel too');
+ok(!!s, 'the set-up switch back to Phone also returns to the court');
 
 // ---- 5. a wrong code, and no sensors
 const ph3 = (await (await launch()).pages())[0]; await ph3.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true }); watch(ph3, 'phone3');

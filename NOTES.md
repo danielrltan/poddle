@@ -544,3 +544,16 @@ Build log. What we tried, what broke, and how each problem was solved.
   says Invite copied / Viewer link copied.
 - `test/pad-e2e.mjs` step 4b: mid-game, Settings -> AirPod goes to the set-up screen with the helper card and stays there
   while the phone keeps swinging; Phone on the switch calibrates on the phone again.
+
+## 42. Cancel a paddle swap; the court pill's menu opens over the scoreboard
+- "Part of the copy link menu clips into the score banner at the top. And also, there is no cancel button to cancel changing
+  your remote type, only a back button which just kicks you. Fix that."
+- While the HUD's court menu is hovered, open or focused, the corner is raised above the scoreboard (z-hud + 4), so its
+  Player link / Viewer link card is drawn on top of the board instead of under it.
+- A swap made mid-game (Settings -> Paddle) can be undone until the new paddle has calibrated: the set-up and calibration
+  screens' Back reads **Cancel**, and it (or Esc, or pressing the old paddle on the set-up switch) puts the old paddle back.
+  If the new paddle never started calibrating, the old calibration is untouched and it is straight back to the court;
+  otherwise the old paddle calibrates again. Back never leaves the court during a swap. Once the new paddle is calibrated,
+  or you leave the court, Back is Back again (main.js undo / cancelSwap, ui.backLabel).
+- `test/pad-e2e.mjs` 4b: Cancel reads Cancel, returns to the court still calibrated on the phone, then Back is Back; the
+  set-up switch back to Phone does the same.
