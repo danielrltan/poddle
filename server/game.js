@@ -9,7 +9,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const WEB = path.join(__dirname, '..', 'web');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon' };
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
 const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html' };            // clean URLs: a fixed map, no extension guessing
 let PAGE_404 = null; try { PAGE_404 = fs.readFileSync(path.join(WEB, '404.html')); } catch { /* no page: plain words */ }
@@ -40,6 +40,7 @@ const httpServer = http.createServer((req, res) => {
     // Validators make 'no-cache' cheap: a reload is a handful of 304s, not 300 KB of JS and CSS again. The tag is weak because the proxy in front (fly) compresses the body.
     const head = { 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : IMAGE.has(ext) ? 'public, max-age=604800' : 'no-cache',     // vendor/ is 18 MB and never changes
       ETag: `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`, 'Last-Modified': new Date(mtime).toUTCString() };
+    if (file.startsWith(path.join(WEB, 'download') + path.sep)) { head['Cache-Control'] = 'no-cache'; head['Content-Disposition'] = `attachment; filename="${path.basename(file)}"`; }      // web/download/: Poddle Helper, saved not shown, and a new build is picked up at once (NOTES 36)
     const inm = req.headers['if-none-match'], ims = Date.parse(req.headers['if-modified-since']);
     const same = inm ? inm.split(',').some(t => t.trim() === '*' || t.trim().replace(/^W\//, '') === head.ETag.slice(2)) : ims >= mtime;
     if (same) { res.writeHead(304, head); return res.end(); }

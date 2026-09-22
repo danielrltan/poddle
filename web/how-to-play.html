@@ -75,7 +75,12 @@
         {
           "@type": "Question",
           "name": "Can I play with an AirPod instead?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes, on a Mac. AirPods Pro, AirPods 3, AirPods 4 and AirPods Max work, with a small helper running on the Mac. See Play with an AirPod on this page. You hold one AirPod. The other stays in its case." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes, on a Mac. AirPods Pro, AirPods 3, AirPods 4 and AirPods Max work, with the free Poddle Helper app open on the Mac. See Play with an AirPod on this page. You hold one AirPod. The other stays in its case." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Poddle Helper safe?",
+          "acceptedAnswer": { "@type": "Answer", "text": "It reads only your AirPod's motion and sends it only to Poddle in your browser, on the same Mac. It never connects to the internet itself. It is open source, so anyone can read what it does. Quit it from its menu bar icon, or drag it to the Trash to remove it." }
         },
         {
           "@type": "Question",
@@ -100,7 +105,7 @@
         {
           "@type": "Question",
           "name": "Why does Poddle say Connect your AirPod?",
-          "acceptedAnswer": { "@type": "Answer", "text": "The helper is not running, or the AirPod is not the Mac's sound output. Start the helper, pick the AirPods in the sound menu, and turn off Automatic Ear Detection. To use your phone instead, press Use your phone instead at the bottom of that screen." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Poddle Helper is not open, or the AirPod is not the Mac's sound output. Open Poddle Helper, pick the AirPods in the sound menu, and turn off Automatic Ear Detection. To use your phone instead, press Use your phone instead at the bottom of that screen." }
         },
         {
           "@type": "Question",
@@ -153,25 +158,25 @@
 
   <section class="card" aria-labelledby="airpod">
     <h2 id="airpod">Play with an AirPod</h2>
-    <p>On a Mac, one AirPod can be the paddle instead of a phone. It is lighter than a phone, and it takes about ten minutes to set up, once. You need macOS 14 or later, Google Chrome, and AirPods Pro, AirPods 3, AirPods 4 or AirPods Max. AirPods 1 and 2 have no motion sensor the Mac can read.</p>
+    <p>On a Mac, one AirPod can be the paddle instead of a phone. It is lighter than a phone. You need macOS 14 or later, Google Chrome, and AirPods Pro, AirPods 3, AirPods 4 or AirPods Max. AirPods 1 and 2 have no motion sensor the Mac can read. The free Poddle Helper app passes the AirPod's motion to the game.</p>
+    <p class="cta"><a class="btn" href="/download/Poddle-Helper.zip" download>Download Poddle Helper</a> <small><a href="https://github.com/danielrltan/poddle-helper">Open source: see exactly what it does</a></small></p>
     <ol>
-      <li>Open Terminal. Press Command and Space, type Terminal, press Return.</li>
-      <li>Install Apple's command line tools. Paste this and press Return. If it says they are already installed, carry on.
-        <pre><code>xcode-select --install</code></pre>
-      </li>
-      <li>Install Node from <a href="https://nodejs.org">nodejs.org</a>. Version 18 or later.</li>
-      <li>Get the helper from <a href="https://github.com/danielrltan/poddle">Poddle on GitHub</a>. Press Code, then Download ZIP, and open the ZIP. In Terminal type <code>cd</code> and a space, drag the new folder into the window, press Return.</li>
-      <li>Build it. It ends with a line that starts <samp>built</samp>.
-        <pre><code>npm install &amp;&amp; bash motion/build.sh</code></pre>
-      </li>
+      <li>Open the download. It unzips to <strong>Poddle Helper</strong>. Drag it into Applications and open it.</li>
+      <li>The first time, your Mac warns that it cannot check the app, because it is not from the App Store. Open System Settings, then Privacy &amp; Security, scroll down and press Open Anyway. On macOS 14 you can also right-click the app and choose Open.</li>
+      <li>When it asks to use Motion &amp; Fitness, choose Allow. That is how it reads the AirPod. A small icon appears in the menu bar.</li>
       <li>Connect your AirPods to the Mac as the sound output.</li>
       <li>In System Settings, Bluetooth, click the i next to your AirPods and turn off Automatic Ear Detection. The AirPod then keeps sending motion out of your ear.</li>
-      <li>Start the helper. It says <samp>motion bridge on</samp>. If your Mac asks to let Terminal use Motion and Fitness, choose Allow. Keep this window open while you play.
-        <pre><code>node bridge/bridge.js</code></pre>
-      </li>
-      <li>Open <a href="/">poddleball.com</a> in Chrome and pick a court. On the screen with the code, press Playing with an AirPod? at the bottom. If Chrome asks to connect to devices on your local network, choose Allow. That is how the page reaches the helper. The game remembers your choice.</li>
+      <li>Open <a href="/">poddleball.com</a> in Chrome and pick a court. On the screen with the code, press Playing with an AirPod? at the bottom. If Chrome asks to connect to devices on your local network, choose Allow. That is how the page reaches Poddle Helper. The game remembers your choice.</li>
       <li>Hold one AirPod in your hand. Leave the other in its case. Calibrate the same way as with a phone.</li>
     </ol>
+    <h3>What Poddle Helper does</h3>
+    <ul>
+      <li>It reads only the AirPod's motion: which way it points, how fast it turns and moves, and which bud it is. No sound, no microphone, no location, no files.</li>
+      <li>It sends that motion only to poddleball.com in your browser, on the same Mac. It never connects to the internet itself, and it reads motion only while a Poddle page is open.</li>
+      <li>It is open source. Read the code on <a href="https://github.com/danielrltan/poddle-helper">GitHub</a>.</li>
+      <li>To quit, click its menu bar icon and choose Quit. To remove it, drag it to the Trash.</li>
+    </ul>
+    <p>Prefer to build it yourself? The source and build steps are on <a href="https://github.com/danielrltan/poddle-helper">GitHub</a>.</p>
   </section>
 
   <section class="card" aria-labelledby="friends">
@@ -209,7 +214,10 @@
     <p>An iPhone or an Android phone with motion sensors, which is nearly all of them. On an iPhone, choose Allow when it asks about motion.</p>
 
     <h3>Can I play with an AirPod instead?</h3>
-    <p>Yes, on a Mac. AirPods Pro, AirPods 3, AirPods 4 and AirPods Max work, with a small helper running on the Mac. See Play with an AirPod on this page. You hold one AirPod. The other stays in its case.</p>
+    <p>Yes, on a Mac. AirPods Pro, AirPods 3, AirPods 4 and AirPods Max work, with the free Poddle Helper app open on the Mac. See Play with an AirPod on this page. You hold one AirPod. The other stays in its case.</p>
+
+    <h3>Is Poddle Helper safe?</h3>
+    <p>It reads only your AirPod's motion and sends it only to Poddle in your browser, on the same Mac. It never connects to the internet itself. It is open source, so anyone can read what it does. Quit it from its menu bar icon, or drag it to the Trash to remove it.</p>
 
     <h3>How do I play with a friend?</h3>
     <p>Press Play, then Create court. Send your friend the link or the 4 character code. Each player needs their own screen and their own paddle.</p>
@@ -224,7 +232,7 @@
     <p>The game is not open on the computer, or the code is from another tab. Open poddleball.com on the computer, press Play, pick a court, and scan the code it shows.</p>
 
     <h3>Why does Poddle say Connect your AirPod?</h3>
-    <p>The helper is not running, or the AirPod is not the Mac's sound output. Start the helper, pick the AirPods in the sound menu, and turn off Automatic Ear Detection. To use your phone instead, press Use your phone instead at the bottom of that screen.</p>
+    <p>Poddle Helper is not open, or the AirPod is not the Mac's sound output. Open Poddle Helper, pick the AirPods in the sound menu, and turn off Automatic Ear Detection. To use your phone instead, press Use your phone instead at the bottom of that screen.</p>
 
     <h3>Is Poddle free?</h3>
     <p>Yes. No account either. Type a name and play.</p>

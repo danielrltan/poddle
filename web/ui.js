@@ -125,7 +125,7 @@ export function hold(name, left) {
 // ---------- connection status ----------
 // What is in the player's hand (NOTES 34): an AirPod through the helper on this Mac, or a phone through its page.
 const PADDLE = {
-  airpod: { name: 'AirPod', wait: 'Take one AirPod out and hold it in your hand.', bad: 'Signal lost. Check the AirPod is still connected to this Mac.', lost: 'AirPod signal lost', hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', waiting: 'Waiting for the AirPod' },
+  airpod: { name: 'AirPod', wait: 'Open Poddle Helper, then take one AirPod out and hold it.', bad: 'Signal lost. Check Poddle Helper is open and the AirPod is connected to this Mac.', lost: 'AirPod signal lost', hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', waiting: 'Waiting for the AirPod' },
   phone: { name: 'Phone', wait: 'Scan the code with your phone’s camera.', bad: 'Signal lost. Wake the phone and keep its Poddle page open.', lost: 'Phone signal lost', hold: 'Hold the phone like a paddle handle, top end pointing at the screen.', tilt: 'Tip the top end up toward the ceiling.', waiting: 'Waiting for the phone' },
 };
 let paddle = 'airpod';
@@ -141,15 +141,18 @@ export const paddleKind = () => paddle;
 let qrFor = '';
 export function padPair(o) {
   const box = $('pad-pair'); if (!box) return;
-  box.hidden = !o.show; setText($('connect-title'), o.title || ''); setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
+  box.hidden = !o.show; helperCard(); setText($('connect-title'), o.title || ''); setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
   const sw = $('btn-paddle-swap'); if (sw) { sw.hidden = !o.swap; setText(sw, o.swap || ''); }
   if (o.show && o.url && qrFor !== o.url) { qrFor = o.url;
     import('./vendor/qrcode.mjs').then(({ default: qrcode }) => { const q = qrcode(0, 'M'); q.addData(o.url); q.make(); $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true'); })
       .catch(() => { qrFor = ''; }); }
 }
+// The AirPod's block (NOTES 36): where the phone's code would be, Poddle Helper to download, until the AirPod answers.
+// setPaddle has already been told which paddle it is, and a phone that scanned in makes it 'phone', so no word from main.js.
+function helperCard() { const h = $('pad-helper'); if (h) h.hidden = paddle !== 'airpod' || !$('pad-pair')?.hidden || status.airpod === 'ok'; }
 export function onPaddleSwap(fn) { const sw = $('btn-paddle-swap'); if (sw) sw.addEventListener('click', e => { e.stopPropagation(); fn(); }); }
 const ROW = {
-  airpod: { ok: '', wait: 'Take one AirPod out and hold it in your hand.', bad: 'Signal lost. Check the AirPod is still connected to this Mac.' },
+  airpod: { ok: '', wait: 'Open Poddle Helper, then take one AirPod out and hold it.', bad: 'Signal lost. Check Poddle Helper is open and the AirPod is connected to this Mac.' },
   game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
   camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera when the browser asks.', bad: 'No camera. The game moves you.', off: 'No camera. The game moves you.' },
 };
@@ -164,6 +167,7 @@ export function setStatus(next) {
       status[key] = v; badSince[key] = v === 'bad' ? now : 0; told[key] = false;
       for (const el of [$('set-' + key), $('row-' + key)]) if (el) { el.classList.remove('is-ok', 'is-wait', 'is-bad', 'is-off'); el.classList.add('is-' + v); }      // the HUD lights are gone: big rows on the set-up screen, small rows in the settings panel
       setText($(`row-${key}-text`), ROW[key][v] || ''); setText($(`row-${key}-state`), STATE_WORD[v]); setText($(`set-${key}-state`), STATE_WORD[v]);
+      if (key === 'airpod') helperCard();
     }
     // a lost AirPod or server is the likeliest live failure: after 1.5 s say so where the player is looking, once
     if (LOST[key] && v === 'bad' && !told[key] && !slots.menu && !slots.overlay && now - badSince[key] > 1500) { told[key] = true; toast(LOST[key], 2600); }

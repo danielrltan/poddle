@@ -49,7 +49,7 @@
   "applicationCategory": "GameApplication",
   "applicationSubCategory": "Sports game",
   "operatingSystem": "Any, in a modern browser",
-  "browserRequirements": "Requires a browser with JavaScript and WebGL, and a phone with motion sensors to be the paddle. An AirPod works instead with the Poddle helper on a Mac.",
+  "browserRequirements": "Requires a browser with JavaScript and WebGL, and a phone with motion sensors to be the paddle. An AirPod works instead with the free Poddle Helper app on a Mac.",
   "gamePlatform": ["Web browser"],
   "playMode": ["SinglePlayer", "MultiPlayer"],
   "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 2 },
@@ -279,14 +279,22 @@
           <p class="pad-alt">No camera? Open <b>poddleball.com/pad</b> on the phone and type <b class="pad-code" id="pad-code"></b></p>
         </div>
       </div>
+      <div class="pad-pair pad-helper" id="pad-helper" hidden>
+        <div class="pad-how">
+          <h3>Get Poddle Helper</h3>
+          <ol><li>Download and open Poddle Helper.</li><li>Connect your AirPods to this Mac.</li><li>Take one AirPod out and hold it.</li></ol>
+          <p class="pad-alt">Open source. Reads only your AirPod’s motion and sends it only to this page, on this Mac. <a class="pad-link" href="https://github.com/danielrltan/poddle-helper" target="_blank" rel="noopener">See what it does</a></p>
+        </div>
+        <a class="btn btn-sm pad-get" id="pad-get" href="/download/Poddle-Helper.zip" download>Download for Mac</a>
+      </div>
       <ul class="status-list">
-        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name" id="row-airpod-name">AirPod</b><span class="status-text" id="row-airpod-text">Take one AirPod out and hold it in your hand.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name" id="row-airpod-name">AirPod</b><span class="status-text" id="row-airpod-text">Open Poddle Helper, then take one AirPod out and hold it.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
         <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game</b><span class="status-text" id="row-game-text">Finding the game</span><em class="status-state" id="row-game-state">Waiting</em></li>
         <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Allow the camera when the browser asks.</span><em class="status-state" id="row-camera-state">Waiting</em></li>
       </ul>
     </div>
   </div>
-  <footer class="menu-foot"><span id="connect-foot"><span id="connect-foot-text">Still waiting? Start the Poddle helper on this Mac.</span> <button class="foot-link foot-btn" id="btn-paddle-swap" hidden></button></span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+  <footer class="menu-foot"><span id="connect-foot"><span id="connect-foot-text">Still waiting? Open Poddle Helper on this Mac.</span> <button class="foot-link foot-btn" id="btn-paddle-swap" hidden></button></span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CALIBRATE ============================================== -->

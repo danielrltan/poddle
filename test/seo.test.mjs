@@ -126,11 +126,15 @@ try {
       if (k >= 0xc0 && k <= 0xcf && k !== 0xc4 && k !== 0xc8 && k !== 0xcc) { h = b.readUInt16BE(i + 5); w = b.readUInt16BE(i + 7); prog = k === 0xc2; break; } i += 2 + b.readUInt16BE(i + 2); }
     ok(w === 1200 && h === 630, `og.jpg is a JPEG of ${w}x${h}${prog ? ', progressive' : ''} (want 1200x630)`); ok(b.length < 500 * 1024, `og.jpg is ${(b.length / 1024).toFixed(0)} KB (under 500 KB)`); }
 
+  console.log('downloads');
+  if (!has('download/Poddle-Helper.zip')) pending('/download/Poddle-Helper.zip: web/download/Poddle-Helper.zip is not yet built'); else { const r = await req('/download/Poddle-Helper.zip', { method: 'HEAD' });
+    ok(r.status === 200 && r.h['content-type'] === 'application/zip' && r.h['content-disposition'] === 'attachment; filename="Poddle-Helper.zip"' && r.h['cache-control'] === 'no-cache', `/download/Poddle-Helper.zip: ${r.status} ${r.h['content-type']} | ${r.h['content-disposition']} | ${r.h['cache-control']}`); }
+
   console.log('help page');
   if (!has('how-to-play.html')) pending('how-to-play.html is not yet written'); else { const t = (await req('/how-to-play.html')).body.toString();
     ok((t.match(/<title>/g) || []).length === 1 && (t.match(/<h1\b/g) || []).length === 1 && /<link rel="canonical" href="https:\/\/poddleball\.com\/how-to-play\.html">/.test(t) && /href="\/"/.test(t), 'one title, one h1, its own canonical, a link home');
     let bad = null; for (const m of t.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) try { JSON.parse(m[1]); } catch (e) { bad = e.message; } ok(!bad, 'its JSON-LD parses' + (bad ? ': ' + bad : ''));
-    for (const m of new Set([...t.matchAll(/(?:href|src)="(\/[^"#?]*)/g)].map(m => m[1]))) { if (m === '/') continue; const r = await req(m, { method: 'HEAD' }); if (r.status === 200) ok(true, `it links ${m}: ${r.status}`); else if (/\.(png|jpg|svg)$/.test(m)) pending(`it links ${m}, which is not yet rendered`); else ok(false, `it links ${m}: ${r.status}`); } }
+    for (const m of new Set([...t.matchAll(/(?:href|src)="(\/[^"#?]*)/g)].map(m => m[1]))) { if (m === '/') continue; const r = await req(m, { method: 'HEAD' }); if (r.status === 200) ok(true, `it links ${m}: ${r.status}`); else if (/\.(png|jpg|svg)$/.test(m)) pending(`it links ${m}, which is not yet rendered`); else if (m.startsWith('/download/')) pending(`it links ${m}, which is not yet built (Poddle Helper, NOTES 36)`); else ok(false, `it links ${m}: ${r.status}`); } }
 } catch (e) { ok(false, 'the test threw: ' + (e && e.stack || e)); }
 finally { proc.kill(); }
 console.log(fails ? `\nSEO FAIL (${fails})` : waiting ? `\nSEO PASS, ${waiting} WAITING for files another owner is still rendering (STRICT=1 makes those failures)` : '\nSEO PASS');

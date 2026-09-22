@@ -446,3 +446,31 @@ Build log. What we tried, what broke, and how each problem was solved.
   from what the browser is known to say (the spec's z,x,y on Chrome and Firefox, x,y,z on Safari) and changes only once, on
   strong evidence (one real swing is plenty).
 - The wifi model is a guess at real phone wifi. If it still stutters on a real phone, record what arrives and tune from that.
+
+## 36. Poddle Helper: the AirPod without Terminal
+- "could you add a quick setup? like something that you can just install to get everything going, instead of opening
+  terminal as that's incredibly sus ... make a public repo separate from the entire poddle repo with this package for users
+  to download so we can keep it public and open source for them to see, and mention that as well."
+- The AirPod used to mean Terminal: Xcode tools, Node, clone this repo, `npm install && bash motion/build.sh`, then
+  `node bridge/bridge.js` left running. That is replaced by **Poddle Helper**, a native Mac menu-bar app in its own public
+  repo, `github.com/danielrltan/poddle-helper`. It speaks to the page the same way the bridge did (127.0.0.1:8787), so
+  nothing in the game changed.
+- The download is ours: `/download/Poddle-Helper.zip` on poddleball.com (the built zip is dropped into `web/download/`).
+  `server/game.js` serves `.zip` as `application/zip`, and anything under `/download/` as an attachment with
+  `Cache-Control: no-cache`, so a new build reaches people at once. The GitHub link sits next to every download button as
+  "open source, see what it does", not as the place to get it.
+- Set-up screen, AirPod mode: where the phone's QR would be, a card "Get Poddle Helper" with three steps (Download and open
+  Poddle Helper, Connect your AirPods to this Mac, Take one AirPod out and hold it), a Download for Mac button, and one line:
+  "Open source. Reads only your AirPod's motion and sends it only to this page, on this Mac." with "See what it does".
+  It hides once the AirPod answers, and it never shows in phone mode. `ui.padPair` shows it from the paddle kind that
+  `setPaddle` was just given; main.js only changed the footer's words to "Still waiting? Open Poddle Helper on this Mac." The AirPod row now says "Open Poddle Helper, then take one AirPod
+  out and hold it." and, when the signal drops, to check Poddle Helper is open.
+- How to play: the AirPod section is the download, the first-open warning (Privacy & Security, Open Anyway; right-click,
+  Open on macOS 14), Motion & Fitness, AirPods as the sound output, Automatic Ear Detection off, then Playing with an
+  AirPod?. A "What Poddle Helper does" part says what it reads, where it sends it, that it is open source, and how to quit
+  and remove it. The Terminal steps are gone; one line points to GitHub for anyone who wants to build it. The FAQ (page and
+  JSON-LD, same words) says Poddle Helper, and gains "Is Poddle Helper safe?". The home page's `browserRequirements` says
+  "the free Poddle Helper app". README leads with the app; the Node bridge stays, marked for development.
+- Tests: `test/seo.test.mjs` checks the download's headers once the zip exists, and waits (not fails) on it until then.
+  `test/pad-e2e.mjs` checks the card and its download link show after "Playing with an AirPod?" and hide in phone mode,
+  and screenshots AirPod mode at 1280x720 and 600x900.

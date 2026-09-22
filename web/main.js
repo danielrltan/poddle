@@ -270,7 +270,7 @@ function showPair() {                              // the set-up screen offers t
   const phone = CAN_PHONE && !useAirpod;
   ui.setPaddle(src || (phone ? 'phone' : 'airpod'));
   ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod',
-    foot: phone ? 'Nothing to install.' : 'Still waiting? Start the Poddle helper on this Mac.', swap: !CAN_PHONE ? '' : phone ? 'Playing with an AirPod?' : 'Use your phone instead' });
+    foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.', swap: !CAN_PHONE ? '' : phone ? 'Playing with an AirPod?' : 'Use your phone instead' });
 }
 ui.onPaddleSwap(() => { useAirpod = !useAirpod; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); });
 if (useAirpod || tryBridge) openBridge();
