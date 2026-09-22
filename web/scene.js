@@ -378,34 +378,60 @@ export function createScene(containerEl) {
     [[0, 8, 0], [0.62, 6, 0.5], [-0.62, 6, 0.5], [1.15, 4, 0], [-1.15, 4, 0]].forEach(([lat, n, ph]) => { for (let i = 0; i < n; i++) hole((i + ph) / n, lat); });
     hole(0.5, 1.5); hole(0.5, -1.5);
   });
-  // spin streaks: three short arcs, billboarded. Each one faces the camera drawing it, just before it is drawn (split view draws the frame twice,
-  // from two cameras), so the ring always reads whole; around the true spin axis it was edge-on from behind the baseline.
-  const spinMat = new THREE.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0, depthWrite: false });
-  const spinFx = new THREE.Group(); let spinRoll = 0;
-  const qFx = new THREE.Quaternion(), qRoll = new THREE.Quaternion(), zFx = new THREE.Vector3(0, 0, 1), sFx = new THREE.Vector3();
-  for (let i = 0; i < 3; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(BALL_R * 1.9, BALL_R * 0.13, 6, 14, 1.1), spinMat); arc.frustumCulled = false;
-    arc.onBeforeRender = (r, sc, cam) => { qFx.copy(cam.quaternion).multiply(qRoll.setFromAxisAngle(zFx, spinRoll + i * Math.PI * 2 / 3));
-      arc.matrixWorld.compose(spinFx.position, qFx, sFx.setScalar(spinFx.scale.x)); };
-    spinFx.add(arc); }
-  spinFx.visible = false; scene.add(spinFx);
-  // serve cue: eight chevrons around the ball while it hangs for the serve, all pointing in at it and breathing in and out (they do not turn).
-  // Coral pink, which no court colour, the yellow ball or the icy spin streaks share. One mesh, billboarded per camera like the streaks; the
-  // pulse moves the chevrons along their spokes (updateServeFx), so they keep their size.
-  const serveMat = new THREE.MeshBasicMaterial({ color: 0xff5c8a, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide });
-  const SV_N = 8, SV_S = BALL_R * 0.75, SV_V = [[0.5, 0], [-0.05, 0.55], [-0.5, 0.55], [0.05, 0], [-0.5, -0.55], [-0.05, -0.55]];   // one chevron pointing +x: outer tip, top arm, inner tip, bottom arm
-  const serveFx = (() => { const idx = [];
-    for (let i = 0; i < SV_N; i++) { const o = i * 6; idx.push(o, o + 1, o + 2, o, o + 2, o + 3, o, o + 3, o + 4, o, o + 4, o + 5); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SV_N * 18), 3)); g.setIndex(idx);
-    return new THREE.Mesh(g, serveMat); })();
-  function updateServeFx(R) {                              // every chevron on its spoke at radius R, tip toward the ball
-    const P = serveFx.geometry.attributes.position.array;
-    for (let i = 0, k = 0; i < SV_N; i++) { const th = (i + 0.5) * Math.PI * 2 / SV_N, c = -Math.cos(th), s = -Math.sin(th);
-      for (const [x, y] of SV_V) { P[k++] = -R * c + SV_S * (x * c - y * s); P[k++] = -R * s + SV_S * (x * s + y * c); P[k++] = 0; } }
-    serveFx.geometry.attributes.position.needsUpdate = true;
+  // spin swirl: wind whipping round a sliced ball, turning the way its FIRST BOUNCE will go. The bounce (coast / bounceV in server/game.js) is a
+  // plain one plus, from the spin: forward speed cut by (FLOOR.along - SPUN.along) * spin, and the sideways kick. That extra change D in the ball's
+  // ground speed is what friction does to a ball whose bottom slides the other way, so the swirl turns about up x D like a wheel that will roll the
+  // ball along D when it lands: backspin = the underside rolling forward (it checks up), kick right = a wheel rolling right. |D| (m/s) sets how
+  // wild it is: fatter, more wisps, more wobble, more opaque, faster. It is gone once the ball has bounced (the spin only bites on the first one).
+  // Three tapered wisps (pointed heads leading, tails fading), each with a thin one further out that joins as |D| grows. One mesh; each camera
+  // that draws it (split view draws the frame twice) sets it just before drawing: the ring about the true axis, but leaning at most 52 deg off
+  // facing that camera, so it is never edge-on. Seen along the axis it turns clockwise or anticlockwise; seen across it, it is an ellipse whose
+  // near side sweeps the way the ball's face turns (a backspin ball coming at you: up and away). Receiving, the sideways kick is the clockwise
+  // (kicks right) or anticlockwise (left) turn, since a real slice always carries one (solve: at least 0.55 of SLICE.kick).
+  // The shape is rewritten into the same buffer each frame (updateSpinFx); scaled up with distance like the serve cue, so it reads at game size.
+  const qFx = new THREE.Quaternion(), qRoll = new THREE.Quaternion(), zFx = new THREE.Vector3(0, 0, 1), sFx = new THREE.Vector3(), cFx = new THREE.Vector3(), nFx = new THREE.Vector3();
+  const fxScale = (cam, p) => clamp(cam.position.distanceTo(p) / 6, 1, 1.8);                 // a ball at the far baseline still reads
+  const SW_SEG = 20, SW = [];                                 // per wisp: phase, radius at the head and at the tail (ball radii), sweep (rad), width (ball radii), alpha, companion?
+  for (let i = 0; i < 3; i++) { const ph = i * Math.PI * 2 / 3; SW.push([ph, 1.3, 2.3, 2.5, 0.9, 1, 0], [ph - 1.0, 2.15, 2.85, 1.5, 0.42, 0.8, 1]); }
+  const spinMat = new THREE.MeshBasicMaterial({ color: 0xe4f6ff, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const spinFx = (() => { const nv = SW.length * (SW_SEG + 1) * 2, col = new Float32Array(nv * 4), idx = [];
+    SW.forEach(([, , , , , al], s) => { for (let j = 0; j <= SW_SEG; j++) { const u = j / SW_SEG, a = al * Math.min(1, u / 0.03) * Math.pow(1 - u, 1.2), o = (s * (SW_SEG + 1) + j) * 2;
+      for (const v of [o, o + 1]) col.set([1, 1, 1, a], v * 4);
+      if (j < SW_SEG) idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 4)); g.setIndex(idx);
+    return new THREE.Mesh(g, spinMat); })();
+  function updateSpinFx(w, t) {                              // w: how wild (0..1); t: time, for the wobble of the radii
+    const P = spinFx.geometry.attributes.position.array, k = 0.45 + 0.55 * w, extra = clamp((w - 0.25) / 0.45, 0, 1), wob = 0.04 + 0.2 * w; let q = 0;
+    SW.forEach(([ph, r0, r1, sw, wd, , co], s) => { const kw = k * (co ? extra : 1);
+      for (let j = 0; j <= SW_SEG; j++) { const u = j / SW_SEG, th = ph - u * sw, c = Math.cos(th), sn = Math.sin(th);      // it turns anticlockwise about its own z: the head leads, the tail trails
+        const r = BALL_R * (r0 + (r1 - r0) * u + wob * Math.sin(t * (4 + 6 * w) + s * 1.7 + u * 4)), hw = BALL_R * wd * kw * Math.sqrt(Math.min(1, u / 0.07)) * Math.pow(1 - u, 1.1) * 0.5;
+        P[q++] = c * (r - hw); P[q++] = sn * (r - hw); P[q++] = 0; P[q++] = c * (r + hw); P[q++] = sn * (r + hw); P[q++] = 0; } });
+    spinFx.geometry.attributes.position.needsUpdate = true;
   }
-  let serveA = 0;
-  serveFx.frustumCulled = false; serveFx.renderOrder = 4; serveFx.visible = false; scene.add(serveFx);
-  serveFx.onBeforeRender = (r, sc, cam) => serveFx.matrixWorld.compose(serveFx.position, cam.quaternion, sFx.setScalar(clamp(cam.position.distanceTo(serveFx.position) / 6, 1, 1.8)));   // a serve from the far baseline still reads
+  const spinAxis = new THREE.Vector3(1, 0, 0), camBack = new THREE.Vector3(); let spinRoll = 0, spinW = 0, swHit = -1, swLanded = false, swFrame = -1, swPass = 0; const swSide = [0, 0, 0, 0];
+  const SW_TILT = 1.3;                                       // tan of the most it leans off facing the camera (52 deg: seen across its axis, an ellipse 0.6 as wide)
+  spinFx.frustumCulled = false; spinFx.renderOrder = 4; spinFx.visible = false; scene.add(spinFx);
+  spinFx.onBeforeRender = (r, sc, cam) => {                  // per camera: the true ring about the axis, tilted no more than SW_TILT off facing this camera
+    if (swFrame !== drawn) { swFrame = drawn; swPass = 0; }     // split view moves the one camera between its two draws: each draw of a frame keeps its own state
+    const pass = Math.min(swPass++, 3); cFx.subVectors(cam.position, spinFx.position).normalize(); const along = spinAxis.dot(cFx);
+    if (!swSide[pass] || along * swSide[pass] < -0.15) swSide[pass] = along < 0 ? -1 : 1;     // which end of the axis faces this camera (hysteresis: a pure backspin seen from behind sits near 0)
+    const side = swSide[pass];
+    nFx.copy(spinAxis).addScaledVector(cFx, -along); const across = nFx.length();         // the axis's part across the view
+    if (across > 1e-4) nFx.multiplyScalar(side * Math.min(SW_TILT, across / Math.max(Math.abs(along), 1e-3)) / across);
+    nFx.add(cFx).normalize();                                 // the facing normal of the ring; it turns about it the way the real ball does about that end of its axis
+    camBack.set(0, 0, 1).applyQuaternion(cam.quaternion);
+    qFx.setFromUnitVectors(camBack, nFx).multiply(cam.quaternion).multiply(qRoll.setFromAxisAngle(zFx, side * spinRoll));      // from the camera's own frame: under 60 deg of turn, no flips
+    const k = 1.2 * fxScale(cam, spinFx.position) * spinFx.scale.x;     // seen from the other end of the axis it turns the other way: mirrored, so the heads still lead
+    spinFx.matrixWorld.compose(spinFx.position, qFx, sFx.set(side * k, k, k)); };
+  // serve cue: three short white arcs round the ball while it hangs for the serve, turning slowly and breathing (the look the spin streaks had
+  // before the swirl). Billboarded per camera the same way; never on screen with the swirl (updateBallVis).
+  const serveMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false });
+  const serveFx = new THREE.Group(); let serveA = 0, serveRoll = 0;
+  for (let i = 0; i < 3; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(BALL_R * 1.9, BALL_R * 0.13, 6, 14, 1.1), serveMat); arc.frustumCulled = false; arc.renderOrder = 4;
+    arc.onBeforeRender = (r, sc, cam) => { qFx.copy(cam.quaternion).multiply(qRoll.setFromAxisAngle(zFx, serveRoll + i * Math.PI * 2 / 3));
+      arc.matrixWorld.compose(serveFx.position, qFx, sFx.setScalar(fxScale(cam, serveFx.position) * serveFx.scale.x)); };
+    serveFx.add(arc); }
+  serveFx.visible = false; scene.add(serveFx);
   const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
   // The ball lights itself: from side 1 you see its shaded face (it measured 1.16 : 1 against the kitchen, 1.25 : 1 against the court), from side 0 the lit face
   // was 1.31 : 1 on the low sky. Through its own texture, so the holes still read and the spin still shows. Now 1.5 : 1 at worst (the milky south sky), 2.2+ elsewhere.
@@ -655,7 +681,7 @@ export function createScene(containerEl) {
 
   function updateBallVis(now, dt) {
     const b = ball;
-    if (!b.seen) return;
+    if (!b.seen) { spinW = 0; return; }                   // hidden (hideBall): no stale swirl when it comes back
     if (frozen && !at.on) {                                // paused, or a seat is held: the ball stays where it is drawn. No coast, no hover, no blend, no new trail points
       if (!ballMesh.visible && b.live) { b.pos.set(b.p[0], Math.max(BALL_R, b.p[1]), b.p[2]); b.core.copy(b.pos); b.errT = 1; ballMesh.position.copy(b.pos); blob.position.set(b.pos.x, 0.02, b.pos.z); ballMesh.visible = blob.visible = trailMesh.visible = true; }   // joined a paused room: the packet is where it hangs
       return;
@@ -683,15 +709,20 @@ export function createScene(containerEl) {
     const sp2 = Math.hypot(b.vel.x, b.vel.z);
     // rolls the way it flies; a sliced ball visibly spins BACKWARDS, and fast
     // 60 rad/s at 60 fps is ~1 rad a frame on a ball with a regular hole pattern: it strobes and reads as NOT spinning.
-    // So backspin is drawn slower than life (~3 turns a second), and three bright streaks whip around the ball with it.
-    if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -19, b.spin) * dt);
-      spinFx.position.copy(b.pos); spinFx.visible = b.cool > 0.08 && !b.held;
-      if (spinFx.visible) { spinRoll -= 15 * dt;
-        spinFx.scale.setScalar(1 + 0.25 * Math.sin(spinRoll * 0.5)); spinMat.opacity = 0.85 * Math.min(1, b.cool * 1.4); } }
-    else spinFx.visible = false;
+    // So backspin is drawn slower than life (~3 turns a second), and a swirl of wind whips around the ball with it.
+    if (sp2 > 0.05) { vB.set(b.vel.z, 0, -b.vel.x).normalize(); ballMesh.rotateOnWorldAxis(vB, lerp(Math.min(sp2 / BALL_R * 0.35, 40), -19, b.spin) * dt); }
     serveA = b.live && b.held && !at.on ? Math.min(1, serveA + dt / 0.25) : Math.max(0, serveA - dt / 0.12);     // gone almost at once when it is struck
     serveFx.visible = serveA > 0;
-    if (serveFx.visible) { const k = 0.5 - 0.5 * Math.cos(timeS * Math.PI * 2 * 1.2); serveFx.position.copy(b.pos); updateServeFx(BALL_R * (3.1 - 0.9 * k)); serveMat.opacity = serveA * (0.7 + 0.3 * k); }     // in toward the ball and out again, 1.2 times a second, brightest when closest
+    if (serveFx.visible) { const k = 0.5 - 0.5 * Math.cos(timeS * Math.PI * 2 * 1.2); serveFx.position.copy(b.pos); serveRoll -= 1.6 * dt; serveFx.scale.setScalar(1.05 + 0.2 * k); serveMat.opacity = serveA * (0.85 + 0.15 * k); }     // turning gently, breathing out and in 1.2 times a second, brightest when widest
+    {                                                      // the swirl: what the spin will do to the first bounce, from the same numbers coast() bounces with
+      const spin = at.on ? at.spin : b.spin, kick = at.on ? at.kick : b.kick, cut = (SPUN.along - FLOOR.along) * spin;
+      if (at.on) { if (at.t0 !== swHit) { swHit = at.t0; swLanded = false; } if (b.pos.y <= BALL_R + 1e-3) swLanded = true; }     // attract has no bounce count: watch the floor
+      const dx = b.vel.x * cut + kick, dz = b.vel.z * cut, D = Math.hypot(dx, dz), on = b.live && !b.held && !(at.on ? swLanded : b.bounces > 0) && spin > 0.02;
+      if (on && D > 0.05) spinAxis.set(dz / D, 0, -dx / D);     // up x D
+      spinW += ((on ? clamp(D / 4, 0, 1) : 0) - spinW) * damp(dt, 0.08);
+      spinFx.position.copy(b.pos); spinFx.visible = spinW > 0.05 && serveA === 0;     // the serve cue goes first (0.12 s), then the swirl comes in
+      if (spinFx.visible) { spinRoll = (spinRoll + (5 + 13 * spinW) * dt) % (Math.PI * 2); updateSpinFx(spinW, timeS); spinMat.opacity = Math.min(1, spinW * 5) * (0.45 + 0.5 * spinW); }
+    }
     const h = b.pos.y - BALL_R, k = 1 / (1 + h * 0.55);
     blob.position.set(b.pos.x, 0.02, b.pos.z); blob.scale.setScalar(0.22 + 0.36 * k); blob.material.opacity = 0.35 + 0.5 * k;
     // ribbon trail, camera-facing
