@@ -116,7 +116,7 @@ function setView(name, flip) {                     // flip: asked for by the vie
 }
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
-let showPod = prefs.airpod !== false, showStats = prefs.stats === true;
+let showPod = prefs.airpod !== false, showStats = false;      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
 const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline

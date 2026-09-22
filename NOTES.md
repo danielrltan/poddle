@@ -690,3 +690,12 @@ Build log. What we tried, what broke, and how each problem was solved.
 - `test/swirl-shots.mjs [tag]`: player, opponent, broadcast and split shots of weak and strong spin, a kick, the serve cue and
   the serve -> hit switch, each with a 3x crop, into test/ui-shots/swirl/. For every spin shot it prints which way the swirl
   turned on screen, next to D and which end of the axis faces the camera.
+
+## 52. No Show stats switch; the copy menus have icons
+- "Can you get rid of show stats? Genuinely I don't know if anyone would want to use that." The row is gone from the
+  settings card (the Screen group is Full screen alone). The stats panel starts hidden on every load, even for someone who
+  had it on (they would have had no switch left to turn it off); H still toggles it, unadvertised, for whoever is tuning.
+- "For the copy link drop down, add icons next to the player link and viewer link." Both copy menus (the share screen's
+  and the HUD court pill's) lead each choice with an icon in the outline blue: a paddle for Player link, the watchers
+  pill's eye for Viewer link. The pill's menu keeps names on one line and still ends before the "You" tab (measured
+  1440 to 700 px wide: 19 px clear at 901 px, the tightest).

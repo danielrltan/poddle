@@ -294,7 +294,7 @@ addEventListener('resize', placeSettings);
 export function setSettings(o = {}) {
   if (typeof o.sens === 'number') setText($('set-sens-val'), String(Math.round(o.sens)));
   for (const [key, id] of [['sensMin', 'btn-sens-less'], ['sensMax', 'btn-sens-more']]) if (key in o && $(id)) { if (o[key] && document.activeElement === $(id)) $('settings')?.focus({ preventScroll: true }); $(id).disabled = !!o[key]; }   // a disabled button drops focus to <body>: keep it in the card
-  for (const [key, id] of [['airpod', 'tog-airpod'], ['stats', 'tog-stats']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
+  for (const [key, id] of [['airpod', 'tog-airpod']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
   if ('inRoom' in o) show('btn-leave-room', !!o.inRoom);
   if ('forfeit' in o) setText($('btn-leave-room'), o.forfeit ? 'Forfeit' : 'Leave court');      // mid-match against a person, leaving is a forfeit: the button says so
   if ('canPause' in o) show('set-note', o.canPause === false);
@@ -311,7 +311,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   addEventListener('pointerdown', e => { if (setOpen && !e.target.closest?.('#settings, #btn-menu')) settings(false); });
   const call = (k, ...a) => { if (setH[k]) setH[k](...a); };
   on2('btn-sens-less', 'click', () => call('sens', -1)); on2('btn-sens-more', 'click', () => call('sens', 1));
-  for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-stats', 'stats']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
+  for (const [id, k] of [['tog-airpod', 'airpod']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
   on2('tog-full', 'click', () => fullscreen());
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
   on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });      // phone <-> AirPod at any time, not only on the set-up screen

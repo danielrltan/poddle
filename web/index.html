@@ -83,7 +83,7 @@
     <button class="btn btn-icon" id="btn-menu" aria-label="Settings" aria-expanded="false" aria-controls="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
     <span class="hud-pill ping-pill" id="ping-pill" data-bars="0" hidden><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b id="ping-ms"></b></span>
     <div class="copy-menu room-menu" id="room-menu" hidden><button class="hud-pill room-pill" id="room-pill" aria-haspopup="menu" aria-expanded="false" hidden>Court <b id="room-code"></b><span class="copy-caret" aria-hidden="true"></span></button>
-      <div class="copy-drop" role="menu"><button class="copy-opt" role="menuitem" data-copy="play"><b>Player link</b><span>Joins the court to play</span></button><button class="copy-opt" role="menuitem" data-copy="watch"><b>Viewer link</b><span>Watches as a spectator</span></button></div></div>
+      <div class="copy-drop" role="menu"><button class="copy-opt" role="menuitem" data-copy="play"><svg class="copy-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="2" width="13" height="13.5" rx="5"/><path d="M12 15.5v6.5"/></svg><span class="copy-txt"><b>Player link</b><small>Joins the court to play</small></span></button><button class="copy-opt" role="menuitem" data-copy="watch"><svg class="copy-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="copy-txt"><b>Viewer link</b><small>Watches as a spectator</small></span></button></div></div>
     <span class="hud-pill" id="watchers" role="img" aria-label="0 watching" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg><b id="watch-n">0</b></span>
     <span class="hud-pill is-tag is-paused" id="paused-tag">Paused</span>
     <i class="corner-br"></i>
@@ -168,7 +168,6 @@
   </div></section>
   <section class="set-group" id="grp-screen"><h3 class="set-label">Screen</h3><div class="set-list">
     <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
-    <button class="set-row set-switch" id="tog-stats" role="switch" aria-checked="false"><span>Show stats</span><i></i></button>
   </div></section>
   <button class="btn btn-sm btn-danger" id="btn-leave-room" hidden>Leave court</button>
   <p class="set-note" id="set-note" hidden>Online games can’t pause</p>
@@ -244,7 +243,7 @@
       <p class="caps">Court code</p>
       <div class="code-boxes is-static" id="share-code" aria-live="polite"><span class="code-box"></span><span class="code-box"></span><span class="code-box"></span><span class="code-box"></span></div>
       <div class="share-link well" id="share-row"><span class="addr" id="share-link"></span><div class="copy-menu" id="copy-menu"><button class="btn btn-sm" id="btn-copy" aria-haspopup="menu" aria-expanded="false"><span id="copy-label">Copy link</span><span class="copy-caret" aria-hidden="true"></span></button>
-        <div class="copy-drop" role="menu"><button class="copy-opt" role="menuitem" data-copy="play"><b>Player link</b><span>Joins the court to play</span></button><button class="copy-opt" role="menuitem" data-copy="watch"><b>Viewer link</b><span>Watches as a spectator</span></button></div></div></div>
+        <div class="copy-drop" role="menu"><button class="copy-opt" role="menuitem" data-copy="play"><svg class="copy-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="2" width="13" height="13.5" rx="5"/><path d="M12 15.5v6.5"/></svg><span class="copy-txt"><b>Player link</b><small>Joins the court to play</small></span></button><button class="copy-opt" role="menuitem" data-copy="watch"><svg class="copy-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="copy-txt"><b>Viewer link</b><small>Watches as a spectator</small></span></button></div></div></div>
       <button class="btn btn-lg" id="btn-share-go">Start</button>
     </div>
 
