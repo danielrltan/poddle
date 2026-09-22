@@ -7,7 +7,8 @@ const qs = new URLSearchParams(location.search);
 const clean = t => String(t == null ? '' : t).toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, '').slice(0, 6);
 const GAME = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
 const view = v => { document.body.dataset.view = v; };
-const pad = new PadMotion();
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+const pad = new PadMotion(IOS ? 'xyz' : 'zxy');      // WebKit names rotationRate x,y,z; Chrome and Firefox follow the spec's z,x,y
 const stats = window.__pad = { sent: 0, hz: 0, rtt: 0, host: false, open: false, get view() { return document.body.dataset.view; }, get naming() { return pad.naming + (pad.locked ? '' : '?'); } };
 let code = clean(qs.get('k')), ws = null, started = false, sawMotion = false, peak = 0, fxText = '';
 

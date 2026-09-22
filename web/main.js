@@ -258,6 +258,7 @@ function connect(urls, el, onmsg, onopen) {
 // reaching for localhost makes Chrome ask a first-time visitor about 'devices on your local network' for nothing.
 // A phone weighs forty AirPods and nobody whips it round at 30 rad/s, so its swings count for more (?padgain= to try another value).
 const PHONE_GAIN = Math.max(0.5, Math.min(3, +qs.get('padgain') || 1.5)), pw = v => src === 'phone' ? v * PHONE_GAIN : v;
+const AIRPOD_BUFFER = model.c.BUFFER_MAX, PHONE_BUFFER = 0.2;
 let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE || qs.has('bridge') && qs.get('padtest') !== '1' || ls.get('poddle.airpod') === '1';
 // Someone who played here before phones could be paddles (a name is saved, no choice yet) may have the helper running: it is
 // tried quietly behind the phone's QR, and the first AirPod sample makes the AirPod the paddle, with no click and no change for them.
@@ -279,7 +280,7 @@ function onSample(sample, from) {
   if (from === 'airpod' && (padOn || !useAirpod && !tryBridge)) return;      // a phone was scanned in (or chosen): it is the paddle, the AirPod in a pocket is not
   if (from === 'airpod' && !useAirpod) { useAirpod = true; tryBridge = false; }      // a returning AirPod player's helper answered
   if (!sample || !Array.isArray(sample.r)) return;
-  if (from !== src) { src = from; lastT = -1e9; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
+  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER;      // a phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: let the replay wait longer when (only when) that happens (NOTES 35) if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
     if (stats.calibrated) { stats.calibrated = false; if (phase === 'play') startCal(); } else if (phase === 'calibrate') startCal(); }
   if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if (phase === 'play' || phase === 'calibrate') startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero
   lastT = sample.t;

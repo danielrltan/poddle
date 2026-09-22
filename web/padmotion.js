@@ -19,8 +19,15 @@ export function eulerToQuat(alpha, beta, gamma) {   // degrees, as the event giv
 export const NAMINGS = { xyz: [0, 1, 2], zxy: [1, 2, 0] };
 const LOCK = 6;                                    // rad^2/s of agreement before a naming is trusted (a second of turning the phone over)
 
+const qexp = v => { const a = Math.hypot(v[0], v[1], v[2]); if (a < 1e-12) return [v[0] / 2, v[1] / 2, v[2] / 2, 1]; const k = Math.sin(a / 2) / a; return [v[0] * k, v[1] * k, v[2] * k, Math.cos(a / 2)]; };
+const qn = q => { const n = Math.hypot(q[0], q[1], q[2], q[3]) || 1; return [q[0] / n, q[1] / n, q[2] / n, q[3] / n]; };
+const CARRY_MAX = 0.05;                            // s: never carry an orientation further than this
+
 export class PadMotion {
-  constructor() { this.q = null; this.qAt = 0; this.prevQ = null; this.prevT = 0; this.naming = 'xyz'; this.sign = 1; this.locked = false; this.score = { xyz: 0, zxy: 0 }; this.n = 0; }
+  // naming: what this browser is expected to say until the phone's own turning proves otherwise (pad.js picks it: the spec's
+  // z,x,y for Chrome, x,y,z for Safari). Nothing changes on weak evidence: a guess that flips from sample to sample turns r
+  // inside out and throws the paddle about (NOTES 35).
+  constructor(naming = 'zxy') { this.q = null; this.qAt = 0; this.prevQ = null; this.prevT = 0; this.naming = NAMINGS[naming] ? naming : 'zxy'; this.sign = 1; this.locked = false; this.score = { xyz: 0, zxy: 0 }; this.n = 0; this.lastT = -1; }
   orientation(e, t) {                              // a deviceorientation event (or anything with alpha, beta, gamma); t in s
     if (!fin(e.alpha) || !fin(e.beta) || !fin(e.gamma)) return;
     this.q = eulerToQuat(e.alpha, e.beta, e.gamma); this.qAt = t;
@@ -32,8 +39,12 @@ export class PadMotion {
     if (!this.locked) this.learn(raw, t);
     const m = NAMINGS[this.naming], r = [raw[m[0]] * this.sign, raw[m[1]] * this.sign, raw[m[2]] * this.sign];
     const ac = e.acceleration, a = ac && fin(ac.x) && fin(ac.y) && fin(ac.z) ? [ac.x / G, ac.y / G, ac.z / G] : [0, 0, 0];
+    // The two events come from different sensors and are never in step: the orientation is up to a frame older than the
+    // rate, by a different amount each time. Carry it forward to this moment with the rate, so q and r describe the same instant.
+    const dt = Math.max(-CARRY_MAX, Math.min(CARRY_MAX, t - this.qAt)), q = Math.abs(dt) > 1e-4 ? qn(qmul(this.q, qexp([r[0] * dt, r[1] * dt, r[2] * dt]))) : this.q;
+    if (t <= this.lastT) return null; this.lastT = t;                 // a repeated or out-of-order stamp would read as a zero-length step
     this.n++;
-    return { t, q: this.q, r, a };
+    return { t, q, r, a };
   }
   learn(raw, t) {                                  // body rate from the last two orientations, against each naming
     const q = this.q, p = this.prevQ;
@@ -43,8 +54,8 @@ export class PadMotion {
         const w = [2 * d[0] / dt, 2 * d[1] / dt, 2 * d[2] / dt];                     // small-angle: fine at 60 Hz for a phone being turned over in the hand
         for (const k in NAMINGS) { const m = NAMINGS[k]; this.score[k] += (w[0] * raw[m[0]] + w[1] * raw[m[1]] + w[2] * raw[m[2]]) * dt; }
         const best = Math.abs(this.score.zxy) > Math.abs(this.score.xyz) ? 'zxy' : 'xyz', other = best === 'xyz' ? 'zxy' : 'xyz';
-        this.naming = best; this.sign = this.score[best] < 0 ? -1 : 1;
-        if (Math.abs(this.score[best]) > LOCK && Math.abs(this.score[best]) > 2 * Math.abs(this.score[other])) this.locked = true;
+        if (Math.abs(this.score[best]) > LOCK && Math.abs(this.score[best]) > 3 * Math.abs(this.score[other])) {      // decided once, on strong evidence (one real swing is plenty)
+          this.naming = best; this.sign = this.score[best] < 0 ? -1 : 1; this.locked = true; }
       } }
     if (q !== p) { this.prevQ = q; this.prevT = this.qAt; }
   }

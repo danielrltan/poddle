@@ -426,3 +426,23 @@ Build log. What we tried, what broke, and how each problem was solved.
   `test/pad.test.mjs` (relay, isolation, hostile input, reconnects either order, 60 Hz within the budget),
   `test/pad-e2e.mjs` (a first visit never touches localhost; game in one Chrome, pad.html in another fed synthetic sensor events: QR, calibrate, rally, the
   phone page closing and coming back, a typed code, a device with no sensors).
+
+## 35. The phone paddle stops jittering
+- "The movement is very buggy with the phone, it jitters u around."
+- Measured with `test/phone-jitter.mjs`, which plays a phone the way a browser really reports one: deviceorientation and
+  devicemotion at 60 Hz each on their own clocks (different sensors, never in step), Chrome's 0.1 deg rounding, a quiet
+  network and phone wifi (power save holds packets for 40-220 ms and lets them go in a burst). Roughness at 120 Hz is
+  test/jitter.mjs's measure; the AirPod gets about 9 %.
+- Cause 1, the sensors out of step: each sample paired the newest rate with whatever orientation came last, 0 to 16 ms
+  older, by a different amount every time, so the pose wobbled whenever the phone moved (4 to 21 % depending on how the two
+  clocks happened to line up). `padmotion.js` now carries the orientation forward to the rate's own moment with that rate
+  (at most 50 ms). Quiet network: 4 % on every phase.
+- Cause 2, the network: samples now cross the internet twice (phone -> fly -> tab), and phone wifi arrives in bursts longer
+  than the replay's 120 ms buffer, so the paddle froze and then jumped (13 to 39 %). A phone's buffer may now grow to 200 ms
+  (`PHONE_BUFFER` in main.js; the AirPod keeps 120). It only grows when late packets are actually seen, so a good connection
+  still renders 25 ms behind. Only the picture waits: swings are still called the moment a sample arrives. Bursty wifi: 5 to 11 %.
+- Cause 3, a risk rather than a measurement: before its rotationRate naming was locked, `PadMotion` re-picked naming and sign
+  on every sample from near-zero evidence, which could turn the rate inside out from one sample to the next. It now starts
+  from what the browser is known to say (the spec's z,x,y on Chrome and Firefox, x,y,z on Safari) and changes only once, on
+  strong evidence (one real swing is plenty).
+- The wifi model is a guess at real phone wifi. If it still stutters on a real phone, record what arrives and tune from that.
