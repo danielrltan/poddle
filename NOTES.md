@@ -609,3 +609,30 @@ Build log. What we tried, what broke, and how each problem was solved.
 - A hit goes out on the early guess and the settled swing can re-aim it within 0.25 s: the tab then sends `tint` (a new
   padfx, allowed by the server) and the glow still on screen changes to the settled power's colour, with no second buzz.
 - `test/pad-e2e.mjs` checks my hit set the glow's colour.
+
+## 48. Spin is a swirl of wind turning the way the bounce will go; the serve cue is the old arcs in white (supersedes 28 and 32)
+- "Instead of the lines around the ball for spin, make it look like wind swirling around the ball. Remove the chevron ring for
+  the serve and put the existing spin indicator there instead", then: the serve cue plain white, and the swirl should show the
+  spin's DIRECTION, turning the way the ball will bounce, and how hard: a stronger kick is a wilder, faster swirl.
+- The swirl (scene.js spinFx) is one mesh: three tapered wisps spiralling out from the ball, pointed heads leading, tails fading
+  (per-vertex alpha), each with a thin companion further out. The shape is rewritten into the same buffer every frame
+  (updateSpinFx), nothing allocated. Icy white. Scaled up with distance (1.2 x the serve cue's clamp) so it reads at game size.
+- It comes from the same numbers the bounce does (coast / bounceV): a spun first bounce differs from a plain one by
+  D = (vx * cut + kick, vz * cut), cut = (SPUN.along - FLOOR.along) * spin, the extra change in ground speed. Friction does that
+  to a ball whose underside slides against D, so the swirl turns about up x D, like a wheel that will roll the ball along D when
+  it lands: backspin = the underside rolling forward, so it checks up; kick right = a wheel rolling right. |D| / 4 m/s is how
+  wild it is (0..1): fatter, the companions join from 0.25, more wobble, more opaque, 5 -> 18 rad/s. It is gone once the ball
+  has bounced (the spin only bites on the first bounce); attract has no bounce count, so it watches the floor.
+- Each camera sets it just before drawing (split view draws twice): the ring about the true axis, leaning at most 52 deg off
+  facing that camera, so never edge-on. Split view moves its one camera between the two draws, so each draw of a frame keeps its
+  own state (which end of the axis faces it); the roll itself advances once a frame and stops with a frozen ball. Seen along the axis (broadcast, a backspin ball) it turns
+  clockwise or anticlockwise as the real ball does; seen across it (receiving pure backspin) it is an ellipse whose near side
+  sweeps up and away, the way the ball's face turns. A real slice always kicks (at least 0.55 of SLICE.kick), so receiving it
+  is also a clear turn: clockwise = kicks right, anticlockwise = left. From the other end of the axis it turns the other way,
+  mirrored so the heads still lead; which end faces a camera has hysteresis (0.15), so a pure backspin seen from behind cannot flicker.
+- Serve cue (serveFx): the old spin streaks, three short arcs, now white, turning slowly and breathing (1.2 Hz) while the ball
+  hangs. The coral chevrons are gone. The swirl waits until the cue is fully gone (0.12 s after the serve is struck), so the
+  two are never on screen together.
+- `test/swirl-shots.mjs [tag]`: player, opponent, broadcast and split shots of weak and strong spin, a kick, the serve cue and
+  the serve -> hit switch, each with a 3x crop, into test/ui-shots/swirl/. For every spin shot it prints which way the swirl
+  turned on screen, next to D and which end of the axis faces the camera.

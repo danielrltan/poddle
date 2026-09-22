@@ -137,7 +137,7 @@ MAIN calls `setMenu(true)` whenever a menu screen covers the court (title, lobby
 
 ### 2.6 `setFrozen(on)`: pause and seat hold (NEXT 7). Idempotent; MAIN may call it on every state packet.
 - on: the ball is drawn exactly where it is on this frame and stays there: age forced to 0, no `coast / coastTo /
-  hover`, no blend, the trail stops taking points, the spin streaks stop. Packets still update `ball.p / v` silently
+  hover`, no blend, the trail stops taking points, the spin swirl stops. Packets still update `ball.p / v` silently
   (they are identical while the server is paused). Avatars keep idling; bot swing wind-up does not start.
 - off: `clock.reset()` (the server's `t` stood still while wall time ran: a stale minimum would age every packet by
   the length of the pause and the ball would leap), `ball.snap = true`, and the next packet is the truth.
