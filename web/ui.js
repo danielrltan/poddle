@@ -154,8 +154,19 @@ export function padPair(o) {
   const seg = $('paddle-seg'); if (seg) { seg.hidden = !o.choose; $('connect-title').hidden = !!o.choose;      // where a phone can pair, the switch is the heading
     for (const b of seg.querySelectorAll('[data-paddle]')) b.setAttribute('aria-checked', String(b.dataset.paddle === o.mode)); } setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
   if (o.show && o.url && qrFor !== o.url) { qrFor = o.url;
-    import('./vendor/qrcode.mjs').then(({ default: qrcode }) => { const q = qrcode(0, 'M'); q.addData(o.url); q.make(); $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true'); })
-      .catch(() => { qrFor = ''; }); }
+    import('./vendor/qrcode.mjs').then(({ default: qrcode }) => {
+      const q = qrcode(0, 'H'); q.addData(o.url); q.make();                   // 'H', not 'M': the phone in the middle covers modules, and only H's 30 % recovery reads through that (NOTES 67)
+      $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }).replace('</svg>', phoneGlyph(q.getModuleCount() * 4) + '</svg>');
+      const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true');
+    }).catch(() => { qrFor = ''; }); }
+}
+// The phone that sits in the middle of the pairing QR, so the code looks like what it is for. Sized from the REAL module
+// count (the URL's length moves it), never a fixed number. 28 % of the width is ~8 % of the area: well inside H's budget.
+function phoneGlyph(size) {
+  const box = Math.round(size * 0.28), at = Math.round((size - box) / 2), pad = Math.round(box * 0.17), inner = box - pad * 2;
+  return `<g><rect x="${at}" y="${at}" width="${box}" height="${box}" rx="${Math.round(box * 0.22)}" fill="#fff"/>`
+    + `<svg x="${at + pad}" y="${at + pad}" width="${inner}" height="${inner}" viewBox="0 0 24 24" fill="none" stroke="#1b2a33" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">`
+    + `<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 5.5h3"/><path d="M11 18.5h2"/></svg></g>`;      // the same phone as the paddle picker's chip
 }
 // The AirPod's block (NOTES 36): where the phone's code would be, Poddle Helper to download, until the AirPod answers.
 // setPaddle has already been told which paddle it is, and a phone that scanned in makes it 'phone', so no word from main.js.

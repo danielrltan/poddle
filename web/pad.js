@@ -93,7 +93,7 @@ function quit() {
 }
 { const b = $('btn-quit'); let t = 0;
   const off = () => { clearTimeout(t); b.classList.remove('is-held'); };
-  b.addEventListener('pointerdown', () => { off(); b.classList.add('is-held'); t = setTimeout(() => { off(); quit(); }, 700); });
+  b.addEventListener('pointerdown', () => { off(); b.classList.add('is-held'); t = setTimeout(() => { off(); b.classList.add('is-done'); quit(); }, 700); });      // is-done closes the ring in green: window.close() is usually refused, so the button is still on screen behind the 'done' view
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, off);
   b.addEventListener('contextmenu', e => e.preventDefault()); }
 $('again').addEventListener('click', start);      // changed their mind, or hit it by accident: straight back to playing

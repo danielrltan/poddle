@@ -950,3 +950,23 @@ Build log. What we tried, what broke, and how each problem was solved.
   rally gate of 1 m, which from 2.8 m out the ball passes before any report can land — without that the over-read ones could
   never be pulled back. Measured: a bet of 33 settling at 30 lands 5.43 m, the same bet settling at 8 lands 2.20 m.
 - The lesson, which is worth keeping: a swing is the one thing that may never wait for a better answer. Correct it after.
+
+## 67. A phone in the pairing QR, and a ring that fills while you hold the X
+- "Can you make the phone QR code have a phone in it?" and "when you're pressing and holding the X, have a bigger circle
+  with a circling completion animation around it, so you know it's working and you just have to keep holding."
+- QR: the same phone as the paddle picker's chip sits on a white rounded tile in the middle of the code. There is only ONE
+  QR in the game (the phone's pairing code); the AirPod side has a Download button, not a code, so there was nothing to
+  put an AirPod in.
+- A glyph covers modules, so the error correction went from `M` (15 %) to `H` (30 %). That costs density: the same URL goes
+  from 29 modules to 37, so each module is ~22 % smaller on screen. The tile is 28 % of the width — about 8 % of the area,
+  well inside H's budget — and is sized from the REAL module count, because the URL's length changes it (localhost, a LAN
+  IP and poddleball.com all differ).
+- Verified by DECODING, not by looking: rendered through the real ui.js and read back with jsQR at the desktop size and at
+  the narrow breakpoint's smaller box, for four URL lengths — localhost, a LAN IP, poddle.fly.dev and poddleball.com.
+  8/8 decoded back to the exact URL. (jsQR and pngjs were installed with --no-save; they are not dependencies.)
+- X button: `.btn-hold`'s indicator is a left-to-right bar, which on a round button reads as a smudge rather than progress.
+  The X now opts out of it and draws an SVG ring instead, inset -.4rem so it is visibly wider than the button (53 px round
+  a 44 px button), turning over the same 700 ms via stroke-dashoffset. Measured mid-hold: 138 -> 102 -> 33 -> 0.
+- Let go and it snaps back rather than unwinding: the transition lives only on `.is-held`, so removing the class has none.
+  Completing turns the ring green (`is-done`), which matters because `window.close()` is usually refused and the button is
+  still on screen behind the 'done' view.

@@ -54,6 +54,14 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
    to it — as this page already did at that height. */
 @media (max-height:520px){.btn-x{position:static;transform:none;margin:1.25rem auto .5rem}[data-name="live"]{padding-bottom:0}}
 .btn-x svg{width:1.15rem;height:1.15rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
+/* Holding the X draws a ring around it, wider than the button itself, so the wait reads as progress instead of as nothing
+   happening (NOTES 67). .btn-hold's own indicator is a left-to-right bar — on a round button that reads as a smudge, so the
+   X opts out of it and uses the ring. Released: no transition, so the ring snaps back rather than slowly unwinding. */
+.btn-x.btn-hold{overflow:visible} .btn-x.btn-hold::before{display:none}
+.btn-x .hold-ring{position:absolute;inset:-.4rem;width:auto;height:auto;overflow:visible;pointer-events:none;transform:rotate(-90deg)}
+.btn-x .hold-ring circle{fill:none;stroke:var(--line);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:138.2;stroke-dashoffset:138.2;transition:none}
+.btn-x.is-held .hold-ring circle{stroke-dashoffset:0;transition:stroke-dashoffset .7s linear}
+.btn-x.is-done{border-color:var(--good)} .btn-x.is-done .hold-ring circle{stroke:var(--good);stroke-dashoffset:0}
 @media (prefers-reduced-motion:reduce){body{transition:none}}
 
 /* Always dark (NOTES 39): the phone is in your hand, near your eyes, while you watch the big screen. A bright page flashing
