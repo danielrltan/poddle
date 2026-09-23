@@ -1133,7 +1133,7 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   0.30 on 71's code. Bow from contact 0.46 - 0.48 m (was 0.45 - 0.5), landing 0.01 m off the moved marker. reaim.mjs: curled
   hits' sharpest kink p50 0.19 m/s (71: 0.79), straight hits unchanged (p50 0.13). coast, badwifi, bet, kitchen pass.
 
-## 70. The X's hold ring stands clear of the button, so it turns around your thumb
+## 73. The X's hold ring stands clear of the button, so it turns around your thumb
 - "The outline around the X needs to be separated from it — that way you can see it circle around your thumb."
 - 67 put the ring .4rem outside the button: 53 px round a 44 px button, about 4 px of daylight. A thumb held on the button
   covers all of it, so the one moment the ring exists is the one moment you cannot see it. The gap has to beat a thumb's
@@ -1147,3 +1147,13 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   the ring's containing block — the ring sized itself against a far ancestor instead and came out 438 px wide, straight
   over the content. `position:relative` sits in the flow identically and keeps the ring anchored. 112 px there too now.
 - The whole thing is inside the button, `pointer-events:none`, so a bigger ring never grows the tap target.
+
+## 74. Your own avatar is on the court, barely there
+- "Make it so that the court avatar on the player's side is visible, just very very transparent." Your own body used to be
+  hidden in your view (only the ghost forearm showed). Now dress() draws it at SELF_A (0.12) opacity: no depth write, so the
+  ball, its trail and your paddle show through it, and no shadow (a solid shadow under a ghost read as a bug; the menu's
+  shadow hold turns it back off after re-enabling every caster). Its materials stay `transparent` for good, so the split view
+  flipping one body between solid (the other half) and see-through (its own half) each frame never recompiles a shader.
+- It only had a pose for the remote player; the body block in updatePads() now runs for both, so your ghost stands beside your
+  paddle (BODY offset), crouches and runs with it. The Calibrating/Paused tag stays off your own body.
+- test/scene-next.mjs now expects your own avatar see-through (not hidden) in pov and split, and passes.

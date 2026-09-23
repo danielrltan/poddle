@@ -593,7 +593,18 @@ export function createScene(containerEl) {
   function rebase(pd) { for (const m of pd.mats) m.userData.base = { c: (m.userData.base ? m.userData.base.c : new THREE.Color()).copy(m.color), o: m.userData.base ? m.userData.base.o : m.opacity, t: m.userData.base ? m.userData.base.t : m.transparent }; }   // the colours to come back to (paint() changes them when Matt takes a seat)
   function ghostify(pd) {
     const k = ease(pd.ghost);
-    for (const m of pd.mats) { const b = m.userData.base, t = b.t || k > 0; m.color.copy(b.c).lerp(WHITE, 0.86 * k); if (m.emissive) m.emissive.setScalar(0.3 * k); m.opacity = b.o * (1 - 0.5 * k); if (m.transparent !== t) { m.transparent = t; m.needsUpdate = true; } }
+    for (const m of pd.mats) { const b = m.userData.base, t = b.t || k > 0 || pd.bodyM.has(m); m.color.copy(b.c).lerp(WHITE, 0.86 * k); if (m.emissive) m.emissive.setScalar(0.3 * k); m.opacity = b.o * (1 - 0.5 * k) * (pd.self && pd.bodyM.has(m) ? SELF_A : 1); if (m.transparent !== t) { m.transparent = t; m.needsUpdate = true; } }
+  }
+  // Your own body, seen from behind it: there, but barely (SELF_A), so it never hides the ball or your paddle. Its materials stay
+  // `transparent` for good, so flipping between halves of a split each frame only moves opacity and depthWrite: no recompile.
+  // No depth write (the trail and the ball's glow show through it) and no shadow: a solid shadow under a ghost reads as a bug.
+  const SELF_A = 0.12;
+  for (const pd of pads) { pd.bodyM = new Set(); pd.self = false; pd.avatar.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) pd.bodyM.add(mt); }); ghostify(pd); }
+  function selfish(pd, on) {
+    if (pd.self === on) return; pd.self = on;
+    for (const m of pd.bodyM) m.depthWrite = !on;
+    pd.avatar.traverse(m => { if (m.isMesh) m.castShadow = !on; });
+    ghostify(pd);
   }
   function tagTexture(status) {                             // built once per status: a white pill, a small icon, ONE word
     if (tagTex[status]) return tagTex[status];
@@ -612,7 +623,7 @@ export function createScene(containerEl) {
   }
   let vpW = 1, vpH = 1;                                     // the viewport being drawn (a half, in split): the tag's size is set in its pixels
   function placeTag(pd) {
-    const on = pd.avatar.visible && pd.ghost > 0.02 && !!pd.tagFor; pd.tag.visible = on; if (!on) return;
+    const on = pd.avatar.visible && !pd.self && pd.ghost > 0.02 && !!pd.tagFor; pd.tag.visible = on; if (!on) return;
     const e = camera.projectionMatrix.elements, px = clamp(vpH * 0.062, 34, 58);      // sizeAttenuation off: scale is NDC / lens, so pixels -> scale through the projection's own terms
     pd.tag.scale.set(2 * px * 4 / (vpW * e[0]), 2 * px / (vpH * e[5]), 1); pd.tag.material.opacity = ease(pd.ghost);
     pd.tag.position.set(pd.avatar.position.x, pd.avatar.position.y + 2.42, pd.avatar.position.z);
@@ -623,11 +634,11 @@ export function createScene(containerEl) {
     pd.handM.color.setHex(skin); pd.ghostM.color.setHex(skin); pd.sleeveM.color.setHex(shirt);       // the hand on his paddle, and his forearm when a spectator looks through his eyes
     rebase(pd); if (pd.ghost > 0) ghostify(pd);
   }
-  // Whose eyes is the picture taken from? Their avatar is hidden and their ghost forearm shown. -1: nobody's (broadcast, free, attract, a spectator's menu).
+  // Whose eyes is the picture taken from? Their avatar is all but see-through (SELF_A) and their ghost forearm shown. -1: nobody's (broadcast, free, attract, a spectator's menu).
   const eyeSide = () => (at.on || (spectator && (menu || vName !== 'pov')) ? -1 : spectator ? vSide : localSide);
   const isMe = side => !spectator && !at.on && side === localSide;      // the 1:1 paddle and "my" sounds. A spectator has neither; both paddles are remote
   function dress(eye, hideBack, hideSide) {                 // what this camera may see: per view, and per half in split
-    for (const pd of pads) { pd.avatar.visible = pd.has && pd.side !== eye; pd.forearm.visible = pd.has && pd.side === eye; placeTag(pd); }
+    for (const pd of pads) { pd.avatar.visible = pd.has; selfish(pd, pd.side === eye); pd.forearm.visible = pd.has && pd.side === eye; placeTag(pd); }
     for (let i = 0; i < 2; i++) { const b = i !== hideBack, s = i !== hideSide; for (const o of backFence[i]) o.visible = b; for (const o of sideFence[i]) o.visible = s; }
   }
   const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vF = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
@@ -678,7 +689,7 @@ export function createScene(containerEl) {
         vA.set(pd.pos.x + s * 0.2, Math.max(0.2, pd.pos.y - 0.3), pd.pos.z + s * 0.72).sub(w).normalize();
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
       }
-      if (!local) {                                             // Mii stands so its right shoulder is the arm pivot: the paddle sweeps around the body, not through it
+      {                                                         // Mii stands so its right shoulder is the arm pivot: the paddle sweeps around the body, not through it (your own too: it is drawn, see-through, SELF_A)
         const bx = pd.pos.x - s * BODY[0], bz = pd.pos.z + s * BODY[1], px = pd.bodyX, pz = pd.bodyZ;
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
@@ -1208,7 +1219,7 @@ export function createScene(containerEl) {
     const hold = menu && shadowHold === 1;                 // a menu's shadow map is drawn ONCE, without the players (a moving avatar must not leave its shadow baked on the court)
     if (hold) { for (const o of casters) o.castShadow = false; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true; }
     renderer.render(scene, camera);
-    if (hold) { for (const o of casters) o.castShadow = true; renderer.shadowMap.autoUpdate = false; shadowHold = 2; }
+    if (hold) { for (const o of casters) o.castShadow = true; for (const pd of pads) if (pd.self) pd.avatar.traverse(m => { if (m.isMesh) m.castShadow = false; }); renderer.shadowMap.autoUpdate = false; shadowHold = 2; }      // your own see-through body still casts none
     return true;
   }
 

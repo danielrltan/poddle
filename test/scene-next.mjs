@@ -33,7 +33,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) for (const v of ['broadcast', 's
   const r = await page.evaluate(() => { const sc = __scene, d = sc._dbg, R = d.renderer, calls = [], real = R.render.bind(R), fences = [];
     d.scene.traverse(o => { const g = o.geometry && o.geometry.parameters; if (g && g.height === 2.4 && g.width > 10) fences[o.position.z > 0 ? 0 : 1] = o; if (g && g.height === 1.3 && g.width > 20) fences[o.position.x > 0 ? 2 : 3] = o; });
     R.render = (s, c) => { const vp = R.getViewport(new THREE.Vector4()); calls.push({ vp: [vp.x, vp.y, vp.z, vp.w], camZ: +c.position.z.toFixed(2), camX: +c.position.x.toFixed(2), aspect: +c.aspect.toFixed(3), fov: +c.fov.toFixed(1),
-      av: d.pads.map(p => p.avatar.visible), arm: d.pads.map(p => p.forearm.visible), fence: fences.map(f => f.visible), px: d.pads.map(p => +p.pos.clone().project(c).x.toFixed(3)) }); real(s, c); };
+      av: d.pads.map(p => p.avatar.visible && !p.self), see: d.pads.map(p => p.avatar.visible && p.self), arm: d.pads.map(p => p.forearm.visible), fence: fences.map(f => f.visible), px: d.pads.map(p => +p.pos.clone().project(c).x.toFixed(3)) }); real(s, c); };
     const drew = sc.render(1e7 + 400); R.render = real;
     return { drew, calls, view: d.view(), scissor: R.getScissorTest(), seat: null }; });
   await page.screenshot({ path: `${shots}${v}-${w}x${h}.png` });
@@ -44,9 +44,9 @@ for (const [w, h] of [[1280, 720], [600, 900]]) for (const v of ['broadcast', 's
   if (v === 'split') { const L = c[0], Rt = c[1] || {}, half = Math.floor(w / 2), hh = Math.floor(h / 2);
     if (w > h) ok(c.length === 2 && L.vp[0] === 0 && L.vp[2] === half && Rt.vp[0] === half && Rt.vp[2] === w - half && L.vp[3] === h && Math.abs(L.aspect - half / h) < 0.01 && !r.scissor, `${tag}: two viewports in one render(), each half wide, aspect ${L.aspect}, scissor test off again`);
     else ok(c.length === 2 && L.vp[0] === 0 && Rt.vp[0] === 0 && L.vp[2] === w && Rt.vp[2] === w && L.vp[1] === h - hh && L.vp[3] === hh && Rt.vp[1] === 0 && Rt.vp[3] === h - hh && Math.abs(L.aspect - w / hh) < 0.01 && !r.scissor, `${tag}: taller than wide = STACKED, side 0 on top (GL y ${L.vp[1]}), each full width, aspect ${L.aspect}, scissor test off again`);
-    ok(L.camZ > 0 && !L.av[0] && L.arm[0] && L.av[1] && !L.arm[1] && !L.fence[0] && L.fence[1], `${tag}: first view = side 0's eyes (own avatar hidden, ghost arm, own fence gone, far fence up)`);
+    ok(L.camZ > 0 && !L.av[0] && L.see[0] && L.arm[0] && L.av[1] && !L.arm[1] && !L.fence[0] && L.fence[1], `${tag}: first view = side 0's eyes (own avatar see-through, ghost arm, own fence gone, far fence up)`);
     ok(Rt.camZ < 0 && !Rt.av[1] && Rt.arm[1] && Rt.av[0] && !Rt.arm[0] && !Rt.fence[1] && Rt.fence[0], `${tag}: second view = side 1's eyes`); }
-  if (v.startsWith('pov')) { const s = +v[3], k = c[0]; ok(c.length === 1 && r.view.side === s && (s ? k.camZ < 0 : k.camZ > 0) && !k.av[s] && k.arm[s] && k.av[1 - s] && !k.fence[s] && k.fence[1 - s], `${tag}: behind side ${s} (camera z ${k.camZ}), their avatar hidden, ghost arm shown, their fence gone`); }
+  if (v.startsWith('pov')) { const s = +v[3], k = c[0]; ok(c.length === 1 && r.view.side === s && (s ? k.camZ < 0 : k.camZ > 0) && !k.av[s] && k.see[s] && k.arm[s] && k.av[1 - s] && !k.fence[s] && k.fence[1 - s], `${tag}: behind side ${s} (camera z ${k.camZ}), their avatar see-through, ghost arm shown, their fence gone`); }
   if (v === 'free') ok(c.length === 1 && c[0].camX > 8 && !c[0].fence[2] && c[0].av[0] && c[0].av[1], `${tag}: free cam outside the +x wall, which is hidden (camera x ${c[0].camX})`);
   await page.close();
 }
