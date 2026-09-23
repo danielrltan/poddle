@@ -55,7 +55,7 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
 /* A short phone: tighten the live view so everything, the X included, still fits without scrolling. */
 @media (max-height:760px){[data-name="live"]{gap:.6rem;padding-bottom:7.75rem}[data-name="live"] .ring{width:8.5rem;height:8.5rem}[data-name="live"] .ring b{font-size:1.25rem}}
 /* Shorter than the live view itself (a phone turned sideways): there is no room to hold a strip at the bottom, and pinning
-   the X there would drop it on the Calibrate again / Re-center row. It goes back into the flow, last, and the page scrolls
+   the X there would drop it on the Calibrate again / Recentre row. It goes back into the flow, last, and the page scrolls
    to it — as this page already did at that height. */
 @media (max-height:520px){.btn-x{position:relative;transform:none;margin:1.75rem auto 1rem}[data-name="live"]{padding-bottom:0}}
 .btn-x svg{width:1.15rem;height:1.15rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}

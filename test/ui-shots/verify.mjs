@@ -24,7 +24,7 @@ try {
   await p.keyboard.press('KeyH'); console.log('keys after keydown:', await p.evaluate(() => document.getElementById('keys').classList.contains('is-idle')));
   await p.screenshot({ path: root + 'test/ui-shots/hud-idle-1440x900.png' });
   await p.close();
-  p = await open('screen=match-win'); await p.evaluate(() => window.__ui.toast('Re-centered', 5000)); await sleep(500);
+  p = await open('screen=match-win'); await p.evaluate(() => window.__ui.toast('Recentred', 5000)); await sleep(500);
   console.log('toast over veil: z', await p.evaluate(() => getComputedStyle(document.getElementById('toast')).zIndex + ' vs screen ' + getComputedStyle(document.getElementById('screen-match')).zIndex)); await p.close();
   p = await open('screen=title', true); await sleep(300);
   console.log('reduced motion: start button glow opacity =', await p.evaluate(() => getComputedStyle(document.getElementById('btn-start'), '::after').opacity)); await p.close();

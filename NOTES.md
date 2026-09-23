@@ -1219,3 +1219,18 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   (#pad-code) and on the phone (#start-code).
 - Checked in headless Chrome: computed user-select is none for body text and headings on all four pages, all on every code,
   text on every input.
+
+## 80. "Recentre camera", and the phone and camera sit in front of the pause blur
+- Two small asks. The settings row now reads **Recentre camera** (it was "Re-center"), and its toast is "Recentred" — the
+  phone's own button keeps the short word "Recentre" because it shares a row with "Calibrate again" and the long label
+  wrapped on a narrow phone. docs/ui-spec.md's key-hint and toast lists follow.
+- The pause blur is the one shared `.glass` layer (`z-screen - 1`), raised for `[data-settings][data-paused]`. The camera
+  and AirPod insets sit at `z-hud`, far below it, so both went milky the moment you paused — exactly the two things you
+  look at to line yourself back up. `body[data-settings] .inset` now lifts them to `z-screen`, in front of the blur.
+- The settings card is lifted with them. It is `z-screen - 1` like the glass and wins on DOM order alone, so leaving it
+  there would have put the insets over it; being later in the DOM it now stays over both where a full-width card and the
+  insets meet on a narrow phone. Checked at 1440x900 and 600x900: court blurred, both insets sharp, card on top.
+- ui-next fails 9 the same way with these changes stashed and without them (settings rows, Sound, Tab order, hostile name)
+  — that is 77's restructure: "Leave court" left `#settings > .btn` for `.set-foot` and a "Show player model" row arrived,
+  so the expected row list and the tab order in test/ui-next.mjs are stale, and two tab stops come back empty. Not mine to
+  renumber blind: the empty stops look like a real regression rather than a stale string.

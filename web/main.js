@@ -158,7 +158,7 @@ function pickSink(id) {
 function setPod(on) { showPod = !!on; show('podwrap', showPod); savePrefs(); syncSettings(); }
 function setBody(on) { showBody = !!on; scene.setSelfBody(showBody); savePrefs(); syncSettings(); }
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
-function recenter() { model.recenter(); if (body) body.center(); say('Re-centered'); }
+function recenter() { model.recenter(); if (body) body.center(); say('Recentred'); }
 function leave() { if (!LOBBY || !room) return; game.send({ type: 'leave' }); toLobby(); }
 // Opening the panel pauses a match against Matt (or an empty court); against a human it is only a card over a live rally.
 const vsHuman = () => { const o = state && state.paddles[1 - side]; return !!o && !o.bot; };
@@ -383,7 +383,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'pong') { net.pong(m); return; }
   if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
-  if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Re-center, pressed on the phone
+  if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
   if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
   if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online); return; }

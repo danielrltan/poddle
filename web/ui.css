@@ -291,6 +291,10 @@ body[data-paused]:not([data-settings]) #paused-tag{display:inline-flex}
 body[data-screen="calibrate"] .inset,body[data-screen="connect"] .inset-cam{z-index:calc(var(--z-screen) + 1);top:auto;bottom:calc(4.5rem + var(--edge));width:11rem}
 body[data-screen="calibrate"] .inset-pod{left:var(--edge);right:auto;width:9rem}
 body[data-screen="hud"] #camwrap[hidden] ~ .inset-pod{top:var(--edge)}
+/* the panel is open (paused behind it, so .glass is up): the camera and the AirPod stay sharp in FRONT of the blur — they are
+   how you line yourself up again before playing on. The card is raised with them and, being later in the DOM, stays over both
+   where a full-width card and the insets meet on a narrow phone. */
+body[data-settings] .inset,body[data-settings] .settings{z-index:var(--z-screen)}
 body[data-screen="title"] .inset,body[data-screen="connect"] .inset-pod,body[data-overlay] .inset,body[data-overlay] .keyhints,body[data-overlay] .views,body[data-overlay] .corner,body[data-overlay] .hold-card,body[data-overlay] #split-line,body[data-overlay] .scoreboard,body[data-overlay] .banner-tag,body[data-overlay] .callout-layer,body[data-overlay] .countdown{opacity:0;pointer-events:none}
 /* 'This game is full' must not wait behind the whole set-up routine: it is the one overlay that also covers the menu screens */
 body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 2);background:var(--tex-scan), linear-gradient(180deg,#fff,var(--sky-2))}
@@ -651,7 +655,7 @@ body[data-paused] .set-list{background:#fff}
 button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent} button.set-row:hover{background:rgba(255,255,255,.9)}
 .set-list > :first-child{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)} .set-list > :last-child{border-bottom-left-radius:var(--r-md);border-bottom-right-radius:var(--r-md)}
 button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
-.set-action{color:var(--link)} .set-action svg{width:1.25rem;height:1.25rem;margin-right:.375rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}      /* Re-center: a row that does a thing, so it reads as a link, not a setting */
+.set-action{color:var(--link)} .set-action svg{width:1.25rem;height:1.25rem;margin-right:.375rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}      /* Recentre camera: a row that does a thing, so it reads as a link, not a setting */
 .set-row .field{width:11.5rem;height:2.25rem;padding:0 .875rem;font-size:var(--t-md);border-width:.125rem}
 /* Output: the device list on the right. Device names get long ("Default - MacBook Pro Speakers"), so the select is capped and cuts rather than stretching the card */
 .set-pickdev select.field{width:11.5rem;max-width:56%;height:2.25rem;padding:0 .5rem 0 .625rem;font-size:var(--t-sm);font-weight:700;border-width:.125rem;text-overflow:ellipsis}
