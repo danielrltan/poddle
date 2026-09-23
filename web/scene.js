@@ -224,6 +224,7 @@ const SWING = [[0, ...IDLE], [0.13, -64, 12, -30], [0.29, 72, 22, 38], [0.40, 62
 const SWING_CONTACT = 0.2;
 const FACE_C = 0.23 * PADDLE_SCALE, REACH_MAX = 0.4;      // grip -> face centre; how far a hit may tug the paddle toward the ball
 const BODY = [0.5, 0.68];                 // avatar centre, left of / behind the paddle base (player frame)
+const SERVE_STEP = 0.35;                  // m the body steps toward the hanging ball while it serves (looks only)
 // ---------- stance: a whole body inferred from one number, the height of the head ----------
 // Head height IS the paddle's y. bodytrack's T.y() returns exactly `base` at the spot the player calibrated on, and every
 // other source of y agrees: newPlayer starts at 1.0, and runAuto, runBot and the attract striker all recover to 1.0
@@ -690,7 +691,11 @@ export function createScene(containerEl) {
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
       }
       {                                                         // Mii stands so its right shoulder is the arm pivot: the paddle sweeps around the body, not through it (your own too: it is drawn, see-through, SELF_A)
-        const bx = pd.pos.x - s * BODY[0], bz = pd.pos.z + s * BODY[1], px = pd.bodyX, pz = pd.bodyZ;
+        // Serving: the body steps up to the hanging ball and turns to it, and the free hand cups it (below). Looks only: the server
+        // never sees a body, and the ball is drawn where it hangs, so the serve plays exactly as before.
+        const sd0 = pd.stance; sd0.hold = lerp(sd0.hold || 0, ball.heldBy === pd.side && ball.live && ballMesh.visible ? 1 : 0, damp(dt, ball.heldBy === pd.side ? 0.12 : 0.05));
+        const hold = ease(sd0.hold);
+        const bx = pd.pos.x - s * BODY[0] * (1 - 0.3 * hold), bz = pd.pos.z + s * BODY[1] - s * SERVE_STEP * hold, px = pd.bodyX, pz = pd.bodyZ;
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
         pd.vz = lerp(pd.vz, (pd.bodyZ - pz) / Math.max(dt, 1e-3), damp(dt, 0.1));
@@ -719,7 +724,7 @@ export function createScene(containerEl) {
         // ---------- wear it ----------
         const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8), lift = tip * STANCE.toes + reach * 0.1;
         a.position.set(pd.bodyX, hop + Math.abs(Math.sin(timeS * 11)) * 0.05 * run, pd.bodyZ);
-        a.rotation.set(0, s > 0 ? 0 : Math.PI, 0);
+        a.rotation.set(0, (s > 0 ? 0 : Math.PI) - 0.4 * hold, 0);      // on the serve it turns a little toward the ball, out in front of the paddle
         a.rotateZ(clamp(-pd.vx * s * 0.05, -0.22, 0.22)); a.rotateX(-0.06 - run * 0.08 - (pd.swingT >= 0 ? 0.1 : 0));      // the body's old whole-of-it lean, unchanged: it carries the feet with it, so it has to stay small
         if (sd.taunt > 0) a.rotateY(Math.sin(timeS * 25) * sd.taunt * 0.1);
         // Everything the stance adds bends at the waist instead. A crouch's forward lean is three times the old one, and
@@ -729,6 +734,7 @@ export function createScene(containerEl) {
         u.upper.scale.y = clamp(1 - duck * STANCE.squash + tip * 0.06 + reach * 0.14 - sd.spring * 0.5, 0.8, 1.35);
         u.body.scale.y = 1 + Math.sin(timeS * 2.4 + pd.side) * 0.018;
         u.offHand.position.set(-0.42 - duck * 0.13, 0.85 + Math.sin(timeS * 2.4 + 1) * 0.02 + hop * 0.6 - duck * 0.1 + tip * 0.16 + reach * 0.2, -0.12 - duck * 0.12);      // the free arm drops out and forward to balance a crouch, and reaches up on the toes
+        if (hold > 0.01) { a.updateMatrixWorld(true); vA.copy(ballMesh.position); vA.y -= BALL_R + 0.08; u.upper.worldToLocal(vA); u.offHand.position.lerp(vA, hold); }      // the hand under the ball, palm up (the Mii's hand floats, so it can reach)
         // Feet: the stance widens as the knees bend, and the foot in the direction of travel takes the step while the other
         // trails. That stagger is what separates a lunge from a squat — the sink cannot do it, because the shoes would be
         // through the paint long before a 0.7 m duck read as one.
@@ -1088,7 +1094,7 @@ export function createScene(containerEl) {
     if (!p || !v || at.on) return;                         // m optional: the state packet itself ({ t, b, k, serving }), for the clock and for coast()
     if (isFinite(spin) && spin != null) ball.spin = clamp(+spin, 0, 1);
     if (live && !ball.live) ball.snap = true;
-    if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.curl = +m.c || 0; ball.held = m.serving != null; }
+    if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.curl = +m.c || 0; ball.held = m.serving != null; ball.heldBy = m.serving != null ? +m.serving : -1; }
     ball.p = p; ball.v = v; ball.live = !!live; ball.ext = tMs != null; ball.stamp = tMs == null ? madeAt(m ? +m.t : NaN, performance.now()) : tMs;
     if (live) ball.seen = true;
   }

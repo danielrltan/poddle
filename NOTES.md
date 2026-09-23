@@ -1157,3 +1157,13 @@ Asked for: a small notice in the top-right corner when someone starts watching y
 - It only had a pose for the remote player; the body block in updatePads() now runs for both, so your ghost stands beside your
   paddle (BODY offset), crouches and runs with it. The Calibrating/Paused tag stays off your own body.
 - test/scene-next.mjs now expects your own avatar see-through (not hidden) in pov and split, and passes.
+
+## 75. The server holds the ball: a serve animation, looks only
+- "Make an animation when serving... the avatar will hold the ball. Do not change any serving mechanics." Nothing on the server
+  changed, and the ball is still drawn exactly where it hangs (SERVE_AHEAD in front of the paddle). Only the body moves to it.
+- While a side is serving (the state packet's `serving`, now kept as ball.heldBy), that avatar eases (0.12 s) into a hold: the
+  body steps SERVE_STEP (0.35 m) toward the ball, a little in toward the paddle, turns 0.4 rad to it, and the free hand goes to
+  just under the ball, palm up. The Mii's hand floats, so it reaches without an arm. The moment the serve is struck the hold lets
+  go faster (0.05 s) and the hand goes back to its idle sway. It works the same for you (on your see-through body, 74), the
+  other player and Matt.
+- The body pose block (updatePads) is the only place it lives; scene-next passes.
