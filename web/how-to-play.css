@@ -11,6 +11,7 @@
   --ball:#e6f03c; --ball-deep:#b9c916;
   --r-md:1rem; --r-lg:1.5rem; --r-pill:999px;
   --sh-2:0 .125rem 0 rgba(90,150,185,.22), 0 .25rem .625rem rgba(40,80,110,.12);
+  --ease-out:cubic-bezier(.22,1,.36,1); --ease-soft:cubic-bezier(.45,0,.25,1); --ease-bounce:cubic-bezier(.34,1.56,.64,1); --d-fast:160ms; --d-med:320ms;      /* same motion tokens as ui.css */
   --font:"Poddle Rounded", ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Helvetica Neue", Arial, sans-serif;
   color-scheme:light;
 }
@@ -22,9 +23,12 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 22rem,var(--bg) 44rem) no-repeat;
   font:500 1.0625rem/1.6 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-a{color:var(--link);font-weight:800;text-underline-offset:.15em}
-a:hover{color:var(--ink-strong)}
-a:focus-visible,.btn:focus-visible{outline:.1875rem solid var(--line);outline-offset:.1875rem;border-radius:.375rem}
+a{color:var(--link);font-weight:800;text-underline-offset:.15em;outline:.1875rem solid transparent;outline-offset:.5rem;
+  transition:color var(--d-fast) linear,text-underline-offset var(--d-fast) var(--ease-out),outline-color .2s linear,outline-offset .24s var(--ease-out)}      /* focus ring tightens in */
+a:hover{color:var(--ink-strong)} @media (hover:hover){ a:hover{text-underline-offset:.28em} }      /* the underline drops away a touch (a mouse only: a tapped link on a phone would keep it) */
+a:focus-visible{outline-color:var(--line);outline-offset:.1875rem;border-radius:.375rem}
+.btn:focus-visible{outline-color:var(--line);outline-offset:.1875rem;border-radius:var(--r-pill)}      /* keeps its pill shape (beats a:focus-visible) */
+@media (forced-colors:active){a{outline-style:none} a:focus-visible{outline-style:solid}}      /* the system colours a transparent outline in: no ring at rest */
 .wrap{width:100%;max-width:46rem;margin:0 auto;padding:0 1rem}
 
 /* header: the wordmark, the ball is the o */
@@ -42,9 +46,11 @@ a:focus-visible,.btn:focus-visible{outline:.1875rem solid var(--line);outline-of
 /* the game's glossy pill button */
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:3rem;padding:0 2rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);
   background:linear-gradient(180deg,#fff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 1.125rem/1 var(--font);letter-spacing:.02em;
-  text-decoration:none;box-shadow:var(--sh-2), inset 0 .125rem 0 rgba(255,255,255,.95)}
+  text-decoration:none;box-shadow:var(--sh-2), inset 0 .125rem 0 rgba(255,255,255,.95);
+  transition:transform var(--d-fast) var(--ease-bounce),border-color var(--d-fast) linear,box-shadow var(--d-fast) linear,color var(--d-fast) linear,outline-color .2s linear,outline-offset .24s var(--ease-out)}      /* the full list: a .btn is also an a */
 .btn:hover{border-color:var(--line-deep);color:var(--ink-strong)}
-.btn:active{background:linear-gradient(180deg,#e4f3fa,#d3ebf6)}
+@media (hover:hover){.btn:hover{transform:translateY(-.125rem) scale(1.03);box-shadow:0 .25rem 0 rgba(90,150,185,.22),0 .5rem 1rem rgba(40,80,110,.16),inset 0 .125rem 0 rgba(255,255,255,.95)}}      /* lifts to meet the pointer */
+.btn:active{background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transform:translateY(.125rem) scale(.97);box-shadow:inset 0 .125rem 0 rgba(255,255,255,.95);transition-duration:60ms}      /* after the hover block, so the press wins; in fast, out on the bounce */
 .btn-lg{min-height:3.75rem;padding:0 3.5rem;font-size:1.5rem}
 .btn-sm{min-height:2.75rem;padding:0 1.5rem;font-size:1rem}
 
@@ -71,7 +77,8 @@ pre{margin:.5rem 0;padding:.75rem 1rem;max-width:100%;overflow-x:auto;border-rad
 code,samp{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.9375em}
 li>code,samp{white-space:nowrap;padding:.0625rem .375rem;border-radius:.375rem;background:#e4eef4;color:var(--ink-strong)}      /* words typed into, or printed by, Terminal, inside a sentence */
 kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.4375rem;border:.125rem solid var(--line-soft);border-bottom-width:.1875rem;background:var(--white);
-  color:var(--ink-strong);font:800 .875rem/1.5 var(--font);text-align:center}
+  color:var(--ink-strong);font:800 .875rem/1.5 var(--font);text-align:center;transition:transform .12s var(--ease-out),border-bottom-color .12s linear}
+@media (hover:hover){kbd:hover{transform:translateY(.0625rem);border-bottom-color:var(--line)}}      /* a key that 'presses' */
 
 .end{padding:1rem 0 3rem;text-align:center}
 .end p{margin:.875rem 0 0;font-size:.9375rem;color:var(--ink-soft)}
@@ -81,4 +88,26 @@ kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.43
   .card{padding:1.5rem 1.75rem 1.625rem}
   .intro{padding-top:2rem}
 }
+/* Motion: decorative, and only for people who have not asked for less (the reduce block at the end clamps the rest). */
+@media (prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+  .logo-ball{animation:ball-drop .8s var(--ease-out) .1s backwards}      /* the o drops in and bounces once, on load */
+  .intro > :not(.hero){animation:rise .5s var(--ease-out) backwards}
+  .intro > h1{animation-delay:60ms} .intro > .lead{animation-delay:120ms} .intro > .note{animation-delay:180ms} .intro > .cta{animation-delay:240ms}
+  .hero{animation:hero-in .6s var(--ease-out) backwards}      /* scale only: no fade on the LCP image */
+}
+@media (hover:hover) and (prefers-reduced-motion:no-preference){
+  .btn:hover{animation:btn-wiggle .5s var(--ease-soft)}      /* a wiggle as you arrive: the rotate property, so it composes with the lift */
+  .logo-mark:hover .logo-ball{animation:ball-drop .8s var(--ease-out) .1s backwards,ball-spin .6s var(--ease-bounce)}      /* ball-drop re-listed as is (same name: not replayed); a hop and a spin toward home */
+}
+@media screen and (prefers-reduced-motion:no-preference){
+  @supports (animation-timeline:view()){.card{animation:card-in linear both;animation-timeline:view();animation-range:entry 0% entry 10rem}}      /* each card rises in over its first 10rem into view (a length, so a tall card is not half-faded for a screenful); the timeline goes AFTER the shorthand, which resets it */
+}
+@keyframes rise{from{opacity:0;transform:translateY(.75rem)}}
+@keyframes hero-in{from{transform:scale(.97)}}
+@keyframes card-in{from{opacity:0;transform:translateY(1.5rem) scale(.98)}}
+@keyframes btn-wiggle{30%{rotate:-2deg}65%{rotate:1.5deg}}
+@keyframes ball-drop{0%{transform:translateY(-1.1em) rotate(-120deg);opacity:0}55%{transform:translateY(0) scale(1.14,.86)}75%{transform:translateY(-.14em) scale(.96,1.04)}100%{transform:none}}
+@keyframes ball-spin{50%{translate:0 -.2em;rotate:200deg}100%{rotate:360deg}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;animation-delay:0ms!important;transition-duration:1ms!important}}      /* as ui.css: nothing on this page is information */
 @media print{ body{background:#fff} .card,.hero,.btn{box-shadow:none} }

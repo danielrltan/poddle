@@ -99,6 +99,8 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .screen{position:fixed;inset:0;z-index:var(--z-screen);display:flex;flex-direction:column;opacity:0;visibility:hidden;
   transition:opacity var(--d-med) var(--ease-soft), visibility 0s linear var(--d-med)}
 .screen.is-active{opacity:1;visibility:visible;transition-delay:0s}
+.menu-glass,.menu-bg{scale:1.015;transition:opacity var(--d-med) var(--ease-soft), scale 420ms var(--ease-out), visibility 0s linear var(--d-med)} .menu-glass.is-active,.menu-bg.is-active{scale:none}      /* menus settle in from a hair closer and drift toward you as they go: depth, not a slide. Never under 1, so no edge shows */
+.screen.is-active .menu-head{animation:hm-head 420ms var(--ease-out) backwards} @keyframes hm-head{from{opacity:0;translate:0 -1.5rem}}      /* the header drops into place */
 .screen.is-active .panel, .screen.is-active .result-card{animation:panel-in var(--d-slow) var(--ease-out) both}
 /* visibility:hidden does not stop CSS animations: a hidden screen must not tick over the live game */
 .screen:not(.is-active) *,.screen:not(.is-active) *::before,.screen:not(.is-active) *::after{animation:none!important}
@@ -109,6 +111,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .menu-head{height:5rem;justify-content:center;background:var(--tex-diag), linear-gradient(180deg, #fff, var(--sky-2));border-bottom:.125rem solid var(--line-soft);box-shadow:0 .125rem .75rem rgba(80,140,175,.12)}
 .menu-foot{height:4.5rem;background:var(--tex-diag), linear-gradient(180deg, var(--sky-2), var(--sky-3));border-top:.125rem solid var(--line-soft);justify-content:space-between;color:var(--ink-soft);font-size:var(--t-sm)}
 .menu-title{display:flex;align-items:center;gap:var(--s-3);font-size:var(--t-xl);font-weight:700;color:var(--ink-strong);letter-spacing:.04em}
+#lobby-title.swap{animation:hm-title var(--d-med) var(--ease-out)} @keyframes hm-title{from{opacity:0;translate:0 -.5rem}}      /* the new heading drops in with the view (ui.js lobbyView) */
 .menu-body{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-5);padding:var(--s-5) var(--s-7)}
 
 /* veil: sits over the live court for result / error cards */
@@ -135,7 +138,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
    ========================================================================================================== */
 .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:var(--s-3);height:3.75rem;padding:0 2.75rem;border-radius:var(--r-pill);
   border:.1875rem solid var(--line);background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:700 var(--t-lg)/1 var(--font);letter-spacing:.02em;
-  box-shadow:var(--sh-2), var(--inner-hi);cursor:pointer;transition:transform var(--d-fast) var(--ease-bounce);-webkit-tap-highlight-color:transparent;outline:0;isolation:isolate}
+  box-shadow:var(--sh-2), var(--inner-hi);cursor:pointer;transition:transform var(--d-fast) var(--ease-bounce), scale 240ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft);-webkit-tap-highlight-color:transparent;outline:0;isolation:isolate}
 /* the gloss is a short pill, so its tight corners used to poke out past the button's wide ones. The clip is the button's own
    inner pill, written from the gloss's box: out by its top and side offsets, down by the 52% of the button below it. */
 .btn::before{content:"";position:absolute;left:.5rem;right:.5rem;top:.125rem;height:48%;border-radius:var(--r-pill);background:linear-gradient(180deg,#fff,rgba(255,255,255,.55));opacity:1;pointer-events:none;z-index:-1;
@@ -147,6 +150,8 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .btn:active,.btn.is-pressed{transform:scale(.955);animation:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6)}
 .btn-lg{height:4.5rem;padding:0 3.5rem;font-size:var(--t-xl)}
 .btn-sm{height:2.75rem;padding:0 1.5rem;font-size:var(--t-md)}
+.btn:active,.btn.is-pressed{transition-duration:90ms, 240ms, var(--d-med)}      /* snappy in, springy out */
+@media (hover:hover){ .btn:hover:where(:not(:disabled,[aria-disabled="true"])){scale:1.04} .btn:hover:active,.btn:hover.is-pressed{scale:1} .court-list .btn:hover,.settings .btn:hover{scale:none} }      /* 'scale', not transform: it composes with .is-focus's breathing (0,2,0 so the resets win). A pill in a scroll box (court list, settings card) would clip its halo */
 
 /* key-cap hint chip */
 .keycap{display:inline-flex;align-items:center;justify-content:center;min-width:1.625rem;height:1.625rem;white-space:nowrap;padding:0 .4375rem;border-radius:.4375rem;border:.09375rem solid var(--sky-4);border-bottom-width:.1875rem;
@@ -201,7 +206,8 @@ body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}       
   background:radial-gradient(circle at 32% 34%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 66% 30%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 50% 62%, var(--ball-deep) 0 11%, transparent 12%),
     radial-gradient(circle at 24% 66%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 76% 64%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 35% 30%, #f6fb8a, var(--ball) 60%, #cdd82a);
   box-shadow:0 0 0 .125rem #fff, 0 .0625rem .25rem rgba(10,30,50,.35)}
-.serve-ind.on{visibility:visible;animation:serve-bob 900ms var(--ease-soft) infinite}
+.serve-ind{scale:0;transition:scale 180ms var(--ease-soft), visibility 0s linear 180ms}
+.serve-ind.on{visibility:visible;scale:1;animation:serve-bob 900ms var(--ease-soft) infinite;transition:scale 420ms var(--ease-bounce) 120ms, visibility 0s}      /* the serve changes sides: the ball shrinks away on one tab and springs up on the other just after (scale: composes with the bob) */
 
 /* small banner tag that drops out from under the scoreboard */
 .banner-tag{position:fixed;top:calc(var(--edge) + 4.25rem + .5rem);left:0;right:0;z-index:var(--z-banner);display:flex;justify-content:center;pointer-events:none}
@@ -244,8 +250,8 @@ body:not([data-screen="hud"]) .countdown{display:none}            /* the title a
 .toast{position:fixed;left:50%;bottom:7.5rem;max-width:calc(100vw - 4 * var(--edge));z-index:var(--z-toast);transform:translate(-50%,.75rem) scale(.96);opacity:0;pointer-events:none;white-space:nowrap;
   display:inline-flex;align-items:center;gap:.75rem;height:3.25rem;padding:0 1.75rem;border-radius:var(--r-pill);border:.15625rem solid var(--line);
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;box-shadow:var(--sh-hud), var(--inner-hi);
-  transition:opacity var(--d-med) var(--ease-soft), transform var(--d-med) var(--ease-bounce)}
-.toast.on{opacity:1;transform:translate(-50%,0) scale(1)}
+  transition:opacity 200ms var(--ease-soft), transform 220ms var(--ease-soft)}      /* leaves quick and soft */
+.toast.on{opacity:1;transform:translate(-50%,0) scale(1);transition:opacity var(--d-med) var(--ease-soft), transform 420ms var(--ease-bounce)}      /* arrives with a spring */
 body[data-screen="hud"] .toast{bottom:var(--edge)}
 body[data-overlay] .toast.on{opacity:0}
 
@@ -310,7 +316,7 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
    ========================================================================================================== */
 .steps{display:flex;align-items:center;gap:.625rem;list-style:none;margin:0;padding:0}
 .steps li{display:inline-flex;align-items:center;gap:.5rem;height:2.25rem;padding:0 1rem 0 .375rem;border-radius:var(--r-pill);background:rgba(255,255,255,.7);border:.125rem solid var(--sky-3);color:var(--ink-faint);font-size:var(--t-sm);font-weight:800;letter-spacing:.04em;
-  transition:transform var(--d-med) var(--ease-bounce)}
+  transition:transform var(--d-med) var(--ease-bounce), background-color var(--d-med) var(--ease-soft), border-color var(--d-med) var(--ease-soft), color var(--d-med) var(--ease-soft), box-shadow var(--d-med) var(--ease-soft)}      /* the pill's colours ease with its swell (the on-bubble's gradient still snaps) */
 .steps li > i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--sky-3);color:#fff;font-size:var(--t-xs)}
 .steps li.is-on{background:#fff;border-color:var(--line);color:var(--ink-strong);box-shadow:var(--sh-1);transform:scale(1.04)}
 .steps li.is-on > i{background:linear-gradient(180deg,var(--line),var(--line-deep))}
@@ -358,6 +364,13 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
     radial-gradient(circle at 34% 28%, #fbffa8, var(--ball) 58%, #c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35), 0 .03em .06em rgba(40,80,110,.25)}
 .logo-tag{font-size:var(--t-md);font-weight:800;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-soft);margin:0 -.42em 0 0}
 .title-prompt{display:flex;flex-direction:column;align-items:center;gap:var(--s-3)}
+.screen.is-active .logo-mark > span{animation:hm-letter 560ms var(--ease-bounce) backwards} .screen.is-active .logo-mark > span:nth-child(3){animation-delay:180ms} .screen.is-active .logo-mark > span:nth-child(4){animation-delay:240ms}      /* the letters pop up in turn */
+.screen.is-active .logo-mark > .logo-ball{animation:hm-ball-drop 900ms linear 120ms backwards, hm-ball-hop 4200ms var(--ease-soft) 1.4s infinite}      /* the o is a ball: it drops in, squashes, hops once, then bounces now and then while the title waits */
+.screen.is-active .logo-tag{animation:hm-rise 480ms var(--ease-out) 320ms backwards} .screen.is-active .title-prompt{animation:hm-rise 520ms var(--ease-out) 380ms backwards}      /* on the wrapper, not #btn-start: its breathing stays its own */
+@keyframes hm-letter{from{opacity:0;translate:0 .35em;scale:.8}}
+@keyframes hm-ball-drop{0%{opacity:0;translate:0 -1.4em;rotate:-220deg;animation-timing-function:cubic-bezier(.5,0,1,.6)}55%{opacity:1;translate:0 0;scale:1.12 .86;animation-timing-function:cubic-bezier(.2,.8,.3,1)}75%{translate:0 -.18em;scale:.96 1.04;animation-timing-function:cubic-bezier(.5,0,1,.6)}90%{translate:0 0;scale:1.04 .96}100%{translate:0 0;rotate:0deg;scale:1}}
+@keyframes hm-ball-hop{0%,86%,100%{translate:0 0;scale:1}90%{translate:0 -.14em;scale:.97 1.03}95%{translate:0 0;scale:1.05 .95}98%{translate:0 0;scale:1}}
+@keyframes hm-rise{from{opacity:0;translate:0 .75rem}}
 .safety{display:flex;align-items:center;gap:var(--s-5);text-align:left;width:min(46rem,92vw)}
 .safety-icon{flex:none;width:4.5rem;height:4.5rem}
 .safety h3{margin:0 0 .125rem;font-size:var(--t-lg);font-weight:700;color:var(--ink-strong)}
@@ -481,19 +494,27 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .btn:disabled{opacity:.5;cursor:default;box-shadow:var(--sh-1)} .btn:disabled::after{display:none}
 .btn-back{position:absolute;left:var(--s-5);top:50%;translate:0 -50%;padding:0 1.25rem 0 1rem;gap:.5rem}
 .btn-back svg{width:.625rem;height:1rem;fill:none;stroke:var(--line-deep);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.btn-back svg{transition:translate 240ms var(--ease-bounce)} @media (hover:hover){ .btn-back:hover svg{translate:-.25rem 0} } .btn-back:focus-visible svg{translate:-.1875rem 0} .btn-back:active svg{translate:-.375rem 0}      /* the arrow leans the way it goes */
+#title-room{animation:hm-pop var(--d-med) var(--ease-bounce) 200ms backwards} @keyframes hm-pop{from{opacity:0;scale:.8}}
 .room-chip{display:inline-flex;align-items:center;gap:.375rem;height:2.25rem;padding:0 1.125rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-1);font-size:var(--t-md);font-weight:700;color:var(--ink)}
 .room-chip b,.room-pill b{font-weight:900;letter-spacing:.14em;color:var(--me-ink);margin-right:-.14em}
 
 /* lobby header bits */
 .lobby-online{position:absolute;right:var(--s-7);top:50%;translate:0 -50%;display:inline-flex;align-items:center;gap:.5rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
 .lobby-online::before{content:"";width:.625rem;height:.625rem;border-radius:50%;background:var(--good);box-shadow:0 0 0 .125rem #fff}
+.lobby-online{animation:hm-pop var(--d-med) var(--ease-bounce) backwards} .lobby-online::after{content:"";position:absolute;left:0;top:50%;width:.625rem;height:.625rem;margin-top:-.3125rem;border-radius:50%;background:var(--good);animation:hm-ping 2400ms var(--ease-out) infinite;pointer-events:none}      /* a soft sonar on the live dot */
+@keyframes hm-ping{0%{transform:scale(1);opacity:.55}70%,100%{transform:scale(2.6);opacity:0}}
 #lobby-down{position:absolute;top:calc(5rem - 1.375rem);left:50%;translate:-50% 0;z-index:2}      /* placed on the screen, not the (scrolling) body: it takes no room and hangs on the header's bottom edge, so the name row and the courts never move when it comes and goes */
 .lobby-down{display:inline-flex;align-items:center;gap:.625rem;margin:0;height:2.75rem;padding:0 1.5rem;border-radius:var(--r-pill);background:#fff6e0;border:.125rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-md);font-weight:700;box-shadow:var(--sh-1)}
 .lobby-down .light{background:radial-gradient(circle at 35% 30%,#ffe2a8,var(--warn) 55%,var(--warn-lamp));box-shadow:0 0 0 .125rem #fff}
 .lobby-down .dots-wait i{background:var(--warn-lamp)}
+.lobby-down{animation:hm-hang 420ms var(--ease-bounce) backwards} @keyframes hm-hang{from{opacity:0;transform:translateY(-1.25rem) scale(.9)}}      /* hangs down from the header */
 
 /* views: one at a time */
-.lobby-view{animation:panel-in var(--d-med) var(--ease-out) both}
+#screen-lobby .lobby-view{animation:hm-view-in 380ms var(--ease-out) backwards}      /* backwards, not both: nothing is held afterwards, so the busy dim below works */
+#screen-lobby[data-dir="fwd"] .lobby-view{animation-name:hm-view-fwd} #screen-lobby[data-dir="back"] .lobby-view{animation-name:hm-view-back}      /* deeper views come in from the right, Back brings the last one in from the left (ui.js lobbyView) */
+#screen-lobby #lobby-home{animation:hm-fade var(--d-med) var(--ease-soft) backwards}      /* the home view's tiles deal themselves in: the container only fades */
+@keyframes hm-view-in{from{opacity:0;translate:0 1rem;scale:.965}} @keyframes hm-view-fwd{from{opacity:0;translate:3rem 0;scale:.98}} @keyframes hm-view-back{from{opacity:0;translate:-3rem 0;scale:.98}} @keyframes hm-fade{from{opacity:0}}
 .lobby-home{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);width:100%}
 .panel.lobby-view{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);padding:var(--s-6)}
 #screen-lobby[aria-busy="true"] .lobby-view{pointer-events:none;opacity:.6;transition:opacity var(--d-fast) linear 250ms}      /* 250 ms: an answer normally beats it, so no flicker */
@@ -501,16 +522,18 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 #screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down #btn-watch-code,#screen-lobby.is-down #btn-create,#screen-lobby.is-down #btn-tour,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
 /* first visit, no name yet: the choices are dimmed but still take the click, which sends the player to the name field */
 #screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name #btn-create,#screen-lobby.needs-name #btn-join,#screen-lobby.needs-name #btn-watch-code,#screen-lobby.needs-name .court-state .btn,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
-#screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
+#screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;rotate:none;background-position:100% 0,0 0;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
 
 /* name: one field above every lobby view but the share card. Also the look of the name field in the settings panel (.field) */
-.name-row{flex:none;display:flex;align-items:center;gap:var(--s-3);padding:.375rem .375rem .375rem 1.5rem;border-radius:var(--r-pill);background:rgba(255,255,255,.72);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1)}
+.name-row{flex:none;display:flex;align-items:center;gap:var(--s-3);padding:.375rem .375rem .375rem 1.5rem;border-radius:var(--r-pill);background:rgba(255,255,255,.72);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1);position:relative;transition:background-color var(--d-med) var(--ease-soft), border-color var(--d-med) var(--ease-soft)}
 .name-row label{font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
 .field{width:17rem;height:3rem;padding:0 1.25rem;border-radius:var(--r-pill);border:.1875rem solid var(--sky-4);background:linear-gradient(180deg,var(--sky-1),#fff);box-shadow:inset 0 .125rem .375rem rgba(120,170,200,.25);
   color:var(--ink-strong);font:700 var(--t-lg)/1 var(--font);letter-spacing:.02em;caret-color:var(--line);outline:0;min-width:0}
 .field:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .125rem .375rem rgba(120,170,200,.25)}
+.menu-glass .field{transition:border-color var(--d-fast) linear, box-shadow var(--d-fast) linear}      /* lobby only: the settings panel's field sits over a live rally */
 .name-row.is-bad .field{border-color:var(--bad)} .name-row.is-error{animation:nudge 420ms var(--ease-soft) 1}
 #screen-lobby.needs-name .name-row{background:#fff;border-color:var(--line)}
+#screen-lobby.needs-name .name-row:not(:focus-within)::after{content:"";position:absolute;inset:-.1875rem;border-radius:inherit;box-shadow:var(--glow);opacity:.8;pointer-events:none;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}      /* first visit: the one thing to do breathes until you are in it */
 
 /* Play a bot: Matt's three levels, one click plays */
 .bot-levels{display:grid;grid-template-columns:repeat(4,1fr);justify-content:center;gap:var(--s-4);width:100%}      /* Rookie, Club, Tour, Pro: four across, two by two on a narrow window */
@@ -528,16 +551,40 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 /* the four big tiles */
 .tiles{display:flex;flex-wrap:wrap;gap:var(--s-5);justify-content:center}
 .tile{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-3);width:17rem;height:14.5rem;padding:0;border-radius:var(--r-xl);
-  border:.25rem solid rgba(255,255,255,.9);background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 var(--t-xl)/1.1 var(--font);letter-spacing:.02em;
-  box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce)}
+  border:.25rem solid rgba(255,255,255,.9);background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.95) 50%,transparent 60%) 100% 0/250% 100% no-repeat, linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 var(--t-xl)/1.1 var(--font);letter-spacing:.02em;
+  box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 0s}      /* layer 1 is a sheen parked off the left edge; it snaps back unseen (0s) */
 .tile::before{content:"";position:absolute;inset:.375rem .375rem auto;height:46%;border-radius:calc(var(--r-xl) - .5rem) calc(var(--r-xl) - .5rem) 50% 50% / calc(var(--r-xl) - .5rem) calc(var(--r-xl) - .5rem) 1.25rem 1.25rem;background:linear-gradient(180deg,#fff,rgba(255,255,255,.4));pointer-events:none;z-index:-1}
-.tile::after{content:"";position:absolute;inset:-.25rem;border-radius:inherit;box-shadow:var(--glow);opacity:0;pointer-events:none;transition:opacity var(--d-fast) linear}
+.tile::after{content:"";position:absolute;inset:-.25rem;border-radius:inherit;box-shadow:var(--glow), 0 1.25rem 1.75rem -.5rem rgba(40,80,110,.30);opacity:0;pointer-events:none;transition:opacity var(--d-med) var(--ease-soft)}      /* the halo carries a deeper drop shadow: the lift's shadow grows by opacity alone, never an animated box-shadow */
 .tile svg{width:6.5rem;height:6.5rem}
 .tile b{font-weight:800}
 .tile:hover,.tile:focus-visible{border-color:var(--line)}       /* the outline blue marks the ONE selected tile, as on a console menu; the rest are plain white */
-.tile:hover{transform:translateY(-.25rem) scale(1.02)} .tile:hover::after{opacity:.7}
-.tile:focus-visible{transform:translateY(-.25rem) scale(1.03)} .tile:focus-visible::after{opacity:1;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
-.tile:active{transform:scale(.97);background:linear-gradient(180deg,#e4f3fa,#d3ebf6)}
+.tile:focus-visible{transform:translateY(-.25rem) scale(1.03);background-position:0 0,0 0;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 750ms var(--ease-soft)} .tile:focus-visible::after{opacity:1;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+@media (hover:hover){ .tile:hover{transform:translateY(-.4375rem) scale(1.035);rotate:-.6deg;background-position:0 0,0 0;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 750ms var(--ease-soft)} .tile:nth-child(2):hover{rotate:.6deg} .tile:hover::after{opacity:.75} }      /* lifts, tips a touch and a light runs across it. Before :active, or the lift beats the press */
+.tile:active,.tile:nth-child(n):active{transform:scale(.96);rotate:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transition-duration:90ms}      /* the press goes in fast; the 260ms spring plays on release */
+.tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
+.tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
+@keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
+/* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks.
+   Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
+   The hover block comes after the focus one: both match a focused tile under the mouse, and the loop must win */
+.tile svg *{transform-box:view-box}
+#btn-quick .art-accent-fill{transform-origin:53px 48px} #btn-quick .art-fill{transform-origin:48px 48px}
+#btn-courts circle,#btn-courts .art-accent{transform-origin:63px 59px}      /* lens and handle move as one */
+#btn-bot .art-fill circle,#btn-bot g.art-accent{transform-origin:48px 50px}      /* head and eyes tilt on the neck */
+#btn-quick:focus-visible .art-accent-fill{animation:ic-play 1400ms var(--ease-soft) 1} #btn-quick:focus-visible .art-fill{animation:ic-ring 1400ms var(--ease-soft) 1}
+#btn-courts:focus-visible circle,#btn-courts:focus-visible .art-accent{animation:ic-scan 1800ms var(--ease-soft) 1}
+#btn-bot:focus-visible .art-fill circle{animation:ic-tilt 1800ms var(--ease-soft) 1} #btn-bot:focus-visible g.art-accent{animation:ic-blink 1800ms var(--ease-soft) 1}
+@media (hover:hover){
+  #btn-quick:hover .art-accent-fill{animation:ic-play 1400ms var(--ease-soft) infinite} #btn-quick:hover .art-fill{animation:ic-ring 1400ms var(--ease-soft) infinite}
+  #btn-courts:hover circle,#btn-courts:hover .art-accent{animation:ic-scan 1800ms var(--ease-soft) infinite}
+  #btn-bot:hover .art-fill circle{animation:ic-tilt 1800ms var(--ease-soft) infinite} #btn-bot:hover g.art-accent{animation:ic-blink 1800ms var(--ease-soft) infinite}
+}
+#screen-lobby.needs-name .tile svg *,#screen-lobby.is-down .tile svg *{animation:none}      /* a dimmed tile stays still (last: it ties the hover rules) */
+@keyframes ic-play{0%,45%,100%{transform:none}15%{transform:translateX(7px) scale(1.14,.88)}28%{transform:translateX(-2px) scale(.96,1.05)}38%{transform:translateX(2px)}}
+@keyframes ic-ring{0%,45%,100%{transform:none}15%{transform:scale(1.06)}30%{transform:scale(.98)}}
+@keyframes ic-scan{0%,100%{transform:none}22%{transform:translate(-14px,-8px) rotate(-14deg)}48%{transform:translate(-26px,-22px) rotate(10deg)}72%{transform:translate(-8px,-4px) rotate(-6deg)}}
+@keyframes ic-tilt{0%,100%{transform:none}22%{transform:rotate(-11deg)}50%{transform:rotate(8deg)}72%{transform:rotate(-3deg)}}
+@keyframes ic-blink{0%,100%{transform:rotate(0) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}22%{transform:rotate(-11deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}50%{transform:rotate(8deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}56%{transform:rotate(7deg) translate(0,-14.5px) scale(1,.1) translate(0,14.5px)}62%{transform:rotate(6deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}72%{transform:rotate(-3deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}}      /* the eyes follow the head's tilt and squash about their own middle (y 35.5, 14.5 above the neck): a blink */
 
 /* open rooms: a compact strip of pills under the tiles */
 .rooms{display:flex;flex-direction:column;align-items:center;gap:var(--s-2);width:min(55rem,100%);padding:var(--s-3) var(--s-5) var(--s-4);border-radius:var(--r-lg);background:rgba(255,255,255,.66);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1)}
@@ -588,11 +635,11 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 /* Copy link: hover (or click, or keyboard focus) drops two choices, the player link and the viewer link (&watch=1) */
 #share-row{z-index:3}
 .copy-menu{position:relative;flex:none}
-.copy-caret{width:.5rem;height:.5rem;margin:-.25rem -.25rem 0 0;border:solid currentColor;border-width:0 .15625rem .15625rem 0;transform:rotate(45deg);transition:transform var(--d-fast) var(--ease-soft)}
+.copy-caret{width:.5rem;height:.5rem;margin:-.25rem -.25rem 0 0;border:solid currentColor;border-width:0 .15625rem .15625rem 0;transform:rotate(45deg);transition:transform var(--d-med) var(--ease-bounce)}
 .copy-drop{position:absolute;right:0;top:calc(100% + .5rem);z-index:5;display:flex;flex-direction:column;gap:.125rem;min-width:15rem;padding:.375rem;border-radius:var(--r-lg);
-  background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-2);opacity:0;visibility:hidden;transform:translateY(-.375rem);transition:opacity var(--d-fast) linear, transform var(--d-fast) var(--ease-soft), visibility 0s linear var(--d-fast)}
+  background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-2);opacity:0;visibility:hidden;transform:translateY(-.5rem) scale(.94);transform-origin:100% 0;transition:opacity var(--d-fast) linear, transform var(--d-fast) var(--ease-soft), visibility 0s linear var(--d-fast)}
 .copy-drop::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:.625rem}      /* the gap under the button still counts as hovering */
-.copy-menu:hover .copy-drop,.copy-menu.is-open .copy-drop,.copy-menu:has(:focus-visible) .copy-drop{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.copy-menu:hover .copy-drop,.copy-menu.is-open .copy-drop,.copy-menu:has(:focus-visible) .copy-drop{opacity:1;visibility:visible;transform:none;transition:opacity var(--d-fast) linear, transform 300ms var(--ease-bounce), visibility 0s linear 0s}      /* unfolds from the button with a little spring; closes quick and soft (the base list) */
 .copy-menu:hover .copy-caret,.copy-menu.is-open .copy-caret,.copy-menu:has(:focus-visible) .copy-caret{transform:translateY(.1875rem) rotate(225deg)}
 .copy-opt{display:flex;flex-direction:row;align-items:center;gap:.625rem;padding:.5rem .875rem;border:0;border-radius:calc(var(--r-lg) - .375rem);background:none;font-family:var(--font);text-align:left;cursor:pointer;outline:0}
 .copy-txt{display:flex;flex-direction:column;align-items:flex-start;gap:.0625rem} .copy-opt b{font-size:var(--t-md);font-weight:700;color:var(--ink-strong)} .copy-opt small{font-size:var(--t-sm);font-weight:500;color:var(--ink-soft)}
@@ -668,7 +715,9 @@ body[data-paused] .set-list{background:#fff}
 .set-list > .set-row + .set-row:not([hidden]){box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
 .set-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:2.75rem;width:100%;padding:0 .5rem 0 .875rem;border:.125rem solid transparent;border-radius:0;background:none;
   color:var(--ink-strong);font:700 var(--t-md)/1.2 var(--font);text-align:left}
-button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent} button.set-row:hover{background:rgba(255,255,255,.9)}
+button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;position:relative;isolation:isolate}
+button.set-row::before{content:"";position:absolute;inset:.0625rem 0 0;border-radius:inherit;background:#fff;opacity:0;z-index:-1;pointer-events:none;transition:opacity var(--d-fast) linear}      /* the hover wash is a layer that fades (opacity), not a background swap: the card can sit over a live rally. The top inset keeps the hairline */
+@media (hover:hover){ button.set-row:hover::before{opacity:.9} } button.set-row:active::before{opacity:1;transition-duration:60ms}
 .set-list > :first-child{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)} .set-list > :last-child{border-bottom-left-radius:var(--r-md);border-bottom-right-radius:var(--r-md)}
 button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
 .set-action{color:var(--link)} .set-action svg{width:1.25rem;height:1.25rem;margin-right:.375rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}      /* Recentre camera: a row that does a thing, so it reads as a link, not a setting */
@@ -679,10 +728,12 @@ button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--lin
 .stepper{display:inline-flex;align-items:center;gap:.375rem} .stepper b{min-width:2rem;text-align:center;font-size:var(--t-lg);font-weight:800;font-variant-numeric:tabular-nums}
 .stepper .btn-icon{width:2.375rem;height:2.375rem;box-shadow:var(--sh-1), var(--inner-hi)} .stepper .btn-icon svg{width:1.25rem;height:1.25rem;stroke-width:3.25}
 /* switch: a track and a knob. Off = grey track, knob left; on = the outline blue, knob right, a tick of shape as well as colour */
-.set-switch i{flex:none;position:relative;width:3.25rem;height:1.875rem;border-radius:var(--r-pill);background:var(--sky-4);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3);transition:background var(--d-fast) linear}
-.set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform 360ms var(--ease-bounce), width 200ms var(--ease-out)}
-.set-switch[aria-checked="true"] i{background:linear-gradient(180deg,var(--line),var(--line-deep))} .set-switch[aria-checked="true"] i::after{transform:translateX(1.375rem)}
-.set-switch i{transition:background var(--d-med) var(--ease-soft)} .set-switch:active i::after{width:1.875rem} .set-switch[aria-checked="true"]:active i::after{transform:translateX(1.0625rem)}      /* the knob slides with a little overshoot and stretches while pressed, like a real toggle */
+.set-switch i{flex:none;position:relative;width:3.25rem;height:1.875rem;border-radius:var(--r-pill);background:var(--sky-4);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3)}
+.set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform 360ms var(--ease-bounce), width 200ms var(--ease-out), translate var(--d-fast) var(--ease-out)}
+.set-switch i::before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,var(--line),var(--line-deep));box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3);opacity:0;transition:opacity var(--d-med) var(--ease-soft)}      /* the blue is a layer that fades in: a gradient cannot be tweened, so swapping the background snapped (and flashed see-through going off) */
+.set-switch[aria-checked="true"] i::before{opacity:1} .set-switch[aria-checked="true"] i::after{transform:translateX(1.375rem)}
+.set-switch:active i::after{width:1.875rem} .set-switch[aria-checked="true"]:active i::after{transform:translateX(1.0625rem)}      /* the knob slides with a little overshoot and stretches while pressed, like a real toggle */
+@media (hover:hover){ .set-switch:hover i::after{translate:.125rem 0} .set-switch[aria-checked="true"]:hover i::after{translate:-.125rem 0} }      /* the knob leans toward where a click sends it (translate: composes with the slide) */
 .settings > *{flex-shrink:0}      /* the card scrolls; it never squeezes a row (it squashed Leave court to 13 px in a short window) */
 .set-foot{position:sticky;bottom:-.875rem;z-index:1;display:flex;flex-direction:column;gap:.5rem;margin:0 -.875rem -.875rem;padding:.75rem .875rem .875rem;
   border-radius:0 0 var(--r-lg) var(--r-lg);background:linear-gradient(180deg,rgba(236,244,248,0),rgba(236,244,248,.96) .75rem)}      /* pinned under the list, a soft fade where the rows scroll beneath it */
@@ -726,7 +777,7 @@ body[data-role="spectator"] #ping-pill{display:none}                           /
 body[data-role="spectator"] .emotes{display:flex}
 .emote-btn{display:grid;place-items:center;width:2.75rem;height:2.75rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce), opacity var(--d-fast)}
 .emote-btn img{width:2.125rem;height:2.125rem;pointer-events:none;user-select:none}
-.emote-btn:hover{transform:scale(1.18);background:var(--sky-2)} .emote-btn:active{transform:scale(.9)} .emote-btn:focus-visible{box-shadow:var(--glow)}
+@media (hover:hover){ .emote-btn:hover{transform:scale(1.18);background:var(--sky-2)} } .emote-btn:active{transform:scale(.9)}      /* the grow is for a mouse: on a phone a tapped emote stayed swollen */ .emote-btn:focus-visible{box-shadow:var(--glow)}
 body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none;transition-duration:140ms}
 .emote-layer{position:fixed;inset:0;z-index:var(--z-hud);pointer-events:none;overflow:hidden}
 /* a live-stream reaction: born just above the emote row in the bottom-right corner, it swells in, then floats up about half the
@@ -747,14 +798,14 @@ body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-eve
 /* notices: a small card on the left edge, half way down, when someone starts watching you. It slides in from the left for a few seconds, then slides back out.
    Half way down keeps it clear of the HUD corner above and the key hints / view chips below, and the settings panel takes the same space: that hides it. */
 .notices{position:fixed;left:var(--edge);top:50%;translate:0 -50%;z-index:calc(var(--z-hud) + 3);display:flex;flex-direction:column;align-items:flex-start;gap:.375rem;pointer-events:none}
-.notice{display:inline-flex;align-items:center;gap:.5rem;width:max-content;max-width:min(18rem, calc(100vw - 2 * var(--edge)));height:2.25rem;padding:0 .875rem 0 .625rem;border-radius:var(--r-pill);background:rgba(255,255,255,.95);border:.09375rem solid #fff;box-shadow:var(--sh-hud);
+.notices .notice{display:inline-flex;align-items:center;gap:.5rem;width:max-content;max-width:min(18rem, calc(100vw - 2 * var(--edge)));height:2.25rem;padding:0 .875rem 0 .625rem;border-radius:var(--r-pill);background:rgba(255,255,255,.95);border:.09375rem solid #fff;box-shadow:var(--sh-hud);
   color:var(--ink-strong);font-size:var(--t-sm);font-weight:700;white-space:nowrap;animation:notice-in 420ms var(--ease-bounce) both}
-.notice span{overflow:hidden;text-overflow:ellipsis}
-.notice svg{flex:none;width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .notice svg circle{fill:var(--ink-soft);stroke:none}
-.notice.is-out{animation:notice-out 320ms var(--ease-soft) both}
+.notices .notice span{overflow:hidden;text-overflow:ellipsis}
+.notices .notice svg{flex:none;width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .notices .notice svg circle{fill:var(--ink-soft);stroke:none}
+.notices .notice.is-out{animation:notice-out 320ms var(--ease-soft) both}
 @keyframes notice-in{from{opacity:0;transform:translateX(-1.5rem)} to{opacity:1;transform:none}}
 @keyframes notice-out{to{opacity:0;transform:translateX(-1.5rem)}}
-@media (prefers-reduced-motion: reduce){ .notice,.notice.is-out{animation-duration:1ms} }
+@media (prefers-reduced-motion: reduce){ .notices .notice,.notices .notice.is-out{animation-duration:1ms} }      /* .notices: a bare .notice is also the server-down / game-full card, which this pill rule squashed */
 body[data-overlay] .notices,body[data-settings] .notices{opacity:0}
 .hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:var(--sh-3), var(--inner-hi);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;max-width:calc(100vw - 2 * var(--edge))}
@@ -782,9 +833,9 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 /* title screen: the one line a visitor needs before anything else, centred in the footer */
 .menu-foot-note{justify-content:center;text-align:center;font-weight:700;font-size:max(14px,var(--t-sm));color:var(--ink)}      /* a px floor: in a small window 1rem is 10px and this line, the one that says Mac, fell to 9 px there */
 .menu-glass .menu-foot-note{flex-wrap:wrap;height:auto;min-height:3.5rem;row-gap:.125rem;column-gap:var(--s-4);padding-top:.375rem;padding-bottom:.375rem}
-.foot-link{flex:none;color:var(--line-deep);font-weight:800;font-size:max(14px,var(--t-sm));text-decoration:none;white-space:nowrap}
+.foot-link{flex:none;color:var(--line-deep);font-weight:800;font-size:max(14px,var(--t-sm));text-decoration:none;white-space:nowrap;background:linear-gradient(currentColor,currentColor) 0 100%/0 .125rem no-repeat;transition:background-size var(--d-med) var(--ease-out)}
 .t-note.is-loud{font-size:max(14px,var(--t-sm));font-weight:700}      /* not on a Mac (main.js): the note under Play says so, at a size a phone can read */
-.foot-link:hover,.foot-link:focus-visible{text-decoration:underline}
+.foot-link:focus-visible{background-size:100% .125rem} @media (hover:hover){ .foot-link:hover{background-size:100% .125rem} }      /* the underline draws in from the left */
 /* the logo is the page's h1 and reads "Poddle" to crawlers and screen readers: the ball that is drawn for the o holds a real o */
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
@@ -822,6 +873,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .lobby-home{flex:1;justify-content:center}                                               /* the home view holds only the tiles now */
 .tile-sub{position:absolute;top:.875rem;right:.875rem;height:1.75rem;padding:0 .625rem;border-radius:var(--r-pill);display:inline-flex;align-items:center;background:var(--me-tint);border:.125rem solid #cfe4fb;
   color:var(--me-ink);font-size:var(--t-sm);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}      /* '5 open': a badge in the corner, so the tile never moves when it comes and goes */
+.tile-sub{transition:opacity var(--d-med) var(--ease-soft), scale var(--d-med) var(--ease-bounce), visibility 0s linear 0s} .tile-sub.is-off{opacity:0;scale:.5;visibility:hidden;transition-delay:0s,0s,var(--d-med)} .tile-sub.pop{animation:num-pop 450ms var(--ease-bounce)}      /* '5 open' pops in, and bumps when the count moves */
 .btn.is-tall,.is-tall{min-height:44px}
 .btn svg{flex:none}
 .courts-code .btn svg,.courts-make .btn svg,.room-watch svg,.ask-play svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
@@ -844,7 +896,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .court-wrap .room-bar{right:.3125rem;top:.75rem;bottom:.75rem}
 .court-wrap::after{content:"";position:absolute;left:.5rem;right:1rem;bottom:.5rem;height:2rem;pointer-events:none;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.9));border-radius:0 0 var(--r-lg) var(--r-lg)}      /* a row cut off at the bottom fades: the list scrolls */
 .court-list li{display:flex;align-items:center;gap:.5rem;flex:none}
-.court-row{flex:1;min-width:0;display:grid;grid-template-columns:6rem minmax(0,1fr) auto auto;align-items:center;column-gap:.875rem;height:auto;min-height:max(3.5rem,44px);padding:.25rem .5rem .25rem 1.25rem;text-align:left;transition:transform var(--d-fast) var(--ease-out)}
+.court-row{flex:1;min-width:0;display:grid;grid-template-columns:6rem minmax(0,1fr) auto auto;align-items:center;column-gap:.875rem;height:auto;min-height:max(3.5rem,44px);padding:.25rem .5rem .25rem 1.25rem;text-align:left;transition:transform var(--d-fast) var(--ease-out), box-shadow var(--d-med) var(--ease-soft)}      /* the hover halo eases on (lobby only: no rally under it) */
 .court-row::after{display:none}
 .court-row:hover,.court-row:focus-visible{transform:none;box-shadow:var(--glow)}        /* no scale: a scaled row in a scroll box clips its halo and nudges its neighbours */
 .court-row:active{transform:scale(.985)}
@@ -882,7 +934,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .code-boxes.is-sm{gap:.5rem} .code-boxes.is-sm .code-box{width:max(4.25rem,44px);height:max(5.5rem,52px);font-size:var(--t-2xl)}
 .courts-code .code-err{margin:0;min-height:1.4em;font-size:var(--t-sm)}
 .code-hint{margin:-.375rem 0 .125rem}
-.code-err:not(:empty) + .code-hint{visibility:hidden}      /* the error takes the hint's place; the height stays, nothing moves */
+.code-hint{transition:opacity var(--d-med) var(--ease-soft), visibility 0s linear 0s} .code-err:not(:empty) + .code-hint{visibility:hidden;opacity:0;transition:opacity var(--d-fast) linear, visibility 0s linear var(--d-fast)}      /* the error takes the hint's place; the hint fades rather than blinks. The height stays, nothing moves */
 .code-acts{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-2);width:100%;margin:0}
 .code-acts .btn,.courts-make .btn{height:max(3.5rem,44px);padding:0 1rem;gap:.5rem;font-size:var(--t-md)}
 .courts-rule{width:100%;margin:0;border:0;border-top:.125rem dashed var(--line-soft)}
@@ -912,7 +964,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .ask-card{position:fixed;left:var(--edge);bottom:var(--edge);width:min(32rem, calc(100vw - 2 * var(--edge)));z-index:calc(var(--z-toast) - 1);display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.625rem .75rem .75rem 1rem;overflow:hidden;
   border-radius:var(--r-lg);border:2px solid var(--line-soft);background:linear-gradient(180deg,#fff,var(--sky-1));box-shadow:var(--sh-hud);
   opacity:0;transform:translateY(1rem);transition:opacity 200ms linear, transform 200ms linear}
-.ask-card.is-on{opacity:1;transform:none;transition:opacity 320ms var(--ease-out), transform 320ms var(--ease-out)}
+.ask-card.is-on{opacity:1;transform:none;transition:opacity 320ms var(--ease-out), transform 420ms var(--ease-bounce)}      /* arrives with a small spring */
 .ask-card[hidden],body:not([data-screen="hud"]) .ask-card{display:none}                 /* never over a menu screen: a request there just runs out */
 body.has-toast .ask-card{bottom:calc(var(--edge) + 3.75rem)}
 .ask-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.25rem;background:var(--them)}      /* the keyline, drawn inside: a thick left border on a round box tapers into a crescent */
@@ -942,7 +994,148 @@ body[data-overlay] .ask-play{display:none!important}
 @keyframes ask-drain{from{transform:scaleX(1)} to{transform:scaleX(0)}}
 @media (min-width:701px){ body.has-toast .ask-play{right:var(--edge)} body[data-role="spectator"]:has(#btn-ask:not([hidden])) .views{max-width:calc(100vw - 2 * var(--edge) - 37.625rem)} }      /* 20.625rem: the emote row's width here. A toast (bottom centre) hides the emotes, and the button takes their corner until it goes. The chip row never runs under the button */
 @media (max-width:700px){ .ask-play{right:calc(var(--edge) + 18.95rem + .375rem);bottom:calc(var(--edge) + 5.25rem - .5rem);width:min(16rem, calc(100vw - 2 * var(--edge) - 19.325rem))} }      /* the emotes sit above the view chips here (18.95rem wide): the button sits beside them on that row, never on the near baseline. Under 390 px it gives up width rather than run off the left edge */
-@media (prefers-reduced-motion: reduce){ .ask-card,.ask-card.is-on{transition:none} .ask-play[data-s="sent"] .ask-ring.go{animation:none} .court-row.is-skel::after{animation:none;display:none} }
+@media (prefers-reduced-motion: reduce){ .ask-card,.ask-card.is-on,.ask-card::before{transition:none} .ask-play[data-s="sent"] .ask-ring.go{animation:none} .court-row.is-skel::after{animation:none;display:none} }
+/* ---------- Courts, Create, Share, Play a bot, set-up: motion (ui.js adds the lob-* one-shots; its animationend listener takes them off again) ---------- */
+.court.lob-in{animation:lob-row-in 380ms var(--ease-out) both;animation-delay:calc(var(--i,0) * 45ms)}      /* a court that just opened rises in; a new tab or the first list after the skeletons staggers (ui.js drawCourts) */
+.court-meta.lob-pop{transform-origin:0 50%;animation:num-pop 450ms var(--ease-bounce)}      /* its score or watcher count moved */
+.seg-n.lob-pop{animation:num-pop 450ms var(--ease-bounce)}      /* Open 3 -> Open 4 hops (the pop sits on the count, so the option's press and the thumb are untouched) */
+.lobby-online.lob-pop{animation:hm-pop var(--d-med) var(--ease-bounce) backwards, num-pop 450ms var(--ease-bounce)}      /* 'N online' hops. hm-pop stays in the list: dropping it would replay the entrance when the class comes off */
+.court-go{transition:scale var(--d-med) var(--ease-bounce)} .court-go::after{transition:translate var(--d-med) var(--ease-bounce)}      /* translate, not transform: the chevron is drawn with rotate */
+@media (hover:hover){ #screen-lobby:not(.needs-name):not(.is-down) .court-row:not([aria-disabled="true"]):hover .court-go{scale:1.07} #screen-lobby:not(.needs-name):not(.is-down) .court-row:not([aria-disabled="true"]):hover .court-go::after{translate:.25rem 0} }      /* the row says 'go': its pill swells and the arrow leans in */
+.court-row:not([aria-disabled="true"]):focus-visible .court-go{scale:1.07} .court-row:not([aria-disabled="true"]):focus-visible .court-go::after{translate:.25rem 0}
+.room-bar{transition:opacity var(--d-med) var(--ease-soft)} @starting-style{.room-bar{opacity:0}} .room-bar i{transition:background-color var(--d-fast) linear} @media (hover:hover){ .room-bar:hover i{background:var(--line-deep)} }      /* the track fades in when the list overflows; the thumb darkens under the pointer (its top and height never transition: that would lag the drag) */
+.search svg{transition:scale var(--d-med) var(--ease-bounce), rotate var(--d-med) var(--ease-bounce), stroke var(--d-fast) linear} .search:focus-within svg{scale:1.14;rotate:-12deg;stroke:var(--line-deep)}      /* the glass tips up to look (scale/rotate: translate centres it) */
+#screen-lobby .lobby-view{transition:opacity var(--d-fast) linear, filter var(--d-med) var(--ease-soft)}      /* back from busy fades too (the 250 ms delay lives only on the way in); the 'Watch instead?' desaturate eases */
+/* code boxes, Join / Watch */
+input.code-box{transition:border-color var(--d-fast) var(--ease-soft), box-shadow var(--d-med) var(--ease-out)}      /* the focus ring and the red is-bad border ease in */
+input.code-box.lob-fill{animation:lob-fill 300ms var(--ease-bounce) both;animation-delay:calc(var(--i,0) * 40ms)}      /* a letter lands with a squash-pop; a pasted code deals in box by box */
+input.code-box.lob-clear{animation:lob-clear 220ms var(--ease-out)}
+.code-acts .btn:disabled{scale:.94}      /* the 4th letter wakes Join / Watch: .btn's own scale + opacity transitions fade them up and spring them to size */
+.code-err:not(:empty){animation:lob-err-in 320ms var(--ease-bounce)}      /* 'Court not found' drops in as the boxes shake */
+.courts-make .btn svg{transition:rotate 420ms var(--ease-bounce), scale 420ms var(--ease-bounce)}
+@media (hover:hover){ #screen-lobby:not(.needs-name):not(.is-down) #btn-create:hover svg{rotate:90deg;scale:1.18} #screen-lobby:not(.needs-name):not(.is-down) :is(#btn-watch-code:not(:disabled),.room-watch):hover svg{animation:lob-blink 420ms var(--ease-soft)} }      /* the plus spins a quarter turn; the eye blinks */
+#btn-create:focus-visible svg{rotate:90deg;scale:1.18} :is(#btn-watch-code,.room-watch):focus-visible svg{animation:lob-blink-k 420ms var(--ease-soft)}
+.tour-note.lob-nope{animation:nudge 420ms var(--ease-soft)} .tour-note.lob-nope em{transform-origin:0 50%;animation:num-pop 400ms var(--ease-bounce)}      /* pressing the coming-soon button: the note shakes its head, 'coming soon' hops */
+/* Create court, Your court */
+.t-title.lob-swap,.t-note.lob-swap,.cal-msg.lob-swap,.court-state.lob-swap{animation:lob-swap 300ms var(--ease-out)}      /* new words slide up into place */
+#lobby-share .code-box{animation:lob-deal 520ms var(--ease-bounce) both} #lobby-share .code-box:nth-child(2){animation-delay:70ms} #lobby-share .code-box:nth-child(3){animation-delay:140ms} #lobby-share .code-box:nth-child(4){animation-delay:210ms}      /* your new court's code is dealt out like cards */
+#copy-label.lob-pop{animation:num-pop 450ms var(--ease-bounce)}      /* 'Copied' hops in */
+.copy-opt{opacity:0;transform:translateY(-.25rem);transition:opacity var(--d-fast) linear, transform var(--d-fast) var(--ease-soft)} .copy-opt:nth-child(2){--d:50ms}
+.copy-menu:hover .copy-opt,.copy-menu.is-open .copy-opt,.copy-menu:has(:focus-visible) .copy-opt{opacity:1;transform:none;transition:opacity 200ms linear calc(40ms + var(--d,0ms)), transform 320ms var(--ease-bounce) calc(40ms + var(--d,0ms))}      /* the two choices drop in one after the other; the delay lives only on the way in (also the HUD court pill: transform + opacity only) */
+.room-menu .copy-drop{transform-origin:0 0}      /* the court pill's drop hangs from its left */
+.copy-ic{transition:transform var(--d-med) var(--ease-bounce);transform-origin:50% 85%} .copy-opt[data-copy="watch"] .copy-ic{transform-origin:50% 50%}
+@media (hover:hover){ .copy-opt[data-copy="play"]:hover .copy-ic{transform:rotate(-16deg) scale(1.12)} .copy-opt[data-copy="watch"]:hover .copy-ic{animation:lob-blink 420ms var(--ease-soft)} }      /* the paddle swings, the eye blinks */
+.copy-opt[data-copy="play"]:focus-visible .copy-ic{transform:rotate(-16deg) scale(1.12)} .copy-opt[data-copy="watch"]:focus-visible .copy-ic{animation:lob-blink-k 420ms var(--ease-soft)}
+/* Play a bot: each level moves like it plays. On the card's words, never the .btn: its press, hover scale and breathing stay its own */
+.bot-levels .btn > b{display:block}
+@media (hover:hover){ #screen-lobby:not(.needs-name):not(.is-down) #btn-bot-0:hover > b{animation:lob-sway 720ms var(--ease-soft)} #screen-lobby:not(.needs-name):not(.is-down) #btn-bot-1:hover > b{animation:lob-hop 480ms var(--ease-bounce)} #screen-lobby:not(.needs-name):not(.is-down) #btn-bot-3:hover > b{animation:lob-hop 360ms var(--ease-bounce) 2} #screen-lobby:not(.needs-name):not(.is-down) #btn-bot-2:hover > b{animation:lob-zip 380ms var(--ease-out)} }      /* Rookie ambles, Club hops, Tour double-hops, Pro darts */
+#btn-bot-0:focus-visible > b{animation:lob-sway-k 720ms var(--ease-soft)} #btn-bot-1:focus-visible > b{animation:lob-hop-k 480ms var(--ease-bounce)} #btn-bot-3:focus-visible > b{animation:lob-hop-k 360ms var(--ease-bounce) 2} #btn-bot-2:focus-visible > b{animation:lob-zip-k 380ms var(--ease-out)}      /* the keyboard twins: same moves under a -k name, so a focused card still plays again when the mouse comes over it (an unchanged name never restarts) */
+.bot-levels .btn > *{transition:opacity 280ms var(--ease-soft), translate 420ms var(--ease-bounce)} @starting-style{.bot-levels .btn > *{opacity:0;translate:0 .625rem}} .bot-levels .btn:nth-child(2) > *{transition-delay:50ms} .bot-levels .btn:nth-child(3) > *{transition-delay:100ms} .bot-levels .btn:nth-child(4) > *{transition-delay:150ms}      /* each card's words rise in, left to right (translate: the hover plays on transform, so they compose) */
+/* 'Court is full. Watch instead?' */
+#screen-lobby.is-active .ask.lob-out{animation:lob-out 200ms var(--ease-soft) both;pointer-events:none}      /* it shrinks away (ui.js askWatch). Id-level: .screen.is-active .panel's panel-in would win otherwise */
+/* connect: the status rows, the QR, Phone | AirPod */
+.status-row{transition:border-color var(--d-med) var(--ease-soft)}
+.status-row.is-ok > .light{animation:lob-light-ok 520ms var(--ease-bounce)} .status-row.is-ok .status-state{animation:num-pop 450ms var(--ease-bounce)}      /* Ready: the lamp flares and the word hops (.status-row only: the settings card's chips sit over a rally) */
+.status-row.is-bad{animation:nudge 420ms var(--ease-soft) 1}      /* Problem: the row shakes once */
+.pad-qr > svg{animation:lob-qr-in 480ms var(--ease-bounce) both}      /* the code arrives with a little spring */
+.pad-pair{transition:opacity var(--d-med) var(--ease-soft), translate var(--d-med) var(--ease-out)} @starting-style{.pad-pair{opacity:0;translate:0 .5rem}}      /* Phone <-> AirPod: the new block rises in instead of popping */
+.seg-paddle svg{transition:rotate var(--d-med) var(--ease-bounce), scale var(--d-med) var(--ease-bounce)}
+.seg-paddle .seg-opt[aria-checked="true"] svg{animation:lob-hop 480ms var(--ease-bounce)}      /* the picked paddle hops as the thumb lands */
+@media (hover:hover){ .seg-paddle .seg-opt[aria-checked="false"]:hover svg{rotate:-12deg;scale:1.12} }
+/* calibrate */
+.steps li.is-done > i{animation:num-pop 450ms var(--ease-bounce)}      /* a step done: its number hops as it turns green */
+.cal-count b.lob-pop{animation:num-pop 450ms var(--ease-bounce)}      /* each second ticks with a hop */
+#art-screen{transition:opacity var(--d-med) var(--ease-soft)} #art-hold,#art-tilt{animation:lob-fade var(--d-med) var(--ease-soft)}      /* the screen dims softly; each pose fades in as it shows (a keyframe: @starting-style does not reach an SVG <g>) */
+/* the ask card (over a rally: transform and opacity only) */
+.ask-card::before{transform:scaleY(0);transform-origin:50% 100%;transition:transform 420ms var(--ease-bounce) 120ms} .ask-card.is-on::before{transform:none}      /* the keyline grows up the edge after the card lands */
+.ask-q b.lob-pop{animation:num-pop 450ms var(--ease-bounce) 150ms both}      /* the asker's name hops */
+.ask-card.is-late .ask-bar{animation:light-blink 700ms var(--ease-soft) infinite}      /* the last 3 s: the bar pulses (opacity) */
+@media (prefers-reduced-motion: reduce){ .copy-menu .copy-opt,.bot-levels .btn > *{transition-delay:0s!important} }      /* the global block clamps durations, not transition delays */
+@keyframes lob-row-in{from{opacity:0;transform:translateY(.625rem) scale(.98)}}
+@keyframes lob-fill{0%{transform:scale(.86)}55%{transform:scale(1.08)}100%{transform:none}}
+@keyframes lob-clear{0%{transform:scale(1)}40%{transform:scale(.92)}100%{transform:none}}
+@keyframes lob-swap{from{opacity:.2;transform:translateY(.375rem)}}      /* from .2, not 0: a new status line ('No open courts…') is readable from its first frame */
+@keyframes lob-err-in{from{opacity:0;transform:translateY(-.25rem) scale(.96)}}
+@keyframes lob-deal{0%{opacity:0;transform:translateY(-.75rem) rotate(-8deg) scale(.7)}100%{opacity:1;transform:none}}
+@keyframes lob-blink{0%,100%{transform:scaleY(1)}45%{transform:scaleY(.12)}} @keyframes lob-blink-k{0%,100%{transform:scaleY(1)}45%{transform:scaleY(.12)}}
+@keyframes lob-hop{0%,100%{transform:none}40%{transform:translateY(-.375rem) rotate(-4deg)}70%{transform:translateY(.0625rem)}} @keyframes lob-hop-k{0%,100%{transform:none}40%{transform:translateY(-.375rem) rotate(-4deg)}70%{transform:translateY(.0625rem)}}
+@keyframes lob-sway{0%,100%{transform:none}30%{transform:rotate(-5deg)}65%{transform:rotate(4deg)}} @keyframes lob-sway-k{0%,100%{transform:none}30%{transform:rotate(-5deg)}65%{transform:rotate(4deg)}}
+@keyframes lob-zip{0%{transform:none}35%{transform:translateX(.5rem) skewX(-12deg)}70%{transform:translateX(-.125rem)}100%{transform:none}} @keyframes lob-zip-k{0%{transform:none}35%{transform:translateX(.5rem) skewX(-12deg)}70%{transform:translateX(-.125rem)}100%{transform:none}}
+@keyframes lob-light-ok{0%{transform:scale(1)}40%{transform:scale(1.6)}100%{transform:scale(1)}}
+@keyframes lob-qr-in{from{opacity:0;transform:scale(.88) rotate(-2deg)}}
+@keyframes lob-fade{from{opacity:0}}
+@keyframes lob-out{to{opacity:0;transform:translateY(.5rem) scale(.97)}}
+/* ---------- Settings card, HUD and overlays: motion. Over a live rally only transform and opacity move, once per event; nothing on per-frame numbers (ping, stats).
+   ui.js adds the ov-* one-shots; its animationend listener takes them off again, so nothing replays when a hidden card or the HUD shows again ---------- */
+/* the settings card: grows out of the hamburger, and on close shrinks back into it (display waits out the fade: allow-discrete) */
+.settings{transform-origin:1.375rem -.75rem;transition:display 180ms allow-discrete}
+.settings[hidden]{animation:ov-set-out 180ms var(--ease-soft) both;pointer-events:none}      /* a keyframe, not a transition: Chrome starts no opacity transition while panel-in holds it. pointer-events: a click in the fade reaches the court */
+.settings > .set-group,.settings > .set-foot{transition:opacity 260ms var(--ease-soft), translate 360ms var(--ease-out)} @starting-style{ .settings > .set-group,.settings > .set-foot{opacity:0;translate:0 .5rem} }      /* the groups rise in one after another as it opens */
+.settings > :nth-child(3){transition-delay:25ms} .settings > :nth-child(4){transition-delay:50ms} .settings > :nth-child(5){transition-delay:75ms} .settings > :nth-child(6){transition-delay:100ms} .settings > :nth-child(7){transition-delay:125ms}
+#set-bot,#set-paddle,#set-sink,#sink-hint,#btn-find-sinks,#move-note,#set-note{transition:opacity var(--d-med) var(--ease-soft), translate var(--d-med) var(--ease-out)} @starting-style{ #set-bot,#set-paddle,#set-sink,#sink-hint,#btn-find-sinks,#move-note,#set-note{opacity:.2;translate:0 -.25rem} }      /* a row that turns up with the card open (Difficulty when Matt sits down) fades in rather than popping. From .2: readable from its first frame */
+@starting-style{ #btn-leave-room{opacity:.2} } #btn-leave-room.ov-nudge{animation:nudge 420ms var(--ease-soft)}      /* .btn's own opacity transition fades it in; 'Leave court' -> 'Forfeit' shakes once */
+.settings h2{transform-origin:0 60%} .settings h2.ov-pop{animation:num-pop 450ms var(--ease-bounce)}      /* Settings <-> Paused hops, pivoting on its first letter */
+.set-status li.ov-pop{animation:num-pop 450ms var(--ease-bounce)}      /* a status that changes with the card open bounces once */
+.stepper b.ov-up{animation:ov-tick-up 360ms var(--ease-bounce)} .stepper b.ov-down{animation:ov-tick-down 360ms var(--ease-bounce)}      /* the new number rolls in from the side it came from */
+.stepper .btn-icon svg{transition:rotate var(--d-med) var(--ease-bounce), scale var(--d-fast) var(--ease-bounce)}
+@media (hover:hover){ #btn-sens-more:not(:disabled):hover svg{rotate:90deg} #btn-sens-less:not(:disabled):hover svg{scale:1.25 1} }      /* + spins a quarter turn, - stretches (on the svg: the button's press and breathing stay its own) */
+.set-action svg{transition:rotate 420ms var(--ease-bounce), scale var(--d-fast) var(--ease-bounce)} #btn-recenter.ov-spin svg{animation:ov-recentre 560ms var(--ease-bounce)}      /* Recentre: the crosshair winds round as the camera recentres */
+@media (hover:hover){ #btn-recenter:hover svg{rotate:90deg} #btn-find-sinks:hover svg{scale:1.15} }
+button.set-row > span{transition:translate var(--d-fast) var(--ease-bounce)} button.set-row:active > span{translate:.1875rem 0}      /* the label gives a little under the finger */
+/* the hamburger: its bars do a half spin as the card opens and spin back as it closes */
+#btn-menu svg{transition:rotate 420ms var(--ease-bounce), scale var(--d-fast) var(--ease-bounce)} #btn-menu[aria-expanded="true"] svg{rotate:180deg}
+@media (hover:hover){ #btn-menu:hover svg{scale:1.1 .9} }      /* a little squash under the pointer */
+/* HUD pills (court code, ping, watchers, Paused): pop in when shown. 'backwards': nothing is pinned once it ends, so the room pill's own scale works */
+.corner .hud-pill{animation:ov-pill-in 380ms var(--ease-bounce) backwards} .corner .hud-pill.ov-pop{animation:ov-pill-in 380ms var(--ease-bounce) backwards, num-pop 450ms var(--ease-bounce)}      /* the watcher count hops (ov-pill-in stays in the list, or it would replay) */
+.room-pill{transition:scale var(--d-fast) var(--ease-bounce)} .room-pill:active{scale:.94} @media (hover:hover){ .room-pill:hover{scale:1.05} }
+/* the score: the tab that scored gets a sweep of its colour behind the digits, outward from the rally box. The serve ball: see .serve-ind */
+.score-tab > *{position:relative}      /* over the sweep */
+.score-tab::before{content:"";position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--me) 30%,transparent),transparent);transform:translateX(-120%) skewX(-20deg);pointer-events:none}
+.score-tab.is-them::before{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--them) 30%,transparent),transparent)}
+.score-tab.is-me.ov-scored::before{animation:ov-shine-l 700ms var(--ease-soft)} .score-tab.is-them.ov-scored::before{animation:ov-shine-r 700ms var(--ease-soft)}
+/* the HUD fades under an overlay card (and the notes under the settings card) with the veil, instead of blinking out */
+.scoreboard,.corner,.banner-tag,.callout-layer,.countdown,#split-line,.notices,.emote-layer{transition:opacity var(--d-med) var(--ease-soft)}
+.countdown > span{animation:panel-in var(--d-med) var(--ease-out) both}      /* 'Get ready' rises in with the first number */
+#bot-level.ov-pop{animation:num-pop 450ms var(--ease-bounce)}      /* Difficulty: Club -> Tour hops */
+.keyhints .keycap.ov-press,.views .keycap.ov-press{animation:ov-key-press 240ms var(--ease-out)}      /* the key you pressed dips on screen too */
+/* toast: new words in one that is already up bump it, not a silent swap (scale: its transform does the centring) */
+.toast.ov-bump{animation:ov-bump 360ms var(--ease-bounce)}
+/* seat hold: springs up over the frozen court, shrinks away when they are back; the seconds hop */
+.hold-card{transition:opacity 200ms var(--ease-soft), scale 200ms var(--ease-soft), display 200ms allow-discrete}
+.hold-card:not([hidden]){transition:opacity 240ms var(--ease-soft), scale 420ms var(--ease-bounce), display 0s allow-discrete}
+.hold-card[hidden]{opacity:0;scale:.9} @starting-style{ .hold-card{opacity:.2;scale:.75} }      /* scale only: translate centres it */
+.hold-card b.ov-pop{animation:num-pop 450ms var(--ease-bounce)}
+/* spectators: the view chips get the same sliding plate as the .seg pickers (ui.js measures the pressed chip into --tx/--tw) */
+.views::before{content:"";position:absolute;left:0;top:0;width:var(--tw,0);height:var(--th,0);transform:translate(var(--tx,0),var(--ty,0));border-radius:var(--r-pill);background:rgba(255,255,255,.94);box-shadow:inset 0 0 0 .125rem #fff, var(--sh-hud);opacity:0;pointer-events:none;
+  transition:transform 420ms var(--ease-bounce), width 420ms var(--ease-bounce), opacity var(--d-fast) linear}      /* width: the .seg thumb's one exception, on a lone pseudo-element, per click */
+.views.has-thumb::before{opacity:1} .views.thumb-still::before{transition:none}
+.view-chip{position:relative;z-index:1;transition:scale var(--d-fast) var(--ease-bounce)} .view-chip:active{scale:.94}
+.views.has-thumb .view-chip[aria-pressed="true"]{background:none;border-color:transparent;box-shadow:none} .views.has-thumb .view-chip[aria-pressed="true"]:focus-visible{border-color:var(--line);box-shadow:var(--glow)}      /* the plate is drawn by .views::before now */
+.emote-btn{animation:ov-pill-in 380ms var(--ease-bounce) backwards} .emote-btn:nth-child(2){animation-delay:30ms} .emote-btn:nth-child(3){animation-delay:60ms} .emote-btn:nth-child(4){animation-delay:90ms} .emote-btn:nth-child(5){animation-delay:120ms} .emote-btn:nth-child(6){animation-delay:150ms} .emote-btn:nth-child(7){animation-delay:180ms}      /* the row pops in left to right (scale: composes with the hover / press transform) */
+.emote-btn img{transition:rotate var(--d-med) var(--ease-bounce)} @media (hover:hover){ .emote-btn:hover img{rotate:-12deg} } .emote-btn.ov-sent img{animation:ov-emote-sent 380ms var(--ease-bounce)}      /* the face tilts toward you; a sent one squashes and springs */
+.notices .notice svg{animation:ov-blink 360ms var(--ease-soft) 520ms}      /* the eye blinks once as the note lands (scoped: .notice alone is also the server-down card) */
+body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms var(--ease-bounce) backwards} body[data-role="spectator"] .ask-play.ov-bump:not([hidden]){animation:ov-pill-in 380ms var(--ease-bounce) backwards, ov-bump 360ms var(--ease-bounce)}      /* Ask to play pops in; each change of state bumps it */
+/* match result: the medal lands, then the title, then the two scores; the winner's token bounces */
+.screen.is-active .result-card h2{animation:ov-title-pop 560ms var(--ease-bounce) 380ms both}
+.screen.is-active .tally-num{animation:ov-title-pop 520ms var(--ease-bounce) 560ms both} .screen.is-active .tally-num.is-them{animation-delay:640ms}
+.screen.is-active .tally-side.is-winner .chip{animation:ov-winner-bob 1600ms var(--ease-soft) 1100ms infinite}
+#rematch-note.ov-note{animation:ov-note-in 360ms var(--ease-out)}      /* 'Sam wants a rematch' slides up into place */
+.rematch-count:not([hidden]){animation:panel-in var(--d-med) var(--ease-out) both} #rematch-left.ov-pop{animation:num-pop 360ms var(--ease-bounce)}      /* the count rises in; each second hops */
+.screen.is-active .notice-icon svg{animation:ov-float 2400ms var(--ease-soft) 600ms infinite}      /* server down / game full: the icon floats while it waits */
+@media (prefers-reduced-motion: reduce){ .settings > *,.serve-ind.on{transition-delay:0s!important} .views::before{transition:none} }      /* the global block clamps durations, not transition delays */
+@keyframes ov-tick-up{from{opacity:0;translate:0 .625rem;scale:.8}} @keyframes ov-tick-down{from{opacity:0;translate:0 -.625rem;scale:.8}}
+@keyframes ov-recentre{0%{scale:1}35%{scale:.7}100%{scale:1;rotate:180deg}}
+@keyframes ov-set-out{to{opacity:0;scale:.94;translate:0 -.375rem}}
+@keyframes ov-pill-in{from{opacity:.2;scale:.5}}      /* .2: a pill is there from its first frame, it just grows */
+@keyframes ov-shine-l{from{transform:translateX(250%) skewX(-20deg)} to{transform:translateX(-120%) skewX(-20deg)}} @keyframes ov-shine-r{from{transform:translateX(-120%) skewX(-20deg)} to{transform:translateX(250%) skewX(-20deg)}}
+@keyframes ov-key-press{35%{translate:0 .125rem;scale:.9}}
+@keyframes ov-bump{40%{scale:1.06}}
+@keyframes ov-emote-sent{30%{scale:.7}70%{scale:1.25}}
+@keyframes ov-blink{50%{scale:1 .15}}
+@keyframes ov-title-pop{from{opacity:0;scale:.6}}
+@keyframes ov-winner-bob{0%,100%{translate:0 0}50%{translate:0 -.375rem}}
+@keyframes ov-note-in{from{opacity:0;translate:0 .375rem}}
+@keyframes ov-float{0%,100%{translate:0 0}50%{translate:0 -.25rem}}
 @media (max-width:700px){      /* last, so it wins: the root is at its 10px floor here, and nothing on Courts or the ask card goes under 12 px */
   .courts .t-note,.court-meta,.court-go,.court-list .room-watch,.tour-note,.ask-q small,.seg-n{font-size:max(var(--t-sm),12px)} .court-who,.search .field,.ask-q{font-size:max(var(--t-md),13px)}      /* the root is at its 10px floor here: nothing under 12 px */
   .ask-card .keycap,.ask-play .keycap{font-size:max(.8125rem,11px);min-width:max(1.5rem,20px);height:max(1.5rem,20px)}

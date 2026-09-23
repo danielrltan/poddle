@@ -4,6 +4,13 @@ const $ = id => document.getElementById(id);
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };   // replay a one-shot CSS animation
 const setText = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };       // names arrive here: textContent only, never markup
+const swapText = (el, t, cls) => { if (!el || el.textContent === t) return false; el.textContent = t; if (cls) restart(el, cls); return true; };      // setText that replays a one-shot (cls) when the words really change
+{ const ONE = { 'lob-row-in': 'lob-in', 'num-pop': 'lob-pop', 'lob-fill': 'lob-fill', 'lob-clear': 'lob-clear', 'lob-swap': 'lob-swap', nudge: 'lob-nope' };      // one-shot class <- its animation: back to rest when it ends (or a hidden screen cancels it), so nothing replays when it shows again
+  const done = e => { const c = ONE[e.animationName]; if (c && e.target.classList?.contains(c) && (e.type === 'animationend' || e.target.closest?.('.screen:not(.is-active)'))) e.target.classList.remove(c); };      // a cancel from restart() itself must not strip the replay it just started
+  document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
+{ const OV = { 'num-pop': 'ov-pop', 'ov-tick-up': 'ov-up', 'ov-tick-down': 'ov-down', nudge: 'ov-nudge', 'ov-recentre': 'ov-spin', 'ov-shine-l': 'ov-scored', 'ov-shine-r': 'ov-scored', 'ov-bump': 'ov-bump', 'ov-emote-sent': 'ov-sent', 'ov-key-press': 'ov-press', 'ov-note-in': 'ov-note' };      // the settings / HUD one-shots (ov-*): the class may sit on a parent of what moves (Recentre's svg, an emote's img)
+  const done = e => { const c = OV[e.animationName], el = c && e.target.closest?.('.' + c); if (el && (e.type === 'animationend' || !el.getClientRects().length)) el.classList.remove(c); };      // a cancel: only when its card or the HUD was hidden mid-way (restart() itself cancels too)
+  document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
 const on2 = (id, type, fn) => { const el = $(id); if (el) el.addEventListener(type, fn); };      // every new element is optional (older markup, a test page)
 
 // Shot names for the hit callout. Add new kinds here; an unknown kind falls back to its own name, capitalised.
@@ -21,6 +28,7 @@ function swap(slot, name) {
   if (prev !== name) {
     slots[slot] = name;
     if (prev) { const el = screenEl(prev); el.classList.remove('is-active'); clearTimeout(hideT[prev]); hideT[prev] = setTimeout(() => { el.hidden = true; }, 360); }   // after the fade: out of the render tree
+    if (name === 'lobby') { const l = screenEl('lobby'); delete l.dataset.dir; delete l.dataset.live; }      // entering the lobby: its first view rises, it does not slide
     if (name) { const el = screenEl(name); clearTimeout(hideT[name]); el.hidden = false; void el.offsetWidth; el.classList.add('is-active'); }
   }
   const b = document.body, hud = $('hud');
@@ -44,7 +52,7 @@ export function setNames({ me, meSub, them, themSub } = {}) {
   if (them != null) setText($('name-them'), them); if (themSub != null) setText($('sub-them'), themSub);
 }
 export function setScore(me, them) {
-  for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); } }
+  for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); if (+v > 0) { const t = el.closest('.score-tab'); if (t) restart(t, 'ov-scored'); } } }      // the tab that scored gets a sweep of its colour (not the 0-0 reset)
 }
 export function setServe(who) { $('sv-me').classList.toggle('on', who === 'me'); $('sv-them').classList.toggle('on', who === 'them'); }
 export function setRally(n) { const el = $('rally'); if (el.textContent === String(n)) return; el.textContent = n; if (n > 0) restart(el, 'pop'); }
@@ -75,7 +83,8 @@ export function countdown(n) {
 }
 let toastT;
 export function toast(text, ms = 1200) {
-  const el = $('toast'), b = document.body; el.textContent = text; el.classList.add('on'); b.classList.add('has-toast');     // .has-toast: the key strip yields the bottom band
+  const el = $('toast'), b = document.body, again = el.classList.contains('on') && el.textContent !== text; el.textContent = text; el.classList.add('on'); b.classList.add('has-toast');     // .has-toast: the key strip yields the bottom band
+  if (again) restart(el, 'ov-bump');                                                   // new words in a toast that is already up: a small bump, not a silent swap
   clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('on'); b.classList.remove('has-toast'); }, ms);
 }
 export function toastOff() { clearTimeout(toastT); $('toast').classList.remove('on'); document.body.classList.remove('has-toast'); }     // the screen it spoke about is gone
@@ -116,7 +125,8 @@ export function matchResult(o, me, them, name) {
 }
 function stopCount() { clearInterval(countT); countT = 0; }
 let countWord = '';      // a tournament match: 'Bracket in 6' (the vote's own count is a bare number beside its buttons)
-function drawCount(n) { countLeft = n; setText($('rematch-left'), countWord + n); $('rematch-bar')?.style.setProperty('--p', (countTotal ? Math.min(1, n / countTotal) : 0).toFixed(3)); }
+function drawCount(n) { countLeft = n; { const l = $('rematch-left'), t = countWord + n; if (l && l.textContent !== t) { l.textContent = t; if (n !== countTotal) restart(l, 'ov-pop'); } }
+  $('rematch-bar')?.style.setProperty('--p', (countTotal ? Math.min(1, n / countTotal) : 0).toFixed(3)); }      // each second hops (not the first)
 function lockVote(yes) { voted = true; votedYes = yes; for (const [id, mine] of [['btn-rematch', yes], ['btn-leave', !yes]]) { const b = $(id); if (b) { b.disabled = mine || !yes; b.classList.toggle('is-pressed', mine); } } }      // after Rematch, Leave stays open: nobody is locked in for 20 s behind someone who walked off
 let onVote = null;
 export function onRematch(fn) { onVote = fn; }                                          // Rematch -> fn(true), Leave -> fn(false)
@@ -131,13 +141,13 @@ export function rematch(o = {}) {
   if (resultRole === 'spectator') return;                                                // their note stays "Waiting for a rematch"
   // (after a forfeit the card already says "<name> left" under the title: not twice)
   if ('mine' in o || 'theirs' in o || o.name != null) { const who = votes.name || 'Opponent';
-    setText($('rematch-note'), votes.theirs === true ? `${who} wants a rematch` : votes.theirs === false ? ($('result-note')?.textContent ? '' : `${who} left`) : votes.mine === true ? `Waiting for ${who}` : ''); }
+    swapText($('rematch-note'), votes.theirs === true ? `${who} wants a rematch` : votes.theirs === false ? ($('result-note')?.textContent ? '' : `${who} left`) : votes.mine === true ? `Waiting for ${who}` : '', 'ov-note'); }      // a new note slides up into place
 }
 // seat hold: a small card over the frozen court. main.js calls it once a second with the server's number; hold(null) hides it.
 export function hold(name, left) {
   const el = $('hold'); if (!el) return;
   if (name == null || slots.overlay === 'match') { el.hidden = true; return; }
-  setText($('hold-text'), `Waiting for ${name}`); setText($('hold-left'), left == null ? '' : String(Math.max(0, Math.round(left)))); el.hidden = false;
+  setText($('hold-text'), `Waiting for ${name}`); { const b = $('hold-left'), t = left == null ? '' : String(Math.max(0, Math.round(left))); if (b && b.textContent !== t) { b.textContent = t; if (t && !el.hidden) restart(b, 'ov-pop'); } } el.hidden = false;      // each second hops once the card is up
 }
 
 // ---------- connection status ----------
@@ -204,6 +214,7 @@ export function setStatus(next) {
       status[key] = v; badSince[key] = v === 'bad' ? now : 0; told[key] = false;
       for (const el of [$('set-' + key), $('row-' + key)]) if (el) { el.classList.remove('is-ok', 'is-wait', 'is-bad', 'is-off'); el.classList.add('is-' + v); }      // the HUD lights are gone: big rows on the set-up screen, small rows in the settings panel
       setText($(`row-${key}-text`), ROW[key][v] || ''); setText($(`row-${key}-state`), STATE_WORD[v]); setText($(`set-${key}-state`), STATE_WORD[v]); { const c = $('set-' + key); if (c) c.title = `${c.querySelector('b')?.textContent || key}: ${STATE_WORD[v]}`; }      // the chip in the settings head says its state on hover
+      if (setOpen) { const c = $('set-' + key); if (c) restart(c, 'ov-pop'); }      // with the card open, the chip that changed bounces once
       if (key === 'airpod') helperCard();
     }
     // a lost AirPod or server is the likeliest live failure: after 1.5 s say so where the player is looking, once
@@ -231,7 +242,7 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
   if (!e.ok) { badUntil = now + 1400; badHead = head; }
   const bad = !e.ok || (now < badUntil && !settle && !done && badHead.startsWith(tilt ? 'Level' : 'You'));
   if (bad) head = badHead;
-  const h = $('calh'); setText(h, head); h.classList.toggle('is-bad', bad); h.classList.toggle('is-good', done);
+  const h = $('calh'); swapText(h, head, 'lob-swap'); h.classList.toggle('is-bad', bad); h.classList.toggle('is-good', done);
   setText($('calp'), LEAD[done ? 'done' : settle ? 'settle' : tilt ? 'tilt' : 'hold']);
   $('st1').className = tilt ? 'is-done' : 'is-on'; $('st2').className = done ? 'is-done' : tilt ? 'is-on' : '';
   $('art-hold').toggleAttribute('hidden', tilt); $('art-tilt').toggleAttribute('hidden', !tilt);
@@ -242,8 +253,8 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
   count.classList.toggle('is-bad', bad); count.classList.toggle('is-done', done);
   count.style.visibility = settle && !done ? 'hidden' : '';                  // settling: the bar alone counts; a tick would read as 'finished'
   $('cal-num').hidden = !showNum; $('cal-up').toggleAttribute('hidden', showNum || settle || done); $('cal-check').toggleAttribute('hidden', !done);
-  if (showNum) setText($('cal-num'), String(bad ? HOLD_SECONDS : Math.max(1, Math.ceil(HOLD_SECONDS * (1 - e.progress)))));
-  const m = $('calmsg'); setText(m, waiting ? PADDLE[paddle].waiting : camLost && !tilt ? 'The camera can’t see you. Step into view.' : '');
+  if (showNum) swapText($('cal-num'), String(bad ? HOLD_SECONDS : Math.max(1, Math.ceil(HOLD_SECONDS * (1 - e.progress)))), 'lob-pop');      // ~50 Hz: only a new second hops
+  const m = $('calmsg'), mt = waiting ? PADDLE[paddle].waiting : camLost && !tilt ? 'The camera can’t see you. Step into view.' : ''; swapText(m, mt, mt ? 'lob-swap' : '');
   // replay the sideways nudge for every new mistake (also a second one in a row), not for every 20 ms sample
   if (fresh || (!e.ok && calPrev.msg !== msg)) restart($('calcard'), 'is-error'); else if (!bad) $('calcard').classList.remove('is-error');
   calPrev = { ok: e.ok, msg };
@@ -252,7 +263,7 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
 // ---------- small things ----------
 export function setMode(name) { setText($('mode'), name); for (const o of $('move-seg')?.children || []) o.setAttribute('aria-checked', String(o.dataset.move === String(name).toLowerCase())); }      // how you move lives in the settings panel now (docs/NEXT.md 14d)
 // Matt's level, or null when the other seat is not Matt: the 1 2 3 4 key hint and the settings Difficulty row show only against him
-export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); if (!on) return; setText($('bot-level'), String(level)); for (const o of $('bot-seg')?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level))); }
+export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); if (!on) return; swapText($('bot-level'), String(level), 'ov-pop'); for (const o of $('bot-seg')?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level))); }
 export function toggle(id) { const el = $(id); if (!el) return false; el.hidden = !el.hidden; return !el.hidden; }
 export function show(id, on) { const el = $(id); if (!el) return false; el.hidden = !on; return !el.hidden; }
 export function setCamera(ready) { show('camwrap', !!ready); }
@@ -271,6 +282,7 @@ let idleT;
 const idle = on => { for (const id of ['keys', 'views']) $(id)?.classList.toggle('is-idle', on); };
 export function wake() { idle(false); clearTimeout(idleT); idleT = setTimeout(() => idle(true), 6000); }
 addEventListener('keydown', wake); addEventListener('pointermove', wake); addEventListener('pointerdown', wake);
+addEventListener('keydown', e => { if (e.repeat || e.key.length !== 1 || e.target?.closest?.('input, select, textarea')) return; const k = e.key.toUpperCase(); for (const c of document.querySelectorAll('#keys .keycap, #views .keycap')) if (c.textContent === k && c.offsetParent) restart(c, 'ov-press'); });      // the key you pressed dips on screen too
 
 // finished one-shots go back to rest so nothing is left promoted or mid-animation
 $('callout').addEventListener('animationend', e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('go'); });
@@ -297,7 +309,7 @@ function nameGate() {                                      // first visit: the c
 }
 function needName() {                                      // a seat was asked for with no name: the field says so, nothing is sent
   if (playerName()) return false;
-  const row = $('name-row'); if (row) { row.classList.add('is-bad'); restart(row, 'is-error'); } $('name-input')?.focus({ preventScroll: true }); return true;
+  const row = $('name-row'); if (row) { row.classList.add('is-bad'); restart(row, 'is-error'); row.addEventListener('animationend', function done(e) { if (e.target !== row || e.animationName !== 'nudge') return; row.removeEventListener('animationend', done); row.classList.remove('is-error'); }); } $('name-input')?.focus({ preventScroll: true }); return true;
 }
 
 // ---------- settings panel (hamburger). A card, not a screen: inPlay() in main.js stays true and the rally goes on behind it ----------
@@ -328,7 +340,7 @@ function placeSettings() {                                 // under the hamburge
 }
 addEventListener('resize', placeSettings);
 export function setSettings(o = {}) {
-  if (typeof o.sens === 'number') setText($('set-sens-val'), String(Math.round(o.sens)));
+  if (typeof o.sens === 'number') { const v = $('set-sens-val'), t = String(Math.round(o.sens)), was = +v?.textContent; if (v && v.textContent !== t) { v.textContent = t; if (setOpen) { v.classList.remove('ov-up', 'ov-down'); restart(v, +t > was ? 'ov-up' : 'ov-down'); } } }      // the new number rolls in from the side it came from
   for (const [key, id] of [['sensMin', 'btn-sens-less'], ['sensMax', 'btn-sens-more']]) if (key in o && $(id)) { if (o[key] && document.activeElement === $(id)) $('settings')?.focus({ preventScroll: true }); $(id).disabled = !!o[key]; }   // a disabled button drops focus to <body>: keep it in the card
   for (const [key, id] of [['airpod', 'tog-airpod'], ['sound', 'tog-sound'], ['body', 'tog-body']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
   // Output: the row shows only when the sound can actually be moved AND the browser is willing to name the devices.
@@ -341,7 +353,7 @@ export function setSettings(o = {}) {
       s.value = o.sink != null ? o.sink : keep; if (!s.selectedOptions.length) s.value = ''; } }
   if ('sink' in o) { const s = $('set-sink-sel'); if (s && s.value !== o.sink) s.value = o.sink || ''; }
   if ('inRoom' in o) show('btn-leave-room', !!o.inRoom);
-  if ('forfeit' in o) setText($('btn-leave-room'), o.forfeit ? 'Forfeit' : 'Leave court');      // mid-match against a person, leaving is a forfeit: the button says so
+  if ('forfeit' in o) { const b = $('btn-leave-room'); if (swapText(b, o.forfeit ? 'Forfeit' : 'Leave court') && setOpen && !b.hidden) restart(b, 'ov-nudge'); }      // mid-match against a person, leaving is a forfeit: the button says so
   if ('canPause' in o) show('set-note', o.canPause === false);
   if ('tourMatch' in o) setText($('set-note'), o.tourMatch ? 'Tournament matches can’t pause' : 'Online games can’t pause');
   if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }      // no camera: Body cannot be picked, and the row says why
@@ -350,7 +362,7 @@ export function setSettings(o = {}) {
 }
 export function setPaused(on) {                            // the rest is CSS: blur behind the open card, the "Paused" tag while it is closed
   if (on) document.body.dataset.paused = '1'; else delete document.body.dataset.paused;
-  setText($('set-title'), on ? 'Paused' : 'Settings');
+  swapText($('set-title'), on ? 'Paused' : 'Settings', setOpen ? 'ov-pop' : '');      // with the card open, the new title hops
 }
 {
   on2('btn-menu', 'click', () => settings(!setOpen));
@@ -364,7 +376,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
   on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });      // phone <-> AirPod at any time, not only on the set-up screen
   on2('bot-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });
-  on2('btn-recenter', 'click', () => call('recenter')); on2('btn-leave-room', 'click', () => call('leave'));
+  on2('btn-recenter', 'click', e => { restart(e.currentTarget, 'ov-spin'); call('recenter'); }); on2('btn-leave-room', 'click', () => call('leave'));      // Recentre: the button spins its svg (restart() cannot replay an SVG itself: no offsetWidth)
   // name: saved on Enter / blur. Empty puts the old one back. Esc cancels the edit and hands focus back to the card (main.js owns what Esc does next)
   const commit = el => { const n = cleanName(el.value); if (!n) { el.value = savedName; return; } const changed = n !== savedName; el.value = n; keepName(el); if (changed) call('name', n); };
   on2('set-name-input', 'blur', e => commit(e.currentTarget));
@@ -379,7 +391,7 @@ export function setPaused(on) {                            // the rest is CSS: b
 const VIEWS = ['broadcast', 'split', 'pov', 'free'];
 let onViewFn = null;
 export function setSpectator(on) { const b = document.body; if (on) b.dataset.role = 'spectator'; else { delete b.dataset.role; delete b.dataset.view; } }      // CSS does the rest: tag, chips, no key hints, no insets
-export function setWatchers(n) { n = Math.max(0, n | 0); show('watchers', n > 0); setText($('watch-n'), String(n)); $('watchers')?.setAttribute('aria-label', `${n} watching`); }
+export function setWatchers(n) { n = Math.max(0, n | 0); const was = isVisible('watchers'); show('watchers', n > 0); if (swapText($('watch-n'), String(n)) && was && n > 0) restart($('watchers'), 'ov-pop'); $('watchers')?.setAttribute('aria-label', `${n} watching`); }
 export function onView(fn) { onViewFn = fn; }                                          // a chip click -> fn(name). The active Player chip calls again: main.js flips the side
 export function setView(name, who = '') {
   if (!VIEWS.includes(name)) return;
@@ -397,7 +409,7 @@ export function onEmote(fn) { onEmoteFn = fn; }
 const emoteImg = i => { const img = document.createElement('img'); img.src = new URL(`emoji/${EMOTES[i][0]}.png`, import.meta.url).href; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
 { const box = $('emotes');
   if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.title = em[2]; b.append(emoteImg(i)); box.append(b); });
-  on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (!b || !onEmoteFn) return; onEmoteFn(+b.dataset.e); }); }
+  on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (!b || !onEmoteFn) return; restart(b, 'ov-sent'); onEmoteFn(+b.dataset.e); }); }      // the face squashes and springs as it goes
 // one reaction arriving: floats up from the bottom-right corner like a live-stream reaction, swaying, and fades. Eight on screen at most
 export function emote(i, name) {
   const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
@@ -430,9 +442,9 @@ export function askCard(o) {
   clearTimeout(cardT); clearInterval(cardTick);
   if (!o) { if (!cardOn) { el.hidden = true; return; } cardOn = false; el.classList.remove('is-on'); setText($('ask-live'), ''); cardT = setTimeout(() => { el.hidden = true; }, reduced() ? 0 : 200); return; }
   const left = Math.max(1, Math.min(60, Math.round(+o.left || 10))), name = String(o.name || 'Someone'), bar = el.querySelector('.ask-bar i');
-  setText($('ask-name'), name); cardOn = true; el.hidden = false; void el.offsetWidth; el.classList.add('is-on');
+  setText($('ask-name'), name); cardOn = true; el.classList.remove('is-late'); el.hidden = false; void el.offsetWidth; el.classList.add('is-on'); restart($('ask-name'), 'lob-pop');      // the asker's name hops as the card lands
   setText($('ask-live'), `${name} wants to play. They take Matt’s place and a new match starts. Press Y to accept or N to decline.`);
-  let k = 0; const step = () => { k++; el.querySelector('.ask-bar')?.style.setProperty('--p', Math.max(0, (left - k) / left).toFixed(3)); };      // stepped once a second from the server's number, each step a 1 s linear slide: it reaches 0 at 'left'
+  let k = 0; const step = () => { k++; el.querySelector('.ask-bar')?.style.setProperty('--p', Math.max(0, (left - k) / left).toFixed(3)); el.classList.toggle('is-late', left - k <= 3); };      // the last 3 s pulse (ui.css)      // stepped once a second from the server's number, each step a 1 s linear slide: it reaches 0 at 'left'
   if (bar) { bar.style.transition = 'none'; el.querySelector('.ask-bar').style.setProperty('--p', '1'); void bar.offsetWidth; bar.style.transition = ''; }
   cardT = setTimeout(() => askCard(null), left * 1000 + 500);                         // the server's askoff closes it; this is the backstop
   requestAnimationFrame(() => { if (cardOn) step(); }); cardTick = setInterval(() => { if (k >= left) clearInterval(cardTick); else step(); }, 1000);
@@ -459,10 +471,10 @@ export function askPlay(m) {
   drawAsk();
 }
 function drawAsk() {
-  const b = $('btn-ask'); if (!b) return; const s = ask.s, n = ask.left;
+  const b = $('btn-ask'); if (!b) return; const s = ask.s, n = ask.left, was = b.dataset.s;
   b.hidden = !askOn || s === 'refused' || s === 'yes';
   const label = s === 'idle' ? (askedOnce ? 'Ask again' : 'Ask to play') : s === 'sent' ? `Waiting · ${n}s` : `Again in ${n}s`;      // the count says what it counts: Waiting = the player's time left to answer; Again in = until you may ask (a cooldown, or another request). The why (said no, no answer, someone else asked) is main.js's toast. Both fit 16rem at 390 px
-  setText($('ask-label'), label); b.dataset.s = s; b.setAttribute('aria-disabled', String(s !== 'idle'));
+  setText($('ask-label'), label); b.dataset.s = s; b.setAttribute('aria-disabled', String(s !== 'idle')); if (was && was !== s && !b.hidden) restart(b, 'ov-bump');      // Asked / Again: the button bumps as it changes
 }
 on2('btn-ask', 'click', e => { if (e.pointerType) e.currentTarget.blur(); if (askCan() && onAskFn) onAskFn(); });
 
@@ -478,6 +490,7 @@ on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'Ar
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
 export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
 const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament' };
+const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
 const VIEW_PARENT = { create: 'courts', share: 'courts', tour: 'courts', bracket: 'courts' };      // Back from these goes to Courts, not home (a tournament lives on: T brings it back)
 const NO_NAME = ['share', 'tour', 'bracket'];                                            // views with no name row above them
 export const viewParent = v => VIEW_PARENT[v] || null;
@@ -487,9 +500,12 @@ export function onLobby(handlers) { on = handlers || {}; }                      
 export function lobbyView(name, { code, watch } = {}) {
   if (!name) return view;
   if (name === 'code') name = 'courts';                                                 // the old code view lives inside Courts now: old call sites still land
+  const was = view, sl = $('screen-lobby');
   view = VIEW_TITLE[name] ? name : 'home';
+  if (sl.classList.contains('is-active') && sl.dataset.live && was !== view) { const d = (VIEW_DEPTH[view] ?? 0) - (VIEW_DEPTH[was] ?? 0); if (d) sl.dataset.dir = d > 0 ? 'fwd' : 'back'; else delete sl.dataset.dir; }      // the view slides in from the side it lies on (ui.css); a re-call of the same view keeps its entrance
+  sl.dataset.live = '1';
   for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view;
-  setText($('lobby-title'), view === 'bracket' && ts ? `Tournament ${ts.code}` : VIEW_TITLE[view]); codeError(''); show('name-row', !NO_NAME.includes(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
+  { const t = $('lobby-title'), tt = view === 'bracket' && ts ? `Tournament ${ts.code}` : VIEW_TITLE[view]; if (t.textContent !== tt) { setText(t, tt); restart(t, 'swap'); } } codeError(''); show('name-row', !NO_NAME.includes(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
   if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour();
   deep = null; for (const b of [$('btn-join'), $('btn-watch-code')]) b?.classList.remove('is-focus');
   if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
@@ -524,6 +540,7 @@ function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) 
 // tours: { code, host, n, max } tournaments signing up (docs/COURTS-TOURNEY.md Feature 2; none yet). Every string goes in as textContent.
 // Open = tournaments, courts with someone waiting (a join seats you), ask rows (one human playing Matt: a join asks them), empty courts. Full = two humans (the row is Watch).
 let list = { rooms: [], tours: [] }, seen = false, filter = 'open', query = '';
+let drawn = new Map(), drawnMode = '';      // the rows last drawn (code -> meta) and their state|tab: only NEW rows rise in, only CHANGED metas pop
 try { if (localStorage.getItem('poddle.courts') === 'full') filter = 'full'; } catch { /* private window */ }
 const kindOf = r => r.open !== false ? 'open' : r.ask ? 'ask' : 'full';
 const nm = (r, i) => Array.isArray(r.names) && typeof r.names[i] === 'string' && r.names[i] ? r.names[i].slice(0, 24) : '';
@@ -549,7 +566,7 @@ export function lobbyRooms(rooms = [], online = 0, tours = []) {
   list = { rooms: (Array.isArray(rooms) ? rooms : []).filter(r => r && typeof r.code === 'string'),       // no 12-row cap: the server lists at most ROOM_CAP courts and the list scrolls
     tours: (Array.isArray(tours) ? tours : []).filter(t => t && typeof t.code === 'string') };
   seen = true;
-  $('lobby-online').hidden = !(online > 1); setText($('lobby-online'), `${online} online`);      // 1 online is you: say nothing
+  { const lo = $('lobby-online'), was = !lo.hidden; lo.hidden = !(online > 1); if (swapText(lo, `${online} online`) && was && !lo.hidden) restart(lo, 'lob-pop'); }      // a count that moves hops      // 1 online is you: say nothing
   drawCourts();
 }
 // One state line under the list, exactly one of: down, loading, open empty, full empty, no match, rows. The list box keeps its height in every one.
@@ -560,29 +577,34 @@ const EYE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-
 function drawCourts() {
   const ul = $('room-list'); if (!ul) return;
   const s = shown(), st = courtsState(), rows = st === 'rows' ? s[filter] : [];
-  const nn = st === 'loading' || st === 'down' ? () => '–' : n => String(n); setText($('n-open'), nn(s.open.length)); setText($('n-full'), nn(s.full.length));      // the counts follow the search: a query shows which tab its matches are in. Loading or down: a dash, never a false 0
-  const n = s.all.filter(r => r.kind !== 'full').length, sub = $('courts-n'); if (sub) { setText(sub, n ? `${n} open` : ''); sub.style.visibility = seen && n ? '' : 'hidden'; }      // the home tile: never jumps
+  const nn = st === 'loading' || st === 'down' ? () => '–' : n => String(n); for (const [id, v] of [['n-open', nn(s.open.length)], ['n-full', nn(s.full.length)]]) swapText($(id), v, view === 'courts' ? 'lob-pop' : '');      // the counts follow the search: a query shows which tab its matches are in. Loading or down: a dash, never a false 0
+  const n = s.all.filter(r => r.kind !== 'full').length, sub = $('courts-n'); if (sub) { const t = `${n} open`, was = sub.textContent, off = !(seen && n); if (!off) setText(sub, t); sub.classList.toggle('is-off', off); if (!off && was && was !== t) restart(sub, 'pop'); }      // the home tile: never jumps
   for (const o of $('court-seg')?.children || []) { const yes = o.dataset.filter === filter; o.setAttribute('aria-checked', String(yes)); o.tabIndex = yes ? 0 : -1; }
   const key = [st, filter, query, ...rows.map(r => [r.kind, r.code, r.who, r.meta, r.go, r.watch, r.full].join(':'))].join('|');
   if (key === roomsKey) return; roomsKey = key;                                          // the list arrives every second: only touch the DOM (and the focus) when something drawn changed
   const at = ul.contains(document.activeElement) ? document.activeElement : null, had = at && (at.dataset.watch || at.dataset.code), hadWatch = !!(at && at.dataset.watch),
     idx = at ? [...ul.querySelectorAll('.court-row')].indexOf(at.closest('li')?.firstElementChild) : -1;
+  const mode = st + '|' + filter, fresh = mode !== drawnMode, before = new Map();
+  if (!fresh && !reduced()) for (const li of ul.children) if (li.dataset.code) before.set(li.dataset.code, li.offsetTop);      // FLIP, first half: where each row sat, read BEFORE the wipe (a layout read between the wipe and the last append would clamp scrollTop to 0)
   ul.textContent = ''; ul.setAttribute('aria-busy', String(st === 'loading'));
   if (st === 'loading' || st === 'down') for (let i = 0; i < 4; i++) { const li = mk('li', 'court is-skel'); li.append(mk('span', 'court-row is-skel')); li.setAttribute('aria-hidden', 'true'); ul.append(li); }      // skeletons: nothing in them is focusable
   rows.forEach((r, i) => { const li = mk('li', 'court'), b = mk('button', 'room-row court-row' + (r.kind === 'full' ? ' is-full' : ''));
     li.dataset.kind = r.kind; b.dataset.code = r.code; b.dataset.nav = ''; b.tabIndex = i ? -1 : 0; if (r.kind === 'full') b.dataset.act = 'watch'; if (r.full) b.setAttribute('aria-disabled', 'true');
     const who = mk('span', 'court-who', r.who); if (r.kind === 'tour') who.prepend(mk('span', 'badge-tour', 'Tournament'));
-    b.append(mk('b', 'court-code', r.code), who, mk('span', 'court-meta', r.meta), mk('span', 'court-go', r.go));
+    const meta = mk('span', 'court-meta', r.meta); b.append(mk('b', 'court-code', r.code), who, meta, mk('span', 'court-go', r.go));
+    li.dataset.code = r.code; if (fresh || !drawn.has(r.code)) { li.classList.add('lob-in'); li.style.setProperty('--i', fresh ? Math.min(i, 7) : 0); } else if (r.meta && drawn.get(r.code) !== r.meta) meta.classList.add('lob-pop');      // a court that just opened rises in (a new tab, or the list after the skeletons, staggers); a score or watcher change pops. Classes only here: no layout reads
     b.setAttribute('aria-label', `Court ${r.code}. ${r.who}.${r.meta ? ' ' + r.meta + '.' : ''} ${r.go}${r.watch ? '. Right arrow to watch' : ''}`); if (r.watch) b.setAttribute('aria-keyshortcuts', 'ArrowRight'); li.append(b);      // Watch is off the Tab order: say how to reach it
     if (r.watch) { const w = mk('button', 'btn btn-sm is-tall room-watch'); w.innerHTML = EYE_SVG; w.append('Watch'); w.dataset.watch = r.code; w.tabIndex = -1; w.setAttribute('aria-label', `Watch court ${r.code}`); li.append(w); }
     ul.append(li); });
+  drawnMode = mode; drawn = new Map(rows.map(r => [r.code, r.meta]));
+  for (const li of before.size ? ul.children : []) { const y = before.get(li.dataset.code); if (y == null) continue; const dy = y - li.offsetTop; if (Math.abs(dy) > 1) li.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 360, easing: 'cubic-bezier(.22,1,.36,1)' }); }      // FLIP, second half: rows that stayed glide to their new place, so a closed court's gap closes smoothly
   drawState(st, s); roomBar();
   if (at) { const all = [...ul.querySelectorAll('.court-row, .room-watch')], cr = [...ul.querySelectorAll('.court-row')];      // no selector built from a server string
     const to = all.find(e => hadWatch && e.dataset.watch === had) || all.find(e => !e.dataset.watch && e.dataset.code === had) || cr[Math.min(idx, cr.length - 1)] || $('court-search');
     if (to.classList.contains('court-row')) rove(to); to.focus({ preventScroll: true }); }
 }
 function drawState(st, s) {
-  const p = $('room-empty'); if (!p) return; p.textContent = ''; p.dataset.state = st;
+  const p = $('room-empty'); if (!p) return; const was = p.dataset.state; p.textContent = ''; p.dataset.state = st; if (was !== st && st !== 'rows' && st !== 'loading') restart(p, 'lob-swap');      // a new message rises in; typing inside 'no match' does not flicker
   const btn = (text, fn) => { const b = mk('button', 'btn btn-sm is-tall', text); b.type = 'button'; b.addEventListener('click', fn); return b; };
   const q = query, other = filter === 'open' ? 'full' : 'open';
   if (st === 'down') p.append(mk('span', '', 'Courts show again when the game is back.'));
@@ -599,14 +621,16 @@ function drawState(st, s) {
 }
 function setFilter(f) { filter = f === 'full' ? 'full' : 'open'; try { localStorage.setItem('poddle.courts', filter); } catch { /* fine */ } drawCourts(); }
 function setQuery(q) { query = (String(q || '').toUpperCase().match(CODE_OK) || []).join('').slice(0, 8); const i = $('court-search'); if (i && i.value !== query) i.value = query; drawCourts(); }
-function useCode(c) { setCode(c); codeError(''); $('btn-join').focus({ preventScroll: true }); }
+function useCode(c) { setCode(c); codeError(''); deal(); $('btn-join').focus({ preventScroll: true }); }
+const deal = () => boxes().forEach((b, i) => { if (b.value) { b.style.setProperty('--i', i); restart(b, 'lob-fill'); } });      // the letters land box by box
 const rove = row => { for (const r of $('room-list').querySelectorAll('.court-row')) r.tabIndex = r === row ? 0 : -1; };      // the list is one Tab stop: the arrows walk it
 // "Court is full. Watch instead?" over the lobby. Yes -> on.watch(code). Either button closes it; so does askWatch(null) and leaving the lobby.
-let askCode = null;
+let askCode = null, askOutT = 0;
 export const asking = () => askCode != null;
 export function askWatch(code, title) {                                                // title: a tournament's own question ('This tournament has started. Watch instead?')
   const el = $('ask-watch'); if (!el) return; code = code == null ? null : String(code); if (code != null) setText($('ask-title'), title ? String(title) : 'Court is full. Watch instead?');
-  if (code === askCode) return; const was = askCode; askCode = code; el.hidden = code == null; $('screen-lobby').classList.toggle('is-asking', code != null);
+  if (code === askCode) return; const was = askCode; askCode = code; clearTimeout(askOutT); el.classList.remove('lob-out'); el.inert = false;
+  if (code != null) el.hidden = false; else if (was != null && !reduced() && slots.menu === 'lobby' && !el.hidden) { el.classList.add('lob-out'); el.inert = true; askOutT = setTimeout(() => { el.classList.remove('lob-out'); el.inert = false; if (askCode == null) el.hidden = true; }, 200); } else el.hidden = true;      // it shrinks away instead of vanishing (ui.css .ask.lob-out), inert so Tab cannot land on Yes / No while it fades; the lobby is live again at once
   for (const e of document.querySelectorAll('#screen-lobby .menu-head, #screen-lobby .lobby-view, #name-row')) e.inert = code != null;      // the lobby behind it: no clicks, no Tab stops
   if (code != null) setTimeout(() => { if (askCode === code) $('btn-watch-yes').focus({ preventScroll: true, focusVisible: true }); }, 60);
   else if (was != null && slots.menu === 'lobby') setTimeout(() => { if (slots.menu === 'lobby' && !asking()) viewFocus().focus({ preventScroll: true }); }, 0);
@@ -616,7 +640,7 @@ export function lobbyLink(up) { if ($('screen-lobby').classList.contains('is-dow
   $('lobby-down').hidden = up; $('screen-lobby').classList.toggle('is-down', !up); if (!up) { list = { rooms: [], tours: [] }; seen = false; $('lobby-online').hidden = true; } drawCourts(); }      // a list from before the drop is not worth tapping; back up, it is 'loading' until the first list
 export function codeError(text) {
   setText($('code-err'), text); $('code-boxes').classList.toggle('is-bad', !!text);
-  if (text) { restart($('code-boxes'), 'is-error'); boxes()[3].focus(); }
+  if (text) { const cb = $('code-boxes'); restart(cb, 'is-error'); cb.addEventListener('animationend', function done(e) { if (e.target !== cb || e.animationName !== 'nudge') return; cb.removeEventListener('animationend', done); cb.classList.remove('is-error'); }); boxes()[3].focus(); }
 }
 function setCode(code) { boxes().forEach((b, i) => { b.value = code[i] || ''; }); codeReady(); }
 const getCode = () => boxes().map(b => b.value).join('');
@@ -641,7 +665,7 @@ async function copyLink(btn, watch) {      // watch: the viewer link (&watch=1),
   if (watch) { const u = new URL(href); u.searchParams.set('watch', '1'); href = u.href; }
   href = INVITE[watch ? 'watch' : 'play'] + ' ' + href;
   try { await navigator.clipboard.writeText(href); } catch { const t = document.createElement('textarea'); t.value = href; t.style.cssText = 'position:fixed;opacity:0'; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch { /* nothing more to try */ } t.remove(); }
-  if (btn.id === 'btn-copy') { const l = $('copy-label'); setText(l, 'Copied'); clearTimeout(copyT); copyT = setTimeout(() => setText(l, 'Copy link'), 1500); } else on.copied && on.copied(watch);
+  if (btn.id === 'btn-copy') { const l = $('copy-label'); setText(l, 'Copied'); restart(l, 'lob-pop'); clearTimeout(copyT); copyT = setTimeout(() => setText(l, 'Copy link'), 1500); } else on.copied && on.copied(watch);
 }
 let copyT = 0;
 // Two copy menus, one way of working: the share screen's Copy link and the court pill in the HUD corner. Hover (or a tap) drops the choices.
@@ -691,17 +715,18 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('court-seg', 'click', e => { const o = e.target.closest('.seg-opt'); if (o) setFilter(o.dataset.filter); });
   on2('court-seg', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); setFilter(e.key === 'ArrowLeft' ? 'open' : 'full'); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); });
   document.addEventListener('keydown', e => { if (e.key !== '/' || view !== 'courts' || slots.menu !== 'lobby' || asking() || e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return; e.preventDefault(); $('court-search').focus(); });      // '/' = search, the web's usual key, anywhere on Courts
-  const pick = opt => { for (const o of $('seg').children) { const yes = o === opt; o.setAttribute('aria-checked', yes); o.tabIndex = yes ? 0 : -1; } setText($('seg-note'), opt.dataset.public === '1' ? 'Shows in the court list' : 'Join by code only'); };
+  const pick = opt => { for (const o of $('seg').children) { const yes = o === opt; o.setAttribute('aria-checked', yes); o.tabIndex = yes ? 0 : -1; } swapText($('seg-note'), opt.dataset.public === '1' ? 'Shows in the court list' : 'Join by code only', 'lob-swap'); };      // the note changes with the thumb
   $('seg').addEventListener('click', e => { const o = e.target.closest('.seg-opt'); if (o) pick(o); });
   $('lobby-create').addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); const o = $('seg').children[e.key === 'ArrowLeft' ? 0 : 1]; pick(o); if ($('seg').contains(document.activeElement)) o.focus(); });   // Left = Public, Right = Private, from anywhere on the card
   // code boxes: type, paste (a code or a whole link), Backspace walks back, arrows move, Enter joins
   const form = $('lobby-code'), fill = (from, text) => { const bs = boxes(), chars = cleanCode(text); if (chars.length === 4) from = 0;
-    [...chars].forEach((c, i) => { if (bs[from + i]) bs[from + i].value = c; }); (bs[Math.min(3, from + chars.length)] || bs[3]).focus(); codeReady(); codeError(''); };
+    [...chars].forEach((c, i) => { const b = bs[from + i]; if (b) { b.value = c; b.style.setProperty('--i', i); restart(b, 'lob-fill'); } });      // each letter lands with a pop; a paste deals them
+    (bs[Math.min(3, from + chars.length)] || bs[3]).focus(); codeReady(); codeError(''); };
   form.addEventListener('input', e => { const b = e.target, i = boxes().indexOf(b); if (i < 0) return; const t = b.value; b.value = ''; if (cleanCode(t)) fill(i, t); else codeReady(); });
   form.addEventListener('paste', e => { e.preventDefault(); fill(0, (e.clipboardData || window.clipboardData).getData('text')); });
   form.addEventListener('focusin', e => { if (e.target.select) e.target.select(); });
   form.addEventListener('keydown', e => { const bs = boxes(), i = bs.indexOf(e.target); if (i < 0) return;
-    if (e.key === 'Backspace' && !e.target.value && i > 0) { e.preventDefault(); bs[i - 1].value = ''; bs[i - 1].focus(); codeReady(); }
+    if (e.key === 'Backspace' && !e.target.value && i > 0) { e.preventDefault(); bs[i - 1].value = ''; restart(bs[i - 1], 'lob-clear'); bs[i - 1].focus(); codeReady(); }
     else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); bs[i - 1].focus(); } else if (e.key === 'ArrowRight' && i < 3) { e.preventDefault(); bs[i + 1].focus(); }
     else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); $('btn-watch-code').click(); } });      // Enter = Join (the form), Shift+Enter = Watch
   form.addEventListener('submit', e => { e.preventDefault(); const c = getCode(); if (c.length === 4 && !needName() && on.join) on.join(c); });
@@ -949,4 +974,22 @@ export function tourEnded(why, asToast = false) {                               
   on2('champ-acts', 'keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); $(e.key === 'ArrowLeft' ? 'btn-champ-back' : 'btn-champ-bracket').focus(); } });
   on2('btn-tour-ended-ok', 'click', () => { show('tour-ended', false); if (slots.menu === 'lobby') viewFocus().focus({ preventScroll: true }); });
   for (const id of ['tour-n-num', 'tour-pill-n']) $(id)?.addEventListener('animationend', e => e.currentTarget.classList.remove('pop'));
+}
+// The spectator's view chips get the same sliding plate (.views::before, ui.css), keyed on aria-pressed. 'Player: Sam' changes a chip's width, so it is measured, not assumed.
+{
+  const box = $('views');
+  if (box) {
+    const place = () => {
+      const on = box.querySelector(':scope > [aria-pressed="true"]');
+      if (!on || !box.offsetWidth) { box.classList.remove('has-thumb'); return; }
+      const first = !box.classList.contains('has-thumb');
+      if (first) box.classList.add('thumb-still');
+      const s = box.style; s.setProperty('--tx', on.offsetLeft + 'px'); s.setProperty('--ty', on.offsetTop + 'px'); s.setProperty('--tw', on.offsetWidth + 'px'); s.setProperty('--th', on.offsetHeight + 'px');
+      box.classList.add('has-thumb');
+      if (first) { void box.offsetWidth; requestAnimationFrame(() => box.classList.remove('thumb-still')); }
+    };
+    new MutationObserver(place).observe(box, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] });
+    if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(place); ro.observe(box); for (const c of box.children) ro.observe(c); }
+    place();
+  }
 }

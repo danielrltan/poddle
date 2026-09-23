@@ -11,6 +11,15 @@ const shown = c => (c.length === 4 ? 'P-' + c : c);
 const ok = c => c.length === 4 || c.length === 6;
 const GAME = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
 const view = v => { document.body.dataset.view = v; };
+// Motion (decorative only; pad.css holds the rest). WAAPI ignores the CSS media query, so reduced motion is checked here. The
+// keyframes use the individual translate/scale properties so they compose with pad.css's view-rise entry instead of cutting it off.
+const RM = matchMedia('(prefers-reduced-motion: reduce)'), still = el => RM.matches || !el.animate;
+const restart = (el, c) => { el.classList.remove(c); void el.offsetWidth; el.classList.add(c);      // same idea as ui.js restart(); off again once played, so a redisplay does not replay it
+  el.addEventListener('animationend', function f(e) { if (e.target !== el || !/^(nudge|note-in)$/.test(e.animationName)) return; el.classList.remove(c); el.removeEventListener('animationend', f); }); };
+const say = (el, t) => { if (el.textContent === t) return; el.textContent = t;      // new words slide up into place; unchanged ones never re-animate
+  if (still(el) || el.getAnimations().some(a => a.animationName)) return;      // still rising in with the view: that is enough
+  el.animate([{ opacity: 0, translate: '0 .25rem' }, { opacity: 1, translate: '0 0' }], { duration: 260, easing: 'cubic-bezier(.22,1,.36,1)' }); };
+const bad = t => { $('code-note').textContent = t; restart(document.querySelector('.code-field'), 'is-bad'); restart($('code-note'), 'is-new'); };
 const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
 const pad = new PadMotion(IOS ? 'xyz' : 'zxy');      // WebKit names rotationRate x,y,z; Chrome and Firefox follow the spec's z,x,y
 const stats = window.__pad = { sent: 0, hz: 0, rtt: 0, host: false, open: false, get view() { return document.body.dataset.view; }, get naming() { return pad.naming + (pad.locked ? '' : '?'); } };
@@ -20,7 +29,7 @@ let code = clean(qs.get('k')), ws = null, started = false, sawMotion = false, pe
 if (ok(code)) { $('start-code').textContent = shown(code); view('start'); } else { view('code'); if (qs.get('k')) $('code-note').textContent = 'That code didn’t look right. It is P- and 4 letters or numbers.'; }
 $('code-in').addEventListener('input', e => { e.target.value = clean(e.target.value); });
 $('code-form').addEventListener('submit', e => { e.preventDefault(); const c = clean($('code-in').value);
-  if (!ok(c)) { $('code-note').textContent = 'The code is P- and 4 letters or numbers.'; return; }
+  if (!ok(c)) { bad('The code is P- and 4 letters or numbers.'); return; }
   code = c; history.replaceState(null, '', 'pad.html?k=' + c); $('start-code').textContent = shown(c); view('start'); });
 
 // ---------- the sensors ----------
@@ -66,7 +75,7 @@ function connect() {
   const s = ws = new WebSocket(`${GAME}/?padfor=${code}`);
   s.onopen = () => { delay = 300; stats.open = true; render(); };
   s.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === 'padhost') { if (m.bad) { view('code'); $('code-note').textContent = 'That code didn’t work. Check it and try again.'; started = false; s.close(); return; } stats.host = !!m.on; render(); }
+    if (m.type === 'padhost') { if (m.bad) { view('code'); bad('That code didn’t work. Check it and try again.'); started = false; s.close(); return; } stats.host = !!m.on; render(); }
     else if (m.type === 'pong') stats.rtt = performance.now() - pingAt;
     else if (m.type === 'fx') fx(m); };
   s.onclose = () => { if (ws !== s) return; stats.open = false; stats.host = false; render(); if (started) setTimeout(connect, delay); delay = Math.min(delay * 1.6, 2500); };
@@ -132,10 +141,12 @@ function fx(m) {
 
 // ---------- the screen ----------
 function render() {
-  const on = stats.open && stats.host; document.body.dataset.link = on ? 'on' : 'wait';
-  $('live-h').textContent = on ? (fxText || 'Connected') : stats.open ? 'Looking for your computer' : 'Reconnecting';
-  $('live-p').textContent = on ? 'Watch the computer, not the phone. Keep this page open.' : stats.open ? `Open poddleball.com on a computer and press Play. This phone is paddle ${code}.` : 'Check this phone is online.';
+  const on = stats.open && stats.host, was = document.body.dataset.link; document.body.dataset.link = on ? 'on' : 'wait';
+  const ring = $('ring'); if (on && was === 'wait' && !still(ring)) ring.animate([{ scale: 1 }, { scale: 1.07, offset: 0.4 }, { scale: 1 }], { duration: 440, easing: 'cubic-bezier(.34,1.56,.64,1)' });      // a little 'hello' when the computer answers
+  say($('live-h'), on ? (fxText || 'Connected') : stats.open ? 'Looking for your computer' : 'Reconnecting');
+  say($('live-p'), on ? 'Watch the computer, not the phone. Keep this page open.' : stats.open ? `Open poddleball.com on a computer and press Play. This phone is paddle ${code}.` : 'Check this phone is online.');
 }
 let lastSent = 0;
 setInterval(() => { stats.hz = stats.sent - lastSent; lastSent = stats.sent; $('live-stats').textContent = stats.open && stats.host ? `${stats.hz} samples/s · ${Math.round(stats.rtt)} ms` : ''; }, 1000);
-setInterval(() => { $('ring-fill').style.height = Math.min(100, peak / 25 * 100) + '%'; $('ring-word').textContent = peak > 20 ? 'Smash' : peak > 9 ? 'Swing' : 'Ready'; peak *= 0.8; }, 100);      // the meter jumps with a swing and sinks back. 'Smash' from 20 rad/s: below ~19 phone rad/s the game can no longer call one, however wide the stroke (web/motion.js PACE_R x sqrt(RATE_GAIN), NOTES 82); it said so from 18
+setInterval(() => { $('ring-fill').style.transform = `scaleY(${Math.min(1, peak / 25).toFixed(3)})`; const w = $('ring-word'), t = peak > 20 ? 'Smash' : peak > 9 ? 'Swing' : 'Ready';
+  if (w.textContent !== t) { w.textContent = t; if (t !== 'Ready' && !still(w)) w.animate([{ scale: 1.25 }, { scale: 1 }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' }); } peak *= 0.8; }, 100);      // the meter jumps with a swing and sinks back. 'Smash' from 20 rad/s: below ~19 phone rad/s the game can no longer call one, however wide the stroke (web/motion.js PACE_R x sqrt(RATE_GAIN), NOTES 82); it said so from 18

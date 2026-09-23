@@ -3,6 +3,7 @@
 @font-face{font-family:"Poddle Rounded";font-weight:800;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-800.woff2) format("woff2")}
 @font-face{font-family:"Poddle Rounded";font-weight:900;font-style:normal;font-display:swap;src:url(vendor/fonts/mplus-rounded-1c-900.woff2) format("woff2")}
 :root{--ink:#555e67;--ink-strong:#39434d;--ink-soft:#65717b;--bg:#dfeef6;--line:#34beed;--line-deep:#1a9fd0;--line-soft:#a9e0f6;--link:#0f7aa6;--ball:#e6f03c;--ball-deep:#b9c916;--good:#3ecf72;--good-deep:#13803f;--warn:#ffb534;
+  --ease-out:cubic-bezier(.22,1,.36,1);--ease-soft:cubic-bezier(.45,0,.25,1);--ease-bounce:cubic-bezier(.34,1.56,.64,1);--d-fast:160ms;--d-med:320ms;      /* same motion tokens as ui.css */
   --font:"Poddle Rounded",ui-rounded,"SF Pro Rounded","Arial Rounded MT Bold","Nunito","Helvetica Neue",Arial,sans-serif;color-scheme:light}
 *,*::before,*::after{box-sizing:border-box}
 /* Nothing on the page is selectable (a drag, a double-click or a long press mid-swing lit up text) EXCEPT what you type and the codes:
@@ -12,7 +13,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 #start-code{-webkit-user-select:all;user-select:all;-webkit-touch-callout:default;white-space:nowrap}
 html,body{height:100%}
 body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 45%,var(--bg) 100%) fixed;font:500 1.0625rem/1.5 var(--font);-webkit-font-smoothing:antialiased;
-  -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;transition:background-color .12s}
+  -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:max(1.25rem,env(safe-area-inset-top)) 1.5rem max(1.5rem,env(safe-area-inset-bottom));text-align:center}
 .logo-mark{display:inline-flex;align-items:center;margin:0 0 .5rem;font-size:2.75rem;font-weight:900;line-height:1;color:var(--ink-strong);filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;background:radial-gradient(circle at 30% 32%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 62% 24%,var(--ball-deep) 0 8%,transparent 9%),
@@ -27,9 +28,12 @@ b{font-weight:800;color:var(--ink-strong)}
 a{color:var(--link);font-weight:800}
 .art{width:12rem;height:auto}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:3.25rem;padding:0 2rem;border-radius:999px;border:.1875rem solid var(--line);background:linear-gradient(180deg,#fff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);
-  color:var(--ink-strong);font:800 1.125rem/1 var(--font);letter-spacing:.02em;box-shadow:0 .125rem 0 rgba(90,150,185,.22),0 .25rem .625rem rgba(40,80,110,.12);cursor:pointer}
-.btn:active{transform:translateY(.125rem);box-shadow:0 0 0 rgba(0,0,0,0)}
-.btn:focus-visible,input:focus-visible{outline:.1875rem solid var(--line);outline-offset:.1875rem}
+  color:var(--ink-strong);font:800 1.125rem/1 var(--font);letter-spacing:.02em;box-shadow:0 .125rem 0 rgba(90,150,185,.22),0 .25rem .625rem rgba(40,80,110,.12);cursor:pointer;
+  outline:.1875rem solid transparent;outline-offset:.5rem;transition:transform var(--d-fast) var(--ease-bounce),background-color var(--d-fast) linear,border-color .2s linear,outline-color .2s linear,outline-offset .24s var(--ease-out)}      /* press springs back; focus ring tightens in */
+.btn:active{transform:translateY(.125rem) scale(.97);box-shadow:0 0 0 rgba(0,0,0,0);transition-duration:60ms}      /* in fast, out on the bounce */
+@media (hover:hover){.btn:hover{border-color:var(--line);transform:translateY(-.0625rem)} .btn:active{transform:translateY(.125rem) scale(.97)}}      /* a laptop tester; :active re-stated so the press wins */
+input:focus-visible{outline:.1875rem solid var(--line);outline-offset:.1875rem}
+.btn:focus-visible{outline-color:var(--line);outline-offset:.1875rem}
 .btn-xl{min-height:4.5rem;padding:0 3.5rem;font-size:1.5rem}
 .btn-sm{min-height:2.75rem;padding:0 1.25rem;font-size:1rem}
 .row{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem}
@@ -38,24 +42,26 @@ input{width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem 
 input::placeholder{color:#c3dbe8}
 /* the code box: P- is printed in it, you type the four after it (NOTES 81). The box is the label; the input inside it is bare */
 .code-field{display:flex;align-items:center;justify-content:center;gap:.125em;width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem solid var(--line-soft);background:#fff;font:900 2rem/1 var(--font);letter-spacing:.25em;cursor:text}
-.code-field:focus-within{outline:.1875rem solid var(--line);outline-offset:.1875rem}
+.code-field{outline:.1875rem solid transparent;outline-offset:.5rem;transition:outline-color .2s linear,outline-offset .24s var(--ease-out)}      /* the ring tightens onto the box */
+.code-field:focus-within{outline-color:var(--line);outline-offset:.1875rem}
+@media (forced-colors:active){.btn,.code-field{outline-style:none} .btn:focus-visible,.code-field:focus-within{outline-style:solid}}      /* the system colours a transparent outline in: no ring at rest */
 .code-pre{color:#9dbccd}
 .code-field input{width:4em;max-width:none;height:100%;padding:0;border:0;border-radius:0;background:none;text-align:left;outline:0}
 /* the one thing worth a glance mid-rally: how hard that swing was, and whether the link is up */
 .ring{position:relative;display:grid;place-items:center;width:11rem;height:11rem;border-radius:50%;border:.375rem solid var(--line-soft);background:#fff;overflow:hidden;box-shadow:0 .1875rem 0 rgba(90,150,185,.25),0 .5rem 1rem rgba(40,80,110,.13)}
-.ring-fill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#bfeaff,var(--line));opacity:.55}
+.ring-fill{position:absolute;left:0;right:0;bottom:0;height:100%;transform:scaleY(0);transform-origin:bottom;transition:transform .1s linear;background:linear-gradient(180deg,#bfeaff,var(--line));opacity:.55}      /* pad.js sets scaleY at 10 Hz: compositor-only, the steps blend into a smooth sink */
 .ring b{position:relative;font-size:1.5rem;font-weight:900}
 body[data-link="on"] .ring{border-color:var(--good)}
 body[data-link="wait"] .ring{border-color:var(--warn)}
 .btn-hold{position:relative;overflow:hidden;touch-action:none}
-.btn-hold::before{content:"";position:absolute;inset:0;background:var(--line-soft);transform:scaleX(0);transform-origin:left;opacity:.7}
+.btn-hold::before{content:"";position:absolute;inset:0;background:var(--line-soft);transform:scaleX(0);transform-origin:left;opacity:.7;transition:transform .18s var(--ease-out)}      /* let go early: a quick drain, not a snap */
 .btn-hold.is-held::before{transform:scaleX(1);transition:transform .7s linear}
 .btn-hold.is-done{border-color:var(--good)}
 .btn-hold{isolation:isolate}.btn-hold::before{z-index:-1}
 /* The X that ends the session: low and down the MIDDLE, never in a corner — a hand wrapped round the phone rests on the
    corners, and this must not sit under a palm all rally. Pinned near the bottom (clear of the home bar) so it is in the
    same place on every phone, with the live view padded to match so nothing is ever under it. 2.75rem: a real target. */
-.btn-x{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2.75rem + env(safe-area-inset-bottom));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5}
+.btn-x{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2.75rem + env(safe-area-inset-bottom));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5;transition:border-color .2s linear,color .2s linear}
 [data-name="live"]{padding-bottom:8rem}
 /* A short phone: tighten the live view so everything, the X included, still fits without scrolling. */
 @media (max-height:760px){[data-name="live"]{gap:.6rem;padding-bottom:7.75rem}[data-name="live"] .ring{width:8.5rem;height:8.5rem}[data-name="live"] .ring b{font-size:1.25rem}}
@@ -77,9 +83,11 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
 .btn-x .hold-track{stroke:var(--line-soft);opacity:0}                                   /* the groove it runs in: only while held, so nothing rings the button at rest */
 .btn-x .hold-arc{stroke:var(--line);stroke-dasharray:138.2;stroke-dashoffset:138.2}
 .btn-x.is-held .hold-track{opacity:.4}
+.btn-x .hold-ring .hold-track{transition:opacity .2s var(--ease-out)}      /* (0,3,0) beats the transition:none above: only the faint groove fades, the arc still snaps */
+.btn-x > svg:not(.hold-ring){transition:scale var(--d-fast) var(--ease-bounce)} .btn-x.is-held > svg:not(.hold-ring){scale:.82}      /* the cross squeezes under the thumb; the button itself never scales (the ring gap) */
+.btn-x.is-held{border-color:var(--line);color:var(--ink-strong)}
 .btn-x.is-held .hold-arc{stroke-dashoffset:0;transition:stroke-dashoffset .7s linear}
 .btn-x.is-done{border-color:var(--good)} .btn-x.is-done .hold-arc{stroke:var(--good);stroke-dashoffset:0}
-@media (prefers-reduced-motion:reduce){body{transition:none}}
 
 /* Always dark (NOTES 39): the phone is in your hand, near your eyes, while you watch the big screen. A bright page flashing
    in the corner of your eye is a distraction, so everything is dim and low contrast except the one thing worth a glance. */
@@ -109,3 +117,28 @@ body[data-link="wait"] .ring{border-color:#7a5716}
 .art rect[fill="#5b6670"]{fill:#8795a1}
 .art text{fill:var(--ink-strong)}
 .art .cam-plate{fill:#22364a;stroke:#8795a1} .art .cam-lens{fill:#8795a1} .art .cam-glass{fill:#0d141a} .art .cam-flash{fill:#8a7f55;stroke:#8795a1}      /* the camera bar, dark like the rest */
+
+/* Motion: decorative only, and only for people who have not asked for less. The hold bar and ring fills above stay at 0.7 s
+   whatever the setting: they are information (how long left to hold), not decoration. */
+@media (prefers-reduced-motion:no-preference){
+.view > :not(.btn-x){animation:view-rise .42s var(--ease-out) backwards}      /* a CSS animation replays on every display:none -> flex, so each view switch rises in, no JS. Never on .view itself: a transform there would re-anchor the fixed X */
+.view > :nth-child(2){animation-delay:50ms} .view > :nth-child(3){animation-delay:100ms} .view > :nth-child(n+4):not(.btn-x){animation-delay:150ms}
+.btn-x{animation:x-in .4s var(--ease-bounce) .25s backwards}      /* the scale property, so translateX(-50%) stays */
+.btn-hold:not(.btn-x).is-done{animation:hold-done .42s var(--ease-bounce)}      /* a little 'got it' pop; scale composes with the :active press */
+.code-field.is-bad{animation:nudge .42s var(--ease-soft)}      /* a 'no' head-shake on a bad code */
+#code-note.is-new{animation:view-rise .42s var(--ease-out) .15s backwards,note-in .3s var(--ease-out)}      /* view-rise re-listed as it is (same name: not replayed), note-in added */
+#go{animation:view-rise .42s var(--ease-out) .15s backwards,go-breathe 2.4s var(--ease-soft) 1.2s infinite}      /* re-lists view-rise: a new list replaces the old */
+.art > path,.art > text{animation:art-nudge 1.4s var(--ease-soft) infinite}      /* only the 'edge up' arrow and label, not the hand or phone */
+body[data-link="wait"] .ring{animation:view-rise .42s var(--ease-out) backwards,ring-wait 1.6s var(--ease-soft) infinite}      /* a slow amber breath while it hunts: no link, so no rally */
+.logo-ball{animation:ball-drop .8s var(--ease-out) .1s backwards}      /* the o drops in and bounces once, on load */
+}
+.ring{transition:border-color var(--d-med) var(--ease-soft)}
+@keyframes view-rise{from{opacity:0;transform:translateY(.75rem)}}
+@keyframes x-in{from{opacity:0;scale:.5}}
+@keyframes hold-done{40%{scale:1.06}}
+@keyframes note-in{from{opacity:0;translate:0 .375rem}}
+@keyframes nudge{20%{translate:-.375rem}40%{translate:.375rem}60%{translate:-.25rem}80%{translate:.125rem}}
+@keyframes go-breathe{50%{scale:1.035}}
+@keyframes art-nudge{50%{transform:translateY(-4px)}}
+@keyframes ring-wait{50%{border-color:#4a3510}}
+@keyframes ball-drop{0%{transform:translateY(-1.1em) rotate(-120deg);opacity:0}55%{transform:translateY(0) scale(1.14,.86)}75%{transform:translateY(-.14em) scale(.96,1.04)}100%{transform:none}}

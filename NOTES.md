@@ -1536,3 +1536,23 @@ under-reports lob (motion.js: the upward share of a scoop is still low when the 
   reconnect and the unready-before-the-first-ball forfeit; verify (k) checks your own card is first focus and clear of the headers,
   (o) the Stop watching labels. Not done: the 12 px floor at 1280 (--t-xs is 11.1 px there by design everywhere), the global Back / menu
   button sizes (pre-existing chrome), and Esc on the host screen in the mock (main.js's `back()`; the mock has no main.js), and a real server restart in tourney-e2e (tourney.test covers `tourend restart` on the wire, menu.mjs B6 the call, verify.mjs the words).
+## 88. Motion everywhere: menus settle, tiles play, lists glide, the HUD pops, the phone page springs
+
+A sweep for anything that snapped. Rules kept throughout: playful hover only under `@media (hover:hover)` (no sticky hover on phones);
+hover uses the individual `scale`/`translate`/`rotate` properties so it composes with the `.is-focus` breathe animation on `transform`;
+transition lists are extended, never replaced; anything on screen during a rally animates transform and opacity only, no new blur;
+the global reduced-motion rule still wins.
+
+- Menus: screens settle in from 1.015 as they fade; headers drop in; deeper lobby views slide in from the right, Back from the left.
+- Buttons grow a little on hover, squash on press, fade when disabled. The Back chevron leans back.
+- Home tiles deal in left to right; hover lifts and tips them with a sheen, and each icon plays (Quick play's arrow nudges, the Courts
+  magnifier swings, the bot tilts and blinks). Keyboard/gamepad focus plays it once. Title letters pop in, the ball drops and hops.
+- Courts: new rows rise in, rows below glide up when a court closes, counts hop, code letters pop, errors drop in; copy menus unfold;
+  bot cards each move their own way.
+- Settings card grows out of its button and back; switch colour fades; HUD labels, toasts, seat-hold and ask cards spring; the scoring
+  side sweeps, the serve ball hops sides; spectator view chips get a sliding highlight; the result card lands in steps.
+- pad.html: views rise, buttons spring, hold bars drain instead of snapping, a bad code shakes. How to play: cards rise in on scroll.
+  404: the headline flies in.
+
+test/ui-next.mjs waits a little longer at four places for the new fades (lobby-first, the Watch prompt close, hold(null), Quick play's
+opacity); the checks themselves are unchanged. `#courts-n` hides with an `is-off` class and keeps its last text.
