@@ -1167,3 +1167,13 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   go faster (0.05 s) and the hand goes back to its idle sway. It works the same for you (on your see-through body, 74), the
   other player and Matt.
 - The body pose block (updatePads) is the only place it lives; scene-next passes.
+
+## 76. Settings > Screen > Show player model
+- "Add a setting: show player model... off, where it will just be the legacy / original arm and paddle. When it is ON, the arm
+  connecting to the hand shouldn't be visible since these guys don't have arms." A switch under Screen, on by default, kept in
+  poddle.settings as `body` (stored only when off, like `sound`).
+- On: your own see-through body (74) and NO ghost forearm: a Mii's hands float. Off: the original look, your body hidden and the
+  ghost forearm from the hand back toward the elbow for context. Only your own seat changes; the other player's model is always
+  there. dress() reads scene.setSelfBody()'s flag every frame, so a spectator looking through a player's eyes gets their own
+  setting for that view.
+- test/scene-next.mjs now expects no forearm with the model on (the default), and passes. Rendered both ways in the preview.

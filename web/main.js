@@ -117,14 +117,14 @@ function setView(name, flip) {                     // flip: asked for by the vie
 }
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
-let showPod = prefs.airpod !== false, showStats = false;      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
+let showPod = prefs.airpod !== false, showBody = prefs.body !== false, showStats = false;      // showBody: your own see-through player model (off = the original ghost forearm alone)      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
 // Sound (NOTES 60). sinkId is a deviceId the browser gave us for THIS origin; sinks is what it is willing to name right now.
 let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? prefs.sink : '', sinks = [], sinkDenied = false;
 // sound / sink are left out while they are the default, so a player who never opens the Sound rows keeps the same saved object as before
-const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, sink: sinkId || undefined }));
+const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
-function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready),
+function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready),
   sound: soundOn, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
   sinkWhy: !scene.audio.canSwitch() ? 'browser' : sinks.length ? '' : sinkDenied ? 'denied' : 'devices' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
@@ -156,6 +156,7 @@ function pickSink(id) {
   });
 }
 function setPod(on) { showPod = !!on; show('podwrap', showPod); savePrefs(); syncSettings(); }
+function setBody(on) { showBody = !!on; scene.setSelfBody(showBody); savePrefs(); syncSettings(); }
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
 function recenter() { model.recenter(); if (body) body.center(); say('Re-centered'); }
 function leave() { if (!LOBBY || !room) return; game.send({ type: 'leave' }); toLobby(); }
@@ -250,7 +251,7 @@ function refreshStatus() {
   const n = myName(); if (n !== polledName) { polledName = n; if (room) rename(n); }      // the name was changed in the settings panel while in a room
 }
 
-show('podwrap', showPod); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
+scene.setSelfBody(showBody); show('podwrap', showPod); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
 if (LOBBY && qs.get('room')) setUrl(wantRoom.length === 4 ? wantRoom : null, wantWatch);      // an old ?room= link: same court, the address bar now says ?court=
 if (!LOBBY) { phase = 'connect'; screen('connect'); startCam(); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
 refreshStatus(); setInterval(refreshStatus, 250);
@@ -517,7 +518,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
 ui.onSettings({
   open: () => { pause(true); setDim(); loadSinks(); },
   close: () => { pause(false); setDim(); },
-  sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, stats: setStats, recenter, leave, name: rename,
+  sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
   move: m => { if (MODES.includes(m) && m !== mode && (m !== 'body' || body && body.ready)) setMode(m); },      // how you move is chosen here now, not on the court
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2].includes(level) && !spec()) game.send({ type: 'bot', level }); } });

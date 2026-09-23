@@ -318,7 +318,7 @@ addEventListener('resize', placeSettings);
 export function setSettings(o = {}) {
   if (typeof o.sens === 'number') setText($('set-sens-val'), String(Math.round(o.sens)));
   for (const [key, id] of [['sensMin', 'btn-sens-less'], ['sensMax', 'btn-sens-more']]) if (key in o && $(id)) { if (o[key] && document.activeElement === $(id)) $('settings')?.focus({ preventScroll: true }); $(id).disabled = !!o[key]; }   // a disabled button drops focus to <body>: keep it in the card
-  for (const [key, id] of [['airpod', 'tog-airpod'], ['sound', 'tog-sound']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
+  for (const [key, id] of [['airpod', 'tog-airpod'], ['sound', 'tog-sound'], ['body', 'tog-body']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
   // Output: the row shows only when the sound can actually be moved AND the browser is willing to name the devices.
   // Otherwise the hint says which of the two is missing, rather than leaving a dead control on screen.
   if ('sinkWhy' in o) { show('set-sink', !o.sinkWhy); show('sink-hint', !!o.sinkWhy); if (o.sinkWhy) setText($('sink-hint'), SINK_HINT[o.sinkWhy] || SINK_HINT.browser);
@@ -344,7 +344,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   addEventListener('pointerdown', e => { if (setOpen && !e.target.closest?.('#settings, #btn-menu')) settings(false); });
   const call = (k, ...a) => { if (setH[k]) setH[k](...a); };
   on2('btn-sens-less', 'click', () => call('sens', -1)); on2('btn-sens-more', 'click', () => call('sens', 1));
-  for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-sound', 'sound']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
+  for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-sound', 'sound'], ['tog-body', 'body']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
   on2('set-sink-sel', 'change', e => call('sink', e.currentTarget.value));      // main.js answers with setSettings: if the device refuses, the row goes back by itself
   on2('btn-find-sinks', 'click', () => call('findSinks'));
   on2('tog-full', 'click', () => fullscreen());

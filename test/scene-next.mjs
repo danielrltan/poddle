@@ -44,9 +44,9 @@ for (const [w, h] of [[1280, 720], [600, 900]]) for (const v of ['broadcast', 's
   if (v === 'split') { const L = c[0], Rt = c[1] || {}, half = Math.floor(w / 2), hh = Math.floor(h / 2);
     if (w > h) ok(c.length === 2 && L.vp[0] === 0 && L.vp[2] === half && Rt.vp[0] === half && Rt.vp[2] === w - half && L.vp[3] === h && Math.abs(L.aspect - half / h) < 0.01 && !r.scissor, `${tag}: two viewports in one render(), each half wide, aspect ${L.aspect}, scissor test off again`);
     else ok(c.length === 2 && L.vp[0] === 0 && Rt.vp[0] === 0 && L.vp[2] === w && Rt.vp[2] === w && L.vp[1] === h - hh && L.vp[3] === hh && Rt.vp[1] === 0 && Rt.vp[3] === h - hh && Math.abs(L.aspect - w / hh) < 0.01 && !r.scissor, `${tag}: taller than wide = STACKED, side 0 on top (GL y ${L.vp[1]}), each full width, aspect ${L.aspect}, scissor test off again`);
-    ok(L.camZ > 0 && !L.av[0] && L.see[0] && L.arm[0] && L.av[1] && !L.arm[1] && !L.fence[0] && L.fence[1], `${tag}: first view = side 0's eyes (own avatar see-through, ghost arm, own fence gone, far fence up)`);
-    ok(Rt.camZ < 0 && !Rt.av[1] && Rt.arm[1] && Rt.av[0] && !Rt.arm[0] && !Rt.fence[1] && Rt.fence[0], `${tag}: second view = side 1's eyes`); }
-  if (v.startsWith('pov')) { const s = +v[3], k = c[0]; ok(c.length === 1 && r.view.side === s && (s ? k.camZ < 0 : k.camZ > 0) && !k.av[s] && k.see[s] && k.arm[s] && k.av[1 - s] && !k.fence[s] && k.fence[1 - s], `${tag}: behind side ${s} (camera z ${k.camZ}), their avatar see-through, ghost arm shown, their fence gone`); }
+    ok(L.camZ > 0 && !L.av[0] && L.see[0] && !L.arm[0] && L.av[1] && !L.arm[1] && !L.fence[0] && L.fence[1], `${tag}: first view = side 0's eyes (own avatar see-through, no forearm: a Mii has no arms, own fence gone, far fence up)`);
+    ok(Rt.camZ < 0 && !Rt.av[1] && !Rt.arm[1] && Rt.av[0] && !Rt.arm[0] && !Rt.fence[1] && Rt.fence[0], `${tag}: second view = side 1's eyes`); }
+  if (v.startsWith('pov')) { const s = +v[3], k = c[0]; ok(c.length === 1 && r.view.side === s && (s ? k.camZ < 0 : k.camZ > 0) && !k.av[s] && k.see[s] && !k.arm[s] && k.av[1 - s] && !k.fence[s] && k.fence[1 - s], `${tag}: behind side ${s} (camera z ${k.camZ}), their avatar see-through, no forearm, their fence gone`); }
   if (v === 'free') ok(c.length === 1 && c[0].camX > 8 && !c[0].fence[2] && c[0].av[0] && c[0].av[1], `${tag}: free cam outside the +x wall, which is hidden (camera x ${c[0].camX})`);
   await page.close();
 }

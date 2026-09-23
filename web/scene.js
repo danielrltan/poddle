@@ -599,7 +599,7 @@ export function createScene(containerEl) {
   // Your own body, seen from behind it: there, but barely (SELF_A), so it never hides the ball or your paddle. Its materials stay
   // `transparent` for good, so flipping between halves of a split each frame only moves opacity and depthWrite: no recompile.
   // No depth write (the trail and the ball's glow show through it) and no shadow: a solid shadow under a ghost reads as a bug.
-  const SELF_A = 0.12;
+  const SELF_A = 0.12; let selfBody = true;      // selfBody: Settings > Show player model. Off: the original look, your body hidden and the ghost forearm shown
   for (const pd of pads) { pd.bodyM = new Set(); pd.self = false; pd.avatar.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) pd.bodyM.add(mt); }); ghostify(pd); }
   function selfish(pd, on) {
     if (pd.self === on) return; pd.self = on;
@@ -639,7 +639,7 @@ export function createScene(containerEl) {
   const eyeSide = () => (at.on || (spectator && (menu || vName !== 'pov')) ? -1 : spectator ? vSide : localSide);
   const isMe = side => !spectator && !at.on && side === localSide;      // the 1:1 paddle and "my" sounds. A spectator has neither; both paddles are remote
   function dress(eye, hideBack, hideSide) {                 // what this camera may see: per view, and per half in split
-    for (const pd of pads) { pd.avatar.visible = pd.has; selfish(pd, pd.side === eye); pd.forearm.visible = pd.has && pd.side === eye; placeTag(pd); }
+    for (const pd of pads) { const mine = pd.side === eye; pd.avatar.visible = pd.has && (!mine || selfBody); selfish(pd, mine); pd.forearm.visible = pd.has && mine && !selfBody; placeTag(pd); }      // a Mii has no arms: with the body shown, no forearm
     for (let i = 0; i < 2; i++) { const b = i !== hideBack, s = i !== hideSide; for (const o of backFence[i]) o.visible = b; for (const o of sideFence[i]) o.visible = s; }
   }
   const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vF = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
@@ -1249,6 +1249,7 @@ export function createScene(containerEl) {
       setMute(on) { muted = !!on; if (master) master.gain.value = muted ? 0 : GAIN; },
       setSink(id) { unlockAudio(); return !ac || typeof ac.setSinkId !== 'function' ? Promise.resolve(false) : ac.setSinkId(id || '').then(() => true, () => false); },
     },
+    setSelfBody(on) { selfBody = !!on; },                   // Settings > Show player model (dress() reads it every frame)
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at,               // test harness only
       view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }) },
   };
