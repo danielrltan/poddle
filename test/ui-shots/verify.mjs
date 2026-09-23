@@ -82,5 +82,60 @@ try {
     const tiny = await p.evaluate(() => [...document.querySelectorAll('.courts *, #ask-card *, #btn-ask *, .tile-sub')].filter(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width && c.visibility !== 'hidden' && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && !e.closest('.keycap, .caps, .vh') && parseFloat(c.fontSize) < 11.95; }).map(e => `${e.id || e.className || e.tagName} "${e.textContent.trim().slice(0, 16)}" ${parseFloat(getComputedStyle(e).fontSize).toFixed(1)}px`));
     check(!tiny.length, `${w}x${h} ${scr}: no text under 12 px${tiny.length ? ': ' + tiny.join(', ') : ''}`); await p.close();
   }
+  // ---------- Tournaments (docs/COURTS-TOURNEY.md 4.6): the same three gates on every new screen ----------
+  const TOUR_SEL = '#lobby-tour button, #tour-card button, #tour-pill, #btn-tour-go, #lobby-bracket button, #champ-acts button, #tour-res button, #tour-ended button';
+  for (const scr of ['tourney-courts', 'tourney-host-3', 'tourney-guest', 'tourney-warmfull', 'tourney-banner', 'tourney-banner-host', 'tourney-card', 'tourney-intro', 'tourney-bracket', 'tourney-bracket&n=16&you=watching', 'tourney-win', 'tourney-out', 'tourney-champion', 'tourney-ended', 'tourney-match', 'tourney-match-settings']) for (const [w, h] of [[1280, 720], [600, 900], [390, 844]]) {      // (g) 44 x 44 targets, at a short landscape window too
+    p = await open('screen=' + scr + '&freeze=1', false, w, h);
+    const small = await p.evaluate(sel => [...document.querySelectorAll(sel)].filter(e => { const r = e.getBoundingClientRect(); return r.width && getComputedStyle(e).visibility !== 'hidden' && (r.width < 43.5 || r.height < 43.5); }).map(e => `${e.id || e.className.split(' ').pop()} ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`), TOUR_SEL);
+    check(!small.length, `${w}x${h} ${scr}: every tournament control is 44 x 44 or more${small.length ? ': ' + small.join(', ') : ''}`); await p.close();
+    p = await open('screen=' + scr + '&freeze=1', false, w, h);      // (h) the 12 px floor on a phone-width window (keycaps are exempt, the small caps have an 11 px floor)
+    if (w < 1000) { const tiny = await p.evaluate(() => [...document.querySelectorAll('#lobby-tour *, #tour-card *, #tour-pill *, #btn-tour-go, #lobby-bracket *, #screen-tour-vs *, #result-road *, #tour-res *, #champ-acts *, #tour-ended *, .notices *, #rematch-count *, .badge-tour, #result .tally-side b')].filter(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e), fs = parseFloat(c.fontSize); return r.width && c.visibility !== 'hidden' && +c.opacity > 0.05 && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && !(e.closest('.keycap, .vh') || e.closest('.caps') && fs >= 10.95) && fs < 11.95; }).map(e => `${e.id || e.className || e.tagName} "${e.textContent.trim().slice(0, 16)}" ${parseFloat(getComputedStyle(e).fontSize).toFixed(1)}px`));
+    check(!tiny.length, `${w}x${h} ${scr}: no tournament text under 12 px (small caps 11)${tiny.length ? ': ' + tiny.join(', ') : ''}`); } await p.close();
+  }
+  for (const [scr, sels] of [['tourney-host-3', ['.tour-join', '.tour-join small', '.tour-why', '.tour-chip-name', '.tour-tag', '.tour-copied', '.tour-rules', '.tour-n small']], ['tourney-host-ready', ['.tour-why.is-ready', '#tour-start-label']], ['tourney-warmfull', ['.tour-full']],
+    ['tourney-bracket', ['.br-you', '.br-name', '.br-round', '.br-round small', '.br-live span', '.br-tag', '.br-p.is-me .br-name']], ['tourney-bracket&you=out&next=1', ['.br-next', '.br-p.is-lose .br-name']], ['tourney-bracket&n=16&you=watching', ['.br-left', '.br-you']], ['tourney-banner', ['.tp-long', '.tp-sub b', '.notice.is-tour span']],
+    ['tourney-card', ['.tc-code b', '.tc-code small', '.tc-n']], ['tourney-intro', ['.vs-round', '.vs-target', '#vs-them']], ['tourney-champion', ['#result-title', '.road-step small', '.road-step span', '#result-note']], ['tourney-ended', ['#tour-ended-text']]]) {      // (i) contrast, as (e)
+    p = await open('screen=' + scr + '&freeze=1');
+    const cs = await p.evaluate(ss => ss.map(sel => { const e = document.querySelector(sel); if (!e) return { sel, miss: true }; const fg = getComputedStyle(e).color; let n = e, bgs = [];
+      while (n && n !== document.documentElement) { const c = getComputedStyle(n), img = c.backgroundImage, col = c.backgroundColor;
+        if (img && img !== 'none' && /gradient/.test(img)) { bgs = img.match(/rgba?\([^)]+\)/g) || []; if (bgs.length) break; }
+        if (col && !/rgba\(0, 0, 0, 0\)|transparent/.test(col)) { bgs = [col]; break; } n = n.parentElement; }
+      return { sel, fg, bgs: bgs.length ? bgs : ['rgb(255, 255, 255)'] }; }), sels);
+    for (const c of cs) { if (c.miss) { check(false, `${c.sel} is on ${scr}`); continue; }
+      const over = s => { const v = rgb(s), a = v.length > 3 ? v[3] : 1; return v.slice(0, 3).map(x => x * a + 255 * (1 - a)); }, worst = Math.min(...c.bgs.map(bg => ratio(over(c.fg), over(bg))));
+      check(worst >= 4.5, `${scr} contrast ${c.sel}: ${worst.toFixed(2)}:1`); }
+    await p.close();
+  }
+  for (const reduce of [true, false]) {      // (j) the count pops on a join, and not under reduced motion; focus lands on Copy invite. No freeze: it would end the pop before it is looked at
+    p = await open('screen=tourney-host-3', reduce);
+    const pop = await p.evaluate(async () => { await new Promise(r => setTimeout(r, 400)); const f = document.activeElement?.id, ui = window.__ui, snap = { type: 'tour', code: 'K24M', phase: 'reg', n: 4, max: 16, host: 'Daniel', win: 7, final: 11, you: { id: 1, host: true, warm: 'off' }, players: ['Daniel', 'Kim', 'Ben', 'Sam'].map((name, i) => ({ id: i + 1, name, host: !i, on: true })), rounds: [] };
+      ui.setTour(snap, { link: 'https://poddleball.com/?court=K24M' }); const b = document.getElementById('tour-n-num'), an = b.getAnimations(), start = document.getElementById('btn-tour-start');
+      return { f, n: b.textContent, anim: an.map(x => x.animationName).join(), dur: an[0] ? an[0].effect.getTiming().duration : null, start: !start.disabled, label: start.textContent.trim(), fresh: document.querySelectorAll('#tour-names .tour-chip.is-new').length }; });
+    const motion = reduce ? pop.dur == null || pop.dur <= 1 : pop.anim === 'num-pop' && pop.dur === 450;
+    check(pop.f === 'btn-tour-copy' && pop.n === '4' && pop.start && /Start with 4 players/.test(pop.label) && pop.fresh === 1 && motion, `a join${reduce ? ' (reduced motion)' : ''}: focus ${pop.f}, count ${pop.n}, Start on "${pop.label}", one new chip, ${reduce ? 'no motion' : 'the pop'} (${pop.anim || 'none'} ${pop.dur} ms)`); await p.close(); }
+  for (const [w, h] of [[1440, 900], [1280, 720]]) {      // (k) the first focus on the 16-player bracket is fully in view: inside the scroller, not under a sticky round header
+    for (const you of ['through', 'watching']) { p = await open(`screen=tourney-bracket&n=16&you=${you}&freeze=1`, false, w, h); await sleep(500);
+      const f = await p.evaluate(() => { const a = document.activeElement, r = a.getBoundingClientRect(), b = document.getElementById('bracket').getBoundingClientRect(), hit = [...document.querySelectorAll('.br-round')].filter(x => x.offsetParent).some(x => { const q = x.getBoundingClientRect(); return r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top; });
+        const y = document.querySelector('.br-col.is-current .br-match.is-you'), yr = y && y.getBoundingClientRect(), yhit = !!yr && [...document.querySelectorAll('.br-round')].filter(x => x.offsetParent).some(x => { const q = x.getBoundingClientRect(); return yr.left < q.right && yr.right > q.left && yr.top < q.bottom && yr.bottom > q.top; });
+        return { id: a.className || a.id, t: Math.round(r.top), bt: Math.round(r.bottom), b0: Math.round(b.top), b1: Math.round(b.bottom), inside: r.top >= b.top - .5 && r.bottom <= b.bottom + .5, hit, onYou: !!y && y.contains(a), yClear: !!yr && yr.top >= b.top - .5 && yr.bottom <= b.bottom + .5 && !yhit }; });
+      check(f.inside && !f.hit, `${w}x${h} bracket n=16 you=${you}: first focus (${f.id}) y ${f.t}-${f.bt} inside the scroller ${f.b0}-${f.b1}, clear of the round headers`);
+      if (you === 'through') check(f.onYou && f.yClear, `${w}x${h} bracket n=16 you=through: first focus is your own card (${f.onYou}), in view and clear of the round headers (${f.yClear})`);
+      const g = await p.evaluate(async () => { const out = []; for (let i = 0; i < 3; i++) { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); await new Promise(r => setTimeout(r, 50)); const a = document.activeElement.getBoundingClientRect(), b = document.getElementById('bracket').getBoundingClientRect(); out.push(a.top >= b.top - .5 && a.bottom <= b.bottom + .5); } return out; });
+      check(g.every(Boolean), `${w}x${h} bracket n=16 you=${you}: the arrows keep the focused Watch in view (${g.join()})`); await p.close(); } }
+  for (const [w, h] of [[600, 900], [390, 844]]) {      // (l) a narrow warm-up still says what the count is for
+    p = await open('screen=tourney-banner&freeze=1', false, w, h);
+    const t = await p.evaluate(() => { const pl = document.getElementById('tour-pill'); return [...pl.querySelectorAll('.tp-text > *')].filter(e => e.offsetParent && getComputedStyle(e).display !== 'none').map(e => e.textContent.trim()).join(' / '); });
+    check(/Waiting/.test(t) && /joined/.test(t), `${w}x${h} the warm-up pill reads "${t}"`); await p.close(); }
+  p = await open('screen=tourney-card&freeze=1');                   // (m) Esc and T close the card, and focus goes back to the pill
+  for (const key of ['Escape', 't']) { const k = await p.evaluate(async key => { const ui = window.__ui; if (!ui.tourCard()) ui.tourCard(true); await new Promise(r => setTimeout(r, 50)); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); await new Promise(r => setTimeout(r, 50)); return { open: ui.tourCard(), f: document.activeElement.id }; }, key);
+    check(!k.open && k.f === 'tour-pill', `${key} on the card: closed (${k.open}), focus on ${k.f}`); }
+  await p.close();
+  for (const [why, re] of [['restart', /^The tournament ended: the server restarted$/], ['empty', /^The tournament ended: everyone left$/]]) {      // (n) the ended notice's words
+    p = await open(`screen=tourney-ended&why=${why}&freeze=1`); const t = await p.evaluate(() => document.getElementById('tour-ended-text').textContent);
+    check(re.test(t), `tourney-ended why=${why}: "${t}"`); await p.close(); }
+  for (const you of ['watching', 'through']) {      // (o) the bracket's leave button: a viewer stops watching, a player leaves; both press twice
+    p = await open(`screen=tourney-bracket&n=16&you=${you}&freeze=1`); const l = await p.evaluate(async () => { const b = document.getElementById('btn-br-leave'), t0 = b.textContent.trim(); b.click(); await new Promise(r => setTimeout(r, 50)); return [t0, b.textContent.trim()]; });
+    const want = you === 'watching' ? ['Stop watching', 'Press again to stop watching'] : ['Leave tournament', 'Press again to leave'];
+    check(l[0] === want[0] && l[1] === want[1], `bracket you=${you}: leave reads "${l[0]}", then "${l[1]}"`); await p.close(); }
 } finally { await browser.close(); srv.close(); }
-if (fails) { console.log(`verify: ${fails} FAIL`); process.exitCode = 1; } else console.log('verify: the Courts / Ask to play checks pass');
+if (fails) { console.log(`verify: ${fails} FAIL`); process.exitCode = 1; } else console.log('verify: the Courts / Ask to play / Tournament checks pass');

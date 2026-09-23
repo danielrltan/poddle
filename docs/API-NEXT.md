@@ -482,8 +482,8 @@ mismatch between this file and what was built.
 - `lobbyView('courts')` (title Courts; `'code'` is an alias of it): `#court-search` (codes only, substring, prefix matches first), `#court-seg`
   Open | Full with filtered counts `#n-open` / `#n-full` (a dash while loading or down; the tab kept in `localStorage['poddle.courts']`), `#room-list` (every row, no 12 cap, a fixed
   height in every state), `#room-empty` (one state line: down, loading, open empty, full empty, no match, rows: `courtsState()`), the code form
-  `#lobby-code` with `#btn-join` and `#btn-watch-code`, `#btn-create` (opens the create view), `#btn-tour` (aria-disabled, "Needs at least 4
-  players. Up to 16. Tournaments are coming soon."). `viewParent(v)`: create and share go back to Courts. Keys: `/` search, Esc clears a query
+  `#lobby-code` with `#btn-join` and `#btn-watch-code`, `#btn-create` (opens the create view), `#btn-tour` (Create tournament, or "Your tournament"
+  while you are in one; the disclosure "Needs at least 4 players. Up to 16." under it, `#tour-note`). `viewParent(v)`: create and share go back to Courts. Keys: `/` search, Esc clears a query
   before going Back, Up / Down / Home / End walk the list, Right / Left reach a row's Watch, Shift+Enter in the boxes watches.
 - `lobbyRooms(rooms, online, tours)`. Row kinds: `tour` (Join), `open` (Join, + Watch while someone is there), `ask` (Ask to play = `join`,
   + Watch), `full` (the row is Watch; Stands full when `watch` is 0). Open lists tournaments, then ask rows, then open courts. A row with a
@@ -492,3 +492,26 @@ mismatch between this file and what was built.
 - UI API adds: `viewParent courtsState typedCode askCard({name,left}|null) askShowing onAnswer(fn) askPlay(askstate|null) showAsk(on) askCan onAsk(fn)`.
 - Matt's levels are Rookie, Club, Tour, Pro everywhere (`#bot-levels` 4 buttons, `#btn-bot-3` third; `#bot-seg` 4 options with `data-name`;
   `#key-bot` 1 2 3 4). `botinfo` adds `order: [0,1,3,2]`; `backTo()` writes `bot=` as the index (Tour = 3).
+
+## 9. Tournaments (docs/COURTS-TOURNEY.md 4.6-4.7 and 4.10; NOTES 85)
+- **UI API adds** (web/ui.js): `onTour({ create, open, warm, start, leave, watch(room), bracket, courts, cardOpen, cardClose })`,
+  `setTour(snapshot | null, { link })` (draws the code screen, the card, the pill and the bracket from the server's snapshot; nothing is
+  kept of its own), `tourSnap()`, `tourCourt('warm' | 'match' | null)` (body `data-tour`: the court pill gives way to `#tour-pill`),
+  `tourCard(open?)` (a card like settings; pauses a warm-up), `tourVs(tmove | null)` (the `'tour-vs'` overlay), `tourNote(name)`
+  ("Ben joined the tournament"), `champion(champ, myId)`, `championShowing()`, `tourEnded(why)`, `tourConfirm(on)`.
+  `matchResult(o)` takes `o.tour = { round, next, gap }` (no vote; one button, See bracket). `askWatch(code, title)` takes the question.
+  `setSettings({ tourMatch })` swaps the pause note for "Tournament matches can't pause".
+- **Views**: `lobbyView('tour')` (title Tournament: `#tour-code` huge code button, `#btn-tour-copy` Copy invite, `#tour-n` count,
+  `#tour-names` chips, `#tour-why`, `#btn-tour-warm`, `#btn-tour-start`, `#btn-tour-leave` with its inline confirm) and
+  `lobbyView('bracket')` (title "Tournament CODE": `#br-you`, `#br-next` with its drain bar, `#br-tabs` under 700 px, `#bracket`,
+  `#btn-br-leave` press twice). Both have no name row and go Back to Courts. HUD: `#tour-pill` (T) and `#btn-tour-go` (the host's Start).
+  Overlays: `'tour-vs'`, and the result card's `.is-champion` (`#result-road`, `#champ-acts`). Lobby: `#tour-ended`.
+- **Messages** (MAIN): `tour`, `tmove`, `tourfail` and `tourend` are handled ABOVE the guard (between rounds nobody is in a court);
+  `tourend` before `joinfail` and `closed`. `request()` settles on `tour` too. `closed` `round | tourstart | tourend | empty` in a tournament
+  court says nothing; `toLobby()` then lands on the code screen or the bracket and puts the tournament's code back in the address bar.
+  `room {tour, kind}` shows and copies the TOURNAMENT's code (the real court code stays in `room` for the reconnect URL); a `room
+  {kind:'match'}` that arrives while watching or in another court is my match: straight to it. Reconnect: `&tour=CODE` (with `&room=`
+  if in one of its courts), never `back=1`; nothing within 5 s = `tourend restart`. `restart` during one: "Updating. The tournament will end."
+- **Keys**: T opens the card in a warm-up, goes back to the bracket while watching one of its matches, and brings its screen back from the
+  lobby. Esc closes the card, leaves a watched match for the bracket, and is Back to courts on the champion card. Q Q in a match: "Press Q
+  again to forfeit".

@@ -1447,3 +1447,92 @@ apex. A drive re-aimed to a drive or into a smash never steps; a hard bet that s
 needs over the net. `test/helium.test.mjs` (real server): lobs rise once and never again, still lobs (apex > 3.3), drives and smashes never
 step, a clean lob never rises, every re-aim lands within 0.15 m of its marker. The real cure for the kink is upstream: the bet
 under-reports lob (motion.js: the upward share of a scoop is still low when the peak is predicted) — not touched here.
+
+## 87. Tournaments: a code on the host's screen, people stream in and warm up against Matt, a knockout bracket to a champion
+- "In the courts area you can create a tournament. Put a disclosure that it will require a minimum of 4 players. Basically you
+  have a code up on your screen like Kahoot... then you let people just stream in. In the meantime, you get put against Matt...
+  notify the players that they are waiting for the tournament to begin; and show a number count... even number of people not
+  required; a bot will autofill in. The Tour bot is the one used in tournaments. Anything not mentioned, take from existing sports
+  tournament games like Wii Sports." Spec: docs/COURTS-TOURNEY.md 4 (4.9 server as built, 4.10 client as built).
+- Server (server/game.js, a section after `quick()`): 4-16 players, single elimination; an odd count gets one Tour Matt, paired with
+  a person first (Matt v Matt only where Matts outnumber people, settled at once by a coin flip); round names Final / Semifinal /
+  Quarterfinal / Round N; first to 7, the final to 11, win by 2, a golden point at 15; Matt at Tour with no rubber band; no rematch
+  vote. `TOUR_CAP` 2 tournaments standing, one per address. Courts and tournaments share one code space. Every tournament court is
+  private with no owner address (never counted by `ADDR_ROOMS`); a match court is never swept idle; warm-ups are best effort under
+  `ROOM_CAP - 4`, and `tourKeep()` holds back the courts the next round is owed, so `ROOM_CAP` stays hard between rounds. A drop in a
+  match is held `HOLD_S`, a `leave` is a forfeit at once, a no-show loses after `TOUR_VS_S + TOUR_ARRIVE_S`, and a seated player who
+  never gets a paddle ready loses at `+ CAL_S` (without that the round hung). Nothing of a tournament survives a restart: a reconnect
+  with `&tour=` gets `tourend restart` (then `gone`), and no court of one is revived. Cids never leave the server (the test greps every
+  payload). Protocol: docs/ROOMS.md, docs/SPECTATE.md Tournaments, docs/API-NEXT.md 9.
+- Client. Courts: Create tournament is live, the disclosure "Needs at least 4 players. Up to 16." stays under it ("Your tournament" once
+  in one); the list shows sign-ups with a gold Tournament badge. The host's screen (lobby view `tour`): "Join at poddleball.com with code" ("Join in Courts" on localhost), then the code in four huge boxes
+  (click copies it: "Code copied"), Copy invite ("Join my Poddle tournament! Code K24M: link", "Copied" for 1.5 s; "Copy code" on
+  localhost), the count in big numbers that pops once per join (not under reduced motion), name chips that pop in (Host, You,
+  Reconnecting dimmed, dashed places up to 4, "+N more"), the reason ("Needs at least 4 players · 1 more", then "Ready when you are.",
+  "Full: 16 players"; the rules line names Matt's odd spot), Warm up with Matt, and Start: disabled with its reason below 4, then the big gold
+  "Start with 5 players". Joiners come by the row, the code or the link, get "You're in. Warm up with Matt while people join." and a
+  warm-up court against Tour Matt; the corner pill says "Waiting for the tournament to begin · 5 joined" ("Waiting" over "5 joined" under 900 px; T opens a card with the code,
+  the invite, the names and the host's Start; it pauses the warm-up), "Ben joined the tournament" slides in, and the host gets a gold
+  Start beside the pill from 4 (it opens the card on the card's own Start: never one tap mid-rally). Then Wii Sports: a VS card ("Semifinal · Match 1 of 2", You VS Ben, "First to 7, win by 2") for
+  `TOUR_VS_S`, the match (pill "Semifinal · vs Ben", Leave reads Forfeit, no pause, no 1 2 3 4), a result with no vote ("On to the
+  Final", "Out in the Quarterfinal", "Through: Ben left") and See bracket; the bracket between rounds (a column per round to the Final,
+  your path lit, Matt with a Tour tag, winners with a gold keyline, "(left)" on forfeits, live scores with Live and Watch, "Final in 4"
+  with a draining bar, one round per tab under 700 px); the eliminated watch the rest (T or Esc back to the bracket); the champion
+  card for everyone (gold ribbons, a trophy medal, "You're the champion!" or "Di is the champion!", the road to the title as chips,
+  confetti twice, Back to courts and See bracket). "The tournament ended: the server restarted" (or everyone left, it never started,
+  this tournament has ended) is a notice above the lobby's choices.
+- Glue that mattered: `tour`, `tmove`, `tourfail` and `tourend` are heard ABOVE the no-room guard (between rounds nobody is in a court);
+  `closed round|tourstart|tourend|empty` is quiet and `toLobby()` lands on the code screen or the bracket with the tournament's code back in
+  the address bar (a reload rejoins by cid); a tournament court shows and copies the TOURNAMENT's code, while `room` keeps the private
+  court's code for the reconnect URL (`&tour=CODE`, never `back=1`); a `room {kind:'match'}` that arrives while watching is my match;
+  the champion card leaves the final's court first, or its `closed round` would take the card down; the pause-heal loop counts the
+  tournament card, or it unpaused the warm-up within a second. An end-of-line comment in the botinfo handler swallowed its `else if`
+  (the NOTES 64 trap again): menu.mjs caught it ("Matt · Club" never toasted).
+- The lobby's first focus now tries again (up to 4 times, 100 ms apart) when the element refuses it: under reduced motion the lobby
+  screen turns visible a frame late, and the host's Copy invite never got focus in the verify run.
+- A tournament never reaches into an ordinary court: a member off playing Quick play between rounds gets the champion and a
+  `tourend` as toasts (they were pulled off their court), a finished tournament stops steering the lobby, the address bar and the
+  reconnect (`&tour=` of a deleted one answered `tourend gone` and kicked them out), and Back from a finished bracket lets it go. On
+  the server, `tourRebind` now gives an ordinary court's seat back on a reconnect that carries `&tour=` (it returned before reading `&room=`).
+- Tests: test/tourney.test.mjs (143 checks, eight servers on 8614-8621; the ordinary-court reconnect added), test/tourney-e2e.mjs (new, 8622-8624: four Chromes through
+  create, three ways to join, the banner to 4, Start, VS, a round, the bracket, a loser watching the final, the champion with confetti,
+  Back to courts), menu.mjs B6 (the glue above), verify.mjs (44 px, the 12 px floor at 600x900 and 390x844, AA contrast on every new
+  screen, a join's count, chip and first focus), shoot.mjs (21 tournament states, OVERLAP of the pill, the Start button and the card
+  against the scoreboard and the insets). The gates found: text under 12 px on the card, the tabs, the ended OK and the road chips;
+  targets under 44 px on the tabs and the result buttons; ink-soft and warn-deep at 4.2-4.4:1 on the panel's lower half and the gold
+  card; the Paused tag showing under the tournament card; the corner pill running under the scoreboard at 600 px.
+- Review round. Server: a stall against Matt froze the bracket (slowSeat only ran with two humans; now a tournament match too: CAL_S,
+  `closed away`, Matt through). A held seat locked out the late opponent for good (`free()` is false while a seat is held; a drawn
+  member now sits in their own empty seat regardless: `drawnFree`). `&room=` of a court that has closed (a warm-up closes with its
+  socket) was taken as an ordinary court: `joinfail` and a false "Court closed"; now it is the tournament's own (`closed round`, then a
+  new warm-up). A Watch on your own drawn match seats you (from the stands you lost by no-show). Both finalists leaving in the gap
+  crowned a member who had quit: Matt takes it. A member on an ordinary court after a restart got `tourend` and a frozen court: the
+  client now reconnects without `&tour=` (back=1) and the court comes back like any other (`tourend` still revives nothing itself).
+  Client: the phone pill says "Waiting" over the count; the bracket's first focus and arrow moves scroll the card clear of the sticky
+  header (focus was clipped at 1440 and 1280); the tournament card gave focus back to nobody on close (it hid before asking where
+  focus was): the pill gets it now; one glow at a time on the host screen (Copy invite alone, then Warm up, then Start); "Bracket in 6";
+  "First to 11, win by 2" on the final's VS card; "Tap the code" on touch; 12 px on the code label, the Tournament badge (its row takes
+  the empty Watch slot on a phone), the VS lines, the join notices (which sit above the key hints on a phone, not across the net); the
+  card's Start and Leave one 44 px height; a deep red live dot; Leave right-aligned; the ended notice and the champion title no longer
+  break badly. Tests: tourney.test adds the warm-up blip, the held seat, twatch of your own match, both finalists gone, a stall
+  against Matt, a whole win-by-2 match and the 7/11 defaults (P_GOLD, P_DEF); verify.mjs runs 44 px at 1280x720 too, the small caps
+  have an 11 px floor (no longer exempt), adds the courts, banner, VS, win and in-match states, first focus inside the bracket's
+  scroller, the narrow pill's words, Esc/T on the card, the ended words, and a reduced-motion check that can fail (it ran frozen, so
+  the pop was over before it looked); shoot.mjs keeps the query key in the file name (tourney-intro-bot-1, tourney-intro-final-1) and
+  adds the in-match mocks.
+- Second review round. Server: a viewer of a sign-up was signed up (and put in a warm-up) by any reconnect, and at 16 the `tfull`
+  answer tripped the client's hang guard into "the server restarted": a viewer now reconnects with `&watch=1` (no `&room=`) and
+  `tourRebind` keeps them a viewer. A full match could hang before its first ball (readyBy fires once a round, slowSeat only ran once
+  `started`): C in the 3-2-1, a reload or `cal:true` after readyBy held the bracket for ever; slowSeat now runs before the first ball
+  too when both seats are filled (never for a lone seat waiting on a no-show). Its CAL_S runs from both seated, so it usually fires before
+  readyBy; with both unready it puts out the first one it finds (readyBy gave side a the win). Client: a player who is through lands on their OWN card
+  (focused, ringed, clear of the sticky header), not the first live Watch, which pushed their card under the header at 1440 and 1280;
+  a viewer and a player who is out still land on Watch. The bracket's cards sit in equal rows (grid, as tall as the column's live card;
+  one round per tab stacks them at their own heights), so the connector lines meet the next round; "Live · (eye) 3" instead of "Live · 3 wat…" (the Watch label says "3 watching"). The
+  bracket's leave reads "Stop watching" / "Press again to stop watching" for a viewer. Keyboard focus on the code screen and the card
+  is an outline, the halo is only the one button to press next (Copy invite's focus halo plus Start's glow made two). The HUD Start is
+  labelled "Start tournament with 5 players", opens the card on its Start, hides while the card is open, and Tab stays in the card.
+  The code screen says where to type the code ("Join at poddleball.com with code", --t-xl). Tests: tourney.test adds the viewer
+  reconnect and the unready-before-the-first-ball forfeit; verify (k) checks your own card is first focus and clear of the headers,
+  (o) the Stop watching labels. Not done: the 12 px floor at 1280 (--t-xs is 11.1 px there by design everywhere), the global Back / menu
+  button sizes (pre-existing chrome), and Esc on the host screen in the mock (main.js's `back()`; the mock has no main.js), and a real server restart in tourney-e2e (tourney.test covers `tourend restart` on the wire, menu.mjs B6 the call, verify.mjs the words).

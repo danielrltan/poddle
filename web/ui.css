@@ -267,7 +267,7 @@ body[data-settings] .corner{z-index:var(--z-screen)}                /* paused + 
 .hud-pill svg{width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .hud-pill svg circle{fill:var(--ink-soft);stroke:none}
 .hud-pill.is-tag{display:none;background:linear-gradient(180deg,#2a86ea,#0f5cc0);border-color:#fff;color:#fff;letter-spacing:.08em;text-transform:uppercase}
 .hud-pill.is-paused{background:linear-gradient(180deg,#ffc04d,#e08d00);color:#4a2c00}
-body[data-paused]:not([data-settings]) #paused-tag{display:inline-flex}
+body[data-paused]:not([data-settings]):not([data-tourcard]) #paused-tag{display:inline-flex}
 /* big status rows for the connect screen */
 .status-list{display:flex;flex-direction:column;gap:.75rem;margin:0;padding:0;list-style:none;text-align:left}
 .status-row{display:flex;align-items:center;gap:1.125rem;min-height:4.5rem;padding:.75rem 1.5rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
@@ -951,3 +951,179 @@ body[data-overlay] .ask-play{display:none!important}
   .ask-card .ask-btns .btn,.courts-seg .seg-opt{font-size:max(var(--t-md),13px)} .tile-sub{font-size:max(var(--t-sm),12px);height:max(1.75rem,22px)} .courts-code .code-err{font-size:max(var(--t-md),13px);font-weight:700}      /* Accept / Decline, Open / Full, the tile's '8 open' and 'Court not found' (the one word after a failed Join, in the hint's place) */
   .code-acts .btn,.courts-make .btn,.court-state,.court-state .btn{font-size:max(var(--t-md),13px)} .courts .caps{font-size:max(var(--t-xs),11px)} .bot-levels .btn small{font-size:max(var(--t-sm),12px)}      /* the bigger text still fits the question and both buttons on one row */
 }
+
+/* ==========================================================================================================
+   TOURNAMENTS (docs/COURTS-TOURNEY.md 4.6): the host's code screen, the HUD pill and card in a warm-up, the VS card, the bracket,
+   the tournament result and the champion, the ended notice. Gold is the tournament's colour (the Create tournament trophy, the Tour tag).
+   ========================================================================================================== */
+.btn-quiet{border-color:var(--sky-4);color:var(--ink);box-shadow:var(--sh-1)}
+.btn-danger{color:var(--bad-deep);border-color:#f3a3a3;background:linear-gradient(180deg,#fff,#fff3f3)} .btn-danger:hover{background:#fff}
+.tour-view .btn svg,.tour-card .btn svg,.tour-go svg,.br-watch svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tour-go svg{fill:currentColor;stroke:none}
+/* ---- the code screen: the code on the left, big enough to read across a room; who is in and Start on the right */
+.panel.lobby-view.tour-view{width:min(70rem,94vw);display:grid;grid-template-columns:auto minmax(18rem,1fr);align-items:center;gap:var(--s-6);padding:var(--s-6);text-align:left}
+#lobby-tour .btn:focus-visible,#tour-card .btn:focus-visible{outline:3px solid var(--me-ink);outline-offset:3px} #lobby-tour .btn:focus-visible:not(.is-focus)::after,#tour-card .btn:focus-visible:not(.is-focus)::after{opacity:0}      /* keyboard focus is an outline here, not the halo: the halo is the ONE button to press next (.is-focus), so first focus on Copy invite never makes two glows */
+.tour-share{display:flex;flex-direction:column;align-items:center;gap:var(--s-3);min-width:0}
+.tour-share h2{margin:0} .tour-join{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:0 .5rem;text-align:center;font-size:var(--t-xl);font-weight:800;line-height:1.15;color:var(--ink-strong)} .tour-join small{font-size:var(--t-lg);font-weight:700;color:var(--ink)}
+.code-boxes.is-huge{padding:0;border:0;background:none;cursor:pointer;border-radius:var(--r-lg);outline:0;font:inherit;gap:.75rem}
+.code-boxes.is-huge .code-box{width:min(8rem,19vw);height:min(10rem,24vw);font-size:min(7rem,15vw);border-width:.25rem;box-shadow:inset 0 .1875rem .5rem rgba(120,170,200,.25), var(--sh-1)}
+.code-boxes.is-huge:hover .code-box{border-color:var(--line-deep)} .code-boxes.is-huge:focus-visible{box-shadow:var(--glow)} .code-boxes.is-huge:active{transform:scale(.98)}
+.tour-copied{margin:0;min-height:1.5em;font-size:var(--t-sm);font-weight:700;color:var(--ink)}
+.tour-link-row{width:100%;max-width:36rem;justify-content:space-between} .tour-link-row .btn{flex:none;height:max(3.25rem,44px);padding:0 1.25rem;gap:.5rem;font-size:var(--t-md)}
+.tour-link-row .addr[hidden] + .btn{margin:0 auto}
+.tour-rules{max-width:34rem;text-align:center;color:var(--ink)}
+.tour-side{display:flex;flex-direction:column;gap:var(--s-3);min-width:0}
+.tour-n{display:flex;align-items:center;gap:.75rem;margin:0;color:var(--ink-strong)}
+.tour-n b{font-size:5rem;font-weight:900;line-height:.9;color:var(--me-ink);font-variant-numeric:tabular-nums;display:inline-block;transform-origin:50% 70%}
+.tour-n b.pop,.tp-sub b.pop{animation:num-pop 450ms var(--ease-bounce)}
+.tour-n > span{display:flex;flex-direction:column;font-size:var(--t-xl);font-weight:800;line-height:1.1} .tour-n small{font-size:var(--t-md);font-weight:700;color:var(--ink)}
+.tour-names{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;list-style:none;margin:0;padding:0}
+.tour-chip{display:flex;align-items:center;gap:.375rem;min-width:0;height:2.75rem;padding:0 .5rem 0 .875rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-1);font-weight:700;color:var(--ink-strong)}
+.tour-chip-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tour-chip.is-you{border-color:var(--me);background:var(--me-tint)}
+.tour-chip.is-off{opacity:.62;border-style:dashed}
+.tour-chip.is-new{animation:chip-in 420ms var(--ease-bounce) both}
+.tour-chip.is-more{justify-content:center;background:var(--sky-2);border-color:var(--sky-3);color:var(--ink)}
+.tour-chip.is-empty{background:none;border:.125rem dashed var(--sky-4);box-shadow:none}
+.tour-tag{flex:none;padding:.0625rem .4375rem;border-radius:var(--r-pill);background:var(--sky-2);color:var(--ink-strong);font-size:var(--t-xs);font-weight:800;letter-spacing:.02em}
+.tour-tag.is-you{background:#fff;color:var(--me-ink)} .tour-tag.is-off{background:#fff6e0;color:var(--warn-deep)}
+.tour-why{margin:0;font-size:var(--t-md);font-weight:700;color:var(--ink-strong)} .tour-why.is-ready{color:#0f6e36}      /* --good-deep is 4.4:1 on the panel's lower half */
+.tour-wait{display:flex;align-items:center;gap:.25rem;margin:0;font-size:var(--t-lg);font-weight:800;color:var(--ink-strong)}
+.tour-full{margin:0;padding:.5rem .875rem;border-radius:var(--r-md);background:#fff6e0;border:.09375rem solid var(--warn);color:#8a5200;font-size:var(--t-sm);font-weight:700}
+.tour-acts{display:flex;flex-direction:column;gap:var(--s-2)} .tour-acts .btn{height:max(3.5rem,44px);min-width:0;padding:0 1rem;gap:.5rem;font-size:var(--t-md);white-space:nowrap}
+.tour-acts .tour-start:not(:disabled){order:-1;height:max(4.25rem,44px);font-size:var(--t-lg)}      /* ready: Start is the one big thing; before that Warm up leads and Start waits under it, with its reason above */
+.tour-start:not(:disabled){border-color:var(--gold-4);background:linear-gradient(180deg,#fffbe6 0%,#fff3c2 47%,#ffe48a 53%,#ffeaa3 100%)} .tour-start svg{stroke:var(--gold-4)} .tour-start:disabled svg{stroke:currentColor}
+.tour-start.is-focus::after{box-shadow:0 0 0 .25rem rgba(242,168,29,.3), 0 0 1.5rem .25rem rgba(242,168,29,.55)}
+.tour-leave{display:flex;justify-content:flex-end;min-height:max(2.75rem,44px)}      /* right, under the actions it is not one of */
+.tour-leave .btn{padding:0 1.25rem}
+.tour-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:0;font-weight:700;color:var(--ink-strong)} .tour-confirm > span{margin-right:.25rem}
+.tour-view.is-guest .tour-rules{display:block}
+/* ---- the HUD pill (in the corner, in place of the court pill) and the host's Start beside it */
+body[data-tour] #room-menu{display:none!important}
+.tour-pill{height:auto;min-height:max(2.75rem,44px);padding:.25rem .625rem .25rem .5rem;gap:.5rem;cursor:pointer;font-family:var(--font);border-color:#fff;text-align:left;white-space:normal}
+.tour-pill:hover,.tour-pill:focus-visible,.tour-pill[aria-expanded="true"]{background:#fff;outline:0;box-shadow:var(--glow)}
+.tour-pill .tour-ic{flex:none;width:1.5rem;height:1.5rem;padding:.1875rem;border-radius:50%;background:linear-gradient(180deg,var(--gold-1),var(--gold-2));stroke:var(--gold-4);stroke-width:2.2;box-shadow:0 0 0 .09375rem var(--gold-3)}
+.tp-text{display:flex;flex-direction:column;gap:.125rem;line-height:1.15;min-width:0}
+.tp-long,.tp-short{color:var(--ink-strong);font-weight:800} .tp-short{display:none}
+.tp-sub{display:flex;align-items:center;gap:.375rem;color:var(--ink);font-weight:800} .tp-sub b{font-weight:900;color:var(--me-ink);font-variant-numeric:tabular-nums;display:inline-block} .tp-sub b:empty{display:none}
+.tp-sub .keycap{min-width:1.25rem;height:1.25rem;font-size:max(.6875rem,10px);padding:0 .3125rem}
+body[data-tour="match"] .tour-pill{cursor:default} body[data-tour="match"] .tp-sub .keycap{display:none} body[data-tour="match"] .tp-sub:has(b:empty){display:none}
+body[data-tourcard] #btn-tour-go{display:none}      /* the card has its own Start: never two */
+.tour-go{height:max(2.75rem,44px);padding:0 1rem;gap:.375rem;font-size:var(--t-md);border-color:var(--gold-4);background:linear-gradient(180deg,#fffbe6 0%,#fff3c2 47%,#ffe48a 53%,#ffeaa3 100%);color:var(--ink-strong);box-shadow:var(--sh-hud), var(--inner-hi)}
+.notice.is-tour svg{stroke:var(--gold-4)}
+@media (max-width:900px){ .tp-long{display:none} .tp-short{display:inline} .tp-sub .keycap{display:none} .tour-pill{max-width:10rem;padding-right:.75rem} .tp-short{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} }      /* the corner is a 10rem column here: the trophy, "Waiting" over the count (a match: the round) */
+/* ---- the card (T): the settings card's look and place */
+.tour-card{gap:.75rem}
+.tc-code-row{display:flex;align-items:center;gap:.5rem}
+.tc-code{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;min-height:44px;padding:.375rem .875rem;border-radius:var(--r-md);border:.125rem solid var(--line-soft);background:#fff;cursor:pointer;font-family:var(--font);text-align:left;outline:0}
+.tc-code:hover,.tc-code:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
+.tc-code b{font-size:var(--t-xl);font-weight:900;letter-spacing:.16em;color:var(--me-ink);line-height:1} .tc-code small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
+.tc-code-row .btn{flex:none;padding:0 .875rem;gap:.375rem}
+.tc-n{margin:0 .25rem;font-weight:700;color:var(--ink)} .tc-n b{font-size:var(--t-lg);font-weight:900;color:var(--me-ink);font-variant-numeric:tabular-nums}
+.tour-names.is-card{grid-template-columns:repeat(2,minmax(0,1fr));max-height:12rem;overflow-y:auto;padding:.125rem}
+.tour-names.is-card .tour-chip{height:2.25rem;font-size:var(--t-sm)}
+.tc-foot .tour-why{text-align:center;font-size:var(--t-sm)}
+.tour-card .btn{min-height:max(2.75rem,44px)}      /* Start and Leave one height: the destructive one is never the smaller target */
+#btn-tc-start{border-color:var(--gold-4);background:linear-gradient(180deg,#fffbe6 0%,#fff3c2 47%,#ffe48a 53%,#ffeaa3 100%)}
+body[data-tourcard] .corner{z-index:var(--z-screen)}      /* the pill that opened it stays sharp above the blur: it is the way back */
+body[data-tourcard][data-paused] .glass{opacity:1;visibility:visible;transition-delay:0s}
+body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
+/* ---- VS: the two sides slide in from each edge, VS pops (static under reduced motion: the global rule) */
+.vs-card{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:var(--s-5);width:min(56rem,94vw);padding:var(--s-7) var(--s-6);border-radius:var(--r-xl);border:.1875rem solid var(--gold-3);
+  background:linear-gradient(180deg,#fff 0%,#fffdf3 45%,#fbf1d2 100%);box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;overflow:hidden}
+.vs-round{margin:0;font-size:var(--t-md);color:#7a4a00}
+.vs-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:var(--s-5);width:100%}
+.vs-side{display:flex;flex-direction:column;align-items:center;gap:.5rem;min-width:0}
+.vs-side b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-2xl);font-weight:900;line-height:1.1}
+.vs-side.is-me b{color:var(--me-ink)} .vs-side.is-them b{color:#a33a08}      /* --them-ink is 4.3:1 on the gold card */
+.vs-mark{position:relative;isolation:isolate;display:inline-block;font-size:6rem;font-weight:900;line-height:1;letter-spacing:.02em;color:var(--gold-3);padding:.1em .15em}
+.vs-mark::before,.vs-mark::after{content:attr(data-text);position:absolute;inset:0;padding:inherit}
+.vs-mark::before{z-index:-1;color:#fff;-webkit-text-stroke:.28em #fff;filter:drop-shadow(0 .06em .04em rgba(120,80,0,.38))}
+.vs-mark::after{z-index:1;color:transparent;background:linear-gradient(180deg,#ffe98a 0%,var(--gold-2) 47%,var(--gold-3) 53%,#ffc93d 100%);-webkit-background-clip:text;background-clip:text}
+.vs-target{margin:0;font-size:var(--t-lg);font-weight:800;color:var(--ink-strong)}
+.vs-card.go .vs-side.is-me{animation:vs-in-l 500ms var(--ease-out) both} .vs-card.go .vs-side.is-them{animation:vs-in-r 500ms var(--ease-out) both} .vs-card.go .vs-mark{animation:count-pop 900ms linear 350ms both}
+@keyframes vs-in-l{from{opacity:0;transform:translateX(-40vw)}to{opacity:1;transform:none}} @keyframes vs-in-r{from{opacity:0;transform:translateX(40vw)}to{opacity:1;transform:none}}
+@keyframes chip-in{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:none}}
+/* ---- the bracket */
+.panel.lobby-view.bracket-view{width:min(74rem,94vw);max-height:100%;display:flex;flex-direction:column;align-items:stretch;gap:var(--s-3);padding:var(--s-5) var(--s-6);text-align:left}
+.br-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1.5rem}
+.br-you{margin:0;font-size:var(--t-lg);font-weight:800;color:var(--ink-strong)} .br-you.is-out{color:var(--ink)}
+.br-next{display:flex;align-items:center;gap:.75rem;margin:0;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums} .br-next .br-bar{width:9rem}
+.br-tabs{display:none;align-self:center;margin:0}
+.bracket{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(13rem,1fr);gap:var(--s-5);padding:.25rem .375rem .5rem;outline:0;overscroll-behavior:contain;scroll-padding-top:2.75rem}      /* scroll-padding: the sticky round header's height, so a card scrolled to never lands under it */
+.br-col{display:flex;flex-direction:column;gap:.5rem;min-width:0}
+.br-round{position:sticky;top:-.25rem;z-index:2;display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin:0;padding:.375rem .25rem;background:#f1f7fa;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-strong)}
+.br-round small{font-size:var(--t-xs);font-weight:700;letter-spacing:0;text-transform:none;color:var(--ink)}
+.br-col.is-current .br-round{color:var(--me-ink)}
+.br-list{flex:1;display:grid;grid-auto-rows:1fr;align-items:center;gap:.625rem;list-style:none;margin:0;padding:0}      /* equal rows, each as tall as the column's tallest card (a live one, with its Watch row): the cards' middles line up with the next round's, and the connector lines meet */
+.br-match{position:relative;border-radius:var(--r-md);background:#fff;border:.125rem solid var(--sky-3);box-shadow:var(--sh-1)}
+.br-col:not(:last-child) .br-match::after{content:"";position:absolute;left:100%;top:50%;width:calc(var(--s-5) / 2 + .125rem);border-top:.125rem solid var(--line-soft)}      /* the line on to the next round */
+.br-col:not(:first-child) .br-match::before{content:"";position:absolute;right:100%;top:50%;width:calc(var(--s-5) / 2);border-top:.125rem solid var(--line-soft)}
+.br-p{display:flex;align-items:center;gap:.5rem;height:1.875rem;padding:0 .75rem}
+.br-p + .br-p{border-top:.0625rem solid var(--sky-3)}
+.br-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-md);font-weight:600;color:var(--ink)}
+.br-left{font-weight:600;color:var(--ink-soft)}
+.br-sc{min-width:1.5rem;text-align:right;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums}
+.br-p.is-win .br-name,.br-p.is-win .br-sc{font-weight:800;color:var(--ink-strong)} .br-p.is-win{box-shadow:inset .25rem 0 0 var(--gold-3)}
+.br-p.is-lose .br-name,.br-p.is-lose .br-sc{color:var(--ink-soft)}
+.br-match:focus-visible{outline:3px solid var(--me-ink);outline-offset:2px} .br-match.is-you{border-color:var(--me);box-shadow:0 0 0 .125rem rgba(58,160,255,.25), var(--sh-1)} .br-p.is-me{background:var(--me-tint)} .br-p.is-me .br-name{color:var(--me-ink);font-weight:800}
+.br-match > .br-p:first-child{border-radius:calc(var(--r-md) - .125rem) calc(var(--r-md) - .125rem) 0 0} .br-match > .br-p:last-child{border-radius:0 0 calc(var(--r-md) - .125rem) calc(var(--r-md) - .125rem)}
+.br-match.is-tbd{background:rgba(255,255,255,.55);border-style:dashed;box-shadow:none} .br-match.is-tbd .br-name{color:var(--ink-soft)}
+.br-match.is-live{border-color:#f3a3a3}
+.br-tag{flex:none;padding:0 .375rem;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--gold-1),var(--gold-2));border:.09375rem solid var(--gold-4);color:var(--ink-strong);font-size:var(--t-xs);font-weight:800;line-height:1.35}
+.br-live{display:flex;align-items:center;gap:.5rem;padding:.25rem .25rem .25rem .75rem;border-top:.0625rem solid var(--sky-3);font-size:var(--t-sm);font-weight:800;color:var(--bad-deep)}
+.br-live > span{display:flex;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .br-eye{display:inline-flex;margin:0 .1875rem 0 .25rem} .br-eye svg{width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.br-dot{flex:none;width:.625rem;height:.625rem;border-radius:50%;background:var(--bad-deep);animation:dot-live 1200ms var(--ease-soft) infinite}      /* deep red, and it never fades below .7: a status mark keeps 3:1 on the card at its faintest (1.4.11) */
+@keyframes dot-live{0%,100%{opacity:1}50%{opacity:.7}}
+.tour-wait .dots-wait i{background:var(--me-ink)}
+.br-watch{margin-left:auto;height:2.5rem;padding:0 .875rem;gap:.375rem;font-size:var(--t-sm)}
+.bracket.is-big .br-p{height:1.625rem} .bracket.is-big .br-list{gap:.5rem}      /* 16 players: eight matches in the first column */
+.br-foot{display:flex;justify-content:flex-end}
+/* ---- the tournament result and the champion (the result card) */
+.tour-res .btn{min-width:13rem} .tour-res .btn,#champ-acts .btn{min-height:44px}
+.result-card.is-champion{border-color:var(--gold-3);background:linear-gradient(180deg,#fff 0%,#fffdf3 45%,#fbf1d2 100%)}
+.result-card.is-champion h2{color:#8a5200;font-size:3.5rem;margin-inline:calc(-1 * var(--s-5));text-wrap:balance}      /* the title may use the card's padding: 'Daniel is the champion!' on one line like Matt's */ .result-card.is-champion #result-note{color:var(--ink)}
+.medal.is-champion::before,.medal.is-champion::after{background:linear-gradient(90deg,var(--gold-4) 0 22%,#fff 22% 34%,var(--gold-3) 34% 66%,#fff 66% 78%,var(--gold-4) 78%)}
+.medal.is-champion .medal-trophy{width:4rem;height:4rem}
+.result-card.is-champion .tally,.result-card.is-champion #rematch-note{display:none}
+.medal-trophy{display:none} .medal.is-champion .medal-star{display:none} .medal.is-champion .medal-trophy{display:block;fill:#fff7c9;stroke:var(--gold-4);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.medal.is-champion{scale:1.35}
+.road{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;list-style:none;margin:0 auto var(--s-5);padding:0}
+.road-step{display:inline-flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:.25rem 1rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--gold-2);box-shadow:var(--sh-1);font-size:var(--t-md);font-weight:700;color:var(--ink-strong)}
+.road-step small{font-size:var(--t-xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a5200} .road-step b{font-weight:900;font-variant-numeric:tabular-nums}
+#champ-acts .btn{min-width:12rem}
+/* ---- ended: a notice above the lobby's choices, not a dialog */
+.tour-ended{flex:none;display:flex;align-items:center;gap:var(--s-5);width:min(40rem,92vw);padding:var(--s-4) var(--s-5);text-align:left;border-color:var(--gold-3)} .tour-ended .notice-icon{width:4.5rem;height:4.5rem} .tour-ended .notice-icon svg{width:2.5rem;height:2.5rem;fill:none;stroke:var(--gold-4);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tour-ended > div:last-child{flex:1;min-width:0} .tour-ended h2{max-width:none;text-wrap:balance;margin:0 0 .625rem;font-size:var(--t-lg);font-weight:800;line-height:1.25;color:var(--ink-strong)} .tour-ended .ask-btns .btn{min-width:7rem;height:max(2.75rem,44px);font-size:var(--t-md)}
+@media (max-aspect-ratio: 1/1){
+  .panel.lobby-view.tour-view{grid-template-columns:1fr;gap:var(--s-5)}
+  .tour-side{width:min(36rem,100%);justify-self:center}
+  .vs-mark{font-size:4.5rem} .vs-side b{font-size:var(--t-xl)}
+}
+@media (max-width:700px){
+  .br-tabs{display:inline-flex;max-width:100%} .br-tabs .seg-opt{min-height:44px;padding:0 .875rem}
+  .bracket{grid-auto-flow:row;grid-template-columns:minmax(0,1fr);grid-auto-columns:auto}
+  .br-col{display:none} .br-col.is-shown{display:flex} .br-match::before,.br-match::after{display:none} .br-list{grid-auto-rows:auto;align-content:start}      /* one round at a time: no neighbour to line up with, so the cards stack at their own heights */
+  .br-tab-long{display:inline} .br-tab-short{display:none}
+  .br-p{height:max(1.875rem,30px)} .bracket.is-big .br-p{height:max(1.875rem,30px)}
+  .panel.lobby-view.bracket-view{padding:var(--s-4)}
+  .tour-names{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tour-chip,.tour-why,.tour-copied,.tour-rules,.br-name,.br-sc,.br-live,.br-watch,.br-round,.br-next,.road-step,.tc-n,.tour-full,.tp-text{font-size:max(var(--t-sm),12px)}
+  .tour-tag,.br-tag,.br-round small,.tc-code small,.road-step small,.tour-n small,.tour-link-row .addr{font-size:max(var(--t-xs),12px)} .br-tabs .seg-opt{min-width:44px;font-size:max(var(--t-sm),12px)} #btn-br-leave,#btn-tour-ended-ok,.tour-res .btn,#champ-acts .btn{font-size:max(var(--t-md),13px)}
+  .tour-acts .btn,.tour-link-row .btn,.tour-leave .btn,.tour-confirm,.br-you,.tour-wait,.vs-target{font-size:max(var(--t-md),13px)}
+  .result-card.is-champion h2{font-size:3rem}
+  .tour-names.is-card .tour-chip,.tc-foot .tour-why,.tc-n{font-size:max(var(--t-sm),12px)} .tour-card .btn,.tour-card h2{font-size:max(var(--t-md),13px)} .tour-go{font-size:max(var(--t-md),13px)}
+  .tour-names.is-card .tour-chip{height:max(2.25rem,32px)} .tour-card .set-foot .btn{height:max(2.875rem,44px)} .tc-code-row .btn{min-height:44px}
+  .tour-view .caps,.tour-card .caps{font-size:max(var(--t-xs),11px)} .badge-tour{font-size:max(var(--t-xs),12px)}      /* the name over the code boxes, and the one thing that tells a tournament row from a court */
+  .court-list li[data-kind="tour"]::after{display:none}      /* the readable badge needs the room: a tournament row (never a Watch) takes the empty Watch slot too */
+  .vs-round{font-size:max(var(--t-md),13px)} .vs-target{font-size:max(var(--t-lg),15px)} .rematch-count,.tally-side b{font-size:max(var(--t-md),13px)}      /* the VS card's round line, 'Bracket in 6', the result card's names */
+  .notices{top:auto;bottom:calc(var(--edge) + 5.25rem);translate:none} .notice{font-size:max(var(--t-sm),12px);height:auto;min-height:max(2.25rem,28px);max-width:calc(100vw - 2 * var(--edge))} body:has(.ask-card.is-on) .notices{opacity:0}      /* portrait: half way down is the net and the far service box, where the ball is: the cards sit above the key hints instead */
+}
+@media (max-width:480px){
+  .br-tab-long{display:none} .br-tab-short{display:inline}
+  .panel.lobby-view.tour-view{padding:var(--s-5) var(--s-4)}
+  .code-boxes.is-huge{gap:.5rem}
+  .vs-card{padding:var(--s-7) var(--s-4);gap:var(--s-6)} .vs-mark{font-size:5rem} .vs-row{gap:var(--s-3)} .vs-side b{font-size:var(--t-2xl)}      /* a phone-width window: the card is the whole screen's news, so it stays big (the round and target lines: the 700px block) */
+  #champ-acts{flex-direction:column;align-items:stretch} .tour-res .btn,#champ-acts .btn{min-width:0}
+}
+@media (prefers-reduced-motion: reduce){ .br-dot{animation:none} .tour-chip.is-new{animation:none} }

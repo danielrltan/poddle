@@ -169,3 +169,22 @@ the Tab order), answers to Y / N only while it shows, drains for `left` s. The r
 to a spectator watching one human and one Matt, on a device that can be a paddle; it reads Ask to play -> Waiting · Ns (the
 player's time to answer) -> Again in Ns (until you may ask; the why, with the player's name, is a toast) -> Ask again, at one
 fixed width.
+
+## Tournaments (docs/COURTS-TOURNEY.md 4; NOTES 85)
+
+A tournament's courts are private and seat only who they were drawn for: a stranger with a warm-up's or a match's code gets
+`joinfail full, watch:true` and may watch. Watching a match of a tournament is `twatch {room}` (a member or a viewer of THAT
+tournament only; a bad room is `joinfail notfound`, which the client reads as "That match just ended", never "Court not found").
+`watch` with the tournament's own code views its bracket (a viewer: `you.viewer`). The eliminated keep watching; while watching
+one of its matches, T or Esc goes back to the bracket.
+
+| Rule | In a match | In a warm-up |
+|---|---|---|
+| `pause` | refused (`paused {refused:true}`): "Tournament matches can't pause" | allowed (one human against Matt) |
+| `bot` / `1 2 3 4` / B | refused (`botinfo {reason:'tournament'}`, said nowhere): Matt stays at Tour | allowed |
+| `ask` | `askstate {s:'refused', why:'tour'}` (the button never shows: nobody takes a drawn seat) | the same |
+| Leaving | a forfeit at once (`leave`), a drop held `HOLD_S` | the warm-up closes |
+| `matchover` | gains `tour: { round, next, final, gap }`; no vote, no `rematch`; `closed round` after `gap` s | ordinary |
+
+Spectators of a tournament match get the same `matchover` (no "Waiting for a rematch": the card's bar counts down to the bracket).
+The champion card is shown to everyone who is still with the tournament: players, the eliminated and viewers.

@@ -776,20 +776,24 @@ const tourneys = new Map();   // code -> T. Codes are unique across rooms AND to
 | `tleave` | member/viewer → server | `{type}` | `reg`: removed, host passes on. `play`: `out = true`; if seated in a live match that is a forfeit via `room.leave`. Answered with `tourend left` to that socket only |
 | `twatch` | member/viewer → server | `{type, room}` | `room` must be a live match of **this** tournament → `watchCode` (keeps `ws.tour`) |
 | `tour` | server → members and viewers | snapshot, below | On every change, coalesced to at most 4 a second (`T.dirty` flushed in the main loop). Built once, with `you` stitched in per socket |
-| `tmove` | server → member | `{type, round, name, n, of, vs:{name, bot}, target, at}` | Sent before the `room` that seats a member in a match. The client must not treat the `closed` / `room` that follow as leaving |
-| `tourfail` | server → host/member | `{type, why:'few'\|'busy'}` | none |
+| `tmove` | server → member | `{type, round, name, n, of, vs:{name, bot}, target, final, at, side}` (`round` 1-based, `n` 1-based match number, `final` bool, `side` 0 = a, 1 = b) | Sent before the `room` that seats a member in a match. The client must not treat the `closed` / `room` that follow as leaving |
+| `tourfail` | server → host | `{type, why:'few'\|'busy', n?}` (`n`: members on, with `few`) | none |
 | `tourend` | server → member/viewer | `{type, why:'restart'\|'gone'\|'empty'\|'expired'\|'left'}` | none |
-| `closed` | server → client | new reasons `round` (match over, back to the bracket), `tourstart` (warm-up closed at Start) | none |
-| `lobby.tours` | server → lobby | `[{ code, host: name, n, max: 16 }]` | Phase `reg` only. Old clients ignore it |
+| `closed` | server → client | new reasons `round` (match over, back to the bracket), `tourstart` (warm-up closed at Start), `tourend` (the tournament ended under a court; `tourend` came first) | none |
+| `lobby.tours` | server → lobby | `[{ code, tour: true, host: name, n, max: 16 }]` | Phase `reg` only. Always an array (`[]`). Old clients ignore it |
+| `joinfail` | server → client | new reasons `nocid` (tcreate/join with no cid), `tfull` (`watch:true, code`), `started` (`watch:true, code`), `intour` (`code` of the one you are in: `tleave` it first) | `busy` as before for the caps |
+| `matchover` | server → match | adds `tour: { round, next, final, gap }` (`next`: the next round's name, `null` after the final; `gap`: s until `closed round`) | No `rematch` message follows in a match |
+| `room` | server → client | adds `tour: CODE, kind: 'warm'\|'match'` on a tournament's court (seat and watch) | none |
 
 **Snapshot:**
 
 ```js
-{ type:'tour', code, phase, min: 4, max: 16, n, host: hostName,
+{ type:'tour', code, phase, min: 4, max: 16, n, host: hostName, win: TOUR_WIN, final: TOUR_FINAL,
   you: { id|null, host: bool, out: bool, viewer: bool, warm: 'on'|'off'|'full' },
-  players: [{ id, name, host, out, on }],
-  rounds: [{ name, matches: [{ n, a:{ id|null, name, bot }, b:{…}, room|null, score:[x,y], live, w:'a'|'b'|null, forfeit, watchers }] }],
-  next: { what: 'seat'|'round', in: s } | null, champ: { id|null, name, bot, path: [{ vs, score }] } | null }
+  players: [{ id, name, host, out, left, on }],
+  rounds: [{ name, target, matches: [{ n, a:{ id|null, name|null, bot }, b:{…}, room|null, score:[a,b], live, w:'a'|'b'|null, forfeit, watchers }] }],   // in play: every round to the Final, the undrawn ones with a/b { id:null, name:null, bot:false }
+  next: { what: 'seat'|'round', in: s } | null,
+  champ: { id|null, name, bot, path: [{ round, vs, bot, score:[champ, them], forfeit }] } | null }
 ```
 
 ### 4.4 State machine and bracket rules
@@ -847,7 +851,7 @@ reg ── tstart (host, ≥4 on) ─▶ play ── final decided ─▶ done �
 
 **Client:**
 - While `tour` is set, the socket URL is `&lobby=1&tour=CODE[&room=CODE[&watch=1]]&name=…` with **no `back=1`** (`backTo()` returns `''`).
-- A member between rounds sends `&lobby=1&tour=CODE`.
+- A member between rounds sends `&lobby=1&tour=CODE`. A viewer out of any court sends `&lobby=1&tour=CODE&watch=1`, so a reconnect never signs them up.
 
 **Server connection handler**, right after `enterLobby(ws)` and **before** the `room`/revive line:
 
@@ -870,14 +874,15 @@ if (tq) { const t = tourneys.get(tq);
 - One press sends `tcreate`, no extra screen. The rules live on the code screen.
 
 **2. Host code screen** (`data-view="tour"`, title **Tournament**, `panel panel-wide`, `data-fit`, no name row: about 43rem available):
-- caps **Tournament code**
+- `h2.tour-join#tour-code-h` at `--t-xl`, 800, over the boxes: **Join at poddleball.com** *with code* (the invite link's host, so a room reads where to type it, as Kahoot's "Join at kahoot.it"). With no link (localhost): **Join in Courts** *with code*.
 - `button.code-boxes.is-static.is-huge#tour-code`:
   - boxes are `width:min(8rem,20vw); height:min(10rem,24vw); font-size:min(7rem,15vw)`;
-  - a click copies the code alone → **Code copied** under it.
+  - a click copies the code alone → **Code copied** under it. The hint under it reads **Click the code to copy it**, or **Tap the code to copy it** on a touch screen (`hover: none`). The card's reads **Click to copy** / **Tap to copy**.
 - `.share-link.well`: `span.addr#tour-link` (hidden on localhost) + `button.btn.is-tall#btn-tour-copy` **Copy invite**.
   - It copies **Join my Poddle tournament! Code K24M: https://poddleball.com/?court=K24M**, and the label reads **Copied** for 1.5 s.
   - On localhost it reads **Copy code**.
-- `#tour-n` count block (`aria-live="polite"`): big tabular **5** **joined** *of 16*. It pops on change; no pop under reduced motion.
+- `#tour-n` count block (`aria-live="polite"`): big tabular **5** **joined** *of 16*. It pops on change; no pop under reduced motion. At 16, *of 16* is hidden (**Full: 16 players** says it).
+- The rules line under the invite: **Knockout. Matches go to 7, the final to 11. Odd numbers are fine: Matt the bot fills the empty spot.** The numbers come from the snapshot's `win` / `final`. It is the one place that names Matt's odd spot (a guest's `#tour-why` hides once it is ready).
 - `ul#tour-names`: name chips.
   - The host chip has a **Host** tag and yours has **You**.
   - Offline members are dimmed with **Reconnecting**.
@@ -886,12 +891,13 @@ if (tq) { const t = tourneys.get(tq);
   - New chips pop in (fade only under reduced motion).
 - `#tour-why`:
   - below 4: **Needs at least 4 players · {4−n} more**
-  - 4-15: **Ready when you are. Matt fills any odd spot.**
+  - 4-15: **Ready when you are.**
   - 16: **Full: 16 players**
 - Buttons:
-  - `#btn-tour-warm` **Warm up with Matt** (`.is-focus` below 4 players);
+  - `#btn-tour-warm` **Warm up with Matt**;
+  - one glow at a time (host): alone, **Copy invite** has `.is-focus` and Warm up is a plain `.btn`; from the second player to 3, Warm up has it; from 4, Start. A guest's Warm up always has it;
   - `#btn-tour-start` **Start tournament**, `disabled` with `aria-describedby="tour-why"` below 4; from 4 it reads **Start with {n} players** and takes `.is-focus`.
-- `#btn-tour-leave` **Leave tournament** opens an inline confirm: **Leave? The next player becomes host.** with **Leave** / **Stay**. For a host who is alone: **Cancel tournament**.
+- `#btn-tour-leave` **Leave tournament** (right-aligned under the actions) opens an inline confirm: **Leave? The next player becomes host.** with **Leave** / **Stay**. For a host who is alone: **Cancel tournament**.
 - **First focus:** **Copy invite** (a host's first act is to share).
 - **Esc/Back:** to the warm-up court if seated, else to Courts. The tournament lives on, and `T` brings the screen back.
 - **Guest version:** no Start. Instead **Waiting for {host} to start** with `.dots-wait`, plus **Warm up with Matt** if not in a warm-up.
@@ -899,24 +905,24 @@ if (tq) { const t = tourneys.get(tq);
 **3. Joiners** (row, code or link) get `tour`, then the warm-up `room`, then `begin()`, which leads to connect/calibrate only if needed. Toast: **You’re in. Warm up with Matt while people join.**
 
 **4. Waiting pill.** `button.hud-pill.tour-pill#tour-pill` goes in `#corner` after the court pill: trophy + **Waiting for the tournament to begin · 5 joined** + keycap **T**.
-- Under `max-width:900px` it shortens to **Tournament · 5 joined**.
+- Under `max-width:900px` it shortens to **Waiting** over **5 joined** (a 10rem column; the aria-label keeps the whole sentence).
 - Host at 4 or more: **5 joined · Press T to start**.
 - `aria-live="polite"` announces count changes only.
 - It never idles out. The count pops once on change (not under reduced motion).
 - The warm-up's own court pill and copy menu are hidden.
-- A `watcherNote`-style notice with a trophy says **Ben joined the tournament**.
+- A `watcherNote`-style notice with a trophy says **Ben joined the tournament**. Under `max-width:700px` the notices sit at the bottom left above the key hints (never across the net), at 12px, and hide while the ask card shows.
 
 **5. Tournament card.** `#tour-card` opens on T or a pill click, anchored like `.settings`:
 - the code (click copies), **Copy invite**, **{n} of 16 joined**, the names (scrolling, max 12rem);
 - host: **Start tournament** (or the reason);
 - **Leave tournament** (press twice).
 
-Opening it pauses the warm-up, the same way the settings card does. It takes focus the way `settings()` does. Esc or T closes it.
+Opening it pauses the warm-up, the same way the settings card does. It takes focus the way `settings()` does. Esc or T closes it, and focus goes back to the pill. Start and Leave are one height (44px or more).
 
 **6. VS intro.** On `tmove`, a new overlay `'tour-vs'` shows for `TOUR_VS_S`:
 - caps **Semifinal · Match 1 of 2**
 - `chip-me` **You** · **VS** (callout lettering) · `chip-them` **Ben** (or **Matt · Tour**)
-- **First to 7, win by 2** / **Final · first to 11**
+- **First to 7, win by 2** / **First to 11, win by 2** (the round line already says Final)
 
 The sides slide in from each edge over 500ms, and VS pops. Reduced motion: it appears static. Then the existing 3-2-1 runs.
 
@@ -929,7 +935,7 @@ The sides slide in from each edge over 500ms, and VS pops. Reduced motion: it ap
 **8. Match result.** `matchResult({…, tour:{next, out, round}})`:
 - no vote;
 - the note: win → **On to the {next}**; loss → **Out in the {round}**; a forfeit win → **Through: {name} left**;
-- one button **See bracket** (`.is-focus`), which also happens automatically after `TOUR_GAP_S` (the `rematch-bar` counts it);
+- one button **See bracket** (`.is-focus`), which also happens automatically after `TOUR_GAP_S` (the `rematch-bar` counts it, labelled **Bracket in 6**);
 - confetti only on a win.
 
 **9. Bracket** (`data-view="bracket"`, title **Tournament**):
@@ -943,11 +949,12 @@ The sides slide in from each edge over 500ms, and VS pops. Reduced motion: it ap
 - **Wide layout:** one column per round, `grid-auto-flow: column`.
   - Match cards are 13rem × 3.75rem: two name rows, tabular scores, the winner at 800 weight with a gold keyline.
   - `.is-you` gets a `--me` outline and tint.
-  - Live cards get a red dot (static under reduced motion), **Live** and `btn btn-sm is-tall` **Watch** (`twatch`).
+  - Live cards get a deep red dot (`--bad-deep`, blinking no lower than .6; static under reduced motion), **Live** and `btn btn-sm is-tall` **Watch** (`twatch`). A Watch on your own drawn match seats you in it instead (never its stands).
   - Matt shows as **Matt** with a small **Tour** tag. Forfeits read **(left)**.
   - Four columns for 16 players fit `.panel-wide`. Overflow scrolls inside the panel only, never the page.
 - **At `max-width:700px`:** a `.seg` of round tabs (**Round 1 | Semifinal | Final**) shows one column. It opens on the current round.
 - **Keys:** arrows walk the cards' Watch buttons, Enter watches. While watching, T or Esc goes back to the bracket.
+- **Focus is never hidden:** the first focus and every arrow move scroll the focused card fully into the scroller, below the sticky round header (`verify.mjs` (k) at 1440x900 and 1280x720).
 - **Footer:** **Leave tournament** (press twice).
 - Skeleton cards until the first `tour`.
 
@@ -1004,7 +1011,7 @@ Borrowed from Wii Sports and Mario Tennis cups: the VS splash, round names, the 
 | `tour-champion-watch` | champion card for everyone else |
 | `lobby-tour-ended` | `&why=restart\|empty` |
 
-**`test/tour.test.mjs`** (PORT 8612; `AUTOBOT=1 TOUR_WIN=1 TOUR_FINAL=1 WIN_BY=1 TOUR_VS_S=0.3 TOUR_ARRIVE_S=1 TOUR_GAP_S=0.3 HOLD_S=1 ROOM_CAP=12 REVIVE_S=5`). Matches are mostly settled by `leave` forfeits, so they are deterministic.
+**`test/tourney.test.mjs`** (as built: `TOURNEY_PORT` base 8614, eight servers 8614-8621 (P_GOLD 8620: a golden point at 2; P_DEF 8621: the default 7 / 11); `AUTOBOT=1 SWING_SERVE=0 READY_S=0 WIN_BY=1 TOUR_WIN=1 TOUR_FINAL=1 TOUR_VS_S=0.3 TOUR_ARRIVE_S=1 TOUR_GAP_S=0.3 TOUR_DONE_S=2 HOLD_S=1 CAL_S=2`, plus a small-cap, a restart, an address, a slow-clock and a hard-cap server). Matches are mostly settled by `leave` forfeits, so they are deterministic.
 1. create; joins count; the lobby lists it in `reg` only; the 17th → `tfull`.
 2. `tstart` with 3 → `tourfail few`; from a non-host → ignored; double → one start.
 3. Host leaves in `reg` → host passes; the last one leaves → deleted.
@@ -1021,11 +1028,71 @@ Borrowed from Wii Sports and Mario Tennis cups: the VS splash, round names, the 
 14. Restart: kill, respawn, reconnect with `tour=` (and a stray `back=1`) → `tourend restart`, no court revived.
 15. No cid string in any `tour` payload.
 
-**Browser e2e:** `test/tour-e2e.mjs` (PORT 8614). Four browsers:
+**Browser e2e:** `test/tourney-e2e.mjs` as built (ports 8622-8624; 4.10). Planned as `test/tour-e2e.mjs` on 8625. Four browsers:
 - the host creates, three join by code, and everyone sees **4 joined**;
 - Start → VS → the matches;
 - a champion card with confetti;
 - screenshots at all three sizes.
+
+### 4.9 As built (server): what differs from, or adds to, 4.1-4.8
+
+- **Never ready.** A member seated in a match who never sends a paddle (calibrating) before the first ball would hang the round (`countdown()` waits on `ready`, `slowSeat` only ran once started). In a tournament match `slowSeat` also runs before the first ball once both seats are filled: a side unready for `CAL_S` (from the moment it is both seated and serve-due, or goes unready again: C in the 3-2-1, a reload, `cal:true`) is out, `closed away`, a forfeit (both unready: the first one found goes). Never a lone seat waiting for its opponent (that is the no-show rule). `readyBy`, `TOUR_VS_S + TOUR_ARRIVE_S + CAL_S` after the VS card, stays as the backstop (both unready: side a wins).
+- **`ROOM_CAP` is hard between rounds.** `tourKeep()` = for each tournament in play, `max(0, ceil(matches/2) − its match courts still open)`: the courts its next round is owed. `create`, `revive`, `tcreate`, warm-ups (`< ROOM_CAP − 4`) and `tstart` all count it, so ordinary courts cannot take the gap's freed courts.
+- **Warm-ups** are not `noTtl`: a warm-up closes the moment its member leaves it (`closed empty` to its watchers), and `you.warm` goes back to `off` (`twarm` makes another). Only match courts are `noTtl`.
+- **`tcreate`** from someone already active in a tournament (signed up, or not knocked out) answers that tournament's snapshot and makes nothing. A viewer, an eliminated member or a done one is let go of the old one first.
+- **`join`/`watch` of another tournament** while active in one: `joinfail intour`.
+- **Where members sit between rounds:** in the lobby (they also get `lobby`). A member in an ordinary court or in the stands when their match is seated is pulled out of it (`tourSeat`).
+- **`tleave`** answers `tourend left` to that socket only, in every phase. In `play` the member is `out` and `left` (shown `left: true`), and a match they are drawn in is forfeited at once (seated or not). A member who left before their next round is drawn goes through as a forfeit with no court.
+- **`empty`** (in `play`): nobody who has not left is connected (or within `HOLD_S` of dropping). Eliminated members still connected keep it alive.
+- **Done:** the champion snapshot goes out at once. After `TOUR_DONE_S` (env knob, default 90) the tournament is deleted **quietly**: no `tourend` (a reconnect then gets `tourend gone`).
+- **Reconnect** (`&tour=CODE`): a member's match that is live (or held) seats them again; `&room=` of their own warm-up retakes it, else a new warm-up is made in `reg`; `&watch=1&room=` of a live match of it watches. A non-member gets a viewer snapshot (in `reg` with a cid and no `&watch=1`: signed up, a member dropped past `HOLD_S`; with `&watch=1` a viewer stays a viewer). A stray `back=1` never revives anything.
+- **Matt v Matt** is avoided by swapping a Matt with a person from a person-v-person pair; it happens only where Matts outnumber people. Only-Matt rounds are settled at once with no break, so a bracket of Matts runs straight to **Matt is the champion**.
+- **Start refused as `busy`** touches nothing: the check is `rooms.size − its own warm-ups + tourKeep() + ceil(n/2) <= ROOM_CAP`, and the warm-ups are closed (`closed tourstart`) only once Start goes through, so `closed tourstart` is always followed by `tmove`.
+- **`TOUR_CAP` and one-per-address** count tournaments that are not `done` (a finished one holds no courts).
+- **Live bracket:** a live match's `score` is the court's current score, and `watchers` its current spectators (the snapshot is re-sent on each point and each watcher change, coalesced).
+- **Log/ids:** match and warm-up courts have `by = null` and `pub = false`, and carry `tag = { tour, kind }`, which rides on their `room` messages.
+
+
+### 4.10 As built (client): what differs from, or adds to, 4.6-4.8
+
+- **Where the host sees Start.** The lobby's `tour` view is the host's screen only while they are not seated. In a warm-up the same
+  things live in the **tournament card** (`#tour-card`, T or the pill), and the HUD corner gets a gold **Start** button beside the pill
+  from 4 players (`#btn-tour-go`, labelled **Start tournament with {n} players**), so a lobby screen is never put over a live court. It never starts on one tap mid-rally: it opens the card with focus on the card's own **Start with {n} players**, and it hides while the card is open (one Start at a time). Tab and Shift+Tab stay inside the open card. The card pauses the warm-up like settings does; the
+  pause-heal loop, `setDim` and the reconnect re-pause count either card.
+- **The pill** is two lines, because the corner is about 335 px wide at 1440 and 1280 (it must stop short of the scoreboard): **Waiting for
+  the tournament to begin** over **5 joined** with the T keycap. The host's form is the same text plus the Start button (not "Press T to
+  start": the button is the thing to press). Under 900 px the corner is a 10rem column: the trophy, **Waiting** over **5 joined** (in a match: the
+  round name). In a match it reads **Semifinal · vs Ben**.
+- **Code screen**: two columns in landscape (the code, Copy invite and the rules on the left; the count, chips, reason and actions on the
+  right), one column in portrait. The actions stack: **Warm up with Matt** first while under 4, then **Start with {n} players** moves to the
+  top as the big gold button. The rules line says how Matt fills an odd count. A guest reads **Waiting for {host} to start** (with the
+  count's reason while it is short), plus Warm up with Matt if not in a warm-up. Your own chip reads **You** (not also Host).
+- **Leave**: the code screen confirms inline (Stay has focus); the card and the bracket use press-twice ("Press again to leave").
+  A viewer's button reads **Stop watching**.
+- **Bracket**: `#br-you` says where you stand and `#br-next` separately counts the break (**Final in 4** with its bar), counted down on the
+  client (a snapshot only comes on a change). Round headers stick while the columns scroll; the first focus is your own card while you are still in (its Watch if it is live), and the first live match's Watch for a viewer or a player who is out; the focused card (else yours, else the first live match) is scrolled into
+  view below its round header once per drawing, and again on every arrow move. The tabs follow the current round; under 480 px they read R1 / Quarters / Semis / Final.
+- **Champion**: two buttons, **Back to courts** (Esc) and **See bracket** (the final bracket). A player on the final's court leaves it first
+  (its `closed round` would take the card down). The ribbons turn gold.
+- **Ended**: `#tour-ended` is a notice at the top of the lobby's home view (above the name), not in the `lobby-down` slot (that is a
+  one-line pill); OK or any other view puts it away.
+- **Result card**: a forfeit win reads **Through: {name} left**; the final's winner goes straight to the champion card.
+- **Mock states** (test/ui-mock.html, `shoot.mjs`): `tourney-courts`, `tourney-host-empty`, `tourney-host-3`, `tourney-host-ready`,
+  `tourney-host-16`, `tourney-guest`, `tourney-warmfull`, `tourney-banner`, `tourney-banner-host`, `tourney-card`, `tourney-intro` (`&bot=1`,
+  `&final=1`), `tourney-bracket` (`&n=5|16`, `&you=through|out|watching`, `&next=1`), `tourney-win`, `tourney-out`, `tourney-champion`,
+  `tourney-champion-watch` (`&matt=1`), `tourney-ended` (`&why=`). `verify.mjs` holds them to 44 px targets, the 12 px floor (600x900 and
+  390x844) and AA contrast, and checks a join's count, chip and first focus.
+- **Browser e2e**: `test/tourney-e2e.mjs` (ports 8622-8624: game, AirPods, nothing). Four Chromes: the host creates from Courts, Ben joins
+  by the list row, Cy by the code boxes, Di by the invite link; the banner counts to 4; Start; VS; a round; the bracket with the losers out;
+  a loser watches the final from its Watch button; the champion card with confetti for all four; Back to courts.
+- **Ordinary courts are left alone.** A member on an ordinary court between rounds gets the champion and a `tourend` as toasts, never
+  a `leave`. A finished tournament (`phase: 'done'`) no longer steers `toLobby()`, the address bar or the reconnect URL; Back from its
+  bracket lets it go (`tleave`). Server: `tourRebind` falls through to the normal `joinCode`/`watchCode` when `&room=` is not one of
+  the tournament's courts (tourney.test covers it).
+- **Lobby focus retries** (every view, not only the tournament's): a view's first focus is tried again up to 4 times, 100 ms apart,
+  when the element refuses it (the lobby screen turns visible a frame late under reduced motion).
+- **menu.mjs** part B gains B6 (tour, tmove, tourfail, a match court showing the tournament's code, a quiet `closed round` landing on the
+  bracket, `&tour=` with no `back=1` on a reconnect, `tourend restart`); its ui.js stub exports the new names.
 
 ---
 
@@ -1084,12 +1151,12 @@ Borrowed from Wii Sports and Mario Tennis cups: the VS splash, round names, the 
 ### Acceptance: Feature 2 (BUILD NEXT)
 
 - [ ] Create tournament shows the **Needs at least 4 players** disclosure; the host sees a huge code, **Copy invite**, a live count and names (mock plus `tour-e2e`).
-- [ ] Joiners warm up against Tour Matt and see **Waiting for the tournament to begin · N joined**, updated live (`tour.test` 1, `tour-e2e`).
+- [ ] Joiners warm up against Tour Matt and see **Waiting for the tournament to begin · N joined** (**Waiting** over **N joined** at phone width, `verify.mjs` (l)), updated live (`tour.test` 1, `tour-e2e`).
 - [ ] Start is disabled with its reason below 4, and the cap is 16 (`tour.test` 1-2).
 - [ ] Odd counts get one Tour Matt; never Matt vs Matt (`tour.test` 4).
-- [ ] Matches go to 7 and the final to 11 (win by 2, golden point at 15), with no vote (`tour.test` 7).
+- [ ] Matches go to 7 and the final to 11 (win by 2, golden point at 15), with no vote (`tour.test` 7; the defaults and a whole win-by-2 match against Matt on its own servers: `tourney.test` real scoring).
 - [ ] Forfeit and hold rules, no-shows and host passing (`tour.test` 3, 5, 8).
 - [ ] The bracket between rounds; the eliminated can watch; the champion card has confetti (`tour-e2e`).
 - [ ] Tournament rooms are private, exempt from `ADDR_ROOMS`, bounded by `ROOM_CAP` with a reserve of 4, and never closed by the TTL sweep (`tour.test` 9-11).
-- [ ] After a restart every client shows **The tournament ended: the server restarted**, and nothing is revived (`tour.test` 14).
+- [ ] After a restart every client shows **The tournament ended: the server restarted**, and nothing is revived (`tour.test` 14; the words: `verify.mjs` (n)). A member on an ordinary court between rounds gets a toast and reconnects without `&tour=`, so that court comes back like any other.
 - [ ] No cid ever appears in a tournament payload (`tour.test` 15).

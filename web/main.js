@@ -33,7 +33,7 @@ const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, scree
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
 else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
-const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
+const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, role = 'player', names = [null, null], state = null, players = 0, calibrating = true;      // role: 'player' | 'spectator' (docs/SPECTATE.md). names: the server's truth, null = empty seat
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
@@ -86,7 +86,7 @@ const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'str
 // left (blue) and side 1 on the right (orange), names in both, never 'You'. Matt's second line is his level.
 function drawNames() {
   const pd = state ? state.paddles : [], sub = i => !pd[i] ? '' : pd[i].bot ? botLevel : STATUS_WORD[pd[i].status] || (pd[i].wait ? 'Calibrating' : '');      // the same word as the tag over their character (wait: a server from before 'status')
-  ui.setBot(!spec() && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt
+  ui.setBot(!spec() && tourKind !== 'match' && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour)
   if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1) }); return; }
   const o = pd[1 - side];
   if (!o) ui.setNames({ me: 'You', ...alone() });
@@ -99,12 +99,13 @@ function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDi
 // ---------- match end, rematch (docs/SPECTATE.md) ----------
 function showOver() {                              // the result card. A matchover that came while a set-up screen was up waits in `over` for the court to open
   const m = over; over = null; if (!m) return;
-  const L = spec() ? 0 : side, won = m.winner === L, sc = Array.isArray(m.score) ? m.score : [0, 0], vote = LOBBY && m.type === 'matchover';      // the left slot: me, or side 0 for a spectator. Legacy room / old server: it restarts by itself
+  const T = m.tour && typeof m.tour === 'object' ? { round: String(m.tour.round || '').slice(0, 24), next: m.tour.next ? String(m.tour.next).slice(0, 24) : null, final: !!m.tour.final, gap: Math.max(0, Math.round((+m.tour.gap || 0) - (performance.now() - overAt) / 1000)) } : null;      // a tournament match: no vote, back to the bracket after gap s
+  const L = spec() ? 0 : side, won = m.winner === L, sc = Array.isArray(m.score) ? m.score : [0, 0], vote = LOBBY && m.type === 'matchover' && !T;      // the left slot: me, or side 0 for a spectator. Legacy room / old server: it restarts by itself
   ui.setServe(null); ui.hold(null); ui.settings(false);
-  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote });
+  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined });
   const left = Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000));      // less what was spent behind a set-up screen
   if (vote) ui.rematch(spec() ? { left } : { mine: null, theirs: null, left, name: nameOf(1 - L) });
-  else setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s
+  else if (!T) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket
   if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card: a quick 'No rematch' had it falling over the lobby
 }
 
@@ -125,7 +126,7 @@ let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? p
 const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
-function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready),
+function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready), tourMatch: tourKind === 'match',
   sound: soundOn, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
   sinkWhy: !scene.audio.canSwitch() ? 'browser' : sinks.length ? '' : sinkDenied ? 'denied' : 'devices' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
@@ -163,14 +164,15 @@ function recenter() { model.recenter(); if (body) body.center(); say('Recentred'
 function leave() { if (!LOBBY || !room) return; game.send({ type: 'leave' }); toLobby(); }
 // Opening the panel pauses a match against Matt (or an empty court); against a human it is only a card over a live rally.
 const vsHuman = () => { const o = state && state.paddles[1 - side]; return !!o && !o.bot; };
-const forfeits = () => LOBBY && !spec() && vsHuman() && !holding && ui.currentOverlay() !== 'match' && (struck || !!state && state.score[0] + state.score[1] > 0);      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
+const forfeits = () => LOBBY && !spec() && ui.currentOverlay() !== 'match' && (tourKind === 'match' || vsHuman() && !holding && (struck || !!state && state.score[0] + state.score[1] > 0));      // a tournament match: leaving is a forfeit from the first moment, against Matt too      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
 function pause(on) {
   if (spec() || !seated() || !live()) return;
   if (vsHuman()) { if (on) ui.setSettings({ canPause: !(noPause = true) }); return; }
   if (on) ui.setSettings({ canPause: !(noPause = false) }); game.send({ type: 'pause', on });
 }
 let sentName = '', polledName = '', healAt = 0, noPause = false, burstT = 0, struck = false, saidForfeit = false, dim = false;
-function setDim() { const on = pausedUi && ui.settings() && !spec(); if (on !== dim) scene.setDim(dim = on); }      // paused against Matt behind the full blur: the menu's cheap picture (it ran at 2560x1440, 52 fps for up to 10 minutes)
+const cardOpen = () => ui.settings() || ui.tourCard();      // either card pauses a match against Matt (the tournament card in a warm-up)
+function setDim() { const on = pausedUi && cardOpen() && !spec(); if (on !== dim) scene.setDim(dim = on); }      // paused against Matt behind the full blur: the menu's cheap picture (it ran at 2560x1440, 52 fps for up to 10 minutes)
 function rename(n) {                               // the settings panel's Name row (docs/NEXT.md 10b): kept, and told to the room
   n = cleanName(n); if (!n) return; ls.set('poddle.name', n);
   if (seated() && LOBBY && n !== sentName) game.send({ type: 'name', name: sentName = n });
@@ -237,6 +239,53 @@ function askPlay() { game.send({ type: 'ask' }); }
 ui.onAnswer(answer); ui.onAsk(askPlay);
 function switchSeat(m) { const toSpec = m.role === 'spectator'; role = toSpec ? 'spectator' : 'player'; room = m.code; noBot = !toSpec; ui.setRoom(room, shareLink(room)); setUrl(room, toSpec);      // the server moved me between the stands and a seat of the same court: one path
   ui.askPlay(null); ui.askCard(null); ui.setSpectator(toSpec); ui.showAsk(false); syncSettings(); clearFar(); if (toSpec) enterWatch(); else { phase = 'lobby'; begin(); } }      // begin(): connect -> calibrate -> play; a calibrated paddle goes straight to play
+// ---------- tournaments (docs/COURTS-TOURNEY.md 4.5-4.7): the server runs it; this shows where you are in it ----------
+let tour = null, tourKind = null, tourMoving = false, tourVsT = 0, tourHang = 0, champShown = '';
+const tourOn = () => !!tour && tour.phase !== 'done';      // still running: a finished one (its champion shown) no longer steers the lobby, the address bar or the reconnect      // tour: the last snapshot. tourKind: 'warm' | 'match' while in one of its courts. tourMoving: a VS card is up, a match seat is on its way
+function tourScreen(force) {                        // between courts: the code screen while it signs up, the bracket once it runs. Only a view change calls lobbyView (it moves focus)
+  if (!tour || phase !== 'lobby' || room || ui.currentScreen() !== 'lobby') return; const want = tour.phase === 'reg' ? 'tour' : 'bracket', v = ui.lobbyView();
+  if ((force || v === 'tour' || v === 'bracket') && v !== want) ui.lobbyView(want);
+}
+function onTour(m) {
+  clearTimeout(tourHang); const was = tour && tour.code === m.code ? tour : null, you = m.you && typeof m.you === 'object' ? m.you : {}, mine = pending && ['tcreate', 'join', 'watch'].includes(pending.type) ? pending : null;
+  if (mine) settle();                                // request() settles on 'tour' as well as on 'room'
+  tour = m; ui.setTour(m, { link: shareLink(m.code) });
+  if (was && m.phase === 'reg') {
+    if (you.host && !(was.you && was.you.host) && you.id != null) say('You’re the host now', null, 2600);
+    if (tourKind === 'warm' && live()) { const had = new Set((was.players || []).map(p => p && p.id)); for (const p of m.players || []) if (p && !had.has(p.id) && p.id !== you.id) ui.tourNote(cleanName(p.name)); }      // 'Ben joined the tournament', while you warm up
+  } else if (!was && mine && mine.type === 'join' && you.id != null && m.phase === 'reg' && !you.host) say('You’re in. Warm up with Matt while people join.', null, 3200);
+  if (phase === 'lobby' && !room && ui.currentScreen() === 'lobby') { tourScreen(!!mine || !was); setUrl(m.phase === 'done' ? null : m.code, !!you.viewer); }
+  if (m.champ && champShown !== m.code) showChamp();
+}
+function tourMove(m) {                              // my next match is drawn: the VS card now, the court in m.at s (docs/COURTS-TOURNEY.md 4.6 item 6)
+  clearTimeout(tourHang); tourMoving = true; ui.settings(false); ui.tourCard(false); if (ui.currentScreen() === 'lobby') screen(null);
+  ui.tourVs(m); clearTimeout(tourVsT);
+  tourVsT = setTimeout(() => { if (ui.currentOverlay() !== 'tour-vs') return; ui.tourVs(null); tourMoving = false; if (phase === 'lobby' && !room) { screen('lobby'); tourScreen(true); } }, ((+m.at || 4) + 10) * 1000);      // the seat never came (the other side left first: through without a ball)
+}
+function showChamp() {                              // for everyone: the champion card over the court, confetti twice (docs/COURTS-TOURNEY.md 4.6 item 10)
+  champShown = tour.code; const c = tour.champ, me = tour.you && tour.you.id != null ? tour.you.id : null;
+  if (room && !tourKind) { say(me != null && c.id === me ? 'You’re the champion!' : `${c.bot ? 'Matt' : cleanName(c.name) || 'Someone'} is the champion!`, null, 3200); tour = null; champShown = ''; ui.setTour(null); game.send({ type: 'tleave' }); return; }      // busy in an ordinary court: a toast, and the tournament lets go; nobody is pulled off their court
+  if (room) { game.send({ type: 'leave' }); toLobby(); }      // off the final's court first: its 'closed round' must not take the card down
+  tourMoving = false; ui.tourVs(null); screen(null); ui.champion(c, me);
+  const gold = ['#ffd34a', '#f2a81d', '#3aa0ff', '#ffffff']; ui.confetti(gold, 140); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.championShowing()) ui.confetti(gold, 100); }, 900);
+}
+function endTour(why) {                             // tourend: restart | gone | empty | expired | left
+  tour = null; champShown = ''; clearTimeout(tourVsT); ui.setTour(null); ui.tourVs(null);
+  if (room && !tourKind) { ui.tourEnded(why, true); if (why === 'restart' || why === 'gone') game.drop(); return; }      // in an ordinary court: said in a toast, and the court goes on (the server empties its own courts itself). restart / gone only ever answer a reconnect with &tour=, which left this socket in the lobby: open again without it (back=1), and the court comes back like any other
+  if (room) game.send({ type: 'leave' });
+  toLobby(); if (why === 'left') ui.lobbyView('courts'); ui.tourEnded(why);
+}
+function tourCourts() { const t = tour; tour = null; champShown = ''; ui.setTour(null); if (t) game.send({ type: 'tleave' }); ui.showOverlay(null); toLobby(); ui.lobbyView('courts'); }      // the champion's Back to courts: it is over for me (tleave in 'done' only lets go)
+function tourBracket() { if (room) { game.send({ type: 'leave' }); toLobby(); } else { ui.showOverlay(null); if (phase === 'lobby') screen('lobby'); } if (ui.currentScreen() === 'lobby' && ui.lobbyView() !== 'bracket') ui.lobbyView('bracket'); }      // See bracket: off the result card (the court closes by itself anyway)
+function tourKey() {
+  if (tourKind === 'warm' && live() && !ui.currentScreen() && !ui.currentOverlay()) { ui.tourCard(!ui.tourCard()); return; }
+  if (tourKind === 'match' && spec() && live()) { leave(); return; }      // watching one of its matches: back to the bracket
+  if (phase === 'lobby' && !room && !ui.asking()) tourScreen(true);
+}
+ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(true), warm: () => game.send({ type: 'twarm' }), start: () => game.send({ type: 'tstart' }), leave: () => game.send({ type: 'tleave' }),
+  watch: r => request({ type: 'twatch', room: r }), bracket: tourBracket, courts: tourCourts,
+  cardOpen: () => { pause(true); setDim(); },
+  cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
   clearFar(); clearTimeout(burstT); ui.confettiOff(); room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
@@ -245,11 +294,13 @@ function toLobby(msg) {                            // out of a room, back to the
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
+  tourKind = null; tourMoving = false; ui.tourCourt(null); syncSettings();
+  if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // in a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
   padPhase();
 }
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
-  if (phase === 'lobby') { const v = ui.lobbyView(); if (room) { game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
+  if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
   else if (undo && (phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court
   else if (phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }
 }
@@ -279,7 +330,7 @@ function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
     const url = urls[i % urls.length]; let opened = false;
-    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (CAN_PHONE ? '&pad=' + PAD : '') + (LOBBY ? '&lobby=1' + (room ? '&room=' + room + (spec() ? '&watch=1' : '') + (myName() ? '&name=' + encodeURIComponent(myName()) : '') + backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back
+    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (CAN_PHONE ? '&pad=' + PAD : '') + (LOBBY ? '&lobby=1' + (tourOn() ? '&tour=' + tour.code : '') + (room ? '&room=' + room + (spec() ? '&watch=1' : '') : tourOn() && tour.you && tour.you.viewer ? '&watch=1' : '') + ((room || tourOn()) && myName() ? '&name=' + encodeURIComponent(myName()) : '') + (room && !tourOn() ? backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back. tour: its tournament (&watch=1 with no room: its viewer, never signed up by a reconnect; never back=1: nothing of a tournament is revived, docs/COURTS-TOURNEY.md 4.5)
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
       if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Saved address didn’t answer. Using this Mac.', null, 2800); } }
@@ -292,7 +343,7 @@ function connect(urls, el, onmsg, onopen) {
     ws.onerror = () => {};
   };
   open();
-  return { send: m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); } };
+  return { send: m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }, drop: () => { if (ws && ws.readyState === 1) ws.close(); } };      // drop: open again at once, with the address as it is now
 }
 
 // ---------- the paddle: an AirPod (the helper on this Mac) or a phone (its page, by way of the game server) ----------
@@ -402,28 +453,40 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'padtaken') { newPad(); game.send({ type: 'padcode', code: PAD }); showPair(); return; }      // another live tab drew this code first: pick again (nothing was paired to it yet)
   if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
   if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
-  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect
+  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (tour) say('Updating. The tournament will end.', null, 4000); else if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect; a tournament does not
+  if (m.type === 'tourend') { clearTimeout(tourHang); if (tour) endTour(m.why); return; }      // before joinfail and closed (docs/COURTS-TOURNEY.md 4.5)
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
   if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online, m.tours); return; }
+  if (m.type === 'tour') { if (m.code && typeof m.code === 'string') onTour(m); return; }      // above the guard: between rounds nobody is in a court
+  if (m.type === 'tmove') { tourMove(m); return; }
+  if (m.type === 'tourfail') { say(m.why === 'busy' ? 'Courts are full right now. Try Start again in a moment.' : `Needs at least 4 players · ${m.n | 0} here now`, null, 3200); return; }
   if (m.type === 'room') {                                       // seated, or let in to watch (the normal 'welcome' follows). Also the answer to a reconnect with room=CODE.
-    roomPub = m.public === true;
+    clearTimeout(tourHang); roomPub = m.public === true;
+    const tk = typeof m.tour === 'string' && (m.kind === 'warm' || m.kind === 'match') ? m.kind : null, moved = tk === 'match' && m.role !== 'spectator' && room !== m.code && room != null;      // a tournament's court. moved: pulled out of the stands (or another court) into my drawn match: no closed came first
     if ((m.promoted || m.demoted) && room === m.code) { settle(); switchSeat(m); say(m.promoted ? 'You’re in. Get your paddle ready.' : 'Time’s up. You’re watching again.', null, 2600); return; }      // moved between the stands and Matt's seat of the SAME court
     askedFor = !!m.asked;                                                                     // a join into Matt's court landed in the stands: the player is being asked
     const made = pending && pending.type === 'create' && botWant == null, again = room === m.code; settle(); room = m.code; role = m.role === 'spectator' ? 'spectator' : 'player'; wantRoom = ''; wantWatch = false;
-    ui.askWatch(null); ui.setRoom(room, shareLink(room)); setUrl(room, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined
+    tourKind = tk; ui.tourCourt(tk); if (tk) noBot = true; syncSettings();       // Matt comes by himself in a tournament's court, at Tour
+    const shown = tk ? m.tour : room; ui.askWatch(null); ui.setRoom(shown, shareLink(shown)); setUrl(shown, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined. A tournament's court shows (and copies) the tournament's code, never the private court's
+    if (moved) { clearFar(); ui.hold(null); over = null; ui.setSpectator(false); ui.askPlay(null); ui.showAsk(false); phase = 'lobby'; }      // from watching (or another court) straight to my match
     if (phase === 'lobby' && !again) { if (spec()) enterWatch(); else if (made) ui.lobbyView('share'); else begin(); }        // again: a reconnect got the seat back, the player stays where they were. Play a bot skips the share view
     return;
   }
   if (m.type === 'joinfail') {
     const was = pending, watching = !!was && was.type === 'watch'; settle(); wantRoom = ''; wantWatch = false; botWant = null;
     if (room) { toLobby('Court closed'); return; }                                            // a reconnect found the room gone
-    setUrl(null);
+    if (tourOn()) setUrl(tour.code, !!(tour.you && tour.you.viewer)); else setUrl(null);
+    const tcode = ui.cleanCode(typeof m.code === 'string' ? m.code : was && was.code);
+    if ((m.reason === 'tfull' || m.reason === 'started') && m.watch === true && tcode.length === 4) { ui.askWatch(tcode, m.reason === 'tfull' ? 'This tournament is full. Watch instead?' : 'This tournament has started. Watch instead?'); return; }      // a tournament's code: watch its bracket instead
+    if (m.reason === 'intour') { say(`You’re in tournament ${tcode}. Leave it first.`, null, 3200); if (tour) tourScreen(true); return; }
+    if (was && was.type === 'twatch') { say('That match just ended', null, 2200); return; }      // a Watch on the bracket, a moment too late
+    if (was && was.type === 'tcreate') { say(m.reason === 'busy' ? 'Too many tournaments right now. Try again soon.' : 'Couldn’t make a tournament. Reload and try again.', null, 3000); return; }
     if (m.reason === 'full' && m.watch === true && !watching) { const code = ui.cleanCode(typeof m.code === 'string' ? m.code : was && was.code); if (code.length === 4) { ui.askWatch(code); return; } }      // 'Court is full. Watch instead?'
-    const text = (watching ? { notfound: 'Court not found', busy: 'Too many watching', full: 'Too many watching' } : { notfound: 'Court not found', full: 'Court is full', busy: 'No free courts. Try again soon.' })[m.reason] || 'Couldn’t join';
+    const text = (watching ? { notfound: 'Court not found', busy: 'Too many watching', full: 'Too many watching' } : { notfound: 'Court not found', full: 'Court is full', busy: 'No free courts. Try again soon.', nocid: 'Couldn’t join. Reload and try again.' })[m.reason] || 'Couldn’t join';
     if (was && (was.type === 'join' || watching) && ui.lobbyView() === 'courts' && was.code === ui.typedCode()) ui.codeError(text); else say(text, null, 2600);      // typed in the boxes: said under them. A row click: a toast
     return;
   }
-  if (m.type === 'closed') { if (room) toLobby(m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling
+  if (m.type === 'closed') { if (room) toLobby(tourKind && ['round', 'tourstart', 'tourend', 'empty'].includes(m.reason) ? '' : m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling. A tournament's court closing is the tournament moving on: its screen says the rest
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
   if (m.type === 'welcome') {
@@ -431,11 +494,12 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(spec() ? null : side);
     if (spec()) setView(VIEWS.includes(ls.get('poddle.view')) ? ls.get('poddle.view') : 'broadcast', false);
-    if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT && !noBot) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu. Never after taking Matt's seat
+    tourMoving = false; clearTimeout(tourVsT); if (ui.currentOverlay() === 'tour-vs') ui.showOverlay(null);      // the VS card gives way to the court (and its 3-2-1)
+    if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT && !noBot && !tourKind) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu. Never after taking Matt's seat
     noBot = false; ui.askCard(null); ui.askPlay(null); askSync();
     if (askedFor && spec()) { const who = names.find(n => n && n !== 'Matt'); say(who ? `${who} is playing Matt. We asked if you can play.` : 'We asked the player if you can play.', null, 3200); } askedFor = false;
     net.rejoined(); ui.setSpectator(spec()); syncSettings(); drawNames();
-    if (ui.settings() && live()) pause(true);                    // a reconnect with the panel still open: the server let time run when the socket dropped
+    if (cardOpen() && live()) pause(true);                       // a reconnect with a card still open: the server let time run when the socket dropped
     return;
   }
   if (m.type === 'names') {
@@ -462,12 +526,12 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side]; players = o ? 2 : 1;
     scene.updatePaddle(1 - side, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null);
-    if (frozen && !holding && !ui.settings() && performance.now() > healAt) { healAt = performance.now() + 1000; game.send({ type: 'pause', on: false }); }      // paused with the panel shut (a lost 'pause off', a reload): nobody could ever resume it
+    if (frozen && !holding && !cardOpen() && performance.now() > healAt) { healAt = performance.now() + 1000; game.send({ type: 'pause', on: false }); }      // paused with the panel shut (a lost 'pause off', a reload): nobody could ever resume it
     return;
   }
   if (m.type === 'botinfo') {
     const said = botLevel; if (m.active && typeof m.name === 'string') botLevel = m.name.slice(0, 12); drawNames();
-    if (m.reason) { if (live()) say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(`Matt · ${botLevel}`, null, 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath
+    if (m.reason) { if (live() && m.reason !== 'tournament') say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(`Matt · ${botLevel}`, null, 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
     return;
   }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
@@ -492,7 +556,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     else { const won = m.winner === side; ui.pointBanner(won, nameOf(m.winner === 1 ? 1 : 0)); if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); } }      // "Your point!" / "<name> scores", nothing else
   if (m.type === 'launch' && m.by === side && m.n != null && !spec()) { if (m.kind) myKind = m.kind; clearTimeout(myBet); myBet = null; padFx('tint', shownN(+m.n || 0, myKind)); }      // my hit re-aimed on the settled swing: the phone's glow takes that power's colour
   if (SCENE_EVENTS.includes(m.type)) scene.onEvent(m);           // anything else: ignored, no throw
-}, () => { if (pending && !room) game.send(pending); });       // the request made while the socket was down
+}, () => { if (pending && !room) game.send(pending);       // the request made while the socket was down
+  if (tourOn()) { clearTimeout(tourHang); tourHang = setTimeout(() => { if (tourOn()) endTour('restart'); }, 5000); } });      // a tournament socket back: no room, tour or tourend in 5 s = the server restarted under it (docs/COURTS-TOURNEY.md 4.5)
 
 // ---------- link quality ----------
 // The ball already rides out gaps by itself (scene.js coast()). This watches the connection so that (1) a swing can be
@@ -555,7 +620,9 @@ ui.onRematch(yes => { if (!room || spec()) return; if (!yes && votedYes) { voted
   votedYes = !!yes; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
   if (!yes) { const r = room; setTimeout(() => { if (room === r && votedNo) leave(); }, 3000); } });      // unless it never answers
 ui.onRetry(() => location.reload());
-function esc() { if (ui.asking()) ui.askWatch(null); else if (live() && !ui.currentScreen()) { if (!ui.currentOverlay()) ui.settings(!ui.settings()); } else back(); }      // in play and while watching Esc is the hamburger
+function esc() { if (ui.championShowing()) { tourCourts(); return; } if (ui.currentOverlay() === 'tour-vs') return; if (ui.tourCard()) { ui.tourCard(false); return; }
+  if (tourKind === 'match' && spec() && live() && !ui.currentScreen() && !ui.currentOverlay() && !ui.settings()) { leave(); return; }      // watching one of its matches: Esc (and T) is back to the bracket
+  if (ui.asking()) ui.askWatch(null); else if (live() && !ui.currentScreen()) { if (!ui.currentOverlay()) ui.settings(!ui.settings()); } else back(); }      // in play and while watching Esc is the hamburger
 addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Tab'].includes(e.key)) return;   // browser shortcuts are not ours
   unlock();
@@ -565,6 +632,7 @@ addEventListener('keydown', e => {
   if (k === 'f') { ui.fullscreen(); return; }
   if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
+  if (k === 't' && tour && !e.repeat) { tourKey(); return; }     // T: the tournament (its card in a warm-up; back to the bracket while watching; its screen from the lobby)
   if (phase === 'lobby') return;                                 // the lobby's keys live in ui.js; game keys wait for a room
   if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
   if (k === 'h') setStats(!showStats);

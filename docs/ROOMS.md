@@ -19,7 +19,7 @@ server -> client
   seats you directly (its meaning is unchanged), otherwise it can be watched (docs/SPECTATE.md). `ask` = one human is mid-match
   with Matt (a ball has been struck): a join puts you in the stands and asks them for Matt's seat (docs/SPECTATE.md Asking to
   play). `bot` = Matt is seated. `names` = the two seats' names as the scoreboard shows them (untrusted text: `textContent` only).
-  `tours` = tournaments signing up (docs/COURTS-TOURNEY.md Feature 2; an empty list until that is built). An empty room is not listed (nobody is coming to it), but
+  `tours` = tournaments signing up, `[{ code, tour: true, host, n, max: 16 }]` (always an array; docs/COURTS-TOURNEY.md 4.3). An empty room is not listed (nobody is coming to it), but
   `quick` still reuses it and its code still joins. `online` = sockets connected in total.
 - `{ type:'room', code, public }` you are now seated in this room. The normal `welcome` follows immediately.
 - `{ type:'joinfail', reason }` with reason `'notfound' | 'full' | 'busy'` (`busy`: the server is at its room cap).
@@ -32,6 +32,17 @@ client -> server (only valid in the lobby, ignored otherwise, except `leave`)
   Matt it is not a seat: the socket is let in to watch (`room` with `asked:true`, role spectator) and the player is asked.
 - `{ type:'watch', code }` watch that court (docs/SPECTATE.md); never asks.
 - `{ type:'leave' }` (valid in a room) back to the lobby; the server sends a fresh `lobby`.
+
+Tournaments (docs/COURTS-TOURNEY.md 4.3, NOTES 85). Courts and tournaments share ONE code space (`newCode()`), so a code is one or the other:
+- `{ type:'tcreate' }` makes a tournament with you as its host (not seated) and answers `tour`; `joinfail` `nocid` (no cid) or `busy` (the
+  tournament cap, one per address, or `ROOM_CAP`). Already in one: its snapshot again, nothing new.
+- `join` / `watch` with a tournament's code: sign up (answers `tour`, then a warm-up court against Matt at Tour) or view its bracket. `joinfail`
+  gains `tfull` and `started` (both `watch:true, code`: the client offers to watch) and `intour` (`code` of the one you are in: `tleave` it first).
+- `twarm`, `tstart` (the host, 4 or more), `tleave`, `twatch {room}` are heard wherever a tournament's socket is (lobby, warm-up, stands, a match).
+- server -> client: `tour` (the snapshot, at most 4 a second), `tmove` (your match is drawn: the VS card, the court follows in `at` s),
+  `tourfail {why:'few'|'busy'}`, `tourend {why}`; `room` gains `tour, kind:'warm'|'match'` on its courts; `closed` gains `round`, `tourstart`,
+  `tourend`. Tournament courts are private (`by = null`: never counted by `ADDR_ROOMS`), a match court is never swept idle, and nothing of a
+  tournament is revived after a restart (`&tour=CODE` on a reconnect answers `tourend restart` or `gone`).
 
 ## Rooms
 - `code`: 4 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no I, L, O, 0, 1), unique among live rooms.
@@ -61,3 +72,7 @@ code to Join or Watch, Create court and Create tournament) -> connect gear -> ca
 works; players read "court" everywhere, the wire protocol keeps `room`). `?skiptitle=1` keeps today's legacy path
 (no lobby, room `LOCAL`), which is what `test/e2e.mjs` plays its match on; its title check walks title -> lobby ->
 Quick play -> connect. In a room, the code is shown on the HUD so it can be read out.
+A tournament: Courts -> Create tournament -> its code screen (host), or a joiner's warm-up against Matt with the banner
+"Waiting for the tournament to begin · N joined" -> Start -> VS card -> match -> the bracket between rounds -> the champion card.
+While in one, the address bar carries the tournament's code (never a private match court's), and the reconnect URL adds
+`&tour=CODE` with no `back=1`.

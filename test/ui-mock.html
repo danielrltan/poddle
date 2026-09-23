@@ -57,7 +57,8 @@
   // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
   const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
   const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'lobby-courts', 'lobby-courts-full', 'lobby-courts-loading', 'lobby-courts-empty', 'lobby-courts-empty-full', 'lobby-courts-nomatch', 'lobby-courts-down', 'lobby-courts-err', 'lobby-courts-link', 'lobby-courts-many', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
-    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full', 'hud-ask', 'hud-ask-settings', 'match-ask', 'watch-ask'];
+    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full', 'hud-ask', 'hud-ask-settings', 'match-ask', 'watch-ask',
+    'tourney-courts', 'tourney-host-empty', 'tourney-host-3', 'tourney-host-ready', 'tourney-host-16', 'tourney-guest', 'tourney-warmfull', 'tourney-banner', 'tourney-banner-host', 'tourney-card', 'tourney-intro', 'tourney-bracket', 'tourney-win', 'tourney-out', 'tourney-champion', 'tourney-champion-watch', 'tourney-ended', 'tourney-match', 'tourney-match-settings', 'tourney-match-qq'];
   // extra params: &bg=court|grass (flat ground under the HUD) · &name=<player name> · &opp=<opponent> (try a hostile one) · &idle=1 · &freeze=1
   if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
   if (screen === 'all') {
@@ -88,13 +89,34 @@
       { code: 'CQ3N', players: 2, open: false, ask: false, bot: false, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Jo', 'Tia'] },
       { code: 'EV5R', players: 1, open: true, ask: false, bot: false, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Noor', null] },
       { code: 'GJ2W', players: 1, open: true, ask: false, bot: true, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Ivy', 'Matt'] }];
-    const TOURS = qs.get('tour') === '1' ? [{ code: 'T8MX', host: 'Daniel', n: 5, max: 16 }] : [];
+    const TOURS = qs.get('tour') === '1' ? [{ code: 'T8MX', host: 'Daniel', n: 5, max: 16 }] : [];      // (tourney-courts adds it too)
     const lobby = (view = 'home', rooms = ROOMS) => { $('stage').hidden = false; ui.showScreen('lobby'); ui.lobbyView(view); if (rooms) ui.lobbyRooms(rooms, 5, TOURS); };
     const courts = (rooms = ROOMS) => { lobby('courts', rooms); if (qs.get('q')) { const i = $('court-search'); i.value = qs.get('q'); i.dispatchEvent(new Event('input')); } };
     const tab = f => $('court-seg').querySelector(`[data-filter="${f}"]`).click();
     const tab0 = () => { try { localStorage.removeItem('poddle.courts'); } catch { /* fine */ } };
     const result = (o, votes) => { hud(o.me, o.them, 0); ui.setServe(null); ui.matchResult({ nameThem: opp, ...o }); if (votes) ui.rematch({ name: opp, ...votes }); };
     const cal = (e, o) => { ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.showScreen('calibrate'); ui.calibration(e, o); };
+    // tournaments (docs/COURTS-TOURNEY.md 4.6): a snapshot as the server sends it. &n= players, &you=through|out|watching, &next=1 (the break between rounds), &why= (ended)
+    const TN = ['Daniel', 'Kim', 'Ben', 'Sam', 'Ana', 'Priyanka', 'Lu', 'Oliver', 'Mei', 'Rafael', 'Noor', 'Ivy', 'Jo', 'Tia', 'Ada', 'Bo'], LINK = 'https://poddleball.com/?court=K24M';
+    const tsnap = (n, o = {}) => ({ type: 'tour', code: 'K24M', phase: 'reg', min: 4, max: 16, n, host: 'Daniel', win: 7, final: 11, rounds: [], next: null, champ: null, ...o,
+      you: { id: 1, host: true, out: false, viewer: false, warm: 'off', ...o.you }, players: TN.slice(0, n).map((name, i) => ({ id: i + 1, name, host: i === 0, out: false, left: false, on: i !== o.off })) });
+    const P = i => ({ id: i + 1, name: TN[i], bot: false }), M = { id: null, name: 'Matt', bot: true }, TBD = { id: null, name: null, bot: false };
+    const mt = (n, a, b, o = {}) => ({ n, a, b, room: null, score: [0, 0], live: false, w: null, forfeit: false, watchers: 0, ...o });
+    const tbd = k => Array.from({ length: k }, (_, i) => mt(i + 1, TBD, TBD));
+    function bracketSnap(n, you, next) {      // 5 players: Round 1 (3, one Matt), Semifinal, Final. 16: Round 1, Quarterfinal, Semifinal, Final
+      const r1 = n === 5 ? [mt(1, P(0), P(1), { w: 'a', score: [7, 4] }), next ? mt(2, P(2), P(3), { w: 'b', score: [9, 11], forfeit: false }) : mt(2, P(2), P(3), { live: true, room: 'QW7R', score: [5, 3], watchers: 2 }), mt(3, P(4), M, { w: 'b', score: [5, 7] })]
+        : Array.from({ length: 8 }, (_, i) => i === 6 && !next ? mt(7, P(12), P(13), { live: true, room: 'QW7R', score: [4, 6], watchers: 3 }) : i === 7 && !next ? mt(8, P(14), P(15), { live: true, room: 'HN3D', score: [2, 2] }) : mt(i + 1, P(i * 2), P(i * 2 + 1), { w: i % 3 === 1 ? 'b' : 'a', score: i % 3 === 1 ? [3, 7] : i === 4 ? [7, 0] : [7, 5], forfeit: i === 4 }));
+      const rounds = n === 5 ? [{ name: 'Round 1', target: 7, matches: r1 }, { name: 'Semifinal', target: 7, matches: tbd(2) }, { name: 'Final', target: 11, matches: tbd(1) }]
+        : [{ name: 'Round 1', target: 7, matches: r1 }, { name: 'Quarterfinal', target: 7, matches: tbd(4) }, { name: 'Semifinal', target: 7, matches: tbd(2) }, { name: 'Final', target: 11, matches: tbd(1) }];
+      const yid = you === 'out' ? 2 : you === 'watching' ? null : 1;
+      return tsnap(n, { phase: 'play', rounds, next: next ? { what: 'round', in: 6 } : null, you: { id: yid, host: yid === 1, out: you === 'out', viewer: you === 'watching', warm: 'off' } });
+    }
+    const CHAMP = { id: 1, name: 'Daniel', bot: false, path: [{ round: 'Round 1', vs: 'Kim', bot: false, score: [7, 4], forfeit: false }, { round: 'Semifinal', vs: 'Matt', bot: true, score: [7, 5], forfeit: false }, { round: 'Final', vs: 'Priyanka', bot: false, score: [11, 9], forfeit: false }] };
+    const tourLobby = (snap, view) => { $('stage').hidden = false; ui.showScreen('lobby'); ui.setTour(snap, { link: qs.get('local') === '1' ? '' : LINK }); ui.lobbyView(view); };
+    const tmatch = () => { hud(3, 2, 0); ui.setServe('me'); ui.setNames({ them: 'Ben', themSub: 'Far side' }); ui.setBot(null); ui.setSettings({ canPause: false, tourMatch: true, forfeit: true });
+      ui.setTour(tsnap(4, { phase: 'play', rounds: [{ name: 'Semifinal', target: 7, matches: [mt(1, P(0), P(2), { live: true, room: 'QW7R', score: [3, 2] }), mt(2, P(1), P(3), { live: true, room: 'HN3D', score: [1, 4] })] }, { name: 'Final', target: 11, matches: tbd(1) }] }), { link: LINK }); ui.tourCourt('match'); };
+    addEventListener('keydown', e => { if ((e.key === 'Escape' || e.key.toLowerCase() === 't') && ui.tourCard()) ui.tourCard(false); });      // main.js's Esc / T on the open card (esc(), tourKey()): the mock has no main.js
+    const warm = snap => { hud(0, 0, 0); ui.setServe(null); ui.setNames({ them: 'Matt', themSub: 'Tour' }); ui.setBot('Tour'); ui.setTour(snap, { link: LINK }); ui.tourCourt('warm'); };
     const R = {
       'title': () => { $('stage').hidden = false; ui.showScreen('title'); },
       'lobby': () => lobby(), 'lobby-first': () => lobby(), 'lobby-bot': () => lobby('bot'),
@@ -146,6 +168,26 @@
       'hud-ask': () => { hud(); ui.askCard({ name: qs.get('asker') || 'Sam', left: 10 }); },
       'hud-ask-settings': () => { hud(); ui.setPaused(true); ui.settings(true); ui.askCard({ name: 'Sam', left: 7 }); },
       'match-ask': () => { result({ won: true, me: 11, them: 8 }, { mine: null, theirs: null, left: 20 }); ui.askCard({ name: 'Sam', left: 4 }); },
+      'tourney-courts': () => { TOURS.push({ code: 'T8MX', host: 'Daniel', n: 5, max: 16 }); courts(); tab('open'); },
+      'tourney-host-empty': () => tourLobby(tsnap(1), 'tour'),
+      'tourney-host-3': () => tourLobby(tsnap(3, { off: qs.get('off') ? 2 : undefined }), 'tour'),
+      'tourney-host-ready': () => tourLobby(tsnap(+qs.get('n') || 5), 'tour'),
+      'tourney-host-16': () => tourLobby(tsnap(16), 'tour'),
+      'tourney-guest': () => tourLobby(tsnap(+qs.get('n') || 5, { you: { id: 3, host: false, warm: 'off' } }), 'tour'),
+      'tourney-warmfull': () => tourLobby(tsnap(3, { you: { id: 3, host: false, warm: 'full' } }), 'tour'),
+      'tourney-banner': () => { warm(tsnap(+qs.get('n') || 5, { you: { id: 3, host: false, warm: 'on' } })); ui.tourNote('Priyanka'); },
+      'tourney-banner-host': () => warm(tsnap(+qs.get('n') || 5, { you: { id: 1, host: true, warm: 'on' } })),
+      'tourney-card': () => { warm(tsnap(+qs.get('n') || 5, { you: { id: 1, host: true, warm: 'on' } })); ui.setPaused(true); ui.tourCard(true); },
+      'tourney-intro': () => { hud(0, 0, 0); ui.tourVs({ round: 2, name: qs.get('final') ? 'Final' : 'Quarterfinal', n: 2, of: qs.get('final') ? 1 : 4, vs: qs.get('bot') ? { name: 'Matt', bot: true } : { name: 'Kim', bot: false }, target: qs.get('final') ? 11 : 7, final: !!qs.get('final'), at: 4, side: 0 }); },
+      'tourney-bracket': () => tourLobby(bracketSnap(+qs.get('n') === 16 ? 16 : 5, qs.get('you') || 'through', qs.get('next') === '1'), 'bracket'),
+      'tourney-win': () => { hud(7, 4, 0); ui.setServe(null); ui.matchResult({ won: true, me: 7, them: 4, nameThem: 'Kim', tour: { round: 'Quarterfinal', next: 'Semifinal', final: false, gap: 6 } }); },
+      'tourney-out': () => { hud(4, 7, 0); ui.setServe(null); ui.matchResult({ won: false, me: 4, them: 7, nameThem: 'Kim', tour: { round: 'Quarterfinal', next: 'Semifinal', final: false, gap: 6 } }); },
+      'tourney-champion': () => { hud(11, 9, 0); ui.setServe(null); ui.champion(CHAMP, 1); },
+      'tourney-champion-watch': () => { hud(11, 9, 0); ui.setServe(null); ui.champion(qs.get('matt') ? { ...CHAMP, id: null, name: 'Matt', bot: true } : CHAMP, 5); },
+      'tourney-ended': () => { lobby(); ui.tourEnded(qs.get('why') || 'restart'); },
+      'tourney-match': () => tmatch(),                                                                                        // in a match (4.6 item 7): the pill names the round and who, no court pill, no 1 2 3 4
+      'tourney-match-settings': () => { tmatch(); ui.settings(true); },                                                         // Forfeit, and 'Tournament matches can't pause'
+      'tourney-match-qq': () => { tmatch(); ui.toast('Press Q again to forfeit', 1e6); },
       'watch-ask': () => { watch(); ui.setNames({ me: 'Lu', meSub: '', them: 'Matt', themSub: 'Club' }); ui.showAsk(true); const st = qs.get('s') || 'idle'; if (st !== 'idle') ui.askPlay({ s: st, left: st === 'sent' ? 9 : 8, busy: qs.get('busy') === '1' }); const why = st === 'no' ? 'Lu said no' : st === 'expired' ? 'No answer from Lu' : st === 'wait' && qs.get('busy') === '1' ? 'Someone else asked first' : ''; if (why) ui.toast(why, 600000); },      // main.js's toast says why
     };
     (R[screen] || R.title)();
