@@ -56,7 +56,7 @@
 <script type="module">
   // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
   const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
-  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
+  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
     'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full'];
   // extra params: &bg=court|grass (flat ground under the HUD) · &name=<player name> · &opp=<opponent> (try a hostile one) · &idle=1 · &freeze=1
   if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
