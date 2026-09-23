@@ -1210,7 +1210,7 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   existed and the run died on its first assertion. Stubs added; part B runs again and 5 older failures in it are now
   visible (settings panel rows, sensitivity keys, the lob gate in 2) — those are somebody else's to chase.
 
-## 78. Nothing is selectable except the codes (and what you type)
+## 79. Nothing is selectable except the codes (and what you type)
 - "Make everything EXCEPT codes across the website and phone paddle website unselectable." `user-select: none` (and no iOS
   long-press callout) on the whole of index.html, pad.html, how-to-play.html and 404.html. Inputs, selects and textareas stay
   `text`, or you could not type a name or a code (iOS will not focus an input that inherits `none`).
