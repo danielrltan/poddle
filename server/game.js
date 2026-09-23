@@ -298,6 +298,7 @@ function createRoom(code, pub) {
     ball.p[1] = Math.max(ball.p[1], R);
     if (!started && pub) lobbyChanged();                          // the first strike turns a Matt court from Join to Ask to play in the list (sent on its timer, after this)
     ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
+    ball.from = { p: [...ball.p], t: now };                       // where and when it left the paddle: a re-aim flies what is LEFT of the shot struck from here
     planFootwork(1 - side);
     if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
     broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, c: sol.curl });
@@ -308,8 +309,29 @@ function createRoom(code, pub) {
   // speed is never eased (that swung it out wide and the pull hooked it back, a zig-zag: NOTES 72). The pull alone carries it from where
   // it is, on the heading it has, onto the marker: c = 2 (land - x - vx T) / T^2. At least CURVE.swoop m of bow, the way solve() hooks
   // it (or more, if the settled aim needs more bend that same way); the marker says where that lands, kept on the court.
+  // Height is never eased (NOTES 86). Easing vy up onto a lob's solution over 0.45 s WAS the helium ball: a scoop is struck on its
+  // bet (the upward share is still low then, lob 0.12-0.47: a drive), the settled report says lob, and the ball climbed faster and
+  // faster for half a second, +6 to +14 m/s^2 against gravity. Now the vertical is ballistic from the paddle: if the settled shot
+  // wants more height than the ball has, it gets it in ONE step here (the lob's apex, from where it is), and from then on vy only
+  // ever falls at g (easeAim clamps it). T is what is LEFT of the settled shot struck from the contact point, not a fresh full flight
+  // from here: that asked every corrected drive to climb again (under half gravity for 0.45 s), and an unchanged shot now steps by 0.
+  function remaining(side, n, dir, lob, slice, blk, curl, sol) {
+    const f = ball.from || { p: ball.p, t: now }, clean = solve(f.p, side, n, dir, lob, slice, blk, curl), g = gOf(sol.spin);
+    const e = now - f.t, y = Math.max(ball.p[1], R), vy = ball.v[1], down = (vy + Math.sqrt(vy * vy + 2 * g * Math.max(0, y - R))) / g;   // down: when it lands as it flies now
+    const H = Math.max(f.p[1], R) + Math.max(0, clean.v[1]) ** 2 / (2 * g), apexNow = y + Math.max(0, vy) ** 2 / (2 * g);
+    if (lofted(lob) > 0.5 && H > apexNow + 0.05 && clean.v[1] - g * e > 0) { const up = Math.sqrt(2 * g * (H - y)); return (up + Math.sqrt(up * up + 2 * g * (y - R))) / g; }   // a lob: it tops out where the clean lob would have
+    return Math.max(0.3, Math.min(clean.T - e, down));           // anything else keeps the height it has (fly() adds only what the net needs); sooner is fine, it only drops harder
+  }
   function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
+    const g = gOf(sol.spin), clear = lerp(0.25, SLICE.clear, sol.spin), y = Math.max(ball.p[1], R), pz = ball.p[2], vFly = [0, 0, 0];
+    let T = fly(vFly, ball.p[0], y, pz, sol.land[0], sol.land[1], remaining(side, n, dir, lob, slice, blk, curl, sol), g, clear);
+    for (let i = 0; i < 40 && pz * sol.land[1] < 0; i++, T = fly(vFly, ball.p[0], y, pz, sol.land[0], sol.land[1], T + 0.05, g, clear)) {   // the net, at the SLOWER of the pace it has and the pace it eases to: the ease never re-solves the height, so it has to clear from here
+      const vz = Math.min(Math.abs(ball.v[2]), Math.abs(vFly[2])), tn = Math.abs(pz) / Math.max(vz, 0.1);
+      if (y + vFly[1] * tn - 0.5 * g * tn * tn >= COURT.net + clear) break;
+    }
+    sol.T = T; sol.v = [vFly[0] - 0.5 * sol.curl * T, vFly[1], vFly[2]];
+    if (sol.v[1] > ball.v[1]) ball.v[1] = sol.v[1];               // the one step up (a scoop that met the ball on its bet); never eased
     let land = sol.land, v = sol.v;
     if (sol.curl) {
       const T = sol.T, x = ball.p[0], vx = ball.v[0], cReq = 2 * (land[0] - x - vx * T) / (T * T), cMin = Math.abs(sol.curl) * CURVE.swoop / CURVE.bow;
@@ -317,18 +339,21 @@ function createRoom(code, pub) {
       land = [clamp(x + vx * T + 0.5 * c * T * T, -2.5, 2.5), land[1]]; v = [vx, sol.v[1], sol.v[2]];
       ball.curl = 2 * (land[0] - x - vx * T) / (T * T);
     } else ball.curl = 0;
-    ball.aim = { land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin), swoop: !!sol.curl };
+    ball.aim = { land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, swoop: !!sol.curl };
     ball.spin = sol.spin; ball.kick = sol.kick;
     planFootwork(1 - side, v);
-    broadcast({ type: 'launch', by: side, land, spin: sol.spin, k: sol.kick, c: ball.curl, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
+    broadcast({ type: 'launch', by: side, land, spin: sol.spin, k: sol.kick, c: ball.curl, n, kind, p: ball.p, v: ball.v, t: now });     // p v t: the step up (if any) is drawn now, not a state packet later     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
   }
   const aimV = [0, 0, 0];
+  // The ease steers only across and along: the height is the ball's own, ballistic since the re-aim (NOTES 86), so the landing time is
+  // read off it every tick and x / z are eased to meet the marker then. It used to re-solve fly() here, whose net loop could ask for
+  // more height mid-ease (a one-tick hop), and blending vy was the helium itself.
   function easeAim() {
-    const a = ball.aim;
-    a.T = fly(aimV, ball.p[0], Math.max(ball.p[1], R), ball.p[2], a.land[0], a.land[1], Math.max(a.T, 0.1), gOf(ball.spin), a.clear);
-    if (a.swoop) { aimV[0] = ball.v[0]; ball.curl = 2 * (a.land[0] - ball.p[0] - ball.v[0] * a.T) / (a.T * a.T); }   // sideways: never eased, the pull alone swoops it in (re-sized as the ease moves T, so it still lands on the marker)
-    for (let i = 0; i < 3; i++) ball.v[i] += (aimV[i] - ball.v[i]) / a.k;   // equal shares: the last one lands exactly on the solution
-    a.T -= DT;
+    const a = ball.aim, g = gOf(ball.spin), y = Math.max(ball.p[1], R), vy = ball.v[1];
+    a.T = Math.max(DT, (vy + Math.sqrt(vy * vy + 2 * g * (y - R))) / g);
+    aimV[0] = (a.land[0] - ball.p[0]) / a.T; aimV[2] = (a.land[1] - ball.p[2]) / a.T;
+    if (a.swoop) { aimV[0] = ball.v[0]; ball.curl = 2 * (a.land[0] - ball.p[0] - ball.v[0] * a.T) / (a.T * a.T); }   // sideways: never eased, the pull alone swoops it in (re-sized as T is read, so it still lands on the marker)
+    for (const i of [0, 2]) ball.v[i] += (aimV[i] - ball.v[i]) / a.k;   // equal shares: the last one lands exactly on the marker
     if (--a.k <= 0) { ball.aim = null; planFootwork(1 - a.side); }
   }
 

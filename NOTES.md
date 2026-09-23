@@ -1418,3 +1418,32 @@ paints its own pick as before. Pressing an option dips it to 95 %.
 
 The on/off switches already slid (160 ms); the knob now springs (360 ms, overshoot) and stretches while pressed. Under macOS Reduce Motion
 the global rule in ui.css still cuts every transition to 1 ms, on purpose.
+
+## 86. No helium lob: height is never eased, a lob goes up once and then falls like a ball
+
+"Sometimes the ball still floats up like it's filled with helium ... like a bell curve rather than a normal parabola." Cause, found by
+four independent investigations and confirmed by four verifiers with the real `solve()`: a scoop meets the ball on its **bet**, and at that
+point the upward share of the stroke is still low (synthetic lobs bet lob 0.12-0.47, so `lofted()` is 0 and it flies as a drive). The
+settled report arrives 60-280 ms later with lob 0.65-0.78, and `reaim()` handed `easeAim()` a lob solution with vy ~8 m/s against the
+ball's ~1-3. The ease blended ball.v onto it in equal shares over 27 ticks (0.45 s), so vy **rose** the whole time: net +6 to +14 m/s^2
+against gravity, height flat, then climbing faster and faster, then a rounded top. That is the bell. It hit every lob that met the ball
+before its settled report (10 of 10 synthetic lobs); a lob that settled before contact launched clean, hence "sometimes". Smaller copies of
+it: re-aims took a fresh full T from where the ball was (every corrected drive floated at under half gravity for 0.45 s, 30 of 75
+recorded bet hits), and `fly()`'s net loop could hop T by 0.05 mid-ease (a one-tick +29 m/s^2 spike on a few hard drives).
+
+Now (server/game.js):
+- `launch()` remembers where and when the ball left the paddle (`ball.from`).
+- `reaim()` flies what is LEFT of the settled shot struck from there (`remaining()`): a lob gets the clean lob's apex from where the ball
+  is (`vy = sqrt(2 g (H - y))`), anything else keeps the height it has (`min(clean T - elapsed, when it lands as it flies)`), and only the
+  net may ask for more, checked at the slower of the pace it has and the pace it eases to. If that needs more vy than the ball has, it
+  gets it in ONE step, now.
+- `easeAim()` never touches vy: it reads the landing time off the ball's own ballistic height every tick and eases only x and z onto the
+  marker (the swoop's curl as before). After the re-aim tick vy only ever falls at g.
+- The re-aim's `launch` packet carries `p v t`; web/scene.js takes them at once (as it does for `hit`), so the step is drawn on that
+  frame, not pulled in over the next state packets.
+
+The trade: a lob struck on its bet shows one upward kink 60-250 ms after contact (vy +5 to +7.7 m/s), then a true parabola to a 4.1-4.5 m
+apex. A drive re-aimed to a drive or into a smash never steps; a hard bet that settles as a tap steps +0.5 m/s, only what the slower ball
+needs over the net. `test/helium.test.mjs` (real server): lobs rise once and never again, still lobs (apex > 3.3), drives and smashes never
+step, a clean lob never rises, every re-aim lands within 0.15 m of its marker. The real cure for the kink is upstream: the bet
+under-reports lob (motion.js: the upward share of a scoop is still low when the peak is predicted) — not touched here.

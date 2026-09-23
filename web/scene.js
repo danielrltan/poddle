@@ -1038,6 +1038,8 @@ export function createScene(containerEl) {
       ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k; if (isFinite(m.c)) ball.curl = +m.c;      // c: a settled hard swing starts curling from here (the next state packet carries it too)
       if (m.kind) ball.kind = m.kind;      // before the power: a re-aim into a smash (or into a lob) is shown as one
       if (m.n != null && isFinite(m.n)) { ball.power = shownN(clamp(+m.n, 0, 1), ball.kind); ball.betN = null; }      // a re-aim: the hit went out on the early bet, this is the settled swing. The trail burns for THAT (a tap that was called 30 rad/s loses its flame)
+      if (m.v && m.v.length === 3 && m.p && ball.seen && isFinite(m.v[0] + m.v[1] + m.v[2] + m.p[0] + m.p[1] + m.p[2])) {   // a re-aim carries the ball: a lob's one step up is drawn on this frame, never pulled in over the next packets (NOTES 86)
+        ball.p = [m.p[0], m.p[1], m.p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now()); ball.blend = true; }
       if (m.kind === 'smash' && ball.seen) { if (timeS - smashAt > 0.3) igniteFx(m.by, ball.spin, hitLook(m.by)[0]); trail.glow = 1; }      // the settled swing, up to 0.25 s after the hit: the ball takes fire (unless the impact itself was already called a smash)
       if (m.land && !menu) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
         marker.material.color.set(0xffffff); }      // white wherever it lands: the yellow for "coming to ME" read as a warning against the court's own yellows (NOTES 61)
