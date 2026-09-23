@@ -12,7 +12,7 @@ const srv = http.createServer((q, r) => {
   if (EXTRA && u.startsWith('/_x/')) f = path.join(EXTRA, u.slice(4));
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end('nf'); } r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); });
 }).listen(PORT, '127.0.0.1');
-const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud-airpod-lost', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'serve-prompt', 'hud-stats',
+const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud-airpod-lost', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-stats',
   'hud&bg=grass', 'hud&bg=court', 'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'watch&bg=court', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full'];
 const SIZES = (process.env.UI_SIZES || '1440x900,1280x720,600x900').split(',').map(s => s.split('x').map(Number));      // 600x900: the root font is at its 10px floor there, the layout no longer shrinks with the window
 const args = process.argv.slice(2);

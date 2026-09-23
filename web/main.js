@@ -418,7 +418,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'names') {
     const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) struck = false; drawNames(); showView();      // a seat changed hands: a fresh match
-    for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) say(`${names[i]} is here to play`, null, 2600);      // a human sat down (a changed name is not news)
+    for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }
   if (m.type === 'watcher') { if (live() && !spec()) ui.watcherNote(cleanName(m.name)); return; }      // someone started watching you (the server tells only the players)

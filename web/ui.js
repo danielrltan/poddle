@@ -60,6 +60,12 @@ export function pointBanner(won, name = '', side) {
   $('banner-text').textContent = mine ? 'Your point' : name ? `${name} scores` : 'Their point';
   b.classList.toggle('is-me', blue); b.classList.toggle('is-them', !blue); restart(b, 'show');
 }
+// A human took a seat: the same centre banner the points use says who, in the joiner's colour (a player's opponent is always the orange side).
+export function joinBanner(name, them = true) {
+  const b = $('banner'); if (!b) return; name = String(name || '');
+  $('banner-text').textContent = name ? `${name} joined to play` : 'A player joined';
+  b.classList.toggle('is-me', !them); b.classList.toggle('is-them', !!them); restart(b, 'show');
+}
 // The count into a match: n = whole seconds left, 0 or null = gone. Each new number pops once (server/game.js 'countdown').
 export function countdown(n) {
   const el = $('count'), b = $('count-n'); if (!el || !b) return;
@@ -394,7 +400,7 @@ export function emote(i, name) {
   body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only
   el.append(body); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), dur * 1000 + 500); layer.append(el);
 }
-// someone sat down in the stands: a small card top-right for a few seconds. Three at most; names go in as textContent only
+// someone sat down in the stands: a small card on the left edge for a few seconds. Three at most; names go in as textContent only
 const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>';
 export function watcherNote(name) {
   const box = $('notices'); if (!box) return;

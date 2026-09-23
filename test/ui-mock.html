@@ -95,6 +95,7 @@
       'hud-countdown': () => { hud(0, 0, 0); ui.setServe(null); ui.countdown(+qs.get('left') || 3); },      // the count into a match: no score, no rally, nothing in play yet
       'hud-callout': () => { hud(7, 5, 5); ui.callout(qs.get('kind') || 'smash', qs.get('them') === '1'); },
       'hud-point-you': () => { hud(8, 5, 0); ui.pointBanner(true); },
+      'hud-arrivals': () => { hud(0, 0, 0); ui.setServe(null); ui.setWatchers(2); ui.joinBanner(opp); ui.watcherNote('Sam'); ui.watcherNote('Priyanka'); },      // who just arrived: the centre banner for a player, the left cards for the stands
       'hud-point-enemy': () => { hud(7, 6, 0); ui.pointBanner(false); },
       'serve-prompt': () => { hud(7, 5, 0); ui.toast('Your serve!', 1e6); },
       'hud-airpod-lost': () => { hud(); ui.setStatus({ airpod: 'bad' }); ui.toast('AirPod signal lost', 1e6); },

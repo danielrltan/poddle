@@ -1190,3 +1190,22 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   (<= 520 px wide) the card takes the whole width; it was a 230 px strip. The speaker hint is one sentence now ("Allow audio once so
   the browser can list your speakers. Nothing is recorded.").
 - fixes-e2e (the mid-match Forfeit / Leave button) passes; menu.mjs fails exactly as on main.
+
+## 78. Who just arrived: the centre banner for a player, a card on the left for a watcher
+- The arrivals from 68 were in the wrong two places: "Sam is watching" sat top-right, under the camera inset, and a player
+  sitting down was a bottom toast — the quietest thing on the page. Both moved to where they were asked for.
+- A watcher is now a card on the **left edge, half way down** (`.notices`): clear of the HUD corner above it and of the key
+  hints / view chips below, sliding in from the left instead of the right. The settings panel takes exactly that space, so
+  `body[data-settings]` hides the stack the same way `body[data-overlay]` already did. The server side is untouched (68):
+  only the two players hear `{type:'watcher'}`, once per tab, and a reload is not news.
+- A player sitting down now drops out of the **centre banner** — the same `.banner-tag` the points use — as
+  "<name> joined to play" (`ui.joinBanner`), in the joiner's colour: always orange for a player (it can only be your
+  opponent), by side for a spectator. It replaces the `say()` toast at that call site; "<name> left" is still a toast.
+- The banner had only ever held "Your point" / "<name> scores". A 12-character name makes it ~2.5x longer, so the pill got
+  `max-width:calc(100vw - 2 * var(--edge))` and the inner span ellipses. Shot at 600x900 with the longest name a
+  `maxlength=12` field allows: nothing clipped (test/ui-shots, new `hud-arrivals` mock state).
+- Found while testing, not caused by this change: **test/menu.mjs part B could not run at all**. main.js has grown imports
+  the stubs never gained — `scene.js`'s `shownN`, `scene.audio.*`, and `ui.onEmote / emote / emotesOff / countdown /
+  setPing / backLabel`. A missing *named* export fails the whole module graph at link time, so `window.__calls` never
+  existed and the run died on its first assertion. Stubs added; part B runs again and 5 older failures in it are now
+  visible (settings panel rows, sensitivity keys, the lob gate in 2) — those are somebody else's to chase.
