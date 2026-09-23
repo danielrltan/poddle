@@ -152,7 +152,7 @@ const EMOTES = 7, EMOTE_GAP = 60;                               // spectator emo
 const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one address may have made and still standing: 40 idle sockets from one machine took every court (busy beyond that)
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
-const SMASH = 0.76;                                            // n above this is a smash (27.3 rad/s)
+const SMASH = 0.76;                                            // n above this is a smash (power 27.3; a wide stroke gets there from ~24 rad/s, NOTES 82)
 const SMASH_UP = [0.4, 0.55];                                  // lob (0..0.8) over which a hard swing stops being a smash: a smash comes DOWN or level through the ball. Recorded smashes send lob <= 0.27 (<= 0.45 with the reworked lob gate): called at 0.475, upward share 0.6
 const LOB_ARC = [0.25, 0.6];                                   // underhand() over which the flight turns from the drive's into the lob's: 0.8 of the way by 0.5, all of it by 0.6
 const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
@@ -185,7 +185,7 @@ const lofted = lob => smooth(underhand(lob), LOB_ARC[0], LOB_ARC[1]);
 // how flat (level or downward) was it? 1 up to lob 0.4, 0 from 0.55 (upward share 0.69). Only a flat swing smashes or gets the smash's extra pace.
 const flat = lob => 1 - smooth(lob, SMASH_UP[0], SMASH_UP[1]);
 const hard = n => { const t = clamp((n - 0.45) / 0.25, 0, 1); return t * t * (3 - 2 * t); };   // 0 below n 0.45, 1 from 0.7: power beats spin (nothing in here uses it today; test/kinds.mjs still reads it)
-// smash: n 0.76 = 27.3 rad/s: it has to be earned (p90 of every recorded swing, twitches included; of his real strokes, power >= 9, one in four gets there).
+// smash: n 0.76 = power 27.3: it has to be earned. A relaxed stroke tops out at 0.62 (web/motion.js EASY); only speed adds the rest, from ~24 rad/s on a wide stroke (5 of his 62 real strokes, NOTES 82).
 // 'slice' is the label for spin that READS as one (> SLICE.at 0.45: was 0.5, which left his forehand slice at 0.45-0.47 a 'drive'; 27 % of real strokes, test/kinds.mjs). A twitch (n < 0.1) is a tap whatever the wrist did: 28 of the 41 recorded 'slices' were under 9 rad/s.
 // A hard swing with a clear upward component is never a smash (it used to be whenever underhand() <= 0.5, i.e. upward share < 0.75):
 // flat() gates it. The lob label follows the flight: lofted() > 0.5 (u > 0.425) is what flies like a lob.
@@ -731,9 +731,8 @@ function createRoom(code, pub) {
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
     } else if (m.type === 'swing') {
       let pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
-      // an overhead is a smash: the paddle comes DOWN through the ball. But it has to be a real stroke first, and the
-      // bonus adds to it (it used to lift ANY downward swing over 13 rad/s to full smash pace: 4 of 23 recorded smashes).
-      if (clamp(num(m.chop, 0), 0, 1) > 0.45 && pw > 0.55) pw = Math.min(1, pw + 0.2);
+      // No overhead bonus any more (NOTES 82): it lifted any downward stroke past n 0.55 by 0.2 to a smash, however slowly it came
+      // down (4 of 12 recorded overheads, from 8.9 rad/s). An overhead is a smash the way every stroke is: by its speed (web/motion.js).
       // final: the settled report (web/motion.js sends one for every swing; a client from before that sends no such field and is taken at its word).
       // A bet never smashes: 38 of 140 recorded swings were FIRST called at smash pace, 14 settled there, 12 settled as taps, and the label, ring, flash, shake and flame went out on the bet.
       const final = m.final !== false; if (!final) pw = Math.min(pw, SMASH);
@@ -768,7 +767,7 @@ function createRoom(code, pub) {
       }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
         from: now - clamp((num(m.age, 0) + clamp(num(m.net, 0), 0, 250)) / 1000, 0, LAG_MAX),   // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness), and `net` = the round trip: the player saw the ball half a trip ago and the swing took the other half to get here
-        n: pw,                                                     // 6 = a tap, ~17 = backhand, 30 = solid forehand, 34+ = smash
+        n: pw,                                                     // power 6 = a tap, 18-23 = a relaxed stroke (a drive), 27.3+ = a smash (only with speed)
         dir, lob, slice, final, why: null, best: Infinity };   // final: an early report is a bet, and near the net it strikes soft until it settles
       broadcast({ type: 'swung', side: me.side });
       tryHit(me);                                                // ball already there: struck NOW, not on the next tick

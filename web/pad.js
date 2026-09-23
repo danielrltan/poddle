@@ -138,4 +138,4 @@ function render() {
 }
 let lastSent = 0;
 setInterval(() => { stats.hz = stats.sent - lastSent; lastSent = stats.sent; $('live-stats').textContent = stats.open && stats.host ? `${stats.hz} samples/s · ${Math.round(stats.rtt)} ms` : ''; }, 1000);
-setInterval(() => { $('ring-fill').style.height = Math.min(100, peak / 25 * 100) + '%'; $('ring-word').textContent = peak > 18 ? 'Smash' : peak > 9 ? 'Swing' : 'Ready'; peak *= 0.8; }, 100);      // the meter jumps with a swing and sinks back
+setInterval(() => { $('ring-fill').style.height = Math.min(100, peak / 25 * 100) + '%'; $('ring-word').textContent = peak > 20 ? 'Smash' : peak > 9 ? 'Swing' : 'Ready'; peak *= 0.8; }, 100);      // the meter jumps with a swing and sinks back. 'Smash' from 20 rad/s: below ~19 phone rad/s the game can no longer call one, however wide the stroke (web/motion.js PACE_R x sqrt(RATE_GAIN), NOTES 82); it said so from 18

@@ -23,17 +23,23 @@ for (const r of rows) { const w = Math.hypot(...r.r);
   if (w < 4 && cur) { if (cur.peak >= 9) out.push(cur); cur = null; }   // after the feed: the last fix often lands on the sample that ends the movement
   prev = r; }
 const N = p => Math.max(0, Math.min(1, (p - 6) / 28)), pad = (v, n, d = 0) => v.toFixed(d).padStart(n);
-const med = a => (a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : NaN), S = { FLICK: [], WIDE: [] };
-for (const c of out) { const rise = (c.tp - c.t0) * 1000, kind = c.peak > 20 && rise <= 125 ? 'FLICK' : 'WIDE', first = c.ev[0], last = c.ev[c.ev.length - 1];
-  const okN = n => (kind === 'FLICK' ? n <= 0.25 : n >= 0.55), o = { kind, c, first, last, small: !labelled && kind === 'WIDE' && (c.angPk < 80 || rise < 160) };
+// What each is worth (NOTES 82): a FLICK is a soft tap (n <= 0.25); a slow WIDE arm swing (< 16 rad/s) is a drive, not a tap and
+// never a smash (0.45 <= n < SMASH 0.76: it used to be n >= 0.55, and every one past 110 deg / 0.18 s was a smash at any speed);
+// a FAST wide one (>= 16 rad/s) is where a smash comes from (n > 0.76). The 33 rad/s one misses: motion.js times its peak
+// wrong (settles at 0.39), a known limit, not this rule's.
+const SMASH = 0.76, OK = { FLICK: n => n <= 0.25, WIDE: n => n >= 0.45 && n < SMASH, FAST: n => n > SMASH };
+const RULE = { FLICK: 'soft (n<=0.25)', WIDE: 'a drive (0.45<=n<0.76)', FAST: 'a smash (n>0.76)' };
+const med = a => (a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : NaN), S = { FLICK: [], WIDE: [], FAST: [] };
+for (const c of out) { const rise = (c.tp - c.t0) * 1000, kind = c.peak > 20 && rise <= 125 ? 'FLICK' : c.peak < 16 ? 'WIDE' : 'FAST', first = c.ev[0], last = c.ev[c.ev.length - 1];
+  const okN = OK[kind], o = { kind, c, first, last, small: kind !== 'FLICK' && (labelled ? c.angPk < 100 : c.angPk < 80 || rise < 160) };
   if (first) Object.assign(o, { sens: (first.t - c.t0) * 1000, real: first.at - c.t0 * 1000, n1: N(first.power), n2: N(last.power), lastFix: (last.t - first.t) * 1000 });
   S[kind].push(o);
   if (!quiet) console.log(`${kind.padEnd(5)} peak ${pad(c.peak, 3)} rad/s rise ${pad(rise, 4)} ms ${pad(c.angPk, 3)} deg to peak, ${pad((c.t1 - c.t0) * 1000, 3)} ms long, ${pad(c.amax, 4, 1)} g -> ` + (first
     ? `swing at ${pad(o.sens, 4)} ms (real ${pad(o.real, 4)}) n ${o.n1.toFixed(2)}${okN(o.n1) ? '  ' : ' x'} -> final ${o.n2.toFixed(2)}${okN(o.n2) ? '  ' : ' x'} ${c.ev.length - 1} fix${c.ev.length > 1 ? ` (last +${pad(o.lastFix, 3)} ms)` : ''}  dir ${first.dir.toFixed(2)}>${last.dir.toFixed(2)} lob ${first.lob.toFixed(2)}>${last.lob.toFixed(2)}`
     : 'no swing')); }
-// WIDE is everything that is not a flick: in free play that includes small repositioning moves, so outside the labelled
-// capture the soft/strong line is only judged on the "big" ones (>= 80 deg and >= 160 ms to the peak).
-for (const k of ['FLICK', 'WIDE']) { if (!S[k].some(o => o.first)) { console.log(`${k.padEnd(5)} ${S[k].length} movements, none reported`); continue; } const all = S[k], a = all.filter(o => o.first), judged = k === 'WIDE' ? a.filter(o => !o.small) : a, ok = n => (k === 'FLICK' ? n <= 0.25 : n >= 0.55);
+// WIDE/FAST is everything that is not a flick: in free play that includes small repositioning moves, so only the "big" ones are
+// judged (labelled: >= 100 deg to the peak; free play: >= 80 deg and >= 160 ms).
+for (const k of ['FLICK', 'WIDE', 'FAST']) { if (!S[k].some(o => o.first)) { console.log(`${k.padEnd(5)} ${S[k].length} movements, none reported`); continue; } const all = S[k], a = all.filter(o => o.first), judged = a.filter(o => !o.small), ok = OK[k];
   console.log(`${k.padEnd(5)} ${all.length} movements, ${all.length - a.length} with no swing | reported after take-off: median ${pad(med(a.map(o => o.sens)), 3)} ms, worst ${pad(Math.max(...a.map(o => o.sens)), 3)} ms on the sensor clock; median ${pad(med(a.map(o => o.real)), 3)} / worst ${pad(Math.max(...a.map(o => o.real)), 3)} ms real arrival`
-    + ` | ${k === 'FLICK' ? 'soft (n<=0.25)' : `strong (n>=0.55${labelled ? '' : ', big ones only'})`}: first call ${judged.filter(o => ok(o.n1)).length}/${judged.length}, final ${judged.filter(o => ok(o.n2)).length}/${judged.length}`
+    + ` | ${RULE[k]}${k === 'FLICK' ? '' : ', big ones only'}: first call ${judged.filter(o => ok(o.n1)).length}/${judged.length}, final ${judged.filter(o => ok(o.n2)).length}/${judged.length}`
     + ` | first call within 0.1 of final: ${a.filter(o => Math.abs(o.n1 - o.n2) <= 0.1).length}/${a.length}, dir within 0.3: ${a.filter(o => Math.abs(o.first.dir - o.last.dir) <= 0.3).length}/${a.length}`); }

@@ -15,7 +15,7 @@ const main = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8')
 const a0 = main.indexOf('const roll = Math.max('), a1 = main.indexOf("game.send({ type: 'swing'", a0); if (a0 < 0 || a1 < 0) throw new Error('main.js anchors moved');
 const clientOf = new Function('e', main.slice(a0, a1) + '; return { roll, curve, amount, way, slice, lob };');
 const chopRule = /m\.chop, 0\), 0, 1\) > ([\d.]+) && pw > ([\d.]+)\) pw = Math\.min\(1, pw \+ ([\d.]+)\)/.exec(src);
-const [CHOP, CHOP_N, CHOP_ADD] = chopRule.slice(1).map(Number);
+const [CHOP, CHOP_N, CHOP_ADD] = chopRule ? chopRule.slice(1).map(Number) : [0.45, 0.55, 0];   // the server's overhead bonus, if it has one (gone since NOTES 79: + 0)
 const P0 = [0, 1.0, 6.5];                          // contact: baseline (HIT_LINE 6.5), paddle 1 m up, side 0
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], nrm = a => Math.hypot(...a);
 

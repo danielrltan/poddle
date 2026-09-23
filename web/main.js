@@ -288,7 +288,9 @@ function connect(urls, el, onmsg, onopen) {
 // ---------- the paddle: an AirPod (the helper on this Mac) or a phone (its page, by way of the game server) ----------
 // Hosted, the helper's socket is only opened for someone who has played with an AirPod here before or asks to: a page
 // reaching for localhost makes Chrome ask a first-time visitor about 'devices on your local network' for nothing.
-// A phone weighs forty AirPods and nobody whips it round at 30 rad/s, so its swings count for more (?padgain= to try another value).
+// A phone weighs forty AirPods and nobody whips it round at 30 rad/s, so its swings count for more (?padgain= to try another value):
+// motion.js scales the phone's rotation rate by it for the effortless part of the score only (RATE_GAIN), and its speed part by the gain's square root, so a relaxed phone
+// stroke is a drive sooner but a smash still takes a hard swing (~19 rad/s, an AirPod ~23.4) (NOTES 82). pw() now scales only 'raw', which a serve reads.
 const PHONE_GAIN = Math.max(0.5, Math.min(3, +qs.get('padgain') || 1.5)), pw = v => src === 'phone' ? v * PHONE_GAIN : v;
 const AIRPOD_BUFFER = model.c.BUFFER_MAX, PHONE_BUFFER = 0.2;
 let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE || qs.has('bridge') && qs.get('padtest') !== '1' || ls.get('poddle.airpod') === '1';
@@ -335,7 +337,7 @@ function onSample(sample, from) {
   if (!sample || !Array.isArray(sample.r)) return;
   // A phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: its replay may wait
   // longer when (only when) that happens (NOTES 35). The AirPod keeps its own limit.
-  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
+  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; model.c.RATE_GAIN = from === 'phone' ? PHONE_GAIN : 1; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
     if (stats.calibrated) { stats.calibrated = false; if (phase === 'play') startCal(); } else if (phase === 'calibrate') startCal(); }
   if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if (phase === 'play' || phase === 'calibrate') startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero
   lastT = sample.t;
@@ -369,12 +371,12 @@ function onSample(sample, from) {
         // forward axis (|roll| 0.45 -> 0.75) is a wrist roll or a sideways sweep, not a pendulum; if the paddle's pointer is a little off
         // the forearm, that roll leaks into the path. A pendulum underhand rolls 0.1-0.4 (recorded: the deliberate lob 0.39).
         const k = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.45) / 0.3)), g = k * k * (3 - 2 * k), lob = e.lob * (1 - g);
-        game.send({ type: 'swing', power: pw(e.power), raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
-        unsettled = e.final ? null : { power: pw(e.power), raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
+        game.send({ type: 'swing', power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
+        unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);
-      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: pw(e.peak), net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
+      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
   }
 }
 

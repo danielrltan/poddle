@@ -8,8 +8,8 @@ const { underhand, sliced, shotKind } = new Function('const clamp=(v,a,b)=>Math.
 const main = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8');
 const a0 = main.indexOf('const roll = Math.max('), a1 = main.indexOf("game.send({ type: 'swing'", a0); if (a0 < 0 || a1 < 0) throw new Error('web/main.js: the swing maths moved (anchors: "const roll = Math.max(" .. "game.send({ type: \'swing\'")');
 const clientOf = new Function('e', main.slice(a0, a1) + '; return { level: 0, roll, curve, amount, way, slice, lob };');   // the client's OWN spin maths and lob gate, as it sends them: nothing here is copied by hand
-const chopRule = /m\.chop, 0\), 0, 1\) > ([\d.]+) && pw > ([\d.]+)\) pw = Math\.min\(1, pw \+ ([\d.]+)\)/.exec(src); if (!chopRule) throw new Error('server/game.js: the overhead bonus moved');
-const [CHOP, CHOP_N, CHOP_ADD] = chopRule.slice(1).map(Number);                       // the server's overhead bonus, read from its swing handler
+const chopRule = /m\.chop, 0\), 0, 1\) > ([\d.]+) && pw > ([\d.]+)\) pw = Math\.min\(1, pw \+ ([\d.]+)\)/.exec(src);
+const [CHOP, CHOP_N, CHOP_ADD] = chopRule ? chopRule.slice(1).map(Number) : [0.45, 0.55, 0];   // the server's overhead bonus, if it has one (gone since NOTES 79: + 0)
 const pct = (a, p) => [...a].sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * p))];
 const total = {}, real = {}, SP = [];                          // real / SP: the kinds and the spin of the real strokes (power >= 9): more than half of all detected swings are twitches, and they dilute every share
 for (const f of ['data/live-swings.jsonl', 'data/live-play-1.jsonl', 'data/live-play-2.jsonl', 'data/live-play-3.jsonl']) {

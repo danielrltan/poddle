@@ -1248,3 +1248,57 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   ({ type: 'padcode' }) and redraws its QR. test/pad.test.mjs covers pairing on 4, the clash, the re-pick and the same tab
   reconnecting; pad-e2e checks the P-XXXX on screen (its one FAIL, AirPod mode at 1280x720, was there on main). The code never
   breaks at its hyphen.
+
+## 82. A smash takes speed: no swing shape is a smash on its own
+- "It is way too easy to pull off smashes just by swinging normally." Then: "smashes are grouped into a very specific arm
+  swing, so as long as you keep doing that but with no effort, you get a smash. You need to make that kind of swing variable
+  with strength, not just an instant smash."
+- The shape was the slow wide sweep, more than the overhead. motion.js scored credit(ROM, rise) x (0.8 + 0.2 x peak/14):
+  credit was full from 110 deg and 0.18 s to the peak, and the rate factor stopped at 14 rad/s, so peak rate was at most a
+  fifth of the score. A full-credit swing at 8 rad/s was power 32.8, n 0.96. In the recordings (test/effort.mjs, 62 real
+  strokes, old power >= 9) every such sweep was a smash, 8 of 8, from 8.9 to 17 rad/s, and across all strokes n and raw rate
+  ranked -0.24. The server's overhead bonus (chop > 0.45 and n > 0.55: +0.2) was the second way in: 4 of 12 overheads became
+  smashes through it, one at 8.9 rad/s. §8/§12's "rotation speed says almost nothing" was right for telling a flick from an
+  arm stroke, and wrong as the whole of power.
+- Now power = TAP + 28 x (effortless part + speed part), web/motion.js powerOf:
+  - effortless: EASY 0.62 (n 0.62, a drive; SMASH is 0.76) x (0.8 -> 1 as the peak goes 6 -> 15 rad/s) x ease(ROM credit)
+    x (time to peak 0.105 -> 0.145 s). A relaxed stroke of any shape tops out here.
+  - speed: 0.38 x ROM credit x (time to peak 0.11 -> 0.125 s) x ((peak - 10) / 22)^2. Only a fast peak on a real arm stroke
+    adds it. The rise gates are what keep a flick (85-115 ms to its peak, 22-38 rad/s) a tap: FLICK in test/real.mjs is
+    still 8/8 soft on first call and final (worst 0.17).
+  - The server's overhead bonus is gone. An overhead smashes the way everything does, by its speed.
+- The same shape now scales with speed (n; * = smash; before -> after):
+
+  | shape (deg / s to the peak, chop) | 8 | 12 | 16 | 20 | 24 | 28 | 32 rad/s |
+  |---|---|---|---|---|---|---|---|
+  | slow wide 178 / 0.338 | .91* -> .52 | .97* -> .58 | 1* -> .65 | 1* -> .70 | 1* -> .77* | 1* -> .87* | 1* -> 1* |
+  | overhead 127 / 0.359, .73 | 1* -> .52 | 1* -> .58 | 1* -> .65 | 1* -> .70 | 1* -> .77* | 1* -> .87* | 1* -> 1* |
+  | overhead 100 / 0.198, .49 | .99* -> .51 | 1* -> .57 | 1* -> .63 | 1* -> .68 | 1* -> .74 | 1* -> .83* | 1* -> .94* |
+  | overhead 92 / 0.311, .82 | .89* -> .49 | .94* -> .55 | .96* -> .61 | .96* -> .64 | .96* -> .70 | .96* -> .78* | .96* -> .87* |
+  | overhead 82 / 0.157, .72 | .41 -> .45 | .43 -> .50 | .45 -> .55 | .45 -> .58 | .45 -> .63 | .45 -> .69 | .45 -> .77* |
+
+- Recordings, before -> after (node test/effort.mjs): smashes 15 (24 %) -> 5 (8 %) of 62 real strokes; smashes slower than
+  the median stroke (12.9 rad/s) 9 -> 0, slower than p75 (23.5) 13 -> 0; slowest smash 7.7 -> 26.8 rad/s; slow wide sweeps
+  8/8 -> 0/8 smashes, n now 0.54 -> 0.66 as raw goes 8 -> 17 (rank 1.00); rank(n, raw) -0.24 -> +0.21 overall, -0.19 -> +0.04
+  among overheads. Flicks promoted to shots: 0 -> 0. Real-stroke n p25/p50/p75/p90 .25/.44/.79/.97 -> .36/.48/.55/.60: a
+  normal stroke is a drive. test/kinds.mjs (its own replay, 67 strokes of new power >= 9): smash 7 %, was 11-24 % in §§ 1-70.
+- Phone: PHONE_GAIN (1.5) used to multiply the SCORED power, so a phone smashed from AirPod-equivalent power 18.2, 32 of 62
+  strokes (52 %), and its TAP floor reached the server as 9 (n 0.11: every twitch a drive). Now main.js sets motion.js
+  RATE_GAIN = PHONE_GAIN, which scales the rate only the effortless part reads: a relaxed phone stroke is a drive a little
+  sooner (n .58 vs .52 at 8 rad/s), and the speed part reads rate x sqrt(RATE_GAIN), so a phone smashes from ~19 rad/s
+  (an AirPod ~23.4): still a hard swing, never a relaxed one (5 of 62 on both paths, slowest 26.8). pw() now scales only 'raw', which the serve's raw x travel term reads. Phone rates are still unmeasured.
+- test/real.mjs re-specified: FLICK n <= 0.25; WIDE (< 16 rad/s, >= 100 deg) a drive, 0.45 <= n < 0.76 (was n >= 0.55): 6/6
+  first call and final; FAST wide (>= 16 rad/s) a smash: 1/2 (29 rad/s settles 0.91; the 33 rad/s one settles 0.39, its peak
+  is timed wrong, below).
+- test/reaim.mjs (my hits bent after contact): 17 -> 14 re-aimed, 0 twice; landing moved p50 1.06 -> 0.51 m; sharpest kink
+  p50 0.19 -> 0.15, p90 0.44 -> 0.36 m/s. test/latesmash.mjs: 8 -> 6 movements hard enough to smash, all called on the settled report.
+- Tests that read the chop rule out of game.js (kinds, lobdata, effort, lobsynth) fall back to no bonus. test/effort.mjs stays as
+  the tool for this: it snapshots each settled swing, reproduces motion.js's power exactly (or throws), and keeps the OLD
+  formula (oldPower/oldCredit) only to fix who counts as a real stroke. lobsynth's phone grip now goes through RATE_GAIN.
+- Known limits: strokes that reach their peak in 112-122 ms, like a flick, get little of either part even at 32 rad/s (n
+  0.13-0.55), and several of the hardest recorded swings are among them; the data cannot tell them from flicks. The knob is
+  PACE_T's start ([0.105, 0.03] lifts them, and labelled flicks to 0.32-0.46). Early bets on wide swings now come out ~0.51, so
+  settled re-aims go up more often. pad.js's ring word now says "Smash" from 20 rad/s of the phone's own rate (it said so from 18;
+  nothing under ~19 phone rad/s can smash). It is still a speed meter, not the game's call.
+- Phone: the speed part takes only sqrt(1.5) = 1.22 of the gain, a guess between "a smash is the same physical rate" (the phone
+  might never get there: "nobody whips a phone round at 30 rad/s") and the full gain (relaxed phone strokes smashing again). Unmeasured: record a phone session.

@@ -29,7 +29,10 @@ export const DEFAULTS = {
   FIX_STEP: 3, FIX_GAP: 0.06,   // on the way to the peak a 'swingFix' follows when the call has moved by STEP, at most every GAP s; once the real peak is in, one always follows (final: true)
   ARC_TAU: 0.35, ARC_LO: 6, ARC_HI: 14, ARC_MAX: 65,     // swing arc: reference lag (s), and the rotation rates (rad/s) over which it fades in
   POWER_MAX: 34,
-  ROM_IDLE: 4, ROM_MIN: 35, ROM_FULL: 110, ROM_T_MIN: 0.10, ROM_T_FULL: 0.18,   // deg swept, and s taken, from the start of the movement to its peak: below MIN a swing scores nothing, at FULL its whole peak rate
+  EASY: 0.62, EASY_F0: 0.8, EASY_R: [6, 15], EASY_T: [0.105, 0.04],   // power = TAP + (MAX-TAP) x (effortless part + speed part), NOTES 82. Effortless: <= EASY of the range (n 0.62, a drive, never SMASH 0.76) for a
+  PACE_R: [10, 32], PACE_T: [0.11, 0.015],                              // wide stroke, F0..1 of it by peak rad/s over EASY_R, gated by time to the peak (start, ramp s). Speed: the rest, x ((peak - PACE_R[0]) / span)^2, for a real arm stroke only
+  RATE_GAIN: 1,                                                         // the paddle's rate gain (main.js: PHONE_GAIN on a phone). The effortless part reads pace x it, the speed part x its square root only: a phone (1.5) smashes from ~19 rad/s, an AirPod from ~23.4
+  ROM_IDLE: 4, ROM_MIN: 35, ROM_FULL: 110, ROM_T_MIN: 0.10, ROM_T_FULL: 0.18,   // deg swept from the start of the movement to its peak: below MIN a swing scores nothing, from FULL all it can. ROM_T_*: the old rise credit (s), kept for test/effort.mjs and strokes.js
   LOB_GAIN: 0.8,
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
@@ -294,11 +297,19 @@ export class MotionModel {
       const past = rate < c.REARM || rate < sw.peak * 0.6 || (rate < sw.peak * 0.92 && (sw.peak > 18 || el > 0.2));
       // over once the hand is quiet, or once it has clearly let go: the next movement often starts out of the follow-through
       const done = rate < c.REARM || ((sw.fixed || past) && rate < Math.min(c.REARM_HOT, sw.peak * 0.6));
-      // Power is EFFORT, not snap. Measured on the real player: a snappy flick peaks at ~30 rad/s but gets there in
-      // 80-100 ms; a wide arm swing only reaches 9-14 rad/s, takes 240-340 ms to get there and sweeps 100-190 deg on the
-      // way. So rotation speed says almost nothing; how far and how long the hand travelled before the peak says it all.
-      const credit = (rom, rise) => clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1) * clamp((rise - c.ROM_T_MIN) / (c.ROM_T_FULL - c.ROM_T_MIN), 0, 1);
-      const powerOf = (pk, rom, rise) => c.TAP + (c.POWER_MAX - c.TAP) * credit(rom, rise) * (0.8 + 0.2 * clamp(pk / 14, 0, 1));
+      // Power is EFFORT first, then SPEED (NOTES 82). Measured on the real player: a snappy flick peaks at ~30 rad/s but gets there
+      // in 80-115 ms; a wide arm swing takes 240-340 ms to its peak and sweeps 100-190 deg on the way. So how far and how long the
+      // hand travelled before the peak tells a stroke from a flick, and earns the effortless part: a relaxed stroke of any shape tops
+      // out at a drive (EASY 0.62 < SMASH 0.76), leaning a little on pace (0.8 of it at 6 rad/s, all of it from 15). The rest, the
+      // speed part, only a FAST peak on a real arm stroke adds: ((peak - 10) / 22)^2, all of it at 32 rad/s. It used to be credit
+      // alone (ROM_FULL x ROM_T_FULL) x a rate factor that stopped at 14 rad/s: every slow wide sweep (8 of 8 recorded, 8.9-17 rad/s)
+      // and any overhead past n 0.55 (the server's +0.2 chop bonus) was a smash with no effort. Now the same shape scales with speed:
+      // 178 deg in 0.34 s is n 0.52 at 8 rad/s, 0.65 at 16, 0.77 (a smash) at 24, 1.0 at 32. The speed part reads the rate x sqrt(RATE_GAIN):
+      // a phone is heavier and nobody whips it round like an earbud, but half the gain (in log terms) still makes a smash a real effort on it. ROM_T_MIN/ROM_T_FULL no longer score (test/effort.mjs and web/strokes.js still read them).
+      const powerOf = (pk, rom, rise) => { const g = pk * c.RATE_GAIN, romC = clamp((rom / DEG - c.ROM_MIN) / (c.ROM_FULL - c.ROM_MIN), 0, 1);
+        const easy = c.EASY * (c.EASY_F0 + (1 - c.EASY_F0) * clamp((g - c.EASY_R[0]) / (c.EASY_R[1] - c.EASY_R[0]), 0, 1)) * (1 - (1 - romC) ** 2) * clamp((rise - c.EASY_T[0]) / c.EASY_T[1], 0, 1);
+        const e = clamp((pk * Math.sqrt(c.RATE_GAIN) - c.PACE_R[0]) / (c.PACE_R[1] - c.PACE_R[0]), 0, 1), pace = (1 - c.EASY) * romC * clamp((rise - c.PACE_T[0]) / c.PACE_T[1], 0, 1) * e * e;
+        return c.TAP + (c.POWER_MAX - c.TAP) * (easy + pace); };
       // back / off (serves, NOTES 40): how far from the resting aim the hand was when this movement began (deg), and whether the
       // swing is heading back toward it (1) or away (-1). A wind-up leaves the resting aim; the stroke comes back through the ball.
       const aimed = () => { const f = sw.from, off = Math.hypot(f.yaw, f.pitch), vy = -sw.sum[1], vp = sw.sum[0], v = Math.hypot(vy, vp);
@@ -323,8 +334,8 @@ export class MotionModel {
         return Math.max(powerOf(sw.peak, sw.romPk + rate * lead, sw.tPk - sw.mv0 + lead), H ? powerOf(sw.peak, this.ang - sw.ang0 + rate * H, el + H) : 0); };
       if (!sw.sent && (past || this.accM >= c.SNAP_HI || t - sw.tI >= c.EARLY_T - 1e-4)) {
         sw.sent = true; sw.fixed = past; sw.tFix = t;
-        // every swing counts; how much ARM went into it decides the power. A quick wrist flick is a soft tap (a dink),
-        // never a smash, however fast it was.
+        // every swing counts; how much ARM went into it decides how far up to a drive it goes, and only SPEED on top of a real arm
+        // stroke makes a smash. A quick wrist flick is a soft tap (a dink), never a smash, however fast; a slow sweep, however wide, is a drive.
         sw.eff = call(); Object.assign(sw, shot());
         ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, roll: sw.roll || 0, turn: sw.turn || 0, curl: sw.curl || 0, back: sw.back, off: sw.off, age, final: past });
       } else if (sw.sent && !sw.fixed) {                              // the call moved, or the real peak is in and the call was off

@@ -42,8 +42,7 @@ if (F0 < 0 || F1 < F0 || F2 < F1) throw new Error('server/game.js: the solver mo
 const pre = SRC.slice(F0, F1).replace(/^const httpServer[\s\S]*?^\}\);$/m, ''), fns = SRC.slice(F1, F2);   // (constants .. helpers .. solve/fly; no sockets)
 export const server = new Function(pre + '\n' + fns + '\nreturn { underhand, sliced, shotKind, solve, gOf, COURT, SMASH };')();
 const chopRule = /m\.chop, 0\), 0, 1\) > ([\d.]+) && pw > ([\d.]+)\) pw = Math\.min\(1, pw \+ ([\d.]+)\)/.exec(SRC);
-if (!chopRule) throw new Error('server/game.js: the overhead bonus moved');
-export const [CHOP, CHOP_N, CHOP_ADD] = chopRule.slice(1).map(Number);
+export const [CHOP, CHOP_N, CHOP_ADD] = chopRule ? chopRule.slice(1).map(Number) : [0.45, 0.55, 0];   // the server's overhead bonus, if it has one (gone since NOTES 79: + 0)
 const MAIN = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8');
 const a0 = MAIN.indexOf('const roll = Math.max('), a1 = MAIN.indexOf("game.send({ type: 'swing'", a0);
 if (a0 < 0 || a1 < 0) throw new Error('web/main.js: the swing maths moved');
@@ -187,7 +186,7 @@ function toEuler(q) {                              // inverse of padmotion's eul
 
 // ---------- one settled swing event -> what the server does with it ----------
 export function derive(e, grip = 'airpod', { client = clientOf, srv = server, chopRule = [CHOP, CHOP_N, CHOP_ADD] } = {}) {
-  const gain = GRIPS[grip].gain, power = e.power * gain, sp = client(e);
+  const power = e.power, sp = client(e);                                        // the phone's gain is applied inside motion.js (RATE_GAIN, NOTES 79), not to the power
   const n0 = clamp((power - 6) / 28, 0, 1), n = clamp(e.chop || 0, 0, 1) > chopRule[0] && n0 > chopRule[1] ? Math.min(1, n0 + chopRule[2]) : n0;
   const lob = sp.lob, slice = sp.slice, u = srv.underhand(lob), spin = srv.sliced(slice, lob), kind = srv.shotKind(n, lob, slice);
   const py = 1.0, sol = srv.solve([0, py, 6.5], 0, n, clamp(e.dir || 0, -1, 1), lob, slice), g = srv.gOf(sol.spin);
@@ -198,7 +197,7 @@ export function derive(e, grip = 'airpod', { client = clientOf, srv = server, ch
 
 // ---------- run a stroke through MotionModel ----------
 export function runStroke({ stroke, grip = 'airpod', seed = 1, modelOpts = {}, client, srv, noise } = {}) {
-  const syn = synthStroke(stroke, { grip, seed, noise }), m = new MotionModel(modelOpts);
+  const syn = synthStroke(stroke, { grip, seed, noise }), m = new MotionModel({ RATE_GAIN: GRIPS[grip].gain, ...modelOpts });
   const swings = []; let cur = null, calAt = null;
   for (const s of syn.samples) {
     for (const e of m.feed({ t: s.t, q: s.q, r: s.r, a: s.a }, s.t * 1000 + 7)) {
