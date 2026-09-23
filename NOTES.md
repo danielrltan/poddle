@@ -1132,3 +1132,18 @@ Asked for: a small notice in the top-right corner when someone starts watching y
 - Measured: curve.test's new check (sideways speed never steps against the curl after the re-aim) is 0.00 m/s, and fails at
   0.30 on 71's code. Bow from contact 0.46 - 0.48 m (was 0.45 - 0.5), landing 0.01 m off the moved marker. reaim.mjs: curled
   hits' sharpest kink p50 0.19 m/s (71: 0.79), straight hits unchanged (p50 0.13). coast, badwifi, bet, kitchen pass.
+
+## 70. The X's hold ring stands clear of the button, so it turns around your thumb
+- "The outline around the X needs to be separated from it — that way you can see it circle around your thumb."
+- 67 put the ring .4rem outside the button: 53 px round a 44 px button, about 4 px of daylight. A thumb held on the button
+  covers all of it, so the one moment the ring exists is the one moment you cannot see it. The gap has to beat a thumb's
+  width, not merely exist.
+- Now 112 px round the 44 px button — 34 px clear the whole way round — with a faint track under the arc so the groove it
+  runs in is visible too. Track and arc both appear only while held; nothing rings the button at rest.
+- The button moved up to 2.75rem so the ring's bottom clears the screen edge by 10 px, and the live view reserves 8rem
+  (7.75rem on a short phone) so the ring's top half never lands on the notes above. Measured at 844, 740 and 667 px tall:
+  ring 112 px, gap 34 px, 10 px clear of the bottom, zero overlaps with anything in the view.
+- Fixed while measuring: at the sideways breakpoint (max-height 520) the X is `position:static`, which stopped it being
+  the ring's containing block — the ring sized itself against a far ancestor instead and came out 438 px wide, straight
+  over the content. `position:relative` sits in the flow identically and keeps the ring anchored. 112 px there too now.
+- The whole thing is inside the button, `pointer-events:none`, so a bigger ring never grows the tap target.

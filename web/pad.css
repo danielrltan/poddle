@@ -45,23 +45,30 @@ body[data-link="wait"] .ring{border-color:var(--warn)}
 /* The X that ends the session: low and down the MIDDLE, never in a corner — a hand wrapped round the phone rests on the
    corners, and this must not sit under a palm all rally. Pinned near the bottom (clear of the home bar) so it is in the
    same place on every phone, with the live view padded to match so nothing is ever under it. 2.75rem: a real target. */
-.btn-x{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + env(safe-area-inset-bottom));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5}
-[data-name="live"]{padding-bottom:5.5rem}
+.btn-x{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(2.75rem + env(safe-area-inset-bottom));width:2.75rem;height:2.75rem;display:grid;place-items:center;padding:0;border-radius:50%;border:.125rem solid var(--line-soft);background:transparent;color:var(--ink-soft);z-index:5}
+[data-name="live"]{padding-bottom:8rem}
 /* A short phone: tighten the live view so everything, the X included, still fits without scrolling. */
-@media (max-height:760px){[data-name="live"]{gap:.6rem;padding-bottom:4.5rem}[data-name="live"] .ring{width:8.5rem;height:8.5rem}[data-name="live"] .ring b{font-size:1.25rem}}
+@media (max-height:760px){[data-name="live"]{gap:.6rem;padding-bottom:7.75rem}[data-name="live"] .ring{width:8.5rem;height:8.5rem}[data-name="live"] .ring b{font-size:1.25rem}}
 /* Shorter than the live view itself (a phone turned sideways): there is no room to hold a strip at the bottom, and pinning
    the X there would drop it on the Calibrate again / Re-center row. It goes back into the flow, last, and the page scrolls
    to it — as this page already did at that height. */
-@media (max-height:520px){.btn-x{position:static;transform:none;margin:1.25rem auto .5rem}[data-name="live"]{padding-bottom:0}}
+@media (max-height:520px){.btn-x{position:relative;transform:none;margin:1.75rem auto 1rem}[data-name="live"]{padding-bottom:0}}
 .btn-x svg{width:1.15rem;height:1.15rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
-/* Holding the X draws a ring around it, wider than the button itself, so the wait reads as progress instead of as nothing
-   happening (NOTES 67). .btn-hold's own indicator is a left-to-right bar — on a round button that reads as a smudge, so the
-   X opts out of it and uses the ring. Released: no transition, so the ring snaps back rather than slowly unwinding. */
+/* Holding the X turns a ring, so the wait reads as progress instead of as nothing happening (NOTES 67, the gap in 70).
+   .btn-hold's own indicator is a left-to-right bar — on a round button that reads as a smudge, so the X opts out of it.
+   The ring stands well clear of the button — 112 px round a 44 px button, so 34 px of daylight the whole way round —
+   because a thumb covers the button while you hold it. The point is to watch it turn AROUND your thumb, not under it,
+   so the gap has to beat a thumb's width, not just be visible. The button sits 2.75rem up to let the ring's bottom
+   clear the screen edge, and the live view reserves 8rem so the ring's top half never lands on the notes.
+   Released: no transition, so it snaps back rather than slowly unwinding. */
 .btn-x.btn-hold{overflow:visible} .btn-x.btn-hold::before{display:none}
-.btn-x .hold-ring{position:absolute;inset:-.4rem;width:auto;height:auto;overflow:visible;pointer-events:none;transform:rotate(-90deg)}
-.btn-x .hold-ring circle{fill:none;stroke:var(--line);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:138.2;stroke-dashoffset:138.2;transition:none}
-.btn-x.is-held .hold-ring circle{stroke-dashoffset:0;transition:stroke-dashoffset .7s linear}
-.btn-x.is-done{border-color:var(--good)} .btn-x.is-done .hold-ring circle{stroke:var(--good);stroke-dashoffset:0}
+.btn-x .hold-ring{position:absolute;inset:-2.25rem;width:auto;height:auto;overflow:visible;pointer-events:none;transform:rotate(-90deg)}
+.btn-x .hold-ring circle{fill:none;stroke-width:1.8;stroke-linecap:round;transition:none}
+.btn-x .hold-track{stroke:var(--line-soft);opacity:0}                                   /* the groove it runs in: only while held, so nothing rings the button at rest */
+.btn-x .hold-arc{stroke:var(--line);stroke-dasharray:138.2;stroke-dashoffset:138.2}
+.btn-x.is-held .hold-track{opacity:.4}
+.btn-x.is-held .hold-arc{stroke-dashoffset:0;transition:stroke-dashoffset .7s linear}
+.btn-x.is-done{border-color:var(--good)} .btn-x.is-done .hold-arc{stroke:var(--good);stroke-dashoffset:0}
 @media (prefers-reduced-motion:reduce){body{transition:none}}
 
 /* Always dark (NOTES 39): the phone is in your hand, near your eyes, while you watch the big screen. A bright page flashing
