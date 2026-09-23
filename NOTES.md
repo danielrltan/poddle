@@ -1302,3 +1302,38 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   nothing under ~19 phone rad/s can smash). It is still a speed meter, not the game's call.
 - Phone: the speed part takes only sqrt(1.5) = 1.22 of the gain, a guess between "a smash is the same physical rate" (the phone
   might never get there: "nobody whips a phone round at 30 rad/s") and the full gain (relaxed phone strokes smashing again). Unmeasured: record a phone session.
+
+## 83. Spin is deliberate: a real wrist cut, scaled by how fast you swing
+- "It's super easy to effortlessly put spin on things even when I'm not trying to slice at all... dial back that spin
+  distribution, hone in on a SLIGHTLY more slicing motion, and that can also variably ramp up in strength by motion strength /
+  speed." Measured before (test/spin.mjs, 63 real strokes of the four recordings): the median stroke left with spin 0.26, 92 %
+  drew the swirl, 27 % flew as a slice, 51 % kicked more than 0.8 m/s sideways off the bounce, and the no-slice set
+  (live-swings: flicks and wide arm swings only) had 50 % over 0.3. Spin did NOT follow speed (median 0.24 under 9 rad/s, 0.33
+  over 27). Two leaks: `turn` is a path integral of axis wander, so any long or fast swing built it up (0.77 rank correlation with
+  raw rad/s); and a plain wrist roll of 0.3-0.5 already earned 0.2-0.45. A smash's pronation read as spin too (synthetic 0.67).
+- web/main.js only. Intent first: |roll| through a soft knee 0.40 -> 0.58 (ordinary strokes sit at 0-0.46, a real slice
+  0.50-0.62), or |curl| PER RADIAN swept (knee 0.35 -> 0.60) in place of `turn`. Roll that comes with a downward chop
+  (0.5 -> 0.8) is overhead pronation and is faded out, so a smash leaves clean. Then speed scales what the intent earns:
+  x0.85 at 8 rad/s up to x1.40 at 20 (e.raw, the raw peak; not power, which the smash work owns). The 0.85 floor is for the
+  phone: e.raw is unscaled for it and a phone is swung slower; a forehand slice at raw/1.5 still reads 0.48, a slice 3/5.
+  Still CONTINUOUS (18/19): no gate, the knee plus the speed scale spread it p75 0.13 -> p90 0.91.
+- After, same 63 strokes: p25/p50/p75/p90 0/0/0.13/0.91 (was 0.13/0.26/0.55/0.80); exactly 0: 71 % (was 5 %); swirl 29 %
+  (was 92 %); labelled slice 17 % (was 27 %); kick > 0.8 m/s 22 % (was 51 %). No-slice set: over 0.3 0 % (was 50 %), labelled
+  slice 0 % (was 10 %), swirl 20 % (was 100 %). Synthetic drives 0.00; synthetic smash 0.17-0.20 (was 0.67); forehand slice
+  0.54/0.55 AirPod/phone (was 0.45/0.46), slice 3/5; backhand slice 0.96; a light 60 % slice is now 0 (intended). At a fixed roll
+  of 0.52 the spin ramps 0.63 at 8 rad/s, 0.78 at 12.5, 1.0 at 27; across all strokes the rank correlation with speed stays ~0,
+  because the roll share falls as speed rises: the ramp shows only at fixed intent.
+- Unchanged: server sliced()/SLICE/CURVE, scene.js SPUN, the bots' 0.9, the roll lob veto below the block (55 holds: a backhand
+  slice still never lobs). test/slice.test.mjs passes as is.
+- Costs: the purple smash ring (spin > 0.3) will rarely fire now (13 and 50-53 said a smash keeps its spin). Re-aims on the
+  settled report rise, about 12 -> 16 of 63 in the audit that picked this rule (bet vs settled spin differing by > 0.2, game.js re-aim): early bets see the roll share still building. The rule reads e.chop and e.rom, so re-check
+  with `node test/spin.mjs` if motion.js changes how chop is measured. The hard-drive AIR curl (71/72) is gated on power, not
+  spin, and still bends 22 % of real strokes (60 % of the no-slice set); players may read it as spin.
+- Early bets (review fix): the hit launches on the EARLY report (e.final false, 20-80 deg swept), whose roll share is mostly
+  wind-up pronation. Ungated, the new rule gave 0.6-0.9 spin to 10 of 63 real strokes that settle at 0 (the old rule: 0), so
+  the ball left spinning and was un-spun by the re-aim, or kept it past FIX_WINDOW. A bet now earns spin only as it sweeps
+  60 -> 100 deg (`bet`); settled reports are untouched. Spurious bet spin 10 -> 0, bet-vs-settled differences > 0.2 16 -> 14;
+  the cost is that 12 real slices leave flat on the bet and gain their spin from the settled re-aim (inside 0.25 s).
+- test/spin.mjs is the audit: it replays the recordings with the client's and server's own maths (sliced out of their files),
+  prints ingredients, correlations, what the player sees, and the synthetic lobsynth anchors; `--candidate x.mjs` scores a
+  rival rule side by side.

@@ -355,15 +355,19 @@ function onSample(sample, from) {
         setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve!', null, 2600); }, 380); }, 900); }     // after the fade
     else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
       if (!calibrating && !spec() && seated() && !frozen && !holding) {      // a paused or held room takes no swings
-        // Spin comes from the wrist rolling through the ball or from a curved "C" shaped swing, whichever is stronger. Its
-        // sign says which way the ball breaks off the bounce. (How level the paddle is held is NOT used: this player rests
-        // the AirPod flat in the hand, so it read "level" nearly all the time and made every shot a slice.)
-        // The amount is CONTINUOUS (docs/NEXT.md 3b): every hit carries its own spin, linear from what a plain swing does
-        // (roll 0.12, turn 0.3) to the most the wrist gives (roll 0.95, turn 2.9). The old gates (0.6, 1.2) left 76 % of real
-        // strokes at exactly zero and 16 % at 0.8+. Now p50 0.27, p75 0.55, and 27 % read as a slice (> 0.5 on the server).
-        // (2.9, not 2.6: every swing now ends in its settled report, whose turn has had longer to add up. Measured on those: 2.6 gave 29 %.)
-        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.12) / 0.83)), curve = Math.max(0, Math.min(1, ((e.turn || 0) - 0.3) / 2.6));
-        const amount = Math.max(roll, curve), way = curve >= roll && Math.abs(e.curl || 0) > 0.05 ? Math.sign(e.curl) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
+        // Spin is DELIBERATE: intent x speed. Intent is a wrist roll through the ball clearly past what a plain stroke does
+        // (|roll| is the stroke's share of rotation about the forward axis: ordinary strokes 0-0.46, a real slice 0.50-0.62), a soft
+        // knee from 0.40 to full at 0.58; or a consistent sideways curl PER RADIAN swept (|curl|/rom, knee 0.35-0.60). The old `turn`
+        // term is gone: a path integral of axis wander, it grew with any long or fast flick and gave spin to strokes nobody cut.
+        // Roll that comes with a downward chop (0.5 -> 0.8) is overhead pronation, not a cut, so a smash leaves clean.
+        // Speed then scales what the intent earns: x0.85 at 8 rad/s up to x1.40 at 20 (raw peak, not power; the 0.85 floor keeps a
+        // slower phone swing's slice a slice). Sign: which way the ball breaks off the bounce. (How level the paddle is held is NOT used.)
+        // Measured (test/spin.mjs, 63 real strokes): 71 % leave with no spin (was 5 %), 29 % show the swirl (was 92 %), 17 % read as a
+        // slice (was 27 %); the flicks-and-wide-swings set: 0 % over 0.3 (was 50 %). Same roll 0.52: 0.63 at 8 rad/s, 0.78 at 12.5, 1.0 at 27.
+        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.40) / 0.18)), over = Math.max(0, Math.min(1, ((e.chop || 0) - 0.5) / 0.3)), cut = Math.max(0, Math.min(1, (Math.abs(e.curl || 0) / Math.max(0.8, (e.rom || 0) * Math.PI / 180) - 0.35) / 0.25));
+        const knee = t => t * t * (3 - 2 * t), rollI = knee(roll) * (1 - knee(over)), curve = knee(cut), speed = 0.85 + 0.55 * Math.max(0, Math.min(1, ((e.raw || 0) - 8) / 12));
+        const bet = e.final === false ? Math.max(0, Math.min(1, ((e.rom || 0) - 60) / 40)) : 1;   // an early report (a bet, 20-80 deg swept) reads mostly wind-up pronation: ungated it gave 0.6-0.9 spin to 10 of 63 real strokes that settle at 0. A bet earns spin only once it has swept 60-100 deg; the settled report re-aims a real slice (sliced diff > 0.2)
+        const amount = Math.min(1, Math.max(rollI, curve) * speed * bet), way = curve > rollI ? Math.sign(e.curl || 0) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);
         const slice = amount * (way || 1);
         // A lob is meant (docs/NEXT.md 2). motion.js measures it on the HAND's path now, so a curved low-to-high drive (it only ends
         // going up) and a backhand's face-opening roll no longer read as scoops, and a wide underhand is no longer faded out by its curve
