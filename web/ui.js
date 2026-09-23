@@ -295,7 +295,7 @@ let setOpen = false, setH = {}, sinkSig = '';
 // but the browser will not name a single audio device until the page holds MICROPHONE permission — measured, and a camera
 // grant does NOT do it (NOTES 64). denied: they said no, and only the browser's own site settings can undo that.
 const SINK_HINT = { browser: 'This browser can’t move the game’s sound. Choose your speakers in System Settings › Sound.',
-  devices: 'Your browser only names your speakers once this page has audio permission. Nothing is recorded — the microphone is released the moment the list is read.',
+  devices: 'Allow audio once so the browser can list your speakers. Nothing is recorded.',
   denied: 'Audio permission is blocked, so your speakers can’t be listed. Allow it for this site in your browser, or choose them in System Settings › Sound.' };
 export function onSettings(h) { setH = h || {}; }                                       // { open(), close(), sens(dir), airpod(on), stats(on), recenter(), leave(), name(text), move(mode), paddle(kind), bot(level), sound(on), sink() }
 export function settings(open) {

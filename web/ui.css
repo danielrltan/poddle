@@ -622,7 +622,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
    server pauses instead, and then the one shared blur layer (.glass) comes up behind it: nothing is being played.
    ========================================================================================================== */
 /* --set-top: ui.js measures it on open. Under the hamburger on a wide window; on a narrow one also under the room code and the scoreboard, which it would otherwise cover */
-.settings{--set-top:calc(var(--edge) + 3.25rem);position:fixed;left:var(--edge);top:var(--set-top);z-index:calc(var(--z-screen) - 1);width:min(23rem, calc(100vw - 2 * var(--edge)));max-height:calc(100vh - var(--set-top) - var(--edge));overflow-y:auto;
+.settings{--set-top:calc(var(--edge) + 3.25rem);--set-floor:0rem;position:fixed;left:var(--edge);top:var(--set-top);z-index:calc(var(--z-screen) - 1);width:min(23rem, calc(100vw - 2 * var(--edge)));max-height:calc(100dvh - var(--set-top) - var(--edge) - var(--set-floor));overscroll-behavior:contain;overflow-y:auto;
   display:flex;flex-direction:column;gap:.625rem;padding:.875rem .875rem .875rem;border-radius:var(--r-lg);border-width:.15625rem;text-align:left;outline:0;
   background:linear-gradient(180deg,rgba(246,250,252,.84),rgba(231,241,246,.74));box-shadow:var(--sh-3), inset 0 0 0 .125rem rgba(255,255,255,.9);animation:panel-in var(--d-med) var(--ease-out) both}
 /* Show stats is switched from this card, so the stats step out from under it while it is open: beside it, below the scoreboard */
@@ -655,7 +655,14 @@ button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--lin
 .set-switch i{flex:none;position:relative;width:3.25rem;height:1.875rem;border-radius:var(--r-pill);background:var(--sky-4);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3);transition:background var(--d-fast) linear}
 .set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform var(--d-fast) var(--ease-out)}
 .set-switch[aria-checked="true"] i{background:linear-gradient(180deg,var(--line),var(--line-deep))} .set-switch[aria-checked="true"] i::after{transform:translateX(1.375rem)}
-.settings > .btn{width:100%;height:2.875rem;margin:0}
+.settings > *{flex-shrink:0}      /* the card scrolls; it never squeezes a row (it squashed Leave court to 13 px in a short window) */
+.set-foot{position:sticky;bottom:-.875rem;z-index:1;display:flex;flex-direction:column;gap:.5rem;margin:0 -.875rem -.875rem;padding:.75rem .875rem .875rem;
+  border-radius:0 0 var(--r-lg) var(--r-lg);background:linear-gradient(180deg,rgba(236,244,248,0),rgba(236,244,248,.96) .75rem)}      /* pinned under the list, a soft fade where the rows scroll beneath it */
+.set-foot:not(:has(> :not([hidden]))){display:none}      /* nothing to leave and nothing to say: no empty strip */
+body[data-paused] .set-foot{background:linear-gradient(180deg,rgba(231,241,246,0),#e9f2f7 .75rem)}
+.set-foot .btn{width:100%;height:2.875rem;margin:0;flex:none}
+body:not([data-screen="hud"]) .settings{--set-floor:4.75rem}
+@media (max-width:520px){.settings{width:calc(100vw - 2 * var(--edge))}}      /* a phone: the whole width, not a 23rem card that 10px rems shrink to 230 px */      /* every menu screen has a footer bar: the card stops above it instead of running under it */
 .set-pick{flex-wrap:wrap;row-gap:.25rem;padding:.4375rem .5rem .4375rem .875rem} .set-pick small{flex-basis:100%;font-size:var(--t-xs);font-weight:700;color:var(--warn-deep)}      /* Move, Difficulty: a small segmented control in the row */
 .seg-sm{padding:.1875rem;gap:.125rem;margin-left:auto} .seg-sm .seg-opt{height:2.125rem;min-width:0;padding:0 .75rem;font-size:var(--t-sm);border-width:.125rem} .seg-sm .seg-opt:disabled{opacity:.4;cursor:default}
 .set-wide{padding:.4375rem .5rem} .set-wide .seg-sm{margin-left:0;flex:1} .set-wide .seg-opt{flex:1}      /* the paddle switch: the whole width, it is the group's first question */

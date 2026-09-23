@@ -1177,3 +1177,16 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   there. dress() reads scene.setSelfBody()'s flag every frame, so a spectator looking through a player's eyes gets their own
   setting for that view.
 - test/scene-next.mjs now expects no forearm with the model on (the default), and passes. Rendered both ways in the preview.
+
+## 77. The settings card scrolls instead of squashing, and Leave court is pinned to its foot
+- "The leave court button gets squished with all the settings." The card is a flex column capped at the window's height, and
+  flex items shrink by default: once the list (Name, Paddle, Match, Sound, Screen) outgrew a 720 px window, the browser squeezed
+  every row to fit and Leave court came out 18 px tall (13 px at 900x560).
+- Now nothing in the card shrinks (`.settings > * { flex-shrink: 0 }`): the list scrolls, with `overscroll-behavior: contain` so it
+  never scrolls the page. Leave court and the "Online games can't pause" note sit in `.set-foot`, sticky at the bottom of the card
+  with a soft fade where the rows pass under it: always visible, always full size (39 px at 1280x720, 30 at 900x560). With neither
+  showing the foot takes no room at all.
+- On a menu screen (anything but the HUD) the card stops above the screen's footer bar instead of running under it. On a phone
+  (<= 520 px wide) the card takes the whole width; it was a 230 px strip. The speaker hint is one sentence now ("Allow audio once so
+  the browser can list your speakers. Nothing is recorded.").
+- fixes-e2e (the mid-match Forfeit / Leave button) passes; menu.mjs fails exactly as on main.
