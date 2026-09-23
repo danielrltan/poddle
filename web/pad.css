@@ -5,6 +5,11 @@
 :root{--ink:#555e67;--ink-strong:#39434d;--ink-soft:#65717b;--bg:#dfeef6;--line:#34beed;--line-deep:#1a9fd0;--line-soft:#a9e0f6;--link:#0f7aa6;--ball:#e6f03c;--ball-deep:#b9c916;--good:#3ecf72;--good-deep:#13803f;--warn:#ffb534;
   --font:"Poddle Rounded",ui-rounded,"SF Pro Rounded","Arial Rounded MT Bold","Nunito","Helvetica Neue",Arial,sans-serif;color-scheme:light}
 *,*::before,*::after{box-sizing:border-box}
+/* Nothing on the page is selectable (a drag, a double-click or a long press mid-swing lit up text) EXCEPT what you type and the codes:
+   a code is meant to be copied, so one click takes all of it. NOTES 78. */
+html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+#start-code{-webkit-user-select:all;user-select:all;-webkit-touch-callout:default}
 html,body{height:100%}
 body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 45%,var(--bg) 100%) fixed;font:500 1.0625rem/1.5 var(--font);-webkit-font-smoothing:antialiased;
   -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;transition:background-color .12s}

@@ -15,6 +15,10 @@
   color-scheme:light;
 }
 *,*::before,*::after{box-sizing:border-box}
+/* Nothing on the page is selectable (a drag, a double-click or a long press mid-swing lit up text) EXCEPT what you type and the codes:
+   a code is meant to be copied, so one click takes all of it. NOTES 78. */
+html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 22rem,var(--bg) 44rem) no-repeat;
   font:500 1.0625rem/1.6 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}

@@ -1209,3 +1209,13 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   setPing / backLabel`. A missing *named* export fails the whole module graph at link time, so `window.__calls` never
   existed and the run died on its first assertion. Stubs added; part B runs again and 5 older failures in it are now
   visible (settings panel rows, sensitivity keys, the lob gate in 2) — those are somebody else's to chase.
+
+## 78. Nothing is selectable except the codes (and what you type)
+- "Make everything EXCEPT codes across the website and phone paddle website unselectable." `user-select: none` (and no iOS
+  long-press callout) on the whole of index.html, pad.html, how-to-play.html and 404.html. Inputs, selects and textareas stay
+  `text`, or you could not type a name or a code (iOS will not focus an input that inherits `none`).
+- The codes are `user-select: all`, so one click or tap selects the whole code for copying: the court code (#room-code in the
+  room pill, #title-room-code on the title chip, the share boxes), the share link, the phone's pairing code on the computer
+  (#pad-code) and on the phone (#start-code).
+- Checked in headless Chrome: computed user-select is none for body text and headings on all four pages, all on every code,
+  text on every input.
