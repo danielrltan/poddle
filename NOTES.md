@@ -1116,3 +1116,19 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   hooks inward and grows with n. Live: the above (a bet settled at full power bows >= 0.45 m from contact), plus a full-power
   lob and a power-20 drive never carry c. "On the marker" live is sideways < 0.12 m and < 0.3 m in all: the 60 Hz sim sees the
   landing a tick late, up to ~0.25 m along a fast drive whether it curls or not, and a 0.2 m limit failed ~5% of finals.
+
+## 72. A curled shot swoops once instead of zig-zagging (supersedes CURVE.late in 71)
+- "The spin curve isn't like a normal mid air curve to-point. It's like a zig zag, which just seems finicky and janky." A human's
+  shot only starts curling at the settled re-aim (~100 ms after contact). reaim() solved a banana for the flight that was left (start
+  c T / 2 wide of the line, hook back) and easeAim() eased the sideways speed OUT onto it over half the flight while the pull was
+  already hooking it IN: straight, jerk out, curve back. test/curve.test.mjs measured it: the sideways speed stepped 0.30 m/s per
+  packet against the curl, on every re-aimed curl.
+- Now the re-aim never touches the ball's sideways speed. The pull alone carries it from where it is, on the heading it has, to
+  the marker: c = 2 (land - x - vx T) / T^2, re-sized every ease tick as the height/depth ease moves T, so it still lands exactly.
+  It bends at least CURVE.swoop (0.4 m) of bow over the rest of the flight, the way solve() hooks it (in toward the middle), or more
+  if the settled aim needs more bend that same way. The marker moves to where that lands (clamped to |x| <= 2.5). A ball struck
+  already curling (a final swing, the bot) is unchanged: that banana is one bow from contact, no zig.
+- CURVE.late / lateMax are gone; solve() takes curl 0 or 1 again.
+- Measured: curve.test's new check (sideways speed never steps against the curl after the re-aim) is 0.00 m/s, and fails at
+  0.30 on 71's code. Bow from contact 0.46 - 0.48 m (was 0.45 - 0.5), landing 0.01 m off the moved marker. reaim.mjs: curled
+  hits' sharpest kink p50 0.19 m/s (71: 0.79), straight hits unchanged (p50 0.13). coast, badwifi, bet, kitchen pass.

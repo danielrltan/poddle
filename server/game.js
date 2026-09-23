@@ -87,15 +87,15 @@ const BOUNCE = { up: 0.7, along: 0.78 };
 // Then it bites: the first bounce stays low, loses most of its forward speed and kicks a little the way it was aimed.
 // lift is mirrored in web/scene.js SPUN (the client's coast() flies the same curve): change both or neither. skid is server-only.
 const SLICE = { lift: 0.3, skid: 0.12, up: 0.55, along: 0.45, kick: 3.4, clear: 0.15, at: 0.45 };   // kick: sideways m/s the bounce throws the ball — a spinning ball does not come off the floor straight. at: sliced() above this is CALLED a slice
-// Curl: the hardest flat drives bend in the air (NOTES 71). A constant sideways pull until the first bounce, like a second gravity
+// Curl: the hardest flat drives bend in the air (NOTES 71, 72). A constant sideways pull until the first bounce, like a second gravity
 // lying on its side, so every flight stays closed form: solve() starts the ball c T / 2 wide of its line and the bow brings it back
 // onto the marker, c T^2 / 8 off the chord at mid-flight. Sized for a bow of `bow` m (c = 8 bow / T^2, at most max m/s^2), smoothly
 // from n `from` to `full`. Its own threshold on purpose: SMASH and the trail colours may move, and a bet (capped at SMASH) never curls.
 // c rides on the hit / launch / state packets as `c`, so web/scene.js coast() needs no copy of these numbers.
-// late: a human's shot only starts curling at the settled re-aim (~100 ms in), and easeAim() spends half of what is left swinging it out
-// wide, so sized like a struck ball its bow from contact was 0.26 m at full power (one ball-width). reaim() asks for `late` x the bow,
-// capped at lateMax: ~0.45-0.5 m from contact over a 0.7-0.9 s flight. The ease's outward push is the price (reaim.mjs kink, NOTES 71).
-const CURVE = { from: 0.8, full: 0.97, bow: 0.6, max: 24, late: 2, lateMax: 30 };
+// swoop: a human's shot only starts curling at the settled re-aim (~100 ms in). It used to ease the ball out wide onto a banana and let
+// the pull hook it back: a zig then a zag (NOTES 72). Now reaim() keeps the ball's heading and one steady pull swoops it onto the
+// marker, at least a `swoop` m bow over the flight that is left (the marker moves to where that bow lands it; ~1.6 m off the tangent).
+const CURVE = { from: 0.8, full: 0.97, bow: 0.6, max: 24, swoop: 0.4 };
 // Serve: the ball hangs in the air and only drifts after the server when they walk away from it.
 const SERVE_AHEAD = 0.55;                 // it wants to sit this far in front of the paddle
 const SERVE_DEAD = [0.4, 0.2, 0.35];      // x,y,z slack: move this far from it and it stays exactly where it is
@@ -234,9 +234,9 @@ function solve(p, side, n, dir, lob, slice, blk, curl = 0) {   // curl: 1 lets a
   // curl: a lob, a slice-lifted float or a soft drive never bends. It hooks in toward the middle (a banana: it leaves wide and comes back):
   // a real slice bends the way it will kick, a ball to the middle away from the hitter's side, else the forehand way. Deterministic, so
   // the server's c is the only one there is. Curling inward also slows the ball sideways at the bounce, which only helps REACH below.
-  const w = smooth(n, CURVE.from, CURVE.full) * flat(lob) * (1 - u) * Math.min(curl, 1);   // curl > 1 (reaim's CURVE.late) scales the bow, not the ramp
+  const w = smooth(n, CURVE.from, CURVE.full) * flat(lob) * (1 - u) * curl;
   const cs = spin > SLICE.at && kick ? Math.sign(kick) : Math.abs(tx) >= 0.4 ? -Math.sign(tx) : Math.abs(px) >= 0.2 ? -Math.sign(px) : s;
-  const c = w > 0 ? cs * w * Math.min(curl > 1 ? CURVE.lateMax : CURVE.max, 8 * CURVE.bow * curl / (T * T)) : 0;   // inside the cap, so the REACH clamp below sees the real c T / 2
+  const c = w > 0 ? cs * w * Math.min(CURVE.max, 8 * CURVE.bow / (T * T)) : 0;   // inside the cap, so the REACH clamp below sees the real c T / 2
   v[0] -= 0.5 * c * T;                                         // starts wide of its line and the pull hooks it back onto the marker exactly at T
   const ta = lerp(BOUNCE.up, SLICE.up, spin) * (g * T - v[1]) / G, al = lerp(BOUNCE.along, SLICE.along, spin), k = al * ta / T, xc = tx + (tx - px) * k + (kick + al * c * T / 2) * ta;   // it lands moving (tx - px) / T + c T / 2 sideways
   const late = Math.max(Math.abs(v[0]), Math.abs(v[0] + c * T)) * DT;   // the 60 Hz sim lands up to a tick after this closed form, a tick further out: fast wide drives topped out at 3.27 m (test/server.test.mjs sweep allows 3.25)
@@ -294,21 +294,29 @@ function createRoom(code, pub) {
   }
 
   // A corrected power arrived just after the hit. Never swap the velocity: steer onto the new landing spot over FIX_EASE.
-  // curl: the settled swing is the first that may bend it (a bet never does), so a hard one curls from here: easeAim brings the
-  // velocity onto the curled path over the same share of the flight, and the pull runs from now. Sized CURVE.late x the flight that is
-  // left: the ease eats most of a bow sized to it alone, and the one that shows is the bow from contact.
+  // curl: the settled swing is the first that may bend it (a bet never does), so a hard one curls from here as ONE swoop: its sideways
+  // speed is never eased (that swung it out wide and the pull hooked it back, a zig-zag: NOTES 72). The pull alone carries it from where
+  // it is, on the heading it has, onto the marker: c = 2 (land - x - vx T) / T^2. At least CURVE.swoop m of bow, the way solve() hooks
+  // it (or more, if the settled aim needs more bend that same way); the marker says where that lands, kept on the court.
   function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
-    const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl && CURVE.late);
-    ball.aim = { land: sol.land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin) };
-    ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl;
-    planFootwork(1 - side, sol.v);
-    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, k: sol.kick, c: sol.curl, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
+    const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
+    let land = sol.land, v = sol.v;
+    if (sol.curl) {
+      const T = sol.T, x = ball.p[0], vx = ball.v[0], cReq = 2 * (land[0] - x - vx * T) / (T * T), cMin = Math.abs(sol.curl) * CURVE.swoop / CURVE.bow;
+      const c = Math.sign(cReq) === Math.sign(sol.curl) && Math.abs(cReq) >= cMin ? cReq : Math.sign(sol.curl) * cMin;
+      land = [clamp(x + vx * T + 0.5 * c * T * T, -2.5, 2.5), land[1]]; v = [vx, sol.v[1], sol.v[2]];
+      ball.curl = 2 * (land[0] - x - vx * T) / (T * T);
+    } else ball.curl = 0;
+    ball.aim = { land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, clear: lerp(0.25, SLICE.clear, sol.spin), swoop: !!sol.curl };
+    ball.spin = sol.spin; ball.kick = sol.kick;
+    planFootwork(1 - side, v);
+    broadcast({ type: 'launch', by: side, land, spin: sol.spin, k: sol.kick, c: ball.curl, n, kind });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
   }
   const aimV = [0, 0, 0];
   function easeAim() {
     const a = ball.aim;
     a.T = fly(aimV, ball.p[0], Math.max(ball.p[1], R), ball.p[2], a.land[0], a.land[1], Math.max(a.T, 0.1), gOf(ball.spin), a.clear);
-    aimV[0] -= 0.5 * ball.curl * a.T;                                         // the curl's own offset, from here: the last share still lands on the marker
+    if (a.swoop) { aimV[0] = ball.v[0]; ball.curl = 2 * (a.land[0] - ball.p[0] - ball.v[0] * a.T) / (a.T * a.T); }   // sideways: never eased, the pull alone swoops it in (re-sized as the ease moves T, so it still lands on the marker)
     for (let i = 0; i < 3; i++) ball.v[i] += (aimV[i] - ball.v[i]) / a.k;   // equal shares: the last one lands exactly on the solution
     a.T -= DT;
     if (--a.k <= 0) { ball.aim = null; planFootwork(1 - a.side); }

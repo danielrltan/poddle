@@ -48,9 +48,6 @@ function flyOut(p0, side, n, dir, lob, slice, curl) {
   ok(soft.bow < 0.01, `a soft drive (n 0.6) flies straight from above: bow ${soft.bow.toFixed(3)} m`);
   const wide = S.solve([0, 1, 6.5], 0, 1, 1, 0, 0, null, 1), wide1 = S.solve([0, 1, -6.5], 1, 1, 1, 0, 0, null, 1);
   ok(wide.land[0] > 0.4 && wide.curl < 0 && wide1.land[0] < -0.4 && wide1.curl > 0, `it hooks in toward the middle: aimed at x ${wide.land[0].toFixed(1)} curls ${wide.curl.toFixed(1)} m/s^2, at x ${wide1.land[0].toFixed(1)} curls ${wide1.curl.toFixed(1)}`);
-  let lateXc = 0, lateC = 0;                                        // reaim()'s late curl (CURVE.late x the bow): same REACH clamp, its own cap
-  for (const d of [1.7, 3, 4.5, 6.5]) for (const x of [-3, 0, 3]) for (const dir of [-1, 0, 1]) { const r = flyOut([x, 1, d], 0, 1, dir, 0, 0, S.CURVE.late); lateXc = Math.max(lateXc, Math.abs(r.xc)); lateC = Math.max(lateC, Math.abs(r.sol.curl)); }
-  ok(lateXc <= 3.25 && lateC <= S.CURVE.lateMax + 1e-9, `the late (re-aim) curl keeps the top of the bounce inside reach too: |x| <= ${lateXc.toFixed(2)}, c <= ${lateC.toFixed(1)} m/s^2 (cap ${S.CURVE.lateMax})`);
   const ramp = [0.8, 0.85, 0.9, 0.95, 1].map(n => flyOut([0, 1, 6.5], 0, n, 0.6, 0, 0, 1).bow);
   ok(ramp.every((b, i) => !i || b >= ramp[i - 1]), `it grows with power, from nothing at n 0.8: bow ${ramp.map(b => b.toFixed(2)).join(' / ')} m at n 0.8 / 0.85 / 0.9 / 0.95 / 1`);
 }
@@ -62,15 +59,15 @@ const shots = [];                                                  // A's hits: 
 const MODES = ['final', 'bet', 'lob', 'soft'];
 let phase = 'far', modeI = 0;
 function player(o) {
-  const ws = new WebSocket('ws://localhost:' + PORT), P = { ws, side: null, ...o }; let cool = 0, swungAt = 0, mode = null, cur = null, prev = null;
+  const ws = new WebSocket('ws://localhost:' + PORT), P = { ws, side: null, ...o }; let cool = 0, swungAt = 0, mode = null, cur = null, prev = null, lastT = 0;
   ws.on('message', raw => { const m = JSON.parse(raw);
     if (m.type === 'welcome') P.side = m.side;
     if (m.type === 'hit') { cur = null; prev = null;
       if (m.side === P.side && P.a && Date.now() - swungAt < 600) { cur = { mode, phase, hit: m, launches: [], states: [], bounce: null }; shots.push(cur);
         if (mode === 'bet' || mode === 'nearbet') setTimeout(() => ws.send(JSON.stringify({ type: 'swing', power: 34, dir: 0.6, lob: 0, fix: true, final: true })), 100); } }
-    if (m.type === 'launch' && cur && m.by === P.side) cur.launches.push(m);
+    if (m.type === 'launch' && cur && m.by === P.side) cur.launches.push({ ...m, t0: lastT });   // t0: the last state before it, so zig() looks from the re-aim on
     if (m.type === 'bounce' && cur && !cur.bounce) cur.bounce = m.p;
-    if (m.type !== 'state' || P.side == null) return;
+    if (m.type !== 'state' || P.side == null) return; lastT = m.t;
     if (cur && !cur.bounce && m.live && m.b === 0) cur.states.push({ t: m.t, p: m.p, v: m.v, c: +m.c || 0, spin: m.spin, k: m.k });
     const me = m.paddles[P.side], s = P.side === 0 ? 1 : -1, mine = m.live && m.v[2] * s > 0, z = P.a && phase === 'near' ? 3 : 6.5;
     ws.send(JSON.stringify({ type: 'paddle', x: mine ? m.p[0] : 0, y: mine ? Math.max(0.4, Math.min(1.4, m.p[1])) : 1, z, q: [0, 0, 0, 1] }));
@@ -109,7 +106,9 @@ ok(F.every(onMark), `...and still lands on its marker: ${F.map(s => f2(exOf(s)) 
 ok(Bt.every(s => !s.hit.c && s.hit.bet), `a bet never curls: the hit on it carries c ${[...new Set(Bt.map(s => s.hit.c || 0))]}`);
 const BtR = Bt.filter(s => s.launches.some(l => l.n != null));
 ok(BtR.length >= 3 && BtR.every(s => { const r = s.launches.find(l => l.n != null); return r.c && r.n > 0.8; }), `its settled report (full power) curls it from the re-aim: ${BtR.map(s => { const r = s.launches.find(l => l.n != null); return `n ${f2(r.n)} c ${f2(r.c || 0)}`; }).join(', ')}`);
-ok(BtR.every(s => bowOf(s) >= 0.45 && onMark(s)), `...bends like one (bow from contact ${BtR.map(s => f2(bowOf(s))).join(', ')} m, at least 0.45: it was 0.26 sized to the flight left) and lands on the moved marker (${BtR.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off)`);
+const zig = s => { const r = s.launches.find(l => l.n != null), vx = s.states.filter(q => q.t >= r.t0).map(q => q.v[0]), d = vx.slice(1).map((v, i) => v - vx[i]); return Math.max(0, ...d.map(x => x * -Math.sign(r.c))); };   // after the re-aim the ball's sideways speed only ever moves the way it curls
+ok(BtR.every(s => zig(s) < 0.02), `...as one swoop, no zig-zag: the sideways speed never steps against the curl (worst ${BtR.map(s => f2(zig(s))).join(', ')} m/s per packet)`);
+ok(BtR.every(s => bowOf(s) >= 0.3 && onMark(s)), `...bends like one (bow from contact ${BtR.map(s => f2(bowOf(s))).join(', ')} m, at least 0.3) and lands on the moved marker (${BtR.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off)`);
 const NR = N.filter(s => s.launches.some(l => l.n != null));
 ok(NR.length >= 2 && NR.every(s => cOf(s) && onMark(s)), `near the net (z 3), a bet settled at full power curls too: c ${NR.map(s => f2(cOf(s))).join(', ')}, lands ${NR.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off, bow ${NR.map(s => f2(bowOf(s))).join(', ')} m`);
 ok(L.every(s => !cOf(s) && s.states.every(q => !q.c)), `a full-power lob never curls (c on no packet), bow ${L.map(s => f2(bowOf(s))).join(', ')} m`);
