@@ -1405,3 +1405,16 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   while the card shows, N, "Again in" and the "Ann said no" toast, the cooldown, Ask again; then Ann moves to a public court,
   Cat types two letters in Courts, finds its one Ask to play row, walks to it and presses Enter: watch + ask with its toast; Y,
   she calibrates and plays Ann), fixes-e2e and revive-e2e run and pass.
+
+## 85. Pickers slide: one thumb glides between options, and the switches spring
+
+Every segmented picker (Phone | AirPod, Open | Full, Public | Private, Body | Auto, the bot difficulty) used to jump: the highlight was painted by
+the checked option itself, so a change of pick redrew it on the other side. Now each `.seg` draws its pick once, as `.seg::before`, and ui.js
+measures the checked option into `--tx --ty --tw --th`. The options differ in width (Rookie and Club, 'Open 12'), so the thumb is sized
+from the option, not a fixed offset. One MutationObserver per seg (attribute `aria-checked`) catches every place ui.js sets a pick, and a
+ResizeObserver re-measures when a hidden seg shows (settings closed measures 0: the first placement never animates, so it does not fly in from
+the left). The move uses `--ease-bounce` for a small overshoot; the option only fades its ink. Until ui.js has placed the thumb, the option
+paints its own pick as before. Pressing an option dips it to 95 %.
+
+The on/off switches already slid (160 ms); the knob now springs (360 ms, overshoot) and stretches while pressed. Under macOS Reduce Motion
+the global rule in ui.css still cuts every transition to 1 ms, on purpose.

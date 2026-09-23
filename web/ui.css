@@ -562,6 +562,17 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .seg-opt{height:3.5rem;min-width:10rem;padding:0 2rem;border-radius:var(--r-pill);border:.1875rem solid transparent;background:none;color:var(--ink-soft);font:700 var(--t-lg)/1 var(--font);cursor:pointer;outline:0}
 .seg-opt[aria-checked="true"]{background:linear-gradient(180deg,#fff,#f0f7fb);border-color:var(--line);color:var(--ink-strong);box-shadow:var(--sh-1)}
 .seg-opt:focus-visible{box-shadow:var(--glow)}
+/* the pick is one thumb that slides (ui.js measures the checked option into --tx/--tw): the option only changes its ink. Until ui.js has placed it, the option paints its own pick as before */
+.seg{position:relative;--tb:.1875rem} .seg-sm{--tb:.125rem}
+.seg::before{content:"";position:absolute;left:0;top:var(--ty,0);width:var(--tw,0);height:var(--th,0);border-radius:var(--r-pill);background:linear-gradient(180deg,#fff,#f0f7fb);box-shadow:inset 0 0 0 var(--tb) var(--line), var(--sh-1);transform:translateX(var(--tx,0));opacity:0;pointer-events:none;
+  transition:transform 420ms var(--ease-bounce), width 420ms var(--ease-bounce), opacity var(--d-fast) linear}
+.seg.has-thumb::before{opacity:1} .seg.thumb-still::before{transition:none}
+.seg-opt{position:relative;z-index:1;transition:color var(--d-med) var(--ease-soft), transform var(--d-fast) var(--ease-bounce)}
+.seg.has-thumb > .seg-opt[aria-checked="true"]{background:none;border-color:transparent;box-shadow:none}
+.seg.has-thumb > .seg-opt[aria-checked="true"]:focus-visible{box-shadow:var(--glow)}
+.seg-opt:active:not(:disabled){transform:scale(.95)}
+@media (hover:hover){ .seg-opt[aria-checked="false"]:not(:disabled):hover{color:var(--ink-strong)} }
+.seg-n{transition:background var(--d-med) var(--ease-soft), color var(--d-med) var(--ease-soft)}
 
 /* room code: four big boxes (inputs on Enter code, spans on the share card) */
 .code-boxes{display:flex;gap:.75rem;justify-content:center}
@@ -669,8 +680,9 @@ button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--lin
 .stepper .btn-icon{width:2.375rem;height:2.375rem;box-shadow:var(--sh-1), var(--inner-hi)} .stepper .btn-icon svg{width:1.25rem;height:1.25rem;stroke-width:3.25}
 /* switch: a track and a knob. Off = grey track, knob left; on = the outline blue, knob right, a tick of shape as well as colour */
 .set-switch i{flex:none;position:relative;width:3.25rem;height:1.875rem;border-radius:var(--r-pill);background:var(--sky-4);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.3);transition:background var(--d-fast) linear}
-.set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform var(--d-fast) var(--ease-out)}
+.set-switch i::after{content:"";position:absolute;left:.1875rem;top:.1875rem;width:1.5rem;height:1.5rem;border-radius:50%;background:linear-gradient(180deg,#fff,#eaf3f8);box-shadow:0 .0625rem .1875rem rgba(20,60,90,.4);transition:transform 360ms var(--ease-bounce), width 200ms var(--ease-out)}
 .set-switch[aria-checked="true"] i{background:linear-gradient(180deg,var(--line),var(--line-deep))} .set-switch[aria-checked="true"] i::after{transform:translateX(1.375rem)}
+.set-switch i{transition:background var(--d-med) var(--ease-soft)} .set-switch:active i::after{width:1.875rem} .set-switch[aria-checked="true"]:active i::after{transform:translateX(1.0625rem)}      /* the knob slides with a little overshoot and stretches while pressed, like a real toggle */
 .settings > *{flex-shrink:0}      /* the card scrolls; it never squeezes a row (it squashed Leave court to 13 px in a short window) */
 .set-foot{position:sticky;bottom:-.875rem;z-index:1;display:flex;flex-direction:column;gap:.5rem;margin:0 -.875rem -.875rem;padding:.75rem .875rem .875rem;
   border-radius:0 0 var(--r-lg) var(--r-lg);background:linear-gradient(180deg,rgba(236,244,248,0),rgba(236,244,248,.96) .75rem)}      /* pinned under the list, a soft fade where the rows scroll beneath it */

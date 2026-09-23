@@ -696,3 +696,23 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
     const nav = [...$('lobby-home').querySelectorAll('[data-nav]')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });
 }
+
+// ---------- sliding segmented controls ----------
+// Every .seg draws its pick as one thumb (.seg::before, ui.css) that slides to the checked option instead of the highlight jumping.
+// Options differ in width (Rookie / Club, 'Open 12'), so the thumb is measured from the option. One observer per seg catches every
+// aria-checked write, wherever in this file it comes from; a hidden seg (settings closed) measures 0 and is placed, unanimated, when it shows.
+{
+  const place = seg => {
+    const on = seg.querySelector(':scope > [aria-checked="true"]');
+    if (!on || !seg.offsetWidth) { seg.classList.remove('has-thumb'); return; }
+    const first = !seg.classList.contains('has-thumb');
+    if (first) seg.classList.add('thumb-still');
+    const s = seg.style; s.setProperty('--tx', on.offsetLeft + 'px'); s.setProperty('--ty', on.offsetTop + 'px'); s.setProperty('--tw', on.offsetWidth + 'px'); s.setProperty('--th', on.offsetHeight + 'px');
+    seg.classList.add('has-thumb');
+    if (first) { void seg.offsetWidth; requestAnimationFrame(() => seg.classList.remove('thumb-still')); }
+  };
+  const segs = document.querySelectorAll('.seg');
+  const mo = new MutationObserver(ms => { for (const seg of new Set(ms.map(m => m.target.parentElement))) if (seg?.classList.contains('seg')) place(seg); });
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(es => { for (const seg of new Set(es.map(e => e.target.closest('.seg')))) if (seg) place(seg); }) : null;
+  for (const seg of segs) { mo.observe(seg, { subtree: true, attributes: true, attributeFilter: ['aria-checked'] }); ro?.observe(seg); for (const o of seg.children) ro?.observe(o); place(seg); }
+}
