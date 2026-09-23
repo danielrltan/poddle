@@ -119,9 +119,9 @@
   <!-- the count into a match: 3, 2, 1 over the court, so a serve never arrives before the paddle is up (ui.countdown) -->
   <div class="countdown" id="count" role="status" data-fit hidden><b id="count-n" data-text=""></b><span>Get ready</span></div>
 
-  <!-- bottom-right: the keys worth a hint. C always; 1 2 3 only while the other seat is Matt (ui.setBot). Every other key still works and says nothing. -->
+  <!-- bottom-right: the keys worth a hint. C always; 1 2 3 4 only while the other seat is Matt (ui.setBot). Every other key still works and says nothing. -->
   <div class="keyhints" id="keys" data-fit>
-    <ul><li><span class="keycap">C</span>Calibrate</li><li id="key-bot" hidden><span class="keycap">1</span><span class="keycap">2</span><span class="keycap">3</span>Difficulty: <span id="bot-level">Club</span></li></ul>
+    <ul><li><span class="keycap">C</span>Calibrate</li><li id="key-bot" hidden><span class="keycap">1</span><span class="keycap">2</span><span class="keycap">3</span><span class="keycap">4</span>Difficulty: <span id="bot-level">Club</span></li></ul>
   </div>
 
   <!-- spectators: view chips bottom-left (keys 1-4), the split-screen divider, emotes bottom-right (ui.js builds the buttons); for everyone the emote pops and the seat-hold card -->
@@ -133,6 +133,9 @@
   </div>
   <div id="split-line" aria-hidden="true"></div>
   <div class="emotes" id="emotes" role="group" aria-label="React"></div>
+  <!-- a spectator watching one human play Matt asks for Matt's seat (key A). A fixed width: its label counts down without moving anything (docs/SPECTATE.md Asking to play) -->
+  <button class="btn btn-sm is-tall ask-play" id="btn-ask" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-24 11 12)"><rect x="5" y="2" width="12" height="13" rx="3.5"/><path d="M11 15v7"/></g><circle cx="19.5" cy="18" r="2.2"/></svg><span id="ask-label">Ask to play</span><span class="keycap">A</span><i class="ask-ring" aria-hidden="true"></i></button>
+  <span class="vh" id="ask-state" aria-live="polite"></span>
   <div class="emote-layer" id="emote-layer" aria-hidden="true"></div>
   <!-- left edge: "Sam is watching", one small card per person who sits down in the stands (ui.watcherNote) -->
   <div class="notices" id="notices" role="status" aria-live="polite"></div>
@@ -143,6 +146,13 @@
 <div class="inset inset-cam" id="camwrap" data-fit hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas></div>
 <div class="inset inset-pod" id="podwrap" data-fit><div id="pod"></div></div>
 <div class="toast" id="toast" data-fit role="status"></div>
+<!-- a spectator asks to take Matt's seat: a small corner card for 10 s. Never takes focus, never swallows a key; Y / N answer it (docs/COURTS-TOURNEY.md 2.8) -->
+<div class="ask-card" id="ask-card" role="group" aria-labelledby="ask-q" data-fit hidden>
+  <p class="ask-q" id="ask-q"><b id="ask-name"></b> wants to play<small>Takes Matt’s place.</small></p>
+  <p class="ask-btns"><button class="btn btn-sm is-tall ask-yes" id="btn-ask-yes" tabindex="-1" aria-keyshortcuts="Y"><span class="keycap">Y</span>Accept</button><button class="btn btn-sm is-tall ask-no" id="btn-ask-no" tabindex="-1" aria-keyshortcuts="N"><span class="keycap">N</span>Decline</button></p>
+  <div class="rematch-bar ask-bar" aria-hidden="true"><i></i></div>
+  <span class="vh" id="ask-live" aria-live="polite"></span>
+</div>
 
 <!-- ============================================== GLASS (shared ground of title + lobby: the live court, blurred) ============================================== -->
 <div class="glass" id="glass" aria-hidden="true"></div>
@@ -168,7 +178,7 @@
   </div></section>
   <section class="set-group" id="grp-match"><h3 class="set-label">Match</h3><div class="set-list">
     <div class="set-row set-pick" id="set-move"><span>Move</span><span class="seg seg-sm" id="move-seg" role="radiogroup" aria-label="Move"><button class="seg-opt" role="radio" aria-checked="true" data-move="body">Body</button><button class="seg-opt" role="radio" aria-checked="false" data-move="auto">Auto</button></span><small id="move-note" hidden>Body needs a camera</small><span id="mode" hidden>Body</span></div>
-    <div class="set-row set-pick" id="set-bot" hidden><span>Difficulty</span><span class="seg seg-sm" id="bot-seg" role="radiogroup" aria-label="Difficulty"><button class="seg-opt" role="radio" aria-checked="false" data-level="0">Rookie</button><button class="seg-opt" role="radio" aria-checked="true" data-level="1">Club</button><button class="seg-opt" role="radio" aria-checked="false" data-level="2">Pro</button></span></div>
+    <div class="set-row set-pick" id="set-bot" hidden><span>Difficulty</span><span class="seg seg-sm" id="bot-seg" role="radiogroup" aria-label="Difficulty"><button class="seg-opt" role="radio" aria-checked="false" data-level="0" data-name="Rookie">Rookie</button><button class="seg-opt" role="radio" aria-checked="true" data-level="1" data-name="Club">Club</button><button class="seg-opt" role="radio" aria-checked="false" data-level="3" data-name="Tour">Tour</button><button class="seg-opt" role="radio" aria-checked="false" data-level="2" data-name="Pro">Pro</button></span></div>
   </div></section>
   <section class="set-group" id="grp-sound"><h3 class="set-label">Sound</h3><div class="set-list">
     <button class="set-row set-switch" id="tog-sound" role="switch" aria-checked="true"><span>Sound</span><i></i></button>
@@ -230,21 +240,48 @@
         <button class="tile" id="btn-quick" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><circle class="art-fill" cx="48" cy="48" r="34" style="stroke-width:4.5"/><path class="art-accent-fill" d="M40 33 66 48 40 63Z"/></svg>
           <b>Quick play</b></button>
-        <button class="tile" id="btn-create" data-nav>
-          <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill" x="14" y="22" width="68" height="52" rx="14" style="stroke-width:4.5"/><path class="art-accent" d="M48 35v26M35 48h26" style="stroke-width:7"/></svg>
-          <b>Create court</b></button>
-        <button class="tile" id="btn-code" data-nav>
-          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="10" y="30" width="22" height="36" rx="7"/><rect x="37" y="30" width="22" height="36" rx="7"/><rect x="64" y="30" width="22" height="36" rx="7"/></g><g class="art-accent" style="stroke-width:6"><path d="M21 44v8M48 44v8"/></g><path class="art-line" d="M75 42v12" style="stroke-width:3"/></svg>
-          <b>Enter code</b></button>
+        <button class="tile" id="btn-courts" data-nav>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill" x="12" y="18" width="58" height="60" rx="10" style="stroke-width:4.5"/><path class="art-line" d="M12 48h58M41 18v60" style="stroke-width:3"/><circle cx="63" cy="59" r="13" style="fill:#fff;stroke:var(--line);stroke-width:6.5"/><path class="art-accent" d="m73 69 11 11" style="stroke-width:7"/></svg>
+          <b>Courts</b><small class="tile-sub" id="courts-n"></small></button>
         <button class="tile" id="btn-bot" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M20 82c2-19 13-27 28-27s26 8 28 27Z"/><circle cx="48" cy="33" r="17"/></g><g class="art-accent" style="stroke-width:5"><path d="M41 34v3M55 34v3"/></g><path class="art-accent" d="M42 69h12" style="stroke-width:6"/></svg>
           <b>Play a bot</b></button>
       </div>
-      <div class="rooms" data-fit>
-        <h2 class="caps">Courts</h2>
-        <div class="room-wrap"><ul class="room-list" id="room-list"></ul><div class="room-bar" id="room-bar" hidden><i></i></div></div>
-        <p class="t-note" id="room-empty">No courts yet. Quick play starts one.</p>
-      </div>
+    </div>
+
+    <!-- Courts: every public court in one list (search by code, Open | Full), a code to Join or Watch, and making a court or a tournament. docs/COURTS-TOURNEY.md 2.7 -->
+    <div class="panel panel-wide lobby-view courts" id="lobby-courts" data-view="courts" data-fit hidden>
+      <section class="courts-browse" aria-labelledby="courts-h">
+        <h2 class="vh" id="courts-h">Court list</h2>
+        <div class="courts-tools">
+          <label class="search" for="court-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span class="vh">Search courts by code</span>
+            <input class="field" id="court-search" type="search" placeholder="Search by code" maxlength="8" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-controls="room-list"></label>
+          <span class="seg seg-sm courts-seg" id="court-seg" role="radiogroup" aria-label="Show">
+            <button class="seg-opt" role="radio" aria-checked="true" data-filter="open">Open <b class="seg-n" id="n-open">0</b></button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-filter="full">Full <b class="seg-n" id="n-full">0</b></button></span>
+        </div>
+        <div class="room-wrap court-wrap"><ul class="room-list court-list" id="room-list" aria-label="Courts" aria-busy="true"></ul><div class="room-bar" id="room-bar" hidden><i></i></div>
+          <p class="court-state" id="room-empty" role="status"></p></div>
+      </section>
+      <section class="courts-side">
+        <form class="courts-code" id="lobby-code" autocomplete="off" aria-labelledby="code-h">
+          <h2 class="caps" id="code-h">Have a code?</h2>
+          <div class="code-boxes is-sm" id="code-boxes" role="group" aria-labelledby="code-h">
+            <input class="code-box" maxlength="4" aria-label="Code, 1 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+            <input class="code-box" maxlength="4" aria-label="2 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+            <input class="code-box" maxlength="4" aria-label="3 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+            <input class="code-box" maxlength="4" aria-label="4 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+          </div>
+          <p class="code-err" id="code-err" role="alert"></p>
+          <p class="t-note code-hint">Paste a code or a link</p>
+          <p class="code-acts"><button class="btn is-tall" id="btn-join" disabled>Join</button><button class="btn is-tall" type="button" id="btn-watch-code" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>Watch</button></p>
+        </form>
+        <hr class="courts-rule">
+        <div class="courts-make">
+          <button class="btn is-tall" id="btn-create"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Create court</button>
+          <button class="btn is-tall btn-tour" id="btn-tour" aria-disabled="true" aria-describedby="tour-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8.5 20h7M10 17h4v3h-4Z"/></svg>Create tournament</button>
+          <p class="t-note tour-note" id="tour-note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".4"/></svg><span>Needs at least 4 players. Up to 16. <em>Tournaments are coming soon.</em></span></p>
+        </div>
+      </section>
     </div>
 
     <div class="panel panel-narrow lobby-view" id="lobby-create" data-view="create" data-fit hidden>
@@ -264,20 +301,9 @@
       <button class="btn btn-lg" id="btn-share-go">Start</button>
     </div>
 
-    <form class="panel panel-narrow lobby-view" id="lobby-code" data-view="code" data-fit hidden autocomplete="off">
-      <div class="code-boxes" id="code-boxes">
-        <input class="code-box" maxlength="4" aria-label="Code, 1 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
-        <input class="code-box" maxlength="4" aria-label="2 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
-        <input class="code-box" maxlength="4" aria-label="3 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
-        <input class="code-box" maxlength="4" aria-label="4 of 4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
-      </div>
-      <p class="code-err" id="code-err" role="alert"></p>
-      <button class="btn btn-lg" id="btn-join" disabled>Join</button>
-    </form>
-
     <div class="panel panel-mid lobby-view" id="lobby-bot" data-view="bot" data-fit hidden>
       <h2 class="caps" id="bot-title">Select difficulty</h2>
-      <div class="bot-levels" id="bot-levels" role="group" aria-labelledby="bot-title"><button class="btn btn-lg" id="btn-bot-0" data-level="0"><b>Rookie</b><small>Slow and forgiving</small></button><button class="btn btn-lg" id="btn-bot-1" data-level="1"><b>Club</b><small>A fair match</small></button><button class="btn btn-lg" id="btn-bot-2" data-level="2"><b>Pro</b><small>Fast and accurate</small></button></div>
+      <div class="bot-levels" id="bot-levels" role="group" aria-labelledby="bot-title"><button class="btn btn-lg" id="btn-bot-0" data-level="0"><b>Rookie</b><small>Slow and forgiving</small></button><button class="btn btn-lg" id="btn-bot-1" data-level="1"><b>Club</b><small>A fair match</small></button><button class="btn btn-lg" id="btn-bot-3" data-level="3"><b>Tour</b><small>Tournament pace</small></button><button class="btn btn-lg" id="btn-bot-2" data-level="2"><b>Pro</b><small>Fast and accurate</small></button></div>
     </div>
 
     <!-- a full court offers a place to watch. Opens over the lobby; the rest of the lobby is inert meanwhile -->

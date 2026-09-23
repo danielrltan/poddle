@@ -137,7 +137,9 @@ const BOTS = [
   { name: 'Rookie', react: 0.45, foot: 1.9, err: 0.9, reach: 0.55, power: [0.10, 0.40], place: 0.0, lob: 0.25, slice: 0, whiff: 0.18 },
   { name: 'Club',   react: 0.30, foot: 2.5, err: 0.5, reach: 0.70, power: [0.25, 0.65], place: 0.5, lob: 0.15, slice: 0.1, whiff: 0.07 },
   { name: 'Pro',    react: 0.18, foot: 4.2, err: 0.2, reach: 0.90, power: [0.45, 0.95], place: 0.9, lob: 0.10, slice: 0.18, whiff: 0.02 },
+  { name: 'Tour',   react: 0.24, foot: 3.3, err: 0.35, reach: 0.80, power: [0.35, 0.80], place: 0.7, lob: 0.12, slice: 0.14, whiff: 0.045 },   // between Club and Pro: the tournaments' Matt. APPENDED at index 3, so revive's bot= and 0-2 keep meaning Rookie/Club/Pro
 ];
+const BOT_ORDER = [0, 1, 3, 2];                                  // how every picker lists them: Rookie, Club, Tour, Pro
 const AUTOBOT = process.env.AUTOBOT !== '0';                   // tests turn off auto-join and (in LOCAL) seat takeover
 const SWING_SERVE = process.env.SWING_SERVE != null ? process.env.SWING_SERVE !== '0' : AUTOBOT;   // off in tests
 const READY_S = process.env.READY_S != null ? +process.env.READY_S : (AUTOBOT ? 3 : 0);   // s counted down (3, 2, 1) before the FIRST serve of a match, once both seats are ready: a match no longer starts the instant an opponent sits down. Off in tests (like SWING_SERVE), which measure rallies and would just wait: test/countdown.test.mjs and test/rooms.test.mjs keep it on
@@ -155,7 +157,9 @@ const BUF_MAX = 256 * 1024;                                    // bytes queued o
 const SMASH = 0.76;                                            // n above this is a smash (power 27.3; a wide stroke gets there from ~24 rad/s, NOTES 82)
 const SMASH_UP = [0.4, 0.55];                                  // lob (0..0.8) over which a hard swing stops being a smash: a smash comes DOWN or level through the ball. Recorded smashes send lob <= 0.27 (<= 0.45 with the reworked lob gate): called at 0.475, upward share 0.6
 const LOB_ARC = [0.25, 0.6];                                   // underhand() over which the flight turns from the drive's into the lob's: 0.8 of the way by 0.5, all of it by 0.6
+const ASK_S = +process.env.ASK_S || 10, ASK_COOL_S = +process.env.ASK_COOL_S || 10, ASK_GAP_S = process.env.ASK_GAP_S != null ? +process.env.ASK_GAP_S : 3;   // s on the wall clock (docs/SPECTATE.md Asking to play): a request lives 10 s; a requester waits 10 s after it ENDS; a court rests 3 s between requests
 const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
+const PROMO_S = +process.env.PROMO_S || CAL_S;                 // s a spectator who was let into Matt's seat has to get their paddle ready before Matt is back
 let clock = 0;                            // sim clock of the process. A room starts its own time from it and stops that while paused or holding a seat, so rooms agree until one of them pauses
 // A name is untrusted text that lands on other people's screens: strings only, no control, invisible or bidi characters, no angle brackets, 12 characters. '' = none given.
 // Nor characters that draw as nothing (Hangul fillers, the braille blank, soft hyphen, tags: a name of those was a blank on every scoreboard), nor more than 2 stacked marks on a letter. What is left must have something to see in it.
@@ -165,6 +169,10 @@ const cleanName = v => { if (typeof v !== 'string') return '';
   return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };
 const secsTo = ms => Math.max(0, Math.ceil((ms - Date.now()) / 1000));
 // Every message leaves through here. A socket that has stopped reading (BUF_MAX queued) is let go instead of fed: whoever it was reconnects by cid if they are still there.
+const askCool = new Map();                                     // key -> wall ms before which it may not ask again. Keys: 'c:' + cid (or the socket itself with no cid), so a reload does not reset it, AND 'a:' + address, which a client cannot rotate (a new cid, or none, got round the cid alone)
+const askKeys = ws => [ws.cid ? 'c:' + ws.cid : ws, ...(loopback(ws.addr) ? [] : ['a:' + ws.addr])];   // loopback: every test, and this machine's own tabs, share one address
+const coolLeft = ws => Math.max(0, ...askKeys(ws).map(k => { const t = askCool.get(k); return t ? secsTo(t) : 0; }));
+function coolSet(ws) { const ms = Date.now(); for (const [k, t] of askCool) if (t <= ms) askCool.delete(k); for (const k of askKeys(ws)) askCool.set(k, ms + ASK_COOL_S * 1000); }   // past entries pruned on every set: a few hundred at most, and a closed cid-less socket is not kept
 function put(ws, s) { if (!ws || ws.readyState !== 1) return; if (ws.bufferedAmount > BUF_MAX) return ws.terminate(); ws.send(s); }
 
 function newPlayer(ws, side) {
@@ -272,9 +280,10 @@ function createRoom(code, pub) {
   let started = false, firstServe = 0;      // has a ball been struck in this match (before that a leaver just leaves); who served first (the next match alternates)
   let over = null, hold = null, paused = null, slow = null;   // over: { winner, forfeit, votes, until, names }  hold: { side, until, said }  paused: { by, until }  slow: { side, until, said } a seat calibrating mid-match   (until = wall clock ms)
   const ball = { spin: 0, kick: 0, curl: 0, aim: null, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
-  const score = [0, 0]; let revived = null;
+  const score = [0, 0]; let revived = null, resumed = false;   // resumed: a Matt match brought back mid-way after a restart, or Matt back after a demote. It is under way before its first new strike (underway())
   let server = 0, serveAt = Infinity, tick = 0;     // who serves next; when (sim time); steps taken
   let counting = null;                              // the count into a new match: { until (sim time), said (the last whole second told) }
+  let asking = null, askN = 0, askRest = 0, promo = null;   // asking: { id, ws, name, until } the ONE pending request to take Matt's seat. askRest: wall ms before the next may start. promo: { side, until, level } a seat just given to a spectator
 
   function send(pl, msg) { put(pl.ws, JSON.stringify(msg)); }
   function broadcast(msg, skip) { const s = JSON.stringify(msg); for (const pl of players) if (pl.ws !== skip) put(pl.ws, s); for (const ws of spectators) put(ws, s); }
@@ -287,6 +296,7 @@ function createRoom(code, pub) {
   function launch(side, n, dir, lob, hit, slice, blk, curl = 0) {     // curl: only strike() passes 1 (see solve)
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
     ball.p[1] = Math.max(ball.p[1], R);
+    if (!started && pub) lobbyChanged();                          // the first strike turns a Matt court from Join to Ask to play in the list (sent on its timer, after this)
     ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
     planFootwork(1 - side);
     if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
@@ -416,7 +426,7 @@ function createRoom(code, pub) {
 
   // a fresh pair (human+human or human+bot): clean score, first serve
   function startMatch(first) {
-    score[0] = score[1] = 0; if (revived) { score[0] = revived[0]; score[1] = revived[1]; revived = null; }      // a court brought back after a restart carries its score
+    score[0] = score[1] = 0; if (revived) { score[0] = revived[0]; score[1] = revived[1]; revived = null; } else resumed = false;      // a court brought back after a restart carries its score (and stays under way); any later match is a new one
     server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
     counting = READY_S > 0 ? { until: Infinity, said: -1 } : null;   // armed: it starts counting once the room is whole and both seats are ready (countdown())
     if (pub) lobbyChanged();
@@ -427,6 +437,7 @@ function createRoom(code, pub) {
   const voteMsg = () => ({ type: 'rematch', votes: over.votes, left: secsTo(over.until) });
   function endMatch(winner, forfeit, nm) {
     ball.live = false; ball.serving = null; serveAt = Infinity; counting = null; for (const pl of players) pl.swing = pl.servePending = null;
+    askEnd('gone');                                              // a result card is no time to swap seats
     over = { winner, forfeit, names: nm || names(), until: Date.now() + (LEGACY ? 5 : REMATCH_S) * 1000,
       votes: [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? true : null) : false; }) };      // Matt always wants another; a seat that was forfeited cannot
     if (LEGACY) newMatchAt = now + 5;                            // LOCAL: a new match after 5 s whatever anyone says (test/e2e.mjs lives there)
@@ -445,6 +456,7 @@ function createRoom(code, pub) {
     if (LEGACY || room.dead) return;
     const out = [...players.filter(p => p.ws).map(p => p.ws), ...spectators];
     console.log(`[${code}] court closed: ${reason} (${out.length} sent to the lobby, score ${score.join('-')})`);      // fly logs: "why did my court die" has an answer
+    askEnd('gone', false); promo = null;
     room.dead = true; players.length = 0; spectators.clear(); over = hold = paused = slow = null;
     if (rooms.get(code) === room) rooms.delete(code);
     for (const ws of out) { ws.room = ws.pl = null; ws.spec = false; tell(ws, { type: 'closed', reason }); if (ws.readyState === 1) enterLobby(ws); }
@@ -459,7 +471,7 @@ function createRoom(code, pub) {
   function startHold(me) {
     if (paused) resume();                                        // (a bot court) the pauser went: they pause again when they are back with the panel still open
     me.ws = null; me.swing = me.servePending = null;             // the seat stays taken (humans() still counts it): nobody else can sit down in it
-    hold = { side: me.side, until: Date.now() + HOLD_S * 1000, said: -1 }; sayHold();
+    hold = { side: me.side, until: Date.now() + HOLD_S * 1000, said: -1 }; sayHold(); askEnd('gone');   // the player can't answer
     console.log(`[${code}] side ${me.side} dropped: seat held ${HOLD_S} s`);
   }
   function forfeitHeld() {                                        // not back in time: the one who stayed wins
@@ -564,7 +576,7 @@ function createRoom(code, pub) {
   const ready = p => p.bot || p.ready && !p.cal || !AUTOBOT;    // a client sends no 'paddle' until it is calibrated (and says so when it calibrates again, 'status'): until then that player cannot see the court, so no point is played (test clients may never send one)
   // What the others see on that character (docs/SPECTATE.md Seat status): away = the seat is held for a reconnect, paused = this seat stopped the room, calibrating. Matt never has one.
   const statusOf = p => p.bot ? null : hold && hold.side === p.side ? 'away' : paused && paused.by === p.side ? 'paused' : !ready(p) ? 'calibrating' : null;
-  const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name) });
+  const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name), order: BOT_ORDER });   // levels in index order (the wire value), order = how pickers list them
 
   function addBot() {
     if (theBot() || humans().length !== 1) return;
@@ -582,7 +594,7 @@ function createRoom(code, pub) {
     if (over) return;                                            // a match is being voted on: nothing starts behind the result screen
     if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
     if (Number.isInteger(level)) botLevel = clamp(level, 0, BOTS.length - 1);
-    else if (theBot()) botLevel = (botLevel + 1) % BOTS.length;
+    else if (theBot()) botLevel = BOT_ORDER[(BOT_ORDER.indexOf(botLevel) + 1) % BOT_ORDER.length];   // B walks the display order: Club -> Tour -> Pro -> Rookie
     if (!theBot()) addBot(); else broadcast(botInfo());
   }
 
@@ -625,12 +637,14 @@ function createRoom(code, pub) {
     if (paused) tell(ws, { type: 'paused', on: true, by: paused.by });
     if (hold) tell(ws, { type: 'hold', side: hold.side, left: secsTo(hold.until) });
     if (over) { tell(ws, overMsg()); if (!LEGACY) tell(ws, voteMsg()); }
+    if (side != null && asking && humans()[0] && humans()[0].ws === ws) tell(ws, { type: 'askplay', id: asking.id, name: asking.name, left: secsTo(asking.until) });   // the player reloaded mid-request: the card comes back with the time left
+    if (side == null && coolLeft(ws) > 0) tell(ws, { type: 'askstate', s: 'wait', left: coolLeft(ws) });   // a spectator back after a reload: the button is right at once
   }
   // Seat a socket (the lobby layer has checked there is a seat).
   function join(ws) {
     if (paused) resume();                                        // a second human: an online game cannot pause
     if (over) { over = null; newMatchAt = Infinity; broadcast({ type: 'rematchon' }); }   // (a bot room being voted on) the result screen closes, a fresh match starts below
-    if (humans().length >= 1) removeBot();                     // a second human replaces the bot
+    if (humans().length >= 1) { askEnd('gone'); removeBot(); }   // a second human replaces the bot (and any request for that seat is moot)
     botJoinAt = Infinity;
     const want = ws.wantSide, side = (want === 0 || want === 1) && !players.some(p => p.side === want) ? want : players.length && players[0].side === 0 ? 1 : 0;   // wantSide: a court brought back after a restart seats people where they were
     const me = newPlayer(ws, side); me.cid = ws.cid; me.name = ws.name || (side ? 'Player 2' : 'Player 1');
@@ -664,7 +678,51 @@ function createRoom(code, pub) {
     const ms = Date.now(); if (ms - (ws.emoteAt || 0) < EMOTE_GAP) return; ws.emoteAt = ms;
     broadcast({ type: 'emote', e, name: ws.name || '' });
   }
-  function unwatch(ws) { if (spectators.delete(ws)) { ws.room = null; ws.spec = false; if (pub) lobbyChanged(); } }
+  // ---------- asking to play (docs/SPECTATE.md Asking to play): a spectator watching one human play Matt asks for Matt's seat. ONE request per court,
+  // it lives ASK_S, the player answers Y/N, silence is a no; a requester waits ASK_COOL_S from the END of their request, the court rests ASK_GAP_S between two ----------
+  const askSay = (ws, s, left, extra) => tell(ws, { type: 'askstate', s, left, ...extra });
+  function ask(ws) {
+    if (!spectators.has(ws)) return;                             // players and the lobby are never heard asking
+    if (humans().length !== 1) return askSay(ws, 'refused', undefined, { why: 'humans' });
+    if (!theBot()) return askSay(ws, 'refused', undefined, { why: 'nomatt' });
+    if (over) return askSay(ws, 'refused', undefined, { why: 'over' });
+    if (!askable()) return askSay(ws, 'wait', 3);                // a held seat, or a seat just given away: in a moment
+    if (asking && asking.ws === ws) return askSay(ws, 'sent', secsTo(asking.until));   // asked twice: still pending, nothing new
+    const cl = coolLeft(ws); if (cl > 0) return askSay(ws, 'wait', cl);
+    if (asking) return askSay(ws, 'wait', secsTo(asking.until) + Math.ceil(ASK_GAP_S), { busy: true });   // someone else asked: no cooldown charged
+    if (Date.now() < askRest) return askSay(ws, 'wait', secsTo(askRest), { busy: true });
+    asking = { id: ++askN, ws, name: ws.name || 'Someone', until: Date.now() + ASK_S * 1000 };
+    const h = humans()[0]; if (h.ws) send(h, { type: 'askplay', id: asking.id, name: asking.name, left: ASK_S });
+    askSay(ws, 'sent', ASK_S); console.log(`[${code}] a spectator asked to play`);
+  }
+  function askEnd(why, tellPlayer = true, charge = why === 'no' || why === 'expired') {   // the one place a request ends
+    if (!asking) return;
+    const a = asking; asking = null; askRest = Date.now() + ASK_GAP_S * 1000;
+    if (charge) coolSet(a.ws);                                   // the cooldown runs from the END of the request: an expiry still shows its 10 s. A 'gone' the court caused (the player left, dropped or reloaded, the match ended) charges nothing: that was not the requester's doing
+    const h = humans()[0]; if (tellPlayer && h && h.ws) send(h, { type: 'askoff', id: a.id, why });
+    if (spectators.has(a.ws)) askSay(a.ws, why, coolLeft(a.ws));
+  }
+  function answer(me, id, yes) {                                 // one message, so atomic: a double press or an answer after expiry finds nothing to answer
+    if (!Number.isInteger(id) || typeof yes !== 'boolean') return;
+    if (!asking || asking.id !== id || humans().length !== 1 || humans()[0] !== me) return send(me, { type: 'askoff', id, why: 'late' });
+    if (!yes) return askEnd('no');
+    const w = asking.ws, lv = botLevel; asking = null; askRest = Date.now() + ASK_GAP_S * 1000;
+    if (!spectators.has(w) || w.readyState !== 1) return send(me, { type: 'askoff', id, why: 'gone' });
+    if (!askable()) { send(me, { type: 'askoff', id, why: 'gone' }); return askSay(w, 'gone', 0); }
+    spectators.delete(w); askSay(w, 'yes'); tell(w, { type: 'room', code, public: pub, role: 'player', promoted: true });
+    join(w);                                                     // resumes a pause, Matt goes, w sits in his seat, a new match from 0-0, names: the player's usual 'Sam joined to play'
+    promo = { side: w.pl.side, until: Date.now() + PROMO_S * 1000, level: lv }; send(me, { type: 'askoff', id, why: 'yes' });
+    console.log(`[${code}] a spectator took Matt's seat`); if (pub) lobbyChanged();
+  }
+  function demote(p) {                                           // let in, never got a paddle ready: the court would wait for ever (the count waits on ready, slowSeat only runs once started)
+    const ws = p.ws, nm = p.name, lv = promo.level; promo = null; coolSet(ws);   // the cooldown runs from this end too: no ask, accept, wait 60 s, ask again
+    players.splice(players.indexOf(p), 1); spectators.add(ws); ws.pl = null; ws.spec = true;   // no 'left', no score: that match never started
+    tell(ws, { type: 'room', code, public: pub, role: 'spectator', demoted: true }); greet(ws, null);
+    botLevel = lv; addBot(); resumed = true;                     // Matt back at the level he had, and the match counts as under way at once: the player already said who may take Matt's seat, so a joiner in the gap before the next strike is watch + ask, not a seat (addBot's startMatch left started false)
+    const h = humans()[0]; if (h) send(h, { type: 'promoff', name: nm });
+    console.log(`[${code}] the new player was not ready in ${PROMO_S} s: Matt is back`); if (pub) lobbyChanged();
+  }
+  function unwatch(ws) { if (spectators.delete(ws)) { ws.room = null; ws.spec = false; if (asking && asking.ws === ws) askEnd('gone', true, true); if (pub) lobbyChanged(); } }   // the requester walked off: charged, so leaving and coming back is no way round the cooldown
   // A human goes. again: their seat is wanted by their own arrival from the same machine (legacy LOCAL only: the new
   // socket sits down on this same call, nothing is torn down, nobody is told). dropped: the socket closed by itself.
   function leave(me, again, dropped) {
@@ -681,11 +739,13 @@ function createRoom(code, pub) {
         return endMatch(1 - me.side, true, nm);                   // 'leave': forfeit at once
       }
     }
+    if (asking) askEnd('gone', false);                           // the one who was asked is going: the requester hears it (or, with nobody left, 'closed empty' below)
+    if (promo && me.side !== promo.side) promo = null;           // the one who let them in went: the seat is theirs now, a court of one is never handed back to Matt
     players.splice(i, 1);
     if (paused) resume();                                        // the pauser went
     if (over) { over = null; newMatchAt = Infinity; broadcast({ type: 'rematchon' }); }   // LOCAL: no vote to wait for
     removeBot(); ball.live = false; ball.serving = null; serveAt = Infinity; counting = null;
-    score[0] = score[1] = 0; started = false; revived = null;    // somebody LEFT: that match is over, so the score goes now rather than lingering on the board until the next one starts. A seat that only dropped is held instead (startHold), and keeps its score for the 15 s it may come back in
+    score[0] = score[1] = 0; started = false; revived = null; resumed = false;   // somebody LEFT: that match is over, so the score goes now rather than lingering on the board until the next one starts. A seat that only dropped is held instead (startHold), and keeps its score for the 15 s it may come back in
     botJoinAt = AUTOBOT && humans().length === 1 ? now + 2.5 : Infinity;   // whoever is left gets the bot back
     broadcast({ type: 'left' }); tellNames();
     if (!humans().length) sendOff();
@@ -719,6 +779,7 @@ function createRoom(code, pub) {
     if (m.type === 'name') { me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel
     if (m.type === 'bot') return botRequest(me, m.level);
     if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. Booleans only
+    if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
     if (paused || hold) return;                                  // room time stands still: no paddle, no swing
     if (m.type === 'paddle') {
       me.ready = true; me.cal = false;                           // a paddle is only ever sent by a calibrated client
@@ -778,6 +839,8 @@ function createRoom(code, pub) {
     const ms = Date.now();                                       // the three countdowns that run while room time may not
     if (hold) { if (ms >= hold.until) forfeitHeld(); else sayHold(); }
     if (paused && ms >= paused.until) resume();
+    if (asking && ms >= asking.until) askEnd('expired');         // wall clock: a pause does not stop a request
+    if (promo) { const p = bySide(promo.side); if (!p || p.bot || !p.ws || ready(p) || humans().length !== 2) promo = null; else if (ms >= promo.until) demote(p); }   // let in, never got their paddle ready: back to the stands, Matt back
     if (over && !LEGACY && ms >= over.until) return close('norematch');
     slowSeat(ms);
     const frozen = !!(paused || hold);
@@ -891,8 +954,12 @@ function createRoom(code, pub) {
   }
   // what the lobby list says about this room (public rooms only get asked). open: a human seat is free. watch: spectator places left
   const free = () => humans().length < 2 && !hold && !(over && over.forfeit);   // a seat to sit down in. Not after a forfeit: that room only waits to close. Not while a seat is held (a bot court's too)
-  const info = () => ({ code, players: humans().length, open: free(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over });
-  const room = { code, pub, revive: sc => { revived = sc; }, join, leave, retake, heldBy, watch, unwatch, emote, canWatch: () => spectators.size < SPEC_CAP, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
+  const mattSeat = () => humans().length === 1 && !!theBot();
+  const underway = () => !LEGACY && mattSeat() && (started || resumed) && !over;   // one human playing Matt, a ball already struck: taking that seat needs their OK. Before the first strike (share screen, calibrating, the 3-2-1) a joiner just sits down, as always
+  const askable = () => !LEGACY && mattSeat() && !over && !hold && !promo;   // a spectator may ask (paused is fine: the card shows over the settings panel)
+  const canWatch = () => spectators.size < SPEC_CAP;
+  const info = () => ({ code, players: humans().length, open: free() && !underway(), ask: underway() && canWatch(), bot: !!theBot(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over, names: names() });   // open: a join seats you. ask: a join puts you in the stands and asks the player
+  const room = { code, pub, revive: (sc, matt) => { revived = sc; resumed = !!matt && sc[0] + sc[1] > 0; }, mattBack: (pl, lv) => { if (humans().length !== 1 || theBot() || humans()[0] !== pl) return; if (revived && revived[0] + revived[1] > 0) resumed = true; botRequest(pl, lv); }, join, leave, retake, heldBy, watch, unwatch, emote, ask, underway, askable, canWatch, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
   return room;
 }
 
@@ -901,7 +968,7 @@ const LOCAL = createRoom('LOCAL', false);                      // every socket w
 const rooms = new Map(), lobby = new Set();                    // code -> room (LOCAL is not in it, so no code can reach it); sockets that have not chosen yet
 const tell = (ws, msg) => put(ws, JSON.stringify(msg));
 const lobbyMsg = () => JSON.stringify({ type: 'lobby', online: wss.clients.size - pads.size,                 // every public room somebody is in: to join while a seat is free, to watch otherwise
-  rooms: [...rooms.values()].filter(r => r.pub && r.humans().length).map(r => r.info()) });
+  rooms: [...rooms.values()].filter(r => r.pub && r.humans().length).map(r => r.info()), tours: [] });   // tours: tournaments signing up (docs/COURTS-TOURNEY.md Feature 2; none until built)
 // a socket goes from wherever it sits: a seat (dropped = its socket closed by itself: mid-match that seat is held) or a spectator place
 const quit = (ws, dropped) => { const r = ws.room; if (!r) return; if (ws.pl) r.leave(ws.pl, false, !!dropped); else r.unwatch(ws); };
 // The list goes to everyone choosing, at once if it has been quiet for a second, otherwise when that second is up.
@@ -932,7 +999,7 @@ function seat(ws, r) {
     const ghost = r.humans().find(p => p.ws.addr === ws.addr);   // (in a real room two players behind one router are two players)
     if (ghost) { const g = ghost.ws; r.leave(ghost, true); g.close(); }
   }
-  if (!r.free()) return false;
+  if (!r.free() || r.underway()) return false;                // both seats taken, or one human is mid-match with Matt: that seat is theirs to give (joinCode turns this into watch + ask)
   lobby.delete(ws);
   if (ws.viaLobby) tell(ws, { type: 'room', code: r.code, public: r.pub, role: 'player' });
   r.join(ws); lobbyChanged(); return true;
@@ -946,8 +1013,10 @@ function create(ws, pub) {
 }
 const roomOf = code => (typeof code === 'string' ? rooms.get(code.trim().toUpperCase().slice(0, 8)) : null) || null;   // strings only: String() of a deeply nested array overflows the stack
 function joinCode(ws, code) {
-  const r = roomOf(code);
-  if (!r) tell(ws, { type: 'joinfail', reason: 'notfound' }); else if (!seat(ws, r)) tell(ws, { type: 'joinfail', reason: 'full', watch: r.canWatch(), code: r.code });   // "Court is full. Watch instead?"
+  const r = roomOf(code); if (!r) return tell(ws, { type: 'joinfail', reason: 'notfound' });
+  if (seat(ws, r)) return;
+  if (r.underway() && r.canWatch()) { if (watchCode(ws, r.code, { asked: true })) r.ask(ws); return; }   // one human playing Matt: watch, and ask them at once
+  tell(ws, { type: 'joinfail', reason: 'full', watch: r.canWatch(), code: r.code });   // "Court is full. Watch instead?"
 }
 // The server restarted (a deploy, or fly moved the machine) and every court went with the old process. The tabs are still
 // open and reconnect within a second, asking for a code this process has never heard of. For the first REVIVE_S seconds of
@@ -961,26 +1030,27 @@ function revive(ws, q) {
   if (Date.now() - BOOT > REVIVE_S * 1000 || code.length !== 4 || [...code].some(c => !CODE_CHARS.includes(c)) || rooms.size >= ROOM_CAP) return false;
   const r = createRoom(code, q.get('pub') === '1'); r.by = ws.addr; rooms.set(code, r);
   const m = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('score') || ''), a = m ? +m[1] : 0, b = m ? +m[2] : 0;
-  if (m && !(WIN_AT > 0 && Math.max(a, b) >= WIN_AT && Math.abs(a - b) >= WIN_BY)) r.revive([a, b]);      // a finished score is not brought back: start level
+  const lv = q.get('bot'), matt = lv != null && lv !== '' && !watch;   // they were playing Matt (at this level)
+  if (m && !(WIN_AT > 0 && Math.max(a, b) >= WIN_AT && Math.abs(a - b) >= WIN_BY)) r.revive([a, b], matt);      // a finished score is not brought back: start level. A Matt match with points on the board is under way at once: a stranger may not sit in Matt's seat while the host recalibrates (they watch and ask)
   console.log(`[${code}] brought back after a restart by a ${watch ? 'spectator' : 'player'} (${a}-${b})`);
   if (watch) { watchCode(ws, code); return true; }
   seat(ws, r);
-  const lv = q.get('bot'); if (lv != null && lv !== '' && ws.pl) r.onMessage(ws.pl, { type: 'bot', level: +lv });      // they were playing Matt at this level
+  if (matt && ws.pl) r.onMessage(ws.pl, { type: 'bot', level: +lv });      // they were playing Matt at this level
   return true;
 }
-// Watch a room (any room whose code you have; a free seat in it does not matter, you chose to watch).
-function watchCode(ws, code) {
+// Watch a room (any room whose code you have; a free seat in it does not matter, you chose to watch). extra rides on the 'room' message. -> true when it seated the watcher
+function watchCode(ws, code, extra) {
   const r = roomOf(code); if (!r) return tell(ws, { type: 'joinfail', reason: 'notfound' });
   if (ws.cid) for (const o of wss.clients) if (o !== ws && o.cid === ws.cid && o.room) { quit(o); o.terminate(); }   // this tab's own ghost first (a spectator reconnecting is a spectator again, not a second one)
   if (r.dead) return tell(ws, { type: 'joinfail', reason: 'notfound' });                                           // (that ghost was the last one in it)
   if (!r.canWatch()) return tell(ws, { type: 'joinfail', reason: 'busy', code: r.code });
-  lobby.delete(ws); tell(ws, { type: 'room', code: r.code, public: r.pub, role: 'spectator' }); r.watch(ws);
+  lobby.delete(ws); tell(ws, { type: 'room', code: r.code, public: r.pub, role: 'spectator', ...extra }); r.watch(ws); return true;
 }
 // the public room whose one human has waited longest; a public room nobody is in yet will do; otherwise a new one
 function quick(ws) {
   let best = null;
   for (const r of rooms.values()) { const n = r.humans().length;
-    if (r.pub && r.free() && (!best || n > best.n || n === best.n && r.waitAt < best.r.waitAt)) best = { r, n }; }
+    if (r.pub && r.free() && !r.underway() && (!best || n > best.n || n === best.n && r.waitAt < best.r.waitAt)) best = { r, n }; }
   if (!best || !seat(ws, best.r)) create(ws, true);
 }
 
@@ -1040,6 +1110,7 @@ wss.on('connection', (ws, req) => {
       if (m.type === 'leave' && ws.viaLobby) { quit(ws); enterLobby(ws); }
       else if (ws.pl) ws.room.onMessage(ws.pl, m);               // a spectator is heard saying ping, net, leave, emote (and its name, shown on its emotes): nothing else
       else if (m.type === 'emote') ws.room.emote(ws, m.e);
+      else if (m.type === 'ask') ws.room.ask(ws);                // a spectator asks for Matt's seat
     } else if (lobby.has(ws)) {
       if (m.type === 'quick') quick(ws); else if (m.type === 'create') create(ws, m.public === true); else if (m.type === 'join') joinCode(ws, m.code); else if (m.type === 'watch') watchCode(ws, m.code);
     }
@@ -1052,7 +1123,8 @@ wss.on('connection', (ws, req) => {
   if (!ws.viaLobby) { if (!seat(ws, LOCAL)) { ws.send(JSON.stringify({ type: 'full' })); ws.close(); } return; }
   enterLobby(ws);
   const ws0 = +q.get('side'); if (q.get('back') === '1' && (ws0 === 0 || ws0 === 1) && q.get('side') !== null && q.get('side') !== '') ws.wantSide = ws0;
-  if (q.get('room') && !(q.get('back') === '1' && !roomOf(q.get('room')) && revive(ws, q))) (q.get('watch') === '1' ? watchCode : joinCode)(ws, q.get('room'));   // a reconnect getting its seat (or its place to watch) back, or a shared link
+  if (q.get('room') && !(q.get('back') === '1' && !roomOf(q.get('room')) && revive(ws, q))) { (q.get('watch') === '1' ? watchCode : joinCode)(ws, q.get('room'));
+    const lv = q.get('bot'); if (q.get('back') === '1' && lv != null && lv !== '' && ws.pl && ws.room && ws.room.mattBack) ws.room.mattBack(ws.pl, +lv); }   // a spectator rebuilt the court first: the player who was playing Matt gets him back at their level, and the match stays under way (resumed)   // a reconnect getting its seat (or its place to watch) back, or a shared link
 });
 
 // fixed 60Hz steps against the real clock (setInterval alone runs ~2% slow and drifts). Every room steps on every one. One state packet per room per step.

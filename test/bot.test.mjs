@@ -27,7 +27,14 @@ await wait(1500); ok(a.info && !a.info.active, 'alone for 1.5s: no bot yet');
 await wait(2000); ok(a.info && a.info.active && a.info.name === 'Club', 'bot auto-joined by itself at Club: ' + JSON.stringify(a.info));
 await wait(12000); ok(a.served >= 1, `swing-to-serve: the ball waited and the human served it by swinging (${a.served}x)`);
 ok(a.hits[0] >= 2 && a.hits[1] >= 2, `rally vs Club in 12s: human hits ${a.hits[0]}, bot hits ${a.hits[1]}, score ${a.points}`);
-a.ws.send(JSON.stringify({ type: 'bot' })); await wait(300); ok(a.info.name === 'Pro', 'B cycles to ' + a.info.name);
+ok(JSON.stringify(a.info.order) === '[0,1,3,2]' && a.info.levels[3] === 'Tour', `botinfo.order lists Rookie, Club, Tour, Pro: ${JSON.stringify(a.info.order)} ${a.info.levels}`);
+a.ws.send(JSON.stringify({ type: 'bot' })); await wait(300); ok(a.info.name === 'Tour' && a.info.level === 3, 'B cycles Club to ' + a.info.name);
+a.ws.send(JSON.stringify({ type: 'bot' })); await wait(300); ok(a.info.name === 'Pro', 'then to ' + a.info.name);
+a.ws.send(JSON.stringify({ type: 'bot', level: 3 })); await wait(300); ok(a.info.name === 'Tour', 'level 3 sets ' + a.info.name);
+{ const src = (await import('fs')).readFileSync(new URL('../server/game.js', import.meta.url), 'utf8'), B = {};      // the level table as written (game.js starts a server when imported): Tour sits between Club and Pro on every stat
+  for (const [, lit] of src.matchAll(/^\s*(\{ name: '\w+',[^\n]*?\}),\s*(?:\/\/.*)?$/gm)) { const o = Function('return ' + lit)(); B[o.name] = o; }
+  const btw = (c, t, p) => (c <= t && t <= p) || (p <= t && t <= c), out = ['react', 'foot', 'err', 'reach', 'place', 'lob', 'slice', 'whiff'].filter(k => !btw(B.Club[k], B.Tour[k], B.Pro[k])).concat([0, 1].filter(i => !btw(B.Club.power[i], B.Tour.power[i], B.Pro.power[i])).map(i => 'power' + i));
+  ok(B.Club && B.Tour && B.Pro && !out.length, `every Tour stat lies between Club's and Pro's${out.length ? ': not ' + out : ''}`); }
 a.ws.send(JSON.stringify({ type: 'bot', level: 0 })); await wait(300); ok(a.info.name === 'Rookie', 'key 1 sets ' + a.info.name);
 const h0 = [...a.hits]; await wait(10000); ok(a.hits[1] > h0[1], `Rookie still returns balls (${a.hits[1] - h0[1]} in 10s)`);
 const b = human(); await wait(1500); ok(a.info && !a.info.active, 'second human replaced the bot');

@@ -211,7 +211,7 @@ function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal:
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
   phase = 'lobby'; screen('lobby');
-  if (wantRoom.length === 4) { ui.lobbyView('code', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
+  if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
 function begin() {                                 // seated: straight to calibration if the AirPod is already streaming, straight to the court if that is done too
   phase = 'connect'; startCam();
@@ -227,10 +227,20 @@ function request(m) {                               // one lobby request at a ti
 }
 function setUrl(code, watch) { const u = new URL(location.href), q = u.searchParams; q.delete('room'); if (code) q.set('court', code); else q.delete('court'); if (code && watch) q.set('watch', '1'); else q.delete('watch'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room, in the same role
 const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?court=${code}`;      // a localhost link is no use to a friend
+// ---------- asking to play (docs/SPECTATE.md Asking to play) ----------
+let askId = 0, askWho = '', askedFor = false, noBot = false;
+const CAN_PADDLE = CAN_PHONE || /Mac/.test(navigator.platform) && navigator.maxTouchPoints <= 1;      // this device can be a paddle (the inverse of the viewer-only note at the top): only then is there an Ask to play
+function askSync() { const pd = state && state.paddles || [], bots = pd.filter(p => p && p.bot).length, hum = pd.filter(p => p && !p.bot).length;      // a spectator, one human playing Matt
+  ui.showAsk(LOBBY && spec() && phase === 'watch' && CAN_PADDLE && bots === 1 && hum === 1); }
+function answer(yes) { if (!askId) return; game.send({ type: 'answer', id: askId, yes }); ui.askCard(null); }
+function askPlay() { game.send({ type: 'ask' }); }
+ui.onAnswer(answer); ui.onAsk(askPlay);
+function switchSeat(m) { const toSpec = m.role === 'spectator'; role = toSpec ? 'spectator' : 'player'; room = m.code; noBot = !toSpec; ui.setRoom(room, shareLink(room)); setUrl(room, toSpec);      // the server moved me between the stands and a seat of the same court: one path
+  ui.askPlay(null); ui.askCard(null); ui.setSpectator(toSpec); ui.showAsk(false); syncSettings(); clearFar(); if (toSpec) enterWatch(); else { phase = 'lobby'; begin(); } }      // begin(): connect -> calibrate -> play; a calibrated paddle goes straight to play
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
   clearFar(); clearTimeout(burstT); ui.confettiOff(); room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
-  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
+  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
@@ -239,7 +249,7 @@ function toLobby(msg) {                            // out of a room, back to the
 }
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
-  if (phase === 'lobby') { const v = ui.lobbyView(); if (room) { game.send({ type: 'leave' }); toLobby(); } else if (v !== 'home') ui.lobbyView('home'); else { phase = 'title'; screen('title'); } }
+  if (phase === 'lobby') { const v = ui.lobbyView(); if (room) { game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
   else if (undo && (phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court
   else if (phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }
 }
@@ -263,7 +273,7 @@ refreshStatus(); setInterval(refreshStatus, 250);
 // What a reconnect says about the court it was in. If the server restarted meanwhile (every deploy does), the court is gone
 // from its memory; with this the first tab back rebuilds it under the same code, same seats, same score (server: revive()).
 let roomPub = false, restartUntil = 0;
-function backTo() { const o = state && state.paddles && state.paddles[1 - side], lv = o && o.bot ? ['Rookie', 'Club', 'Pro'].indexOf(botLevel) : -1, sc = state && Array.isArray(state.score) ? state.score : null;
+function backTo() { const o = state && state.paddles && state.paddles[1 - side], lv = o && o.bot ? ['Rookie', 'Club', 'Pro', 'Tour'].indexOf(botLevel) : -1, sc = state && Array.isArray(state.score) ? state.score : null;
   return '&back=1&pub=' + (roomPub ? 1 : 0) + (spec() ? '' : '&side=' + side) + (sc ? '&score=' + (sc[0] | 0) + '-' + (sc[1] | 0) : '') + (lv >= 0 ? '&bot=' + lv : ''); }
 function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
@@ -394,9 +404,11 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
   if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
-  if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online); return; }
+  if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online, m.tours); return; }
   if (m.type === 'room') {                                       // seated, or let in to watch (the normal 'welcome' follows). Also the answer to a reconnect with room=CODE.
     roomPub = m.public === true;
+    if ((m.promoted || m.demoted) && room === m.code) { settle(); switchSeat(m); say(m.promoted ? 'You’re in. Get your paddle ready.' : 'Time’s up. You’re watching again.', null, 2600); return; }      // moved between the stands and Matt's seat of the SAME court
+    askedFor = !!m.asked;                                                                     // a join into Matt's court landed in the stands: the player is being asked
     const made = pending && pending.type === 'create' && botWant == null, again = room === m.code; settle(); room = m.code; role = m.role === 'spectator' ? 'spectator' : 'player'; wantRoom = ''; wantWatch = false;
     ui.askWatch(null); ui.setRoom(room, shareLink(room)); setUrl(room, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined
     if (phase === 'lobby' && !again) { if (spec()) enterWatch(); else if (made) ui.lobbyView('share'); else begin(); }        // again: a reconnect got the seat back, the player stays where they were. Play a bot skips the share view
@@ -408,7 +420,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     setUrl(null);
     if (m.reason === 'full' && m.watch === true && !watching) { const code = ui.cleanCode(typeof m.code === 'string' ? m.code : was && was.code); if (code.length === 4) { ui.askWatch(code); return; } }      // 'Court is full. Watch instead?'
     const text = (watching ? { notfound: 'Court not found', busy: 'Too many watching', full: 'Too many watching' } : { notfound: 'Court not found', full: 'Court is full', busy: 'No free courts. Try again soon.' })[m.reason] || 'Couldn’t join';
-    if (was && (was.type === 'join' || watching) && ui.lobbyView() === 'code') ui.codeError(text); else say(text, null, 2600);
+    if (was && (was.type === 'join' || watching) && ui.lobbyView() === 'courts' && was.code === ui.typedCode()) ui.codeError(text); else say(text, null, 2600);      // typed in the boxes: said under them. A row click: a toast
     return;
   }
   if (m.type === 'closed') { if (room) toLobby(m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling
@@ -419,16 +431,23 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(spec() ? null : side);
     if (spec()) setView(VIEWS.includes(ls.get('poddle.view')) ? ls.get('poddle.view') : 'broadcast', false);
-    if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu
+    if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT && !noBot) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu. Never after taking Matt's seat
+    noBot = false; ui.askCard(null); ui.askPlay(null); askSync();
+    if (askedFor && spec()) { const who = names.find(n => n && n !== 'Matt'); say(who ? `${who} is playing Matt. We asked if you can play.` : 'We asked the player if you can play.', null, 3200); } askedFor = false;
     net.rejoined(); ui.setSpectator(spec()); syncSettings(); drawNames();
     if (ui.settings() && live()) pause(true);                    // a reconnect with the panel still open: the server let time run when the socket dropped
     return;
   }
   if (m.type === 'names') {
-    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) struck = false; drawNames(); showView();      // a seat changed hands: a fresh match
+    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }
+  if (m.type === 'askplay') { if (!spec() && Number.isInteger(m.id)) { askId = m.id; askWho = cleanName(m.name) || 'Someone'; ui.askCard({ name: askWho, left: m.left | 0 }); } return; }      // a spectator asks for Matt's seat: the corner card, 10 s
+  if (m.type === 'askoff') { const had = ui.askShowing(); ui.askCard(null); if (m.why === 'gone' && had && live()) say(`${askWho} left`, null, 1800); return; }
+  if (m.type === 'askstate') { if (!spec()) return; ui.askPlay(m); const who = names.find(n => n && n !== 'Matt') || 'The player';      // the button counts; this says why, with a name (the one human on the court)
+    if (m.s === 'no') say(`${who} said no`, null, 2600); else if (m.s === 'expired') say(`No answer from ${who}`, null, 2600); else if (m.s === 'wait' && m.busy) say('Someone else asked first', null, 2600); return; }
+  if (m.type === 'promoff') { if (live()) say(`${cleanName(m.name) || 'They'} wasn’t ready. Matt is back.`, null, 2600); return; }
   if (m.type === 'watcher') { if (live() && !spec()) ui.watcherNote(cleanName(m.name)); return; }      // someone started watching you (the server tells only the players)
   if (m.type === 'emote') { if (live() && Number.isInteger(m.e)) ui.emote(m.e, cleanName(m.name)); return; }      // a spectator's reaction, players and spectators alike see it
   if (m.type === 'state') {
@@ -436,7 +455,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     scene.updateBall(m.p, m.v, m.live, undefined, m.spin, m); if (frozen || holding) net.idle(); else net.packet();      // a stopped room is not a bad link
     if ((m.watchers | 0) !== watchers) ui.setWatchers(watchers = m.watchers | 0);
     setPaused(frozen && !holding); drawNames();
-    if (spec()) { ui.setScore(m.score[0], m.score[1]); for (const i of [0, 1]) { const o = m.paddles[i]; scene.updatePaddle(i, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null); } return; }
+    if (spec()) { askSync(); ui.setScore(m.score[0], m.score[1]); for (const i of [0, 1]) { const o = m.paddles[i]; scene.updatePaddle(i, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null); } return; }
     if (ui.settings() && noPause !== vsHuman()) ui.setSettings({ canPause: !(noPause = vsHuman()) });      // somebody sat down (or left) while the panel was open: the note follows
     if (forfeits() !== saidForfeit) ui.setSettings({ forfeit: saidForfeit = forfeits() });      // the Leave button says what it costs
     if (live() && !frozen && !holding) serveCoach(m); else svT = 0;      // no serve coaching over a set-up screen or a stopped room; its clock starts again afterwards
@@ -448,7 +467,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'botinfo') {
     const said = botLevel; if (m.active && typeof m.name === 'string') botLevel = m.name.slice(0, 12); drawNames();
-    if (m.reason) { if (live()) say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said) say(`Matt · ${botLevel}`, null, 1400);
+    if (m.reason) { if (live()) say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(`Matt · ${botLevel}`, null, 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath
     return;
   }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
@@ -519,7 +538,7 @@ addEventListener('pointerdown', () => { unlock(); play(); });
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
-  bot: level => { if (pending) return; botWant = [0, 1, 2].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
+  bot: level => { if (pending) return; botWant = [0, 1, 2, 3].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600) });
 // open(): the device list is re-read every time the card opens, because headphones come and go.
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
@@ -529,7 +548,7 @@ ui.onSettings({
   sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
   move: m => { if (MODES.includes(m) && m !== mode && (m !== 'body' || body && body.ready)) setMode(m); },      // how you move is chosen here now, not on the court
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
-  bot: level => { if ([0, 1, 2].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
+  bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });
 ui.onRematch(yes => { if (!room || spec()) return; if (!yes && votedYes) { votedNo = true; return leave(); }      // Leave after Rematch: the server takes one answer each, and a player leaving the vote closes the court for everyone just the same
@@ -542,20 +561,21 @@ addEventListener('keydown', e => {
   unlock();
   const k = e.key.toLowerCase();
   if (e.target.tagName === 'INPUT') { if (k === 'escape') esc(); return; }      // typing a room code or a name: F, C, B, M are letters there
+  if ((k === 'y' || k === 'n') && ui.askShowing()) { if (!e.repeat) answer(k === 'y'); return; }      // only while the card shows: otherwise Y and N do nothing
   if (k === 'f') { ui.fullscreen(); return; }
   if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
   if (phase === 'lobby') return;                                 // the lobby's keys live in ui.js; game keys wait for a room
   if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
   if (k === 'h') setStats(!showStats);
-  if (spec()) { if ('1234'.includes(k) && !e.repeat) setView(VIEWS[+k - 1], true); return; }      // watching: 1-4 pick the view (3 again = the other player), F, H, Q Q and Esc. Nothing else
+  if (spec()) { if ('1234'.includes(k) && !e.repeat) setView(VIEWS[+k - 1], true); else if (k === 'a' && !e.repeat && ui.askCan()) askPlay(); return; }      // A: Ask to play      // watching: 1-4 pick the view (3 again = the other player), F, H, Q Q and Esc. Nothing else
   if (k === 'c') startCal();
   if (k === 'r') recenter();
   if (k === 'p') resetPeaks();
   if (k === 'v') setPod(!showPod);
   if (k === '[' || k === ']') sens(k === ']' ? 1 : -1);          // [ = less sensitive, ] = more (the settings panel's - / +)
   if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty
-  if ('123'.includes(k)) game.send({ type: 'bot', level: +k - 1 });
+  if ('1234'.includes(k)) game.send({ type: 'bot', level: [0, 1, 3, 2][+k - 1] });      // keys follow the display order: Rookie, Club, Tour, Pro (the wire keeps each level's index)
 });
 addEventListener('resize', () => scene.resize());
 

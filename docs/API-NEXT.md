@@ -323,7 +323,7 @@ while `!live()` (mid-calibration) is kept and shown on entering play, unless `re
 
 | message | honoured when | MAIN does |
 |---|---|---|
-| `lobby {rooms, online}` | LOBBY, always | `ui.lobbyRooms(rooms, online)` |
+| `lobby {rooms, online, tours}` | LOBBY, always | `ui.lobbyRooms(rooms, online, tours)`. Rows gain `ask`, `bot`, `names` (docs/ROOMS.md) |
 | `room {code, public, role}` | LOBBY, always | `settle()`; `room`, `role`; `ui.setRoom(code, shareLink)`; URL `?room=CODE` (+ `&watch=1` for a spectator); `scene.stopAttract()`. Player: create -> share view, Play a bot / quick / join -> `begin()`. Spectator: `enterWatch()`. Same code again = a reconnect: stay where you are |
 | `joinfail {reason, watch, code}` | LOBBY, always | `full` + `watch:true` -> `ui.askWatch(code)`. `full` + no watch -> "Court is full". A failed `watch`: `busy` -> "Too many watching", `notfound` -> "Room not found". Rest as today. While `room` is set -> `toLobby('Room closed')` |
 | `closed {reason}` | LOBBY, always | `toLobby(reason === 'norematch' ? 'No rematch' : 'Room closed')`. Legacy page: `ui.showOverlay(null)` only |
@@ -343,6 +343,11 @@ while `!live()` (mid-calibration) is kept and shown on entering play, unless `re
 | `holdoff` | seated | `holding = false`; `ui.hold(null)`; frozen follows the next `state` |
 | `paused {on, by, refused}` | seated | `refused` -> `ui.setSettings({ canPause:false })`. Else `ui.setPaused(on)`; `scene.setFrozen(on \|\| holding)` |
 | `left` | seated | only before a match started now: clear the far side; `live()` -> toast "<name> left" |
+| `room {asked \| promoted \| demoted}` | LOBBY | `asked`: after the spectator `welcome`, toast "<name> is playing Matt. We asked if you can play.". `promoted` / `demoted` (same code): `switchSeat(m)`: role flips, player -> `begin()` (no `bot` sent after it), spectator -> `enterWatch()`; toast "You’re in. Get your paddle ready." / "Time’s up. You’re watching again." |
+| `askplay {id, name, left}` | seated player | `ui.askCard({ name, left })`; Y / N or a click -> `answer` |
+| `askoff {id, why}` | seated player | `ui.askCard(null)`; `gone` while it showed -> toast "<name> left" |
+| `askstate {s, left, why, busy}` | spectator | `ui.askPlay(m)` |
+| `promoff {name}` | seated player | toast "<name> wasn’t ready. Matt is back." |
 | anything else | | ignored, no throw |
 
 ### 4.4 Client -> server
@@ -350,7 +355,9 @@ while `!live()` (mid-calibration) is kept and shown on entering play, unless `re
 |---|---|---|
 | `quick` | Quick play | `{ type, name }` |
 | `create` | Create; Play a bot | `{ type, public, name }`. Play a bot: `public:false`, remember the level, skip the share view, go to `begin()` |
-| `bot` | right after the `welcome` that answers a Play a bot create; keys B / 1 2 3 (players, silent keys) | `{ type, level }` (no `level` = B: next level) |
+| `bot` | right after the `welcome` that answers a Play a bot create; keys B / 1 2 3 4 (players, silent keys) | `{ type, level }` (no `level` = B: next level in the order Rookie, Club, Tour, Pro). Keys 1-4 send levels 0, 1, 3, 2 (display order; Tour is index 3) |
+| `ask` | a spectator's Ask to play button or key A | `{ type }` |
+| `answer` | the player's card: Y / N or a click | `{ type, id, yes }` |
 | `join` | a room row, the code form, `?room=CODE` after Play | `{ type, code, name }` |
 | `watch` | a Watch button, "Yes" on the prompt, `?room=CODE&watch=1` after Play | `{ type, code, name }`. One lobby request at a time (`request()`), like the others |
 | `leave` | Q twice, settings "Leave room", Back on the set-up screens; a spectator's only exit | `{ type }`, then `toLobby()` |
@@ -375,7 +382,8 @@ Socket URL: `?cid=..&lobby=1[&room=CODE][&watch=1][&name=..]`; `room` / `watch` 
   Spectator: `1 2 3 4` = views (3 again flips), `F`, `H`, `Q Q`, Esc; nothing else. One function serves keys and
   chips (`ui.onView`): `scene.setView(...)`, then `ui.setView(v.name, v.name === 'pov' ? nameOf(v.side) : '')` with
   what the scene returned, then save `poddle.view`. A `names` change while in `pov` refreshes the chip. Player: every key of today still
-  works and says nothing new: C, M, R, F, [ ], V, H, B, 1 2 3, P, Q. V and H also call `ui.setSettings`.
+  works and says nothing new: C, M, R, F, [ ], V, H, B, 1 2 3 4, P, Q. V and H also call `ui.setSettings`. Y and N answer the
+  ask card, only while it shows; A is a spectator's Ask to play.
 - Settings callbacks: `sens(dir)` = today's `]` / `[` code path; level shown = `(90 - sideDeg) / 5 + 1` (1..14) or, in
   Body mode, `round((0.42 - body.reach) / 0.03) + 1`. `airpod(on)` / `stats(on)` -> `ui.show('podwrap' | 'dev', on)`.
   `recenter()` = R. `leave()` = send `leave` + `toLobby()`.
@@ -467,3 +475,20 @@ mismatch between this file and what was built.
   Shows in the court list, Leave court, Joining court CODE, Select difficulty (+ Slow and forgiving / A fair match / Fast and
   accurate), Move, Calibrating (was Setting up), Paused, Reconnecting.
 
+
+## 8. Courts, Ask to play, the Tour bot (docs/COURTS-TOURNEY.md; NOTES 84)
+- Lobby home: three tiles, `#btn-quick` Quick play, `#btn-courts` Courts (sub-line `#courts-n` "{n} open"), `#btn-bot` Play a bot. `#btn-code`,
+  the home Create court tile and the home list are gone.
+- `lobbyView('courts')` (title Courts; `'code'` is an alias of it): `#court-search` (codes only, substring, prefix matches first), `#court-seg`
+  Open | Full with filtered counts `#n-open` / `#n-full` (a dash while loading or down; the tab kept in `localStorage['poddle.courts']`), `#room-list` (every row, no 12 cap, a fixed
+  height in every state), `#room-empty` (one state line: down, loading, open empty, full empty, no match, rows: `courtsState()`), the code form
+  `#lobby-code` with `#btn-join` and `#btn-watch-code`, `#btn-create` (opens the create view), `#btn-tour` (aria-disabled, "Needs at least 4
+  players. Up to 16. Tournaments are coming soon."). `viewParent(v)`: create and share go back to Courts. Keys: `/` search, Esc clears a query
+  before going Back, Up / Down / Home / End walk the list, Right / Left reach a row's Watch, Shift+Enter in the boxes watches.
+- `lobbyRooms(rooms, online, tours)`. Row kinds: `tour` (Join), `open` (Join, + Watch while someone is there), `ask` (Ask to play = `join`,
+  + Watch), `full` (the row is Watch; Stands full when `watch` is 0). Open lists tournaments, then ask rows, then open courts. A row with a
+  Watch says "Right arrow to watch" in its label (`aria-keyshortcuts="ArrowRight"`). Open and empty with courts to watch: "{n} to watch in Full".
+  Every string is `textContent`.
+- UI API adds: `viewParent courtsState typedCode askCard({name,left}|null) askShowing onAnswer(fn) askPlay(askstate|null) showAsk(on) askCan onAsk(fn)`.
+- Matt's levels are Rookie, Club, Tour, Pro everywhere (`#bot-levels` 4 buttons, `#btn-bot-3` third; `#bot-seg` 4 options with `data-name`;
+  `#key-bot` 1 2 3 4). `botinfo` adds `order: [0,1,3,2]`; `backTo()` writes `bot=` as the index (Tour = 3).

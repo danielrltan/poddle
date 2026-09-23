@@ -56,8 +56,8 @@
 <script type="module">
   // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
   const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
-  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
-    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full'];
+  const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'lobby-courts', 'lobby-courts-full', 'lobby-courts-loading', 'lobby-courts-empty', 'lobby-courts-empty-full', 'lobby-courts-nomatch', 'lobby-courts-down', 'lobby-courts-err', 'lobby-courts-link', 'lobby-courts-many', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
+    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full', 'hud-ask', 'hud-ask-settings', 'match-ask', 'watch-ask'];
   // extra params: &bg=court|grass (flat ground under the HUD) · &name=<player name> · &opp=<opponent> (try a hostile one) · &idle=1 · &freeze=1
   if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
   if (screen === 'all') {
@@ -76,14 +76,39 @@
     if (qs.get('bg')) $('stage').classList.add('bg-' + qs.get('bg'));
     const hud = (a = 7, b = 5, rally = 4) => { $('stage').hidden = false; ui.showScreen(null); ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.setRoom('K24M', 'https://poddleball.com/?court=K24M'); ui.setNames({ them: opp, themSub: opp === 'Matt' ? 'Club' : 'Far side' }); ui.setBot(opp === 'Matt' ? 'Club' : null); ui.setScore(a, b); ui.setServe('me'); ui.setRally(rally); ui.setSettings({ sens: 8, airpod: true, stats: false, inRoom: true }); };
     const watch = (view = 'broadcast', who = '') => { hud(6, 4, 7); $('camwrap').hidden = true; ui.setNames({ me: me || 'Player 1', meSub: '', them: opp, themSub: '' }); ui.setSpectator(true); ui.setWatchers(3); ui.setSettings({ spectator: true }); ui.setView(view, who); };
-    const lobby = (view = 'home') => { $('stage').hidden = false; ui.showScreen('lobby'); ui.lobbyView(view); ui.lobbyRooms([{ code: 'KXQ7', players: 1, open: true, watch: 8, watchers: 0, score: [0, 0], live: false }, { code: 'M3PD', players: 2, open: false, watch: 6, watchers: 2, score: [7, 4], live: true },
-      { code: 'RN2S', players: 2, open: false, watch: 0, watchers: 8, score: [10, 9], live: true }, { code: 'WXYZ', players: 1, open: true }], 5); };
+    // the court list: open courts (a join seats you), ask rows (one human playing Matt: a join asks them), full courts (the row is Watch). &tour=1 adds a tournament signing up
+    const ROOMS = [{ code: 'KXQ7', players: 1, open: true, ask: false, bot: false, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Dan', null] },
+      { code: 'M3PD', players: 2, open: false, ask: false, bot: false, watch: 6, watchers: 2, score: [7, 4], live: true, names: ['Ann', 'Ben'] },
+      { code: 'RN2S', players: 2, open: false, ask: false, bot: false, watch: 0, watchers: 8, score: [10, 9], live: true, names: ['Priyanka', 'Sam'] },
+      { code: 'WXYZ', players: 1, open: true, ask: false, bot: true, watch: 8, watchers: 1, score: [0, 0], live: false, names: ['Kim', 'Matt'] },
+      { code: 'KXQ9', players: 1, open: false, ask: true, bot: true, watch: 7, watchers: 1, score: [4, 6], live: true, names: ['Lu', 'Matt'] },
+      { code: 'H4TT', players: 1, open: true, ask: false, bot: false, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Oliver', null] },
+      { code: 'B7QE', players: 1, open: true, ask: false, bot: false, watch: 8, watchers: 3, score: [0, 0], live: false, names: ['Mei', null] },
+      { code: 'Z9KP', players: 1, open: false, ask: true, bot: true, watch: 8, watchers: 0, score: [2, 1], live: true, names: ['Rafael', 'Matt'] },
+      { code: 'CQ3N', players: 2, open: false, ask: false, bot: false, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Jo', 'Tia'] },
+      { code: 'EV5R', players: 1, open: true, ask: false, bot: false, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Noor', null] },
+      { code: 'GJ2W', players: 1, open: true, ask: false, bot: true, watch: 8, watchers: 0, score: [0, 0], live: false, names: ['Ivy', 'Matt'] }];
+    const TOURS = qs.get('tour') === '1' ? [{ code: 'T8MX', host: 'Daniel', n: 5, max: 16 }] : [];
+    const lobby = (view = 'home', rooms = ROOMS) => { $('stage').hidden = false; ui.showScreen('lobby'); ui.lobbyView(view); if (rooms) ui.lobbyRooms(rooms, 5, TOURS); };
+    const courts = (rooms = ROOMS) => { lobby('courts', rooms); if (qs.get('q')) { const i = $('court-search'); i.value = qs.get('q'); i.dispatchEvent(new Event('input')); } };
+    const tab = f => $('court-seg').querySelector(`[data-filter="${f}"]`).click();
+    const tab0 = () => { try { localStorage.removeItem('poddle.courts'); } catch { /* fine */ } };
     const result = (o, votes) => { hud(o.me, o.them, 0); ui.setServe(null); ui.matchResult({ nameThem: opp, ...o }); if (votes) ui.rematch({ name: opp, ...votes }); };
     const cal = (e, o) => { ui.setStatus({ airpod: 'ok', game: 'ok', camera: 'ok' }); ui.showScreen('calibrate'); ui.calibration(e, o); };
     const R = {
       'title': () => { $('stage').hidden = false; ui.showScreen('title'); },
       'lobby': () => lobby(), 'lobby-first': () => lobby(), 'lobby-bot': () => lobby('bot'),
       'lobby-ask': () => { lobby(); ui.askWatch('M3PD'); },
+      'lobby-courts': () => { courts(); tab('open'); },
+      'lobby-courts-full': () => { courts(); tab('full'); },
+      'lobby-courts-loading': () => { tab0(); lobby('courts', null); },
+      'lobby-courts-empty': () => { courts([ROOMS[1], ROOMS[2]]); tab('open'); },
+      'lobby-courts-empty-full': () => { courts(ROOMS.filter(r => r.open !== false || r.ask)); tab('full'); },      // nothing to watch: the Full tab's own empty line
+      'lobby-courts-nomatch': () => { if (!qs.get('q')) qs.set('q', 'ZZ'); courts([...ROOMS, { code: 'ZZ4Q', players: 2, open: false, ask: false, bot: false, watch: 8, watchers: 0, score: [3, 5], live: true, names: ['Ada', 'Bo'] }]); tab('open'); },      // one Full court matches ZZ: the '1 in Full' switch shows
+      'lobby-courts-down': () => { courts(); tab('open'); ui.lobbyLink(false); },
+      'lobby-courts-err': () => { courts(); tab('open'); ui.lobbyView('courts', { code: 'QQ4R' }); ui.codeError('Court not found'); },
+      'lobby-courts-link': () => { courts(); tab('open'); ui.lobbyView('courts', { code: 'M3PD', watch: true }); },
+      'lobby-courts-many': () => { courts([...Array(42)].map((_, i) => ({ code: 'CDEFGHJKMN'[i % 10] + 'PQRSTUVWXY'[(i / 10) | 0] + '2' + '3456789ABC'[i % 10], players: i % 3 ? 1 : 2, open: i % 3 === 1, ask: i % 3 === 2, bot: i % 3 === 2, watch: 8, watchers: i % 4, score: [i % 11, (i * 3) % 11], live: true, names: ['Player' + (i + 1), i % 3 === 2 ? 'Matt' : 'Guest' + i] }))); tab('open'); },
       'connect': () => { ui.setStatus({ airpod: 'wait', game: 'ok', camera: 'wait' }); ui.showScreen('connect'); },
       'calibrate1': () => cal({ stage: 'hold', progress: .62, ok: true, msg: 'Hold it like a paddle, pointed at the screen. Keep still.' }),
       'calibrate2': () => cal({ stage: 'tilt', progress: .4, ok: true, msg: 'Now tip the front of the AirPod up.' }),
@@ -117,6 +142,11 @@
       'match-legacy': () => { hud(11, 8, 0); ui.setServe(null); ui.matchResult(true, 11, 8, opp); },                           // the old positional call: no vote
       'server-down': () => { hud(); ui.setStatus({ game: 'bad' }); ui.setServerAddress('ws://localhost:8080'); ui.showOverlay('server-down'); },
       'game-full': () => { hud(); ui.showOverlay('game-full'); },
+      // asking to play: the player's corner card (over the court, over the paused settings card, over the result card), the spectator's button
+      'hud-ask': () => { hud(); ui.askCard({ name: qs.get('asker') || 'Sam', left: 10 }); },
+      'hud-ask-settings': () => { hud(); ui.setPaused(true); ui.settings(true); ui.askCard({ name: 'Sam', left: 7 }); },
+      'match-ask': () => { result({ won: true, me: 11, them: 8 }, { mine: null, theirs: null, left: 20 }); ui.askCard({ name: 'Sam', left: 4 }); },
+      'watch-ask': () => { watch(); ui.setNames({ me: 'Lu', meSub: '', them: 'Matt', themSub: 'Club' }); ui.showAsk(true); const st = qs.get('s') || 'idle'; if (st !== 'idle') ui.askPlay({ s: st, left: st === 'sent' ? 9 : 8, busy: qs.get('busy') === '1' }); const why = st === 'no' ? 'Lu said no' : st === 'expired' ? 'No answer from Lu' : st === 'wait' && qs.get('busy') === '1' ? 'Someone else asked first' : ''; if (why) ui.toast(why, 600000); },      // main.js's toast says why
     };
     (R[screen] || R.title)();
     if (qs.get('idle') === '1') for (const id of ['keys', 'views']) $(id).classList.add('is-idle');

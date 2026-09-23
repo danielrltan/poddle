@@ -123,3 +123,49 @@ Clients white out that character and float a tag over it: Paused / Calibrating /
 - **Result card.** After Rematch the Leave button stays open (Leave then = leaving the vote: `leave`, which closes the court for everyone). After a forfeit
   there is no countdown on the card and spectators are not told to wait for a rematch.
 
+
+## Asking to play (docs/COURTS-TOURNEY.md 2.1-2.3; test/joinreq.test.mjs)
+A spectator watching ONE human play Matt may ask for Matt's seat. The player gets a small corner card for 10 s and answers Y or
+N (or a click); the server enforces every rule, the clients only draw.
+
+**When.** Two predicates in the room (never in `LOCAL`):
+- `underway` = one human, Matt seated, a ball already struck, no result card. A `join` (code, link or list row) into such a court
+  is not a seat: the joiner is let in to watch (`room` with `asked:true`, role spectator) and asked at once. Before the first
+  strike (share screen, calibrating, the 3-2-1) and on a bot court's result card a joiner still sits down directly, as always:
+  Matt is seated within 2.5 s of nearly every lone human, so "Matt is seated" alone would turn every friend's code into a request
+  and stop Quick play from pairing. `quick` never picks an under-way court. `&watch=1` / `watch` only watches, never asks.
+- `askable` = one human, Matt seated, no result card, no held seat, no seat just given away. Paused is fine (the card shows over
+  the settings panel). A spectator's `ask` is heard only here.
+
+**Rules.** ONE pending request per court. It lives `ASK_S` (10 s); silence is a no. A requester waits `ASK_COOL_S` (10 s) counted
+from the END of their request (a no, an expiry, walking out of the stands mid-request, or being sent back to the stands after
+`PROMO_S`), keyed by `cid` so a reload does not reset it, and by address so a new cid is no way round it. A request the court
+ended (the player left, dropped or reloaded, the match ended) charges nothing. A court rests `ASK_GAP_S` (3 s) between two requests. Asking while another request is pending
+or during the gap charges no cooldown. A spectator let into the seat has `PROMO_S` (= `CAL_S`, 60 s) to get a paddle ready;
+otherwise they go back to the stands and Matt returns at the level he had. If the player who said yes leaves first, the new player
+is the court's only human and keeps the seat. After a restart a revived Matt match with points on the board is under way at once,
+so a stranger cannot take Matt's seat while the player recalibrates.
+
+| message | direction | fields |
+|---|---|---|
+| `ask` | spectator -> server | `{type}`. From a player or the lobby it is never routed |
+| `askstate` | server -> requester | `{type, s, left, why, busy}`. `s`: `sent` (pending, `left` = s to expiry), `no` / `expired` (`left` = cooldown), `wait` (cooldown running, or `busy:true`: someone else's request or the gap), `gone` (the player left, dropped, the match ended; `left` = cooldown), `refused` (`why`: `humans`, `nomatt`, `over`), `yes` (just before `room promoted`) |
+| `askplay` | server -> the seated human | `{type, id, name, left}`. `id` counts up per court (never a cid); `name` already cleaned. Re-sent with the time left when the player reloads mid-request |
+| `askoff` | server -> the seated human | `{type, id, why}`, `why`: `yes`, `no`, `expired`, `gone`, `late`. The card closes on any of them |
+| `answer` | seated human -> server | `{type, id, yes}`. Heard BEFORE the pause gate. Dropped unless `id` is an integer and `yes` a boolean. A stale, repeated or unknown `id` gets `askoff late` |
+| `room` | server -> requester | `asked:true` (in the stands, a request went out); `promoted:true, role:'player'` (accepted: `welcome` as a player follows, Matt gone, 0-0, `names`); `demoted:true, role:'spectator'` (not ready in `PROMO_S`) |
+| `promoff` | server -> the player | `{type, name}`: "Sam wasn't ready. Matt is back." |
+| `lobby.rooms[i]` | server -> lobby | adds `ask` (under way and a place to watch), `bot`, `names`; `open` now also means "not under way" |
+
+**Race matrix** (each row a case in test/joinreq.test.mjs): a join before a strike seats directly; after a strike it is watch + ask;
+the player reloading mid-request on a half-open socket retakes the seat and gets the card again (a clean reload drops the seat into a hold, which ends the request with no cooldown); a double accept promotes once (the second is `late`);
+accept after expiry is `late`; the requester leaving closes the card (`askoff gone`); the player leaving sends the requester
+`askstate gone` then `closed empty`; the player dropping with people watching holds the seat and ends the request (`gone`, no cooldown);
+a second spectator asking while one is pending, or inside the gap after one, gets `wait busy`; the match ending ends the request; a promoted spectator who
+never sends a paddle is demoted after `PROMO_S` and the player hears `promoff`; `answer` while paused is heard.
+
+**Clients.** The player's card sits bottom-left outside `#hud`, never takes focus, never swallows a key (its buttons are out of
+the Tab order), answers to Y / N only while it shows, drains for `left` s. The requester's button (`#btn-ask`, key A) shows only
+to a spectator watching one human and one Matt, on a device that can be a paddle; it reads Ask to play -> Waiting · Ns (the
+player's time to answer) -> Again in Ns (until you may ask; the why, with the player's name, is a toast) -> Ask again, at one
+fixed width.

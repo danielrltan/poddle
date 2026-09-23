@@ -285,8 +285,10 @@ ok(pz.n.hit === hits0 && (pz.n.swung || 0) === sw0 && pT.every(m => JSON.stringi
 const late2 = await watching(pz.room.code); ok(late2.got('paused', m => m.on === true).length === 1 && await until(() => late2.st && late2.st.paused === true), 'someone who arrives during the pause is told, and sees paused:true in state');
 pz.send({ type: 'pause', on: true }); pz.send({ type: 'pause', on: 'yes' }); pz.ws.send(`{"type":"pause","on":${nest(1500)}}`); pz.send({ type: 'pause' }); await wait(200);
 ok(pzW.n.paused === 3 && pz.st.paused === true, 'pause again, or with something that is not a boolean: nothing changes for the room');
-const pj = await joined(pz.room.code, 'lobby=1', PORT, 'Joy');
-ok(pj.side === 1 && await until(() => pzW.got('paused', m => m.on === false).length === 2 && pz.last('paused').on === false) && await until(() => pz.st && !pz.st.paused && pj.st && !pj.st.paused), `a second human sits down in the paused public room: it resumes (${JSON.stringify(pz.last('paused'))})`);
+const pj = await joined(pz.room.code, 'lobby=1', PORT, 'Joy');   // Matt's match is under way: a join is a request to the one playing him (docs/SPECTATE.md Asking to play), heard while paused
+ok(pj.room && pj.room.asked === true && pj.room.role === 'spectator' && await until(() => pz.last('askplay')), `a second human joining the paused, under-way Matt court lands in the stands and the player is asked: ${JSON.stringify(pj.room)}`);
+pz.send({ type: 'answer', id: pz.last('askplay').id, yes: true });
+ok(await until(() => pj.side === 1) && await until(() => pzW.got('paused', m => m.on === false).length === 2 && pz.last('paused').on === false) && await until(() => pz.st && !pz.st.paused && pj.st && !pj.st.paused), `accepted: the second human sits down in the paused public room and it resumes (${JSON.stringify(pz.last('paused'))})`);
 play(pj); pz.send({ type: 'pause', on: true }); const np = pj.n.paused || 0;
 ok(await until(() => pz.last('paused').refused === true && pz.last('paused').on === false) && (pj.n.paused || 0) === np && !pz.st.paused, `two humans: refused, only the one who asked hears it: ${JSON.stringify(pz.last('paused'))}`);
 // A bot court with people watching: a socket that closes by itself (a reload, a wifi blip) no longer empties the stands at once. The seat is held like any other (HOLD_S=3).

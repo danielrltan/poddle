@@ -24,10 +24,23 @@ ok(await until(() => w.got('welcome').length) && w.got('room')[0]?.role === 'spe
 console.log('alone against Matt');
 const m = await tab(P, 'cid=mm&room=M3PD&back=1&side=0&score=2-7&pub=0&name=Sue&bot=2');
 ok(await until(() => m.got('botinfo').some(i => i.active && i.level === 2)) && await until(() => m.st && m.st.score.join() === '2,7'), `Matt is back at Pro and the score is ${m.st && m.st.score}`);
+const x = await tab(P, 'cid=xx'); await until(() => x.got('lobby').length); x.ws.send(JSON.stringify({ type: 'join', code: 'M3PD', name: 'Xi' }));
+ok(await until(() => x.got('room').length) && x.got('room')[0].role === 'spectator' && x.got('room')[0].asked === true && m.st.score.join() === '2,7', `a stranger joining while Sue recalibrates does not take Matt's seat: the match is under way, they watch and ask (${JSON.stringify(x.got('room')[0])}, ${m.st.score})`);
+x.ws.close();
+
+const t3 = await tab(P, 'cid=t3&room=T3UR&back=1&side=0&score=1-1&pub=0&name=Tia&bot=3');
+ok(await until(() => t3.got('botinfo').some(i => i.active && i.level === 3 && i.name === 'Tour')), 'bot=3 brings Matt back as Tour (appended at index 3, so 0-2 keep their meaning)');
 
 console.log('a spectator is first back');
 const w2 = await tab(P, 'cid=w2&room=WXYZ&back=1&watch=1&pub=1'), p2 = await tab(P, 'cid=p2&room=WXYZ&back=1&side=1&score=1-0&pub=1&name=Pat');
 ok(await until(() => w2.got('welcome').length && p2.got('welcome').length) && w2.got('room')[0].role === 'spectator' && p2.got('welcome')[0].side === 1, 'the court is rebuilt for the spectator, and the player who follows gets their own seat');
+
+const w3 = await tab(P, 'cid=w3&room=QRST&back=1&watch=1&pub=1&score=3-5'); await until(() => w3.got('welcome').length);
+const h3 = await tab(P, 'cid=h3&room=QRST&back=1&side=0&score=3-5&pub=1&name=Hal&bot=3');
+ok(await until(() => h3.got('botinfo').some(i => i.active && i.level === 3)) && await until(() => h3.st && h3.st.score.join() === '3,5'), `a spectator rebuilt the court first: Hal gets Matt back as Tour at ${h3.st && h3.st.score}`);
+const x3 = await tab(P, 'cid=x3'); await until(() => x3.got('lobby').length); x3.ws.send(JSON.stringify({ type: 'join', code: 'QRST', name: 'Xu' }));
+ok(await until(() => x3.got('room').length) && x3.got('room')[0].asked === true && h3.st.score.join() === '3,5', `and that match is under way too: a stranger watches and asks (${JSON.stringify(x3.got('room')[0])})`);
+[w3, h3, x3].forEach(c => c.ws.close());
 
 console.log('what it will not do');
 const n1 = await tab(P, 'cid=n1&room=QQQQ'), n2 = await tab(P, 'cid=n2&room=IIII&back=1&side=0'), n3 = await tab(P, 'cid=n3&room=R2D2&back=1&side=0&score=11-3&name=Fin');

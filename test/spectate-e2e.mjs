@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws';
 import puppeteer from 'puppeteer-core';
 import { makeSynth, CALIBRATE, SESSION_LOOP } from './fake-bridge.mjs';
 const P0 = +process.env.SPEC_E2E_PORT || 8440, G = P0, B = P0 + 1, DEAD = P0 + 2, root = new URL('..', import.meta.url).pathname, sleep = ms => new Promise(r => setTimeout(r, ms));
-const LINK = 'court=', WORD = 'court', HINTS = (keys, level) => keys === (level ? `CCalibrate | 123Difficulty: ${level}` : 'CCalibrate');      // what the page says, in one place
+const LINK = 'court=', WORD = 'court', HINTS = (keys, level) => keys === (level ? `CCalibrate | 1234Difficulty: ${level}` : 'CCalibrate');      // what the page says, in one place
 const WIN = 5, HOLD = 15;                           // first to 5, no win-by-2, so a match is SURE to end inside a test (Ben stops swinging, but Ann swings blind: at deuce they could trade points for ever). The seat hold keeps its real 15 s
 const server = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: G, WIN_AT: WIN, WIN_BY: 1, HOLD_S: HOLD }, stdio: ['ignore', 'pipe', 'inherit'] }), slog = []; server.stdout.on('data', d => slog.push(String(d)));
 
@@ -27,7 +27,7 @@ const browsers = [], launch = async () => { const b = await puppeteer.launch({ e
 fs.mkdirSync(root + 'test/ui-shots', { recursive: true });
 const out = [], errs = [], ok = (c, what) => { out.push((c ? 'PASS ' : 'FAIL ') + what); console.log(c ? 'PASS' : 'FAIL', what); return c; };
 const done = async code => { for (const b of browsers) await b.close().catch(() => {}); server.kill(); process.exit(code); };
-setTimeout(() => { console.log('SPECTATE E2E FAIL (timeout)'); done(2); }, 780000);
+setTimeout(() => { console.log('SPECTATE E2E FAIL (timeout)'); done(2); }, 900000);
 for (const ev of ['uncaughtException', 'unhandledRejection']) process.on(ev, e => { console.log('SPECTATE E2E FAIL', e); done(2); });      // never leave the server or a Chrome behind
 server.on('exit', c => { console.log(`SPECTATE E2E FAIL: server/game.js stopped (${c}). Is port ${G} taken?`); done(2); });
 
@@ -116,9 +116,9 @@ await sleep(1200); s = await st(a); ok(!s.pill && !s.room && s.scene.attract && 
 // 3. Create + Enter code: Ann and Ben. A third page finds the court full and watches instead
 // =====================================================================================================================
 const b = await open('b', 'Ben', '', 600, 900);
-await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'a create -> share view');
+await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'a create -> share view');
 const CODE = s.share; ok(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/.test(CODE) && s.search.includes(LINK + CODE), `Ann made private court ${CODE}, address bar ${s.search}`);
-await toLobby(b); await b.click('#btn-code'); await sleep(300); await type(b, CODE.toLowerCase()); await b.keyboard.press('Enter');
+await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await type(b, CODE.toLowerCase()); await b.keyboard.press('Enter');
 await a.click('#btn-share-go'); [s, t] = await Promise.all([toCourt(a), toCourt(b)]);
 [s, t] = await Promise.all([until(a, s => s.them === 'Ben', 5000, 'a sees Ben'), until(b, s => s.them === 'Ann', 5000, 'b sees Ann')]);
 ok(s.them === 'Ben' && t.them === 'Ann' && s.me === 'You' && t.me === 'You', `names on the scoreboards: Ann sees "${s.them}", Ben sees "${t.them}"`);
@@ -200,8 +200,9 @@ await sleep(1000); u = await st(c); ok(u.scene.attract && u.scene.menu && !u.sce
 // 6. Quick play, watched from the lobby list. Ben's wifi goes for good: hold, then forfeit, then everyone to the lobby
 // =====================================================================================================================
 swing('b'); await a.click('#btn-quick'); s = await until(a, s => s.pill, 4000, 'a quick play'); const PUB = s.pill; await b.click('#btn-quick'); t = await until(b, s => s.pill, 4000, 'b quick play'); ok(t.pill === PUB, `quick play: Ann and Ben share ${PUB}`);
-u = await until(c, s => s.rows.some(r => new RegExp(`^${PUB}\\d+-\\d+.*Watch$`).test(r)), 5000, 'c lists the full court with a Watch button'); ok(u.rows.some(r => new RegExp(`^${PUB}\\d+-\\d+.*Watch$`).test(r)), `lobby list: ${JSON.stringify(u.rows)}`); await shot(c, '17-lobby-watch', BOTH);
-await c.click(`#room-list [data-watch="${PUB}"]`); u = await until(c, s => s.phase === 'watch' && s.room === PUB, 5000, 'c watches from the list'); ok(u.scene.name === 'broadcast' && u.dview === 'broadcast', `the view chosen last is remembered (${u.scene.name})`);
+await c.click('#btn-courts'); await sleep(300); await c.click('#court-seg [data-filter="full"]');      // two humans: under Full, the row itself is Watch (docs/COURTS-TOURNEY.md 2.7)
+u = await until(c, s => s.rows.some(r => new RegExp(`^${PUB}.* vs .*(\\d+-\\d+|Starting).*Watch$`).test(r)), 5000, 'c lists the full court to watch'); ok(u.rows.some(r => new RegExp(`^${PUB}.* vs .*(\\d+-\\d+|Starting).*Watch$`).test(r)), `lobby list: ${JSON.stringify(u.rows)}`); await shot(c, '17-lobby-watch', BOTH);
+await c.click(`#room-list .room-row[data-code="${PUB}"]`); u = await until(c, s => s.phase === 'watch' && s.room === PUB, 5000, 'c watches from the list'); ok(u.scene.name === 'broadcast' && u.dview === 'broadcast', `the view chosen last is remembered (${u.scene.name})`);
 [s, t] = await Promise.all([toCourt(a), toCourt(b)]); const h0 = (await st(a)).ev.hit || 0; await until(a, s => s.ev.hit > h0, 40000, 'a ball is struck in the new match');
 const tDrop = Date.now(); b.cutting = true; await b.evaluate(() => window.__cut(true));
 s = await until(a, s => s.hold, 4000, 'hold again'); ok(/^Waiting for Ben/.test(s.hold), `hold: "${s.hold}"`);
@@ -221,8 +222,42 @@ await a.click('#btn-menu'); [s, u] = await Promise.all([until(a, s => s.paused &
 ok(u.meSub === 'Paused' && u.tags[1] == null && u.scene.frozen, `paused: Cat reads "${u.me} / ${u.meSub}", tag over Ann only ${JSON.stringify(u.tags)}, HUD tag ${u.pausedTag}`); await shot(c, '20-tag-paused-broadcast', BOTH); await shot(a, '21-settings-matt', BOTH);
 await a.click('#bot-seg [data-level="0"]'); s = await until(a, s => s.botRow === 'Rookie' && s.themSub === 'Rookie', 3000, 'Difficulty row -> Rookie'); await a.click('#move-seg [data-move="auto"]'); s = await until(a, s => s.moveSeg === 'Auto', 2000, 'Move row -> Auto');
 await a.keyboard.press('Escape'); s = await until(a, s => !s.paused && !s.settings, 3000, 'resume'); s = await wake(a); ok(HINTS(s.keys, 'Rookie') && s.moveSeg === 'Auto', `the hint follows the level: "${s.keys}"`);
-await a.keyboard.press('Digit3'); s = await until(a, s => s.themSub === 'Pro', 3000, 'key 3 = Pro'); s = await wake(a); ok(HINTS(s.keys, 'Pro'), `1 2 3 still change the level: "${s.keys}"`); await shot(a, '22-hud-difficulty', BOTH);
+await a.keyboard.press('Digit3'); s = await until(a, s => s.themSub === 'Tour', 3000, 'key 3 = Tour'); await a.keyboard.press('Digit4'); s = await until(a, s => s.themSub === 'Pro', 3000, 'key 4 = Pro'); s = await wake(a); ok(HINTS(s.keys, 'Pro'), `1 2 3 4 still change the level (3 = Tour, 4 = Pro): "${s.keys}"`); await shot(a, '22-hud-difficulty', BOTH);
 
+
+// =====================================================================================================================
+// 8. Ask to play (docs/COURTS-TOURNEY.md 2.11): Cat, watching Ann play Matt, asks for Matt's seat. N first, then Y. The card never takes focus
+// =====================================================================================================================
+const askUI = pg => pg.evaluate(() => { const bt = document.getElementById('btn-ask'), cd = document.getElementById('ask-card'), ae = document.activeElement;
+  return { btn: bt && !bt.hidden && getComputedStyle(bt).display !== 'none' ? document.getElementById('ask-label').textContent : null, card: !!cd && !cd.hidden && cd.classList.contains('is-on'), focus: ae ? ae.id || ae.tagName : null }; });
+const askUntil = async (pg, test, ms, what) => { const end = Date.now() + ms; let v; do { v = await askUI(pg); if (test(v)) return v; await sleep(120); } while (Date.now() < end); ok(false, `${what} (gave up: ${JSON.stringify(v)})`); return v; };
+await until(a, s => s.hits >= 1, 30000, 'Ann has struck a ball against Matt: the match is under way');
+let q = await askUntil(c, v => v.btn === 'Ask to play', 8000, 'c sees Ask to play'); ok(q.btn === 'Ask to play', `Cat, watching Ann against Matt: "${q.btn}"`); await shot(c, '22-ask-button', BOTH);
+await a.evaluate(() => document.activeElement && document.activeElement.blur()); const focus0 = (await askUI(a)).focus; await c.keyboard.press('KeyA');      // nothing focused on Ann's page: Space and Enter below reach the game, not a button
+q = await askUntil(c, v => /^Waiting · \d+s$/.test(v.btn || ''), 3000, 'c: Waiting'); ok(/^Waiting · \d+s$/.test(q.btn), `A asks: "${q.btn}"`);
+let r = await askUntil(a, v => v.card, 3000, 'a gets the card'); ok(r.card && r.focus === focus0, `Ann’s card shows and takes no focus (${focus0} -> ${r.focus})`); await shot(a, '23-ask-card', BOTH);
+const hits0 = (await st(a)).hits; await a.keyboard.press('Space'); await a.keyboard.press('Enter'); await sleep(300); r = await askUI(a); u = await st(c); t = await st(a); ok(r.card && u.srole === 'spectator' && !t.paused && !t.settings, `Space and Enter answer nothing: the card is still up, Cat is still watching (${u.srole}), Ann is still playing (paused ${t.paused})`);
+t = await until(a, s => s.hits > hits0, 6000, 'the ball is struck while the card shows'); r = await askUI(a); ok(t.hits > hits0 && r.card, `the card blocks no play: the ball is struck while it shows (hits ${hits0} -> ${t.hits}, card up ${r.card})`);      // the game has no Space serve (a swing serves): what the card must never stop is the paddle
+await a.keyboard.press('KeyN'); q = await askUntil(c, v => /^Again in \d+s$/.test(v.btn || ''), 3000, 'c: Again in'); r = await askUntil(a, v => !v.card, 2000, 'the card goes on N'); u = await st(c);
+ok(/^Again in \d+s$/.test(q.btn) && !r.card && u.toast === 'Ann said no', `N declines: Cat reads "${q.btn}" and the toast "${u.toast}", Ann's card is gone`); await shot(c, '24-ask-no');
+q = await askUntil(c, v => v.btn === 'Ask again', 15000, 'c: Ask again after the cooldown'); ok(q.btn === 'Ask again', `after the cooldown: "${q.btn}"`);
+await c.keyboard.press('KeyQ'); await sleep(200); await c.keyboard.press('KeyQ'); await until(c, s => s.screen === 'lobby' && !s.room, 4000, 'c leaves the stands (Q Q)');      // the Y round comes in the way a stranger would: Courts, search, the row, Enter
+await a.keyboard.press('KeyQ'); await sleep(200); await a.keyboard.press('KeyQ'); await until(a, s => s.screen === 'lobby' && !s.room, 4000, 'a leaves Matt (Q Q)');      // a public court this time, so it is listed
+await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="1"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'a creates a public court'); const OPEN = s.share;
+await a.click('#btn-share-go'); s = await toCourt(a); s = await until(a, s => s.them === 'Matt', 8000, 'Matt walks in'); await a.keyboard.press('Digit1');      // Rookie: a match against him lasts past this round (first to 5)
+await c.click('#btn-courts'); await sleep(300); await c.click('#court-seg [data-filter="open"]'); await c.click('#court-search'); await type(c, OPEN.slice(0, 2).toLowerCase());      // Cat's last visit left the Full tab on (it is remembered)
+const askRow = code => c.evaluate(code => { const li = [...document.querySelectorAll('#room-list > li.court[data-kind="ask"]')].filter(l => l.firstElementChild.dataset.code === code); return { n: li.length, go: li[0]?.querySelector('.court-go')?.textContent, who: li[0]?.querySelector('.court-who')?.textContent }; }, code);
+for (let i = 0; i < 150 && !(q = await askRow(OPEN)).n; i++) await sleep(200);      // listed as Join until Ann's first strike, then as Ask to play (the list arrives every second)
+ok(q.n === 1 && q.go === 'Ask to play' && /^Ann vs Matt$/.test(q.who), `Cat types "${OPEN.slice(0, 2)}": one ask row for ${OPEN}, "${q.who}", "${q.go}"`);
+for (let i = 0; i < 8 && await c.evaluate(() => document.activeElement.dataset.code) !== OPEN; i++) await c.keyboard.press('ArrowDown');      // Down from search walks the list to it
+await c.evaluate(() => { window.__toasts = []; new MutationObserver(() => { const t = document.getElementById('toast'); if (t.classList.contains('on')) window.__toasts.push(t.textContent); }).observe(document.getElementById('toast'), { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] }); });      // every toast Cat is shown from here on
+ok(await c.evaluate(() => document.activeElement.dataset.code) === OPEN, `the arrows reach ${OPEN}'s row`); await c.keyboard.press('Enter');
+u = await until(c, s => s.phase === 'watch' && s.room === OPEN, 6000, 'c presses Enter on the row: in the stands');
+q = await askUntil(c, v => /^Waiting · \d+s$/.test(v.btn || ''), 3000, 'c: Waiting after a join'); const toasts = await c.evaluate(() => [...new Set(window.__toasts)]);
+ok(u.srole === 'spectator' && /^Waiting · \d+s$/.test(q.btn) && toasts.length === 1 && /We asked (if you|the player if you) can play\./.test(toasts[0]), `Enter on an Ask to play row is watch + ask: button "${q.btn}", toasts ${JSON.stringify(toasts)}`);
+await askUntil(a, v => v.card, 3000, 'a gets the card again'); await a.keyboard.press('KeyY');
+u = await until(c, s => s.srole === 'player' && (s.screen === 'calibrate' || s.screen === 'connect' || s.screen === 'hud'), 6000, 'Y: Cat goes to her paddle as a player'); ok(u.srole === 'player' && u.role !== 'spectator', `Y accepts: Cat is a player now (${u.screen})`);
+u = await toCourt(c); s = await until(a, s => s.them === 'Cat', 6000, 'Ann plays Cat'); ok(s.them === 'Cat' && s.scMe === 0 && s.scThem === 0, `Matt's seat is Cat's: Ann plays "${s.them}" from ${s.scMe}-${s.scThem}`);
 for (const pg of [a, b, c]) ok((await st(pg)).errors === 0, `${pg.tag}: no script errors counted`);
 ok(!errs.length, 'no console errors, page errors or failed requests' + (errs.length ? ':\n  ' + errs.join('\n  ') : ''));
 const fails = out.filter(l => l.startsWith('FAIL')); console.log(`${out.length - fails.length} passed, ${fails.length} failed`);

@@ -487,6 +487,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 /* lobby header bits */
 .lobby-online{position:absolute;right:var(--s-7);top:50%;translate:0 -50%;display:inline-flex;align-items:center;gap:.5rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
 .lobby-online::before{content:"";width:.625rem;height:.625rem;border-radius:50%;background:var(--good);box-shadow:0 0 0 .125rem #fff}
+#lobby-down{position:absolute;top:calc(5rem - 1.375rem);left:50%;translate:-50% 0;z-index:2}      /* placed on the screen, not the (scrolling) body: it takes no room and hangs on the header's bottom edge, so the name row and the courts never move when it comes and goes */
 .lobby-down{display:inline-flex;align-items:center;gap:.625rem;margin:0;height:2.75rem;padding:0 1.5rem;border-radius:var(--r-pill);background:#fff6e0;border:.125rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-md);font-weight:700;box-shadow:var(--sh-1)}
 .lobby-down .light{background:radial-gradient(circle at 35% 30%,#ffe2a8,var(--warn) 55%,var(--warn-lamp));box-shadow:0 0 0 .125rem #fff}
 .lobby-down .dots-wait i{background:var(--warn-lamp)}
@@ -497,9 +498,9 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .panel.lobby-view{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);padding:var(--s-6)}
 #screen-lobby[aria-busy="true"] .lobby-view{pointer-events:none;opacity:.6;transition:opacity var(--d-fast) linear 250ms}      /* 250 ms: an answer normally beats it, so no flicker */
 #screen-lobby.is-down .rooms{display:none}
-#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
+#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down #btn-watch-code,#screen-lobby.is-down #btn-create,#screen-lobby.is-down #btn-tour,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
 /* first visit, no name yet: the choices are dimmed but still take the click, which sends the player to the name field */
-#screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
+#screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name #btn-create,#screen-lobby.needs-name #btn-join,#screen-lobby.needs-name #btn-watch-code,#screen-lobby.needs-name .court-state .btn,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
 #screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
 
 /* name: one field above every lobby view but the share card. Also the look of the name field in the settings panel (.field) */
@@ -512,8 +513,11 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 #screen-lobby.needs-name .name-row{background:#fff;border-color:var(--line)}
 
 /* Play a bot: Matt's three levels, one click plays */
-.bot-levels{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-4)}
-.bot-levels .btn{min-width:12rem;height:auto;min-height:5.25rem;padding:.75rem 1.5rem;flex-direction:column;gap:.25rem} .bot-levels .btn small{font-size:var(--t-sm);font-weight:600;letter-spacing:0;color:var(--ink-soft)}
+.bot-levels{display:grid;grid-template-columns:repeat(4,1fr);justify-content:center;gap:var(--s-4);width:100%}      /* Rookie, Club, Tour, Pro: four across, two by two on a narrow window */
+@media (max-width:700px){ .bot-levels{grid-template-columns:repeat(2,1fr)} }
+#bot-seg .seg-opt{min-width:0;padding:0 .75rem}
+.bot-levels .btn{min-width:0;height:auto;min-height:max(6rem,44px);padding:.75rem 1rem;flex-direction:column;justify-content:flex-start;gap:.25rem} .bot-levels .btn small{font-size:var(--t-sm);font-weight:600;letter-spacing:0;color:var(--ink-soft);white-space:nowrap}      /* one line each: four titles on one baseline */
+#lobby-bot{width:min(64rem,94vw)}
 #bot-title{margin:0 0 var(--s-4);text-align:center}
 
 /* "Court is full. Watch instead?": a notice over the lobby. Its own spread shadow is the scrim; the lobby behind it is inert (ui.js) */
@@ -593,7 +597,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 /* narrow / tall windows: stack the tiles as wide bars */
 @media (max-aspect-ratio: 1/1){
   .menu-glass .menu-body{padding:var(--s-4);justify-content:safe center;overflow-y:auto}
-  .tiles{display:grid;grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}             /* four tiles: two by two */
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);width:min(56rem,100%);gap:var(--s-3)}             /* three tiles: still three across (60rem wide at the 10px floor) */
   .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
   .tile svg{width:5.5rem;height:5.5rem}
   .name-row .field{width:14rem}
@@ -798,3 +802,140 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .seg-paddle circle{fill:currentColor;stroke:none}
 .cal-art.is-phone{--pod:hidden;--phone:visible}
 @media (max-width:40rem){ .seg-paddle .seg-opt{min-width:8.5rem} }
+
+/* ==========================================================================================================
+   COURTS (docs/COURTS-TOURNEY.md 2.6-2.9): the home's three tiles, the one court list with search and Open | Full, a code to Join or
+   Watch, Create court / Create tournament. Then asking to play: the player's corner card and the spectator's button.
+   ========================================================================================================== */
+.lobby-home{flex:1;justify-content:center}                                               /* the home view holds only the tiles now */
+.tile-sub{position:absolute;top:.875rem;right:.875rem;height:1.75rem;padding:0 .625rem;border-radius:var(--r-pill);display:inline-flex;align-items:center;background:var(--me-tint);border:.125rem solid #cfe4fb;
+  color:var(--me-ink);font-size:var(--t-sm);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}      /* '5 open': a badge in the corner, so the tile never moves when it comes and goes */
+.btn.is-tall,.is-tall{min-height:44px}
+.btn svg{flex:none}
+.courts-code .btn svg,.courts-make .btn svg,.room-watch svg,.ask-play svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+.panel.lobby-view.courts{width:min(74rem, 94vw);display:grid;grid-template-columns:minmax(0,1fr) 21rem;align-items:stretch;gap:var(--s-6);padding:var(--s-5) var(--s-6);text-align:left}
+.courts-browse{display:flex;flex-direction:column;gap:var(--s-3);min-width:0}
+.courts-tools{display:flex;align-items:center;gap:var(--s-3);flex-wrap:wrap}
+.search{position:relative;flex:1 1 16rem;min-width:0;display:flex}
+.search svg{position:absolute;left:1.125rem;top:50%;translate:0 -50%;width:1.375rem;height:1.375rem;fill:none;stroke:var(--ink-soft);stroke-width:2.6;stroke-linecap:round;pointer-events:none}
+.search .field{width:100%;height:max(3.25rem,44px);padding:0 1rem 0 3.125rem;font:800 var(--t-md)/1 var(--font);letter-spacing:.12em;color:var(--ink-strong);text-transform:uppercase;-webkit-appearance:none;appearance:none}
+.search .field::placeholder{letter-spacing:0;font-weight:600;text-transform:none;color:var(--ink-soft)}
+.search .field::-webkit-search-cancel-button{display:none}
+.courts-seg{margin:0;flex:none} .courts-seg .seg-opt{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;height:max(2.75rem,44px);min-width:7.5rem;padding:0 1rem;font-size:var(--t-md)}
+.seg-n{min-width:1.5em;height:1.5rem;padding:0 .375rem;display:inline-grid;place-items:center;border-radius:var(--r-pill);background:var(--sky-3);color:var(--ink-strong);font-size:var(--t-sm);font-weight:800;font-variant-numeric:tabular-nums}
+.seg-opt[aria-checked="true"] .seg-n{background:var(--me-tint);color:var(--me-ink)}
+
+/* the list box: a FIXED height in every state (loading, empty, rows, down), so filtering never moves the code area */
+.court-wrap{position:relative;flex:none;height:26rem;align-self:stretch;border-radius:var(--r-lg);background:rgba(255,255,255,.6);border:.125rem solid var(--line-faint);box-shadow:inset 0 .125rem .375rem rgba(120,170,200,.18);padding:.5rem 1rem .5rem .5rem}
+.court-list,.court-list:empty{display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:flex-start;gap:.5rem;height:100%;max-height:none;padding:.375rem .375rem 2rem;overflow-y:auto}      /* 2rem at the end: the last row scrolls clear of the fade */
+.court-wrap .room-bar{right:.3125rem;top:.75rem;bottom:.75rem}
+.court-wrap::after{content:"";position:absolute;left:.5rem;right:1rem;bottom:.5rem;height:2rem;pointer-events:none;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.9));border-radius:0 0 var(--r-lg) var(--r-lg)}      /* a row cut off at the bottom fades: the list scrolls */
+.court-list li{display:flex;align-items:center;gap:.5rem;flex:none}
+.court-row{flex:1;min-width:0;display:grid;grid-template-columns:6rem minmax(0,1fr) auto auto;align-items:center;column-gap:.875rem;height:auto;min-height:max(3.5rem,44px);padding:.25rem .5rem .25rem 1.25rem;text-align:left;transition:transform var(--d-fast) var(--ease-out)}
+.court-row::after{display:none}
+.court-row:hover,.court-row:focus-visible{transform:none;box-shadow:var(--glow)}        /* no scale: a scaled row in a scroll box clips its halo and nudges its neighbours */
+.court-row:active{transform:scale(.985)}
+.court-code{font-size:var(--t-lg);font-weight:900;letter-spacing:.14em;color:var(--me-ink)}
+.court-who,.court-meta{line-height:1.3}
+.court-who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-strong);font-weight:700}
+.court-meta{color:var(--ink);font-size:var(--t-sm);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.court-go{display:inline-flex;align-items:center;gap:.375rem;height:2.375rem;padding:0 .875rem 0 1rem;border-radius:var(--r-pill);background:var(--me-tint);color:var(--me-ink);font-size:var(--t-sm);font-weight:800;white-space:nowrap}
+.court-go::after{content:"";width:.4375rem;height:.4375rem;border:solid currentColor;border-width:.1875rem .1875rem 0 0;rotate:45deg;margin-left:.125rem}
+.court[data-kind="ask"] .court-go{background:var(--them-tint);color:#b23f0a}          /* asking is a different act. #b23f0a: 5.2:1 on the tint (--them-ink is 4.4) */
+.court-row.is-full{cursor:pointer;border-color:var(--sky-4);background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(234,243,248,.9));box-shadow:var(--sh-1);padding-right:.5rem}
+.court-row.is-full:hover,.court-row.is-full:focus-visible{box-shadow:var(--glow)}
+.court-row.is-full .court-code{color:var(--ink-strong)}
+.court-row.is-full .court-go{background:var(--sky-2);color:var(--ink-strong)}
+.court-row[aria-disabled="true"]{cursor:default}
+.court-row[aria-disabled="true"]:hover{box-shadow:var(--sh-1)} .court-row[aria-disabled="true"] .court-go{background:none;color:var(--ink-soft)} .court-row[aria-disabled="true"] .court-go::after{display:none}
+.badge-tour{display:inline-block;margin-right:.5rem;padding:.125rem .5rem;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--gold-1),var(--gold-2));border:.125rem solid var(--gold-4);color:var(--ink-strong);font-size:var(--t-xs);font-weight:800;letter-spacing:.04em;vertical-align:.08em}
+.court-list .room-watch{flex:none;width:7.5rem;justify-content:center;height:max(3.5rem,44px);padding:0 1rem;gap:.375rem;font-size:var(--t-sm);border-color:var(--line-soft);color:var(--ink)}      /* the quieter second choice on a row */
+.court-list:has(.room-watch) li:not(.is-skel):not(:has(.room-watch))::after{content:"";flex:none;width:7.5rem}      /* a row with no Watch keeps the slot: every Join sits in one column */
+.court.is-skel{pointer-events:none}
+.court-row.is-skel{display:block;position:relative;overflow:hidden;height:max(3.5rem,44px);border-radius:var(--r-pill);border:.15625rem solid transparent;background:var(--sky-2);box-shadow:none;cursor:default}
+.court-row.is-skel::after{display:block;content:"";position:absolute;inset:0;width:auto;height:auto;margin:0;border:0;rotate:0deg;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:translateX(-100%);animation:skel 1.2s linear infinite}
+@keyframes skel{to{transform:translateX(100%)}}
+#screen-lobby.is-down .court-row.is-skel{opacity:.4} #screen-lobby.is-down .court-row.is-skel::after{display:none}
+/* the state line lives in the list box: over the skeletons or the empty box, centred; with rows it is only for screen readers */
+.court-state{position:absolute;inset:0;margin:0;padding:var(--s-5);display:flex;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:var(--s-3);text-align:center;color:var(--ink-strong);font-size:var(--t-md);font-weight:700;pointer-events:none}
+.court-state > span:first-child{flex-basis:100%}
+.court-state .btn{pointer-events:auto;height:2.75rem;padding:0 1.25rem;font-size:var(--t-sm)}
+.court-state[data-state="rows"],.court-state[data-state="loading"]{inset:auto;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
+.court-state[data-state="down"] > span{padding:.5rem 1rem;border-radius:var(--r-pill);background:rgba(255,255,255,.9);box-shadow:var(--sh-1);flex-basis:auto}
+
+.courts-side{display:flex;flex-direction:column;justify-content:space-between;gap:var(--s-3);min-width:0}
+.courts-code{display:flex;flex-direction:column;align-items:center;gap:var(--s-2);margin:0}
+.courts-code h2{margin:0}
+.code-boxes.is-sm{gap:.5rem} .code-boxes.is-sm .code-box{width:max(4.25rem,44px);height:max(5.5rem,52px);font-size:var(--t-2xl)}
+.courts-code .code-err{margin:0;min-height:1.4em;font-size:var(--t-sm)}
+.code-hint{margin:-.375rem 0 .125rem}
+.code-err:not(:empty) + .code-hint{visibility:hidden}      /* the error takes the hint's place; the height stays, nothing moves */
+.code-acts{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-2);width:100%;margin:0}
+.code-acts .btn,.courts-make .btn{height:max(3.5rem,44px);padding:0 1rem;gap:.5rem;font-size:var(--t-md)}
+.courts-rule{width:100%;margin:0;border:0;border-top:.125rem dashed var(--line-soft)}
+.courts-make{display:grid;grid-template-columns:1fr;gap:var(--s-2)}
+.btn-tour svg{stroke:var(--gold-4)}
+.btn-tour[aria-disabled="true"]{opacity:.55;cursor:not-allowed;box-shadow:var(--sh-1)}
+.btn-tour[aria-disabled="true"]:active{transform:none;background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%)} .btn-tour[aria-disabled="true"]:hover::after{opacity:0} .btn-tour[aria-disabled="true"]:focus-visible::after{opacity:.7}
+.tour-note{display:flex;align-items:flex-start;gap:.5rem;margin:.125rem .25rem 0;text-align:left;font-size:var(--t-sm);color:var(--ink)}
+.tour-note svg{flex:none;width:1.125rem;height:1.125rem;margin-top:.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.4;stroke-linecap:round}
+.tour-note em{display:block;font-style:normal;font-weight:700;color:var(--ink-strong)}
+
+@media (max-width:700px){
+  .panel.lobby-view.courts{grid-template-columns:1fr;gap:var(--s-4);padding:var(--s-4)}
+  .court-wrap{height:min(30rem,40dvh)}
+  .court-row{grid-template-columns:5rem minmax(0,1fr) auto;row-gap:0;padding:.375rem .5rem .375rem 1rem}
+  .court-who{grid-column:2;grid-row:1;align-self:end} .court-meta{grid-column:2;grid-row:2;align-self:start} .court-code{grid-row:1 / span 2} .court-go{grid-column:3;grid-row:1 / span 2}
+  .court-meta:empty{display:none} .court-row:has(.court-meta:empty) .court-who{grid-row:1 / span 2;align-self:center}
+  .courts-code{width:min(24rem,100%);align-self:center}
+  .courts-make{grid-template-columns:1fr 1fr} .tour-note{grid-column:1 / -1}
+}
+@media (max-width:480px){
+  .tiles{grid-template-columns:1fr;width:100%}
+  .tile{flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4)} .tile svg{width:4.5rem;height:4.5rem}
+}
+
+/* the player's card: bottom-left, outside #hud so it survives the settings card, the pause blur and the result card */
+.ask-card{position:fixed;left:var(--edge);bottom:var(--edge);width:min(32rem, calc(100vw - 2 * var(--edge)));z-index:calc(var(--z-toast) - 1);display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.625rem .75rem .75rem 1rem;overflow:hidden;
+  border-radius:var(--r-lg);border:2px solid var(--line-soft);background:linear-gradient(180deg,#fff,var(--sky-1));box-shadow:var(--sh-hud);
+  opacity:0;transform:translateY(1rem);transition:opacity 200ms linear, transform 200ms linear}
+.ask-card.is-on{opacity:1;transform:none;transition:opacity 320ms var(--ease-out), transform 320ms var(--ease-out)}
+.ask-card[hidden],body:not([data-screen="hud"]) .ask-card{display:none}                 /* never over a menu screen: a request there just runs out */
+body.has-toast .ask-card{bottom:calc(var(--edge) + 3.75rem)}
+.ask-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.25rem;background:var(--them)}      /* the keyline, drawn inside: a thick left border on a round box tapers into a crescent */
+body[data-settings] .ask-card{left:calc(var(--edge) + min(23rem, 100vw - 2 * var(--edge)) + .5rem)}
+@media (min-aspect-ratio: 1/1){ body[data-overlay="match"] .ask-card{width:min(17rem, calc((100vw - min(50rem, 92vw)) / 2 - var(--edge) - .5rem))} body[data-overlay="match"] .ask-card .ask-btns{flex:1 1 100%;grid-template-columns:1fr 1fr} body[data-overlay="match"] .ask-card .ask-btns .btn{padding:0 .5rem} }      /* the result card: nothing is being played, so it stacks narrow (question over the buttons) in the margin left of the centred panel */      /* the settings card is open: beside it, never on its Leave court button */
+.ask-q{flex:1 1 9rem;min-width:0;margin:0;font-size:var(--t-md);font-weight:600;line-height:1.3;color:var(--ink)} .ask-q b{display:inline-block;max-width:6em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;font-weight:800;color:var(--ink-strong)}      /* a long name gives way, 'wants to play' never does */
+.ask-q small{display:block;margin-top:.125rem;font-size:var(--t-sm);font-weight:600;color:var(--ink)}
+.ask-card .ask-btns{flex:none;display:grid;grid-template-columns:auto auto;gap:.5rem;margin:0}
+.ask-card .ask-btns .btn{min-width:0;padding:0 .75rem;gap:.5rem}
+.ask-card .keycap{min-width:1.5rem;height:1.5rem}
+.ask-yes{background:linear-gradient(180deg,var(--me-tint),#cfe4fb);border-color:var(--me-ink);color:var(--me-ink)} .ask-yes .keycap{border-color:var(--me-ink)}      /* the primary: blue, Decline stays the plain pill */
+.ask-card .ask-bar{flex-basis:100%;width:100%;height:.375rem}
+@media (max-aspect-ratio: 1/1){ .ask-card{top:calc(var(--edge) + 5.25rem);bottom:auto} body.has-toast .ask-card{bottom:auto} }      /* portrait: up under the Court pill, over sky and trees, clear of the near court where the paddle swings */
+@media (max-width:700px){ body[data-settings] .ask-card{left:auto;right:var(--edge);top:auto;bottom:calc(var(--edge) + 3.75rem)} }
+@media (min-aspect-ratio: 1/1) and (max-height:820px){ body:not([data-settings]):not([data-overlay]) .ask-card{top:calc(var(--edge) + 5.25rem);bottom:auto;width:min(22rem, calc(50vw - 21.5rem - var(--edge)))} body:not([data-settings]):not([data-overlay]) .ask-card .ask-btns{flex:1 1 100%;grid-template-columns:1fr 1fr} }      /* a short landscape window (1280 x 720): the near baseline sits so low the bottom-left corner covers it, so the card goes up under the Court pill over the trees (as in portrait, clear of a corner that wraps to two rows), stacked narrow, and stops short of the scoreboard (the corner's own limit) */
+@media (max-width:480px) and (max-aspect-ratio: 1/1){ .ask-card{top:auto;bottom:calc(var(--edge) + 5rem)} }      /* a phone-width window: the top is the corner, the scoreboard's own row and the insets, so it sits just above the two-line key strip instead */      /* narrow, settings open: bottom-right, under the panel's end and clear of the camera and AirPod boxes (the game is paused) */
+/* the spectator's button: on the bottom row just left of the emotes (above them it sat on the near baseline and corner), one fixed width so its countdown never moves anything */
+.ask-play{display:none;position:fixed;right:calc(var(--edge) + 20.625rem + .5rem);bottom:calc(var(--edge) + .3125rem);z-index:var(--z-hud);width:16rem;justify-content:flex-start;gap:.625rem;padding:0 .75rem 0 1.125rem;overflow:hidden;font-size:var(--t-md);isolation:isolate}
+body[data-role="spectator"] .ask-play:not([hidden]){display:inline-flex}
+body[data-overlay] .ask-play{display:none!important}
+#ask-label{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.ask-play .keycap{min-width:1.625rem;height:1.625rem}
+.ask-play[aria-disabled="true"]{cursor:default;color:var(--ink);border-color:var(--line-soft);box-shadow:var(--sh-1)} .ask-play[aria-disabled="true"]:active{transform:none} .ask-play[aria-disabled="true"] .keycap{display:none}      /* waiting: nothing to press, and it looks it (the width is fixed, so the label just gets the room) */
+.ask-play[data-s="no"]{background:var(--them-tint);border-color:var(--them)}
+.ask-ring{position:absolute;left:0;right:0;bottom:0;height:.25rem;background:var(--line);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
+.ask-play[data-s="sent"] .ask-ring{transform:scaleX(1)} .ask-play[data-s="sent"] .ask-ring.go{animation:ask-drain 10s linear forwards}
+@keyframes ask-drain{from{transform:scaleX(1)} to{transform:scaleX(0)}}
+@media (min-width:701px){ body.has-toast .ask-play{right:var(--edge)} body[data-role="spectator"]:has(#btn-ask:not([hidden])) .views{max-width:calc(100vw - 2 * var(--edge) - 37.625rem)} }      /* 20.625rem: the emote row's width here. A toast (bottom centre) hides the emotes, and the button takes their corner until it goes. The chip row never runs under the button */
+@media (max-width:700px){ .ask-play{right:calc(var(--edge) + 18.95rem + .375rem);bottom:calc(var(--edge) + 5.25rem - .5rem);width:min(16rem, calc(100vw - 2 * var(--edge) - 19.325rem))} }      /* the emotes sit above the view chips here (18.95rem wide): the button sits beside them on that row, never on the near baseline. Under 390 px it gives up width rather than run off the left edge */
+@media (prefers-reduced-motion: reduce){ .ask-card,.ask-card.is-on{transition:none} .ask-play[data-s="sent"] .ask-ring.go{animation:none} .court-row.is-skel::after{animation:none;display:none} }
+@media (max-width:700px){      /* last, so it wins: the root is at its 10px floor here, and nothing on Courts or the ask card goes under 12 px */
+  .courts .t-note,.court-meta,.court-go,.court-list .room-watch,.tour-note,.ask-q small,.seg-n{font-size:max(var(--t-sm),12px)} .court-who,.search .field,.ask-q{font-size:max(var(--t-md),13px)}      /* the root is at its 10px floor here: nothing under 12 px */
+  .ask-card .keycap,.ask-play .keycap{font-size:max(.8125rem,11px);min-width:max(1.5rem,20px);height:max(1.5rem,20px)}
+  .ask-card{width:min(36rem, calc(100vw - 2 * var(--edge)))}
+  .ask-play{font-size:max(var(--t-md),13px)}
+  .ask-card .ask-btns .btn,.courts-seg .seg-opt{font-size:max(var(--t-md),13px)} .tile-sub{font-size:max(var(--t-sm),12px);height:max(1.75rem,22px)} .courts-code .code-err{font-size:max(var(--t-md),13px);font-weight:700}      /* Accept / Decline, Open / Full, the tile's '8 open' and 'Court not found' (the one word after a failed Join, in the hint's place) */
+  .code-acts .btn,.courts-make .btn,.court-state,.court-state .btn{font-size:max(var(--t-md),13px)} .courts .caps{font-size:max(var(--t-xs),11px)} .bot-levels .btn small{font-size:max(var(--t-sm),12px)}      /* the bigger text still fits the question and both buttons on one row */
+}

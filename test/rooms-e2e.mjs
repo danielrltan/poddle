@@ -56,12 +56,12 @@ async function toCourt(pg) {                       // seated -> connect/calibrat
 const a = await open('a'), b = await open('b', '', 600, 900); let s, t;
 await shot(a, '1-title'); await shot(b, '1-title');
 await toLobby(a); await shot(a, '2-lobby-empty');
-await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await shot(a, '3-create');
+await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await shot(a, '3-create');
 await a.click('#btn-create-go'); s = await until(a, s => s.view === 'share' && s.share.length === 4, 3000, 'a create -> share view with a code');
 const CODE = s.share; ok(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/.test(CODE) && s.search.includes('court=' + CODE), `a made private room ${CODE}, address bar ${s.search}`); await shot(a, '4-share');
 await toLobby(b); s = await st(b); ok(!s.rooms.some(r => r.startsWith(CODE)), `b: private room is not in the open list (${s.rooms})`);
-await b.click('#btn-code'); await sleep(300); await shot(b, '5-code-empty'); await type(b, 'zz' + 'zz'); await shot(b, '5-code-filled');
-await b.keyboard.press('Enter'); s = await until(b, s => s.err, 3000, 'b wrong code -> inline error'); ok(s.err === 'Court not found' && s.view === 'code', `b wrong code: "${s.err}"`); await shot(b, '5-code-error');
+await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await shot(b, '5-code-empty'); await type(b, 'zz' + 'zz'); await shot(b, '5-code-filled');
+await b.keyboard.press('Enter'); s = await until(b, s => s.err, 3000, 'b wrong code -> inline error'); ok(s.err === 'Court not found' && s.view === 'courts', `b wrong code: "${s.err}" under the boxes on Courts`); await shot(b, '5-code-error');
 for (let i = 0; i < 4; i++) await b.keyboard.press('Backspace'); await type(b, CODE.toLowerCase()); await b.keyboard.press('Enter');
 await a.click('#btn-share-go'); [s, t] = await Promise.all([toCourt(a), toCourt(b)]);
 ok(s.pill === CODE && t.pill === CODE && s.menuBtn && t.menuBtn, `both on the court in room ${CODE} (pills ${s.pill}/${t.pill})`);
@@ -78,7 +78,7 @@ ok(!/Matt/.test(last.s.them + last.t.them), `still no bot (${last.s.them} / ${la
 // ---- 2. a third tab with the link finds the court full: it is asked to watch, and says no (NEW RULE, docs/SPECTATE.md; watching is test/spectate-e2e.mjs) ----
 const c = await open('c', '&court=' + CODE.toLowerCase()); s = await st(c); ok(s.chip === 'Joining court ' + CODE, `c title chip: "${s.chip}"`); await shot(c, '8-title-link');
 await c.click('#btn-start'); s = await until(c, s => s.ask, 3000, 'c gets an answer'); ok(s.ask === 'Court is full. Watch instead?' && s.screen === 'lobby' && !/(court|room)=/.test(s.search), `c full court: "${s.ask}" on ${s.screen}, address bar "${s.search}"`); await shot(c, '8-full');
-await c.click('#btn-watch-no'); s = await until(c, s => !s.ask, 2000, 'No closes the question'); ok(s.screen === 'lobby' && s.view === 'code' && s.pill === null, `c said no: still in the lobby, ${s.view} view`);
+await c.click('#btn-watch-no'); s = await until(c, s => !s.ask, 2000, 'No closes the question'); ok(s.screen === 'lobby' && s.view === 'courts' && s.pill === null, `c said no: still in the lobby, ${s.view} view`);
 
 // ---- 3. reload mid-game: the seat is HELD (NEW RULE), then the same court, the same side, the same score (b is on the far side, so a seat handed out afresh would not do) ----
 const sc0 = await st(a);
@@ -105,10 +105,12 @@ await c.browser().close(); await a.browser().close();
 // ---- 5. quick play: d waits on the court (Matt walks in), f is seated with it and leaves BEFORE a ball is struck: a plain leave, Matt comes back. Then they play ----
 const e = await open('e'), d = await open('d'), f = await open('f');
 await toLobby(e); await toLobby(d); await d.click('#btn-quick'); s = await until(d, s => s.pill, 4000, 'd quick play seats it'); const PUB = s.pill;
-s = await until(e, s => s.rooms.some(r => r.startsWith(PUB)), 3000, 'e sees the waiting court'); ok(s.rooms.some(r => r === PUB + '1 player'), `e lists ${PUB}: ${s.rooms}`); await shot(e, '2-lobby-rooms'); await until(b, s => s.rooms.length, 3000, 'b sees it too'); await shot(b, '2-lobby-rooms');
+s = await until(e, s => s.rooms.some(r => r.startsWith(PUB)), 3000, 'e sees the waiting court'); ok(s.rooms.some(r => r.startsWith(PUB) && /is waitingJoin$/.test(r)), `e lists ${PUB} as a court to join: ${s.rooms}`); await shot(e, '2-lobby-rooms'); await until(b, s => s.rooms.length, 3000, 'b sees it too'); await shot(b, '2-lobby-rooms');
 await toCourt(d); s = await until(d, s => s.them === 'Matt', 8000, 'alone on the court: Matt walks in'); ok(s.them === 'Matt' && /Rookie|Club|Pro/.test(s.themSub), `d plays "${s.them}" / "${s.themSub}" while it waits`);
 await toLobby(f); await f.click('#btn-quick'); s = await until(f, s => s.pill, 4000, 'f quick play seats it'); ok(s.pill === PUB && PUB !== CODE, `d and f share public court ${PUB} (f got ${s.pill})`);
-s = await until(e, s => s.rooms.some(r => /^\w{4}\d+-\d+/.test(r) && r.startsWith(PUB)), 3000, 'the full court stays on e’s list, with its score'); ok(s.rooms.some(r => r.startsWith(PUB + '0-0')), `e lists the full court by its score (NEW RULE: it can be watched): [${s.rooms}]`);
+await e.evaluate(() => document.querySelector('#court-seg [data-filter="full"]').click());      // two humans: the court moves to the Full tab (docs/COURTS-TOURNEY.md 2.7)
+s = await until(e, s => s.rooms.some(r => r.startsWith(PUB) && / vs /.test(r)), 3000, 'the full court stays on e’s list, under Full'); ok(s.rooms.some(r => r.startsWith(PUB) && /(\d+-\d+|Starting).*Watch$/.test(r)), `e lists the full court under Full, to watch (NEW RULE: it can be watched): [${s.rooms}]`);
+await e.evaluate(() => document.querySelector('#court-seg [data-filter="open"]').click());
 s = await until(d, s => s.banner === 'Fay joined to play' || (s.them === 'Fay' && s.themSub === 'Calibrating'), 4000, 'd sees Fay arrive'); ok(s.banner === 'Fay joined to play' || s.them === 'Fay', `d: "${s.them} / ${s.themSub}", centre banner "${s.banner}"`);
 await f.keyboard.press('KeyQ'); await sleep(200); await f.keyboard.press('KeyQ'); const leftAt = Date.now();
 s = await until(d, s => s.toast === 'Fay left', 3000, 'd gets the toast'); ok(s.toast === 'Fay left' && !s.result && !s.hold, `before a ball is struck a leaver just leaves: "${s.toast}"`);

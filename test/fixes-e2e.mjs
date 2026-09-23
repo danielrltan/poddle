@@ -75,9 +75,9 @@ fs.mkdirSync(SHOTS, { recursive: true });
 // ---------- 1. Ann + Ben play to 3, Cat watches ----------
 { const R = rig({ WIN_AT: '3', WIN_BY: '1' }), { ok, note, st, until, open, shot, BOTH, type, play, toLobby, toCourt, rest, go, reload, boxes, overlaps } = R; let s, t, u;
 const a = await open('a', 'Ann'), b = await open('b', 'Ben');
-await toLobby(a); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'share view'); const CODE = s.share;
+await toLobby(a); await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'share view'); const CODE = s.share;
 s = await a.evaluate(() => document.querySelector('label[for=name-input]').textContent); ok(s === 'Name', `lobby name label: "${s}"`);
-await toLobby(b); await b.click('#btn-code'); await sleep(300); await type(b, CODE); await b.keyboard.press('Enter'); await a.click('#btn-share-go');
+await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await type(b, CODE); await b.keyboard.press('Enter'); await a.click('#btn-share-go');
 await Promise.all([toCourt(a), toCourt(b)]);
 const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); s = await until(c, s => s.phase === 'watch', 6000, 'c watches');
 await sleep(1500); let bx = await boxes(c, ['ping-pill', 'room-pill', 'watchers']); ok(bx['ping-pill'] === null && bx['room-pill'], `spectator: no ping pill (${JSON.stringify(bx)})`);
@@ -130,8 +130,8 @@ await R.close(); }
 // ---------- 3. Ann + Ben: a seat that calibrates for ever ----------
 { const R = rig({ CAL_S: '12' }), { ok, note, st, until, open, shot, BOTH, type, play, toLobby, toCourt, rest, go, reload, boxes, overlaps } = R; let s, t, u;
 // Ann + Ben: Ben recalibrates and never finishes
-const a = await open('a', 'Ann'), b = await open('b', 'Ben'); await toLobby(a); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'share'); const C2 = s.share;
-await toLobby(b); await b.click('#btn-code'); await sleep(300); await type(b, C2); await b.keyboard.press('Enter'); await a.click('#btn-share-go'); await Promise.all([toCourt(a), toCourt(b)]);
+const a = await open('a', 'Ann'), b = await open('b', 'Ben'); await toLobby(a); await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'share'); const C2 = s.share;
+await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await type(b, C2); await b.keyboard.press('Enter'); await a.click('#btn-share-go'); await Promise.all([toCourt(a), toCourt(b)]);
 await until(a, s => s.hits > 0, 30000, 'a ball is struck'); rest('b'); await b.keyboard.press('KeyC'); s = await until(a, s => s.themSub === 'Calibrating', 4000, 'a is told'); 
 s = await until(a, s => s.hold, 20000, 'the wait is counted down'); ok(/^Waiting for Ben\|\d+$/.test(s.hold), `the serve waits for Ben, counted down: "${s.hold}"`); await shot(a, 'G-wait-card', BOTH);
 s = await until(a, s => s.result, 20000, 'the staller forfeits'); await sleep(700); u = await boxes(a, ['rematch-count', 'rematch-bar', 'btn-leave', 'btn-rematch']); t = await a.evaluate(() => ({ r: document.getElementById('btn-rematch').disabled, l: document.getElementById('btn-leave').disabled }));

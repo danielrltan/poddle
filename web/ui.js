@@ -246,8 +246,8 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
 
 // ---------- small things ----------
 export function setMode(name) { setText($('mode'), name); for (const o of $('move-seg')?.children || []) o.setAttribute('aria-checked', String(o.dataset.move === String(name).toLowerCase())); }      // how you move lives in the settings panel now (docs/NEXT.md 14d)
-// Matt's level, or null when the other seat is not Matt: the 1 2 3 key hint and the settings Difficulty row show only against him
-export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); if (!on) return; setText($('bot-level'), String(level)); for (const o of $('bot-seg')?.children || []) o.setAttribute('aria-checked', String(o.textContent === String(level))); }
+// Matt's level, or null when the other seat is not Matt: the 1 2 3 4 key hint and the settings Difficulty row show only against him
+export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); if (!on) return; setText($('bot-level'), String(level)); for (const o of $('bot-seg')?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level))); }
 export function toggle(id) { const el = $(id); if (!el) return false; el.hidden = !el.hidden; return !el.hidden; }
 export function show(id, on) { const el = $(id); if (!el) return false; el.hidden = !on; return !el.hidden; }
 export function setCamera(ready) { show('camwrap', !!ready); }
@@ -387,7 +387,7 @@ export const EMOTES = [['1f923', '🤣', 'Rolling on the floor laughing'], ['1f9
   ['1f621', '😡', 'Angry'], ['1f480', '💀', 'Skull'], ['1f940', '🥀', 'Wilted flower'], ['1f622', '😢', 'Crying']];     // the index is the wire value (server EMOTES)
 let onEmoteFn = null;
 export function onEmote(fn) { onEmoteFn = fn; }
-const emoteImg = i => { const img = document.createElement('img'); img.src = `emoji/${EMOTES[i][0]}.png`; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
+const emoteImg = i => { const img = document.createElement('img'); img.src = new URL(`emoji/${EMOTES[i][0]}.png`, import.meta.url).href; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
 { const box = $('emotes');
   if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.title = em[2]; b.append(emoteImg(i)); box.append(b); });
   on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (!b || !onEmoteFn) return; onEmoteFn(+b.dataset.e); }); }
@@ -412,35 +412,89 @@ export function watcherNote(name) {
 export function notesOff() { $('notices')?.replaceChildren(); }
 export function emotesOff() { const layer = $('emote-layer'); if (layer) layer.replaceChildren(); }     // out of the room: nothing carries over
 
+// ---------- asking to play (docs/SPECTATE.md Asking to play) ----------
+// The player's card: bottom-left, 10 s, Y / N. It never takes focus and never swallows a key: its buttons are out of the Tab order
+// (so Space and Enter can never press them), a click blurs, and a pointerdown on it is not a court tap. o = { name, left } | null.
+let cardOn = false, cardT = 0, cardTick = 0, onAnswerFn = null;
+export const askShowing = () => cardOn && !slots.menu;                                // hidden under a menu screen: Y / N do nothing there
+export function onAnswer(fn) { onAnswerFn = fn; }                                     // fn(true | false) on a click; Y / N are main.js's
+export function askCard(o) {
+  const el = $('ask-card'); if (!el) return;
+  clearTimeout(cardT); clearInterval(cardTick);
+  if (!o) { if (!cardOn) { el.hidden = true; return; } cardOn = false; el.classList.remove('is-on'); setText($('ask-live'), ''); cardT = setTimeout(() => { el.hidden = true; }, reduced() ? 0 : 200); return; }
+  const left = Math.max(1, Math.min(60, Math.round(+o.left || 10))), name = String(o.name || 'Someone'), bar = el.querySelector('.ask-bar i');
+  setText($('ask-name'), name); cardOn = true; el.hidden = false; void el.offsetWidth; el.classList.add('is-on');
+  setText($('ask-live'), `${name} wants to play. They take Matt’s place and a new match starts. Press Y to accept or N to decline.`);
+  let k = 0; const step = () => { k++; el.querySelector('.ask-bar')?.style.setProperty('--p', Math.max(0, (left - k) / left).toFixed(3)); };      // stepped once a second from the server's number, each step a 1 s linear slide: it reaches 0 at 'left'
+  if (bar) { bar.style.transition = 'none'; el.querySelector('.ask-bar').style.setProperty('--p', '1'); void bar.offsetWidth; bar.style.transition = ''; }
+  cardT = setTimeout(() => askCard(null), left * 1000 + 500);                         // the server's askoff closes it; this is the backstop
+  requestAnimationFrame(() => { if (cardOn) step(); }); cardTick = setInterval(() => { if (k >= left) clearInterval(cardTick); else step(); }, 1000);
+}
+{ const card = $('ask-card');
+  if (card) { card.addEventListener('pointerdown', e => e.stopPropagation());          // not a court tap, and it does not close the settings card
+    for (const [id, yes] of [['btn-ask-yes', true], ['btn-ask-no', false]]) on2(id, 'click', e => { e.currentTarget.blur(); if (cardOn && onAnswerFn) onAnswerFn(yes); }); } }
+// The requester's button: on the bottom row left of the emotes, one fixed width. m = the server's askstate { s, left, why, busy } | null (back to Ask to play).
+// Counts down here from 'left'; showAsk(on) is main.js's call (a spectator watching one human play Matt, on a device that can be a paddle).
+const ASK_SAID = { sent: 'Asked. Waiting for an answer.' };      // no / expired / busy: main.js says why in a toast with the player's name (a role=status, so it is read out too), and the button only counts
+let ask = { s: 'idle', left: 0, busy: false }, askT = 0, askOn = false, askedOnce = false;      // askedOnce: a request of mine ended (a no, an expiry): the idle label is Ask again
+export const askCan = () => askOn && !$('btn-ask')?.hidden && ask.s === 'idle';
+let onAskFn = null;
+export function onAsk(fn) { onAskFn = fn; }
+export function showAsk(on) { if (askOn === !!on) return; askOn = !!on; drawAsk(); }      // main.js asks on every state packet: only a change draws
+export function askPlay(m) {
+  clearInterval(askT);
+  if (!m || typeof m !== 'object') { ask = { s: 'idle', left: 0, busy: false }; askedOnce = false; }
+  else { const s = ['sent', 'no', 'expired', 'wait', 'gone', 'refused', 'yes'].includes(m.s) ? m.s : 'idle', left = Math.max(0, Math.min(99, m.left | 0));
+    ask = { s: (s === 'gone' || s === 'wait') && !left ? 'idle' : s, left, busy: !!m.busy }; if (s === 'no' || s === 'expired' || s === 'gone') askedOnce = true; else if (s === 'yes' || s === 'refused') askedOnce = false;
+    if (ASK_SAID[s]) setText($('ask-state'), ASK_SAID[s]);
+    const ring = $('btn-ask')?.querySelector('.ask-ring'); if (ring && s === 'sent') { ring.style.animationDuration = `${left || 10}s`; restart(ring, 'go'); } }      // the ring drains over the request's life
+  if (ask.left > 0 && ['sent', 'no', 'expired', 'wait', 'gone'].includes(ask.s)) askT = setInterval(() => { ask.left--; if (ask.left <= 0) { clearInterval(askT); if (ask.s !== 'sent') ask = { s: 'idle', left: 0, busy: false }; else ask.left = 1; } drawAsk(); }, 1000);      // Asked holds at 1 until the answer comes
+  drawAsk();
+}
+function drawAsk() {
+  const b = $('btn-ask'); if (!b) return; const s = ask.s, n = ask.left;
+  b.hidden = !askOn || s === 'refused' || s === 'yes';
+  const label = s === 'idle' ? (askedOnce ? 'Ask again' : 'Ask to play') : s === 'sent' ? `Waiting · ${n}s` : `Again in ${n}s`;      // the count says what it counts: Waiting = the player's time left to answer; Again in = until you may ask (a cooldown, or another request). The why (said no, no answer, someone else asked) is main.js's toast. Both fit 16rem at 390 px
+  setText($('ask-label'), label); b.dataset.s = s; b.setAttribute('aria-disabled', String(s !== 'idle'));
+}
+on2('btn-ask', 'click', e => { if (e.pointerType) e.currentTarget.blur(); if (askCan() && onAskFn) onAskFn(); });
+
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });
 on2('btn-leave', 'click', () => { if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
 on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const b = $(e.key === 'ArrowLeft' ? 'btn-rematch' : 'btn-leave'); if (b && !b.disabled) { e.preventDefault(); b.focus(); } });
 
 // ---------- lobby ----------
-// Five views inside #screen-lobby, one at a time: home (four tiles + the room list), create (public / private), share (the
-// new room's code and link), code (four letter boxes), bot (Matt's three levels). Above them the name field (not on share).
+// Views inside #screen-lobby, one at a time: home (three tiles), courts (the court list, search, Open | Full, a code to Join or Watch,
+// Create court / Create tournament: docs/COURTS-TOURNEY.md 2.7), create (public / private), share (the new court's code and link),
+// bot (Matt's four levels). Above them the name field (not on share).
 // main.js owns the socket; this only draws and reports what was chosen. Handlers carry no name: main.js reads playerName().
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
 export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
-const VIEW_TITLE = { home: 'Play', create: 'Create court', share: 'Your court', code: 'Enter code', bot: 'Play a bot' };
+const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot' };
+const VIEW_PARENT = { create: 'courts', share: 'courts' };                                // Back from these goes to Courts, not home
+export const viewParent = v => VIEW_PARENT[v] || null;
 const boxes = () => [...$('code-boxes').children];
-let view = 'home', roomsKey = '', on = {};
+let view = 'home', roomsKey = '', on = {}, deep = null;                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
 export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied() }
 export function lobbyView(name, { code, watch } = {}) {
   if (!name) return view;
+  if (name === 'code') name = 'courts';                                                 // the old code view lives inside Courts now: old call sites still land
   view = VIEW_TITLE[name] ? name : 'home';
   for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view;
   setText($('lobby-title'), VIEW_TITLE[view]); codeError(''); show('name-row', view !== 'share'); askWatch(null);
-  if (view === 'code') setCode(code || '');
-  if (view === 'code' && watch) setText($('lobby-title'), 'Joining as spectator'); setText($('btn-join'), view === 'code' && watch ? 'Watch' : 'Join');      // a watch link with no name yet: the code screen says what Join will do
+  deep = null; for (const b of [$('btn-join'), $('btn-watch-code')]) b?.classList.remove('is-focus');
+  if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
   nameGate();
   setTimeout(() => { if (slots.menu === 'lobby' && !asking()) firstFocus().focus({ preventScroll: true, focusVisible: true }); }, 60);    // after the key that brought us here is up: a held Enter must not press it
 }
 // where focus lands on a view. No name yet (the first visit): the name field, and nothing else can be chosen until it has a letter
 const firstFocus = () => (view !== 'share' && !playerName() && $('name-input')) || viewFocus();
-const viewFocus = () => ({ home: $('btn-quick'), create: $('btn-create-go'), share: $('btn-share-go'), code: boxes().find(b => !b.value) || $('btn-join'), bot: $('btn-bot-1') }[view] || $('btn-quick'));
-// rooms: { code, players, open, watch, watchers, score:[a,b], live } (the old { code, players, open } still draws). An open room is a button that joins;
-// a full one is a plain row with its score. Either gets a Watch button while there is a place to watch and somebody to watch.
+function courtsFocus() {                                                                 // a code half typed: its next box. A link: Join / Watch. A mouse: search. A finger: the switch, so no keyboard pops up
+  const c = getCode(); if (c && c.length < 4) return boxes().find(b => !b.value);
+  if (deep) return $(deep === 'watch' ? 'btn-watch-code' : 'btn-join');
+  return matchMedia('(pointer: fine)').matches ? $('court-search') : $('court-seg').querySelector('[aria-checked="true"]');
+}
+const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1') }[view] || $('btn-quick'));
 // The list scrolls when it is full, and macOS hides scrollbars until you already know to scroll. So the bar is ours: a
 // track and a thumb that are always drawn while there is more to see, sized from the list's own scroll numbers. Drag it or wheel.
 function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) return; const more = l.scrollHeight > l.clientHeight + 1; t.hidden = !more; if (!more) return;
@@ -451,23 +505,89 @@ function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) 
   th.addEventListener('pointermove', e => { if (grab) l.scrollTop = grab.top + (e.clientY - grab.y) * l.scrollHeight / t.clientHeight; });
   th.addEventListener('pointerup', () => { grab = null; }); th.addEventListener('pointercancel', () => { grab = null; });
   t.addEventListener('pointerdown', e => { if (e.target === t) l.scrollTop += (e.offsetY > th.offsetTop ? 1 : -1) * l.clientHeight * 0.9; }); } }      // a click on the track pages
-export function lobbyRooms(rooms = [], online = 0) {
-  rooms = (Array.isArray(rooms) ? rooms : []).filter(r => r && typeof r.code === 'string').slice(0, 12);
-  const list = $('room-list'), key = rooms.map(r => [r.code, r.players, r.open, r.watch, r.watchers, r.score].join(':')).join();
-  $('lobby-online').hidden = !(online > 1); setText($('lobby-online'), `${online} online`);      // 1 online is you: say nothing
-  if (key === roomsKey) return; roomsKey = key;                                       // the list arrives every second: only touch the DOM (and the focus) when it changed
-  const at = list.contains(document.activeElement) ? document.activeElement : null, had = at && (at.dataset.watch || at.dataset.code), hadWatch = !!(at && at.dataset.watch);
-  list.textContent = '';
-  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  for (const r of rooms) { const open = r.open !== false, li = el('li'), row = el(open ? 'button' : 'div', open ? 'room-row' : 'room-row is-full'), n = r.watchers | 0;
-    row.dataset.code = r.code; if (open) row.dataset.nav = '';
-    const said = [open ? (r.players ? '1 player' : 'Empty') : `${Array.isArray(r.score) ? r.score[0] | 0 : 0}-${Array.isArray(r.score) ? r.score[1] | 0 : 0}`]; if (n > 0) said.push(`${n} watching`);
-    row.append(el('b', '', r.code), el('span', '', said.join(' · '))); li.append(row);
-    if (r.watch > 0 && r.players > 0) { const w = el('button', 'btn btn-sm room-watch', 'Watch'); w.dataset.watch = r.code; w.dataset.nav = ''; w.setAttribute('aria-label', `Watch ${r.code}`); li.append(w); }
-    list.append(li); }
-  $('room-empty').hidden = rooms.length > 0; roomBar();
-  if (had) { const all = [...list.querySelectorAll('[data-nav]')]; (all.find(e => hadWatch && e.dataset.watch === had) || all.find(e => (e.dataset.code || e.dataset.watch) === had) || $('btn-quick')).focus({ preventScroll: true }); }     // no selector built from a server string
+
+// ---------- the court list ----------
+// rooms: { code, players, open, ask, bot, watch, watchers, score:[a,b], live, names:[n0,n1] } (an older server's { code, players, open } still draws).
+// tours: { code, host, n, max } tournaments signing up (docs/COURTS-TOURNEY.md Feature 2; none yet). Every string goes in as textContent.
+// Open = tournaments, courts with someone waiting (a join seats you), ask rows (one human playing Matt: a join asks them), empty courts. Full = two humans (the row is Watch).
+let list = { rooms: [], tours: [] }, seen = false, filter = 'open', query = '';
+try { if (localStorage.getItem('poddle.courts') === 'full') filter = 'full'; } catch { /* private window */ }
+const kindOf = r => r.open !== false ? 'open' : r.ask ? 'ask' : 'full';
+const nm = (r, i) => Array.isArray(r.names) && typeof r.names[i] === 'string' && r.names[i] ? r.names[i].slice(0, 24) : '';
+const sc = r => `${Array.isArray(r.score) ? r.score[0] | 0 : 0}-${Array.isArray(r.score) ? r.score[1] | 0 : 0}`;
+function rowsOf() {                                                                      // every court as a row: { kind, code, who, meta, go, watch, label }
+  const out = [];
+  for (const t of list.tours) out.push({ kind: 'tour', code: t.code, who: `${String(t.host || 'Someone').slice(0, 24)}’s tournament`, meta: `${t.n | 0} of ${t.max | 0 || 16} joined`, go: 'Join' });
+  for (const r of list.rooms) { const k = kindOf(r), w = r.watchers | 0, human = nm(r, 0) && nm(r, 0) !== 'Matt' ? nm(r, 0) : nm(r, 1) && nm(r, 1) !== 'Matt' ? nm(r, 1) : '';
+    if (k === 'open') out.push({ kind: k, code: r.code, who: !r.players ? 'Empty' : `${human || 'A player'} is waiting`, meta: w > 0 ? `${w} watching` : '', go: 'Join', watch: r.players > 0 && r.watch > 0, w, players: r.players > 0 });      // players: a human is sitting there waiting
+    else if (k === 'ask') out.push({ kind: k, code: r.code, who: `${human || 'A player'} vs Matt`, meta: sc(r), go: 'Ask to play', watch: r.watch > 0, w });
+    else out.push({ kind: k, code: r.code, who: `${nm(r, 0) || 'Player 1'} vs ${nm(r, 1) || 'Player 2'}`, meta: (r.live === false ? 'Starting' : sc(r)) + (w > 0 ? ` · ${w} watching` : ''), go: r.watch > 0 ? 'Watch' : 'Stands full', full: !(r.watch > 0), w }); }
+  return out;
 }
+const tabOf = row => row.kind === 'full' ? 'full' : 'open';
+function shown() {                                                                       // this tab's rows that match the search: codes that START with it first, then codes that contain it
+  const all = rowsOf(), q = query, hit = r => !q || r.code.includes(q), pick = t => all.filter(r => tabOf(r) === t && hit(r));
+  const order = rs => q ? [...rs.filter(r => r.code.startsWith(q)), ...rs.filter(r => !r.code.startsWith(q))] : rs;
+  const o = pick('open'), open = order([...o.filter(r => r.kind === 'tour'), ...o.filter(r => r.kind === 'open' && r.players), ...o.filter(r => r.kind === 'ask'), ...o.filter(r => r.kind === 'open' && !r.players)]);      // tournaments, then someone waiting for an opponent (Join is instant and never refused), then a player vs Matt (Ask to play can be refused, and has a cooldown), then empty courts
+  const full = order(pick('full').map((r, i) => [r, i]).sort((a, b) => b[0].w - a[0].w || a[1] - b[1]).map(a => a[0]));      // the most watched first (stable)
+  return { open, full, all };
+}
+export function lobbyRooms(rooms = [], online = 0, tours = []) {
+  list = { rooms: (Array.isArray(rooms) ? rooms : []).filter(r => r && typeof r.code === 'string'),       // no 12-row cap: the server lists at most ROOM_CAP courts and the list scrolls
+    tours: (Array.isArray(tours) ? tours : []).filter(t => t && typeof t.code === 'string') };
+  seen = true;
+  $('lobby-online').hidden = !(online > 1); setText($('lobby-online'), `${online} online`);      // 1 online is you: say nothing
+  drawCourts();
+}
+// One state line under the list, exactly one of: down, loading, open empty, full empty, no match, rows. The list box keeps its height in every one.
+export function courtsState() { const down = $('screen-lobby')?.classList.contains('is-down'), s = shown();
+  return down ? 'down' : !seen ? 'loading' : s[filter].length ? 'rows' : query ? 'nomatch' : filter === 'open' ? 'empty-open' : 'empty-full'; }
+const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const EYE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>';
+function drawCourts() {
+  const ul = $('room-list'); if (!ul) return;
+  const s = shown(), st = courtsState(), rows = st === 'rows' ? s[filter] : [];
+  const nn = st === 'loading' || st === 'down' ? () => '–' : n => String(n); setText($('n-open'), nn(s.open.length)); setText($('n-full'), nn(s.full.length));      // the counts follow the search: a query shows which tab its matches are in. Loading or down: a dash, never a false 0
+  const n = s.all.filter(r => r.kind !== 'full').length, sub = $('courts-n'); if (sub) { setText(sub, n ? `${n} open` : ''); sub.style.visibility = seen && n ? '' : 'hidden'; }      // the home tile: never jumps
+  for (const o of $('court-seg')?.children || []) { const yes = o.dataset.filter === filter; o.setAttribute('aria-checked', String(yes)); o.tabIndex = yes ? 0 : -1; }
+  const key = [st, filter, query, ...rows.map(r => [r.kind, r.code, r.who, r.meta, r.go, r.watch, r.full].join(':'))].join('|');
+  if (key === roomsKey) return; roomsKey = key;                                          // the list arrives every second: only touch the DOM (and the focus) when something drawn changed
+  const at = ul.contains(document.activeElement) ? document.activeElement : null, had = at && (at.dataset.watch || at.dataset.code), hadWatch = !!(at && at.dataset.watch),
+    idx = at ? [...ul.querySelectorAll('.court-row')].indexOf(at.closest('li')?.firstElementChild) : -1;
+  ul.textContent = ''; ul.setAttribute('aria-busy', String(st === 'loading'));
+  if (st === 'loading' || st === 'down') for (let i = 0; i < 4; i++) { const li = mk('li', 'court is-skel'); li.append(mk('span', 'court-row is-skel')); li.setAttribute('aria-hidden', 'true'); ul.append(li); }      // skeletons: nothing in them is focusable
+  rows.forEach((r, i) => { const li = mk('li', 'court'), b = mk('button', 'room-row court-row' + (r.kind === 'full' ? ' is-full' : ''));
+    li.dataset.kind = r.kind; b.dataset.code = r.code; b.dataset.nav = ''; b.tabIndex = i ? -1 : 0; if (r.kind === 'full') b.dataset.act = 'watch'; if (r.full) b.setAttribute('aria-disabled', 'true');
+    const who = mk('span', 'court-who', r.who); if (r.kind === 'tour') who.prepend(mk('span', 'badge-tour', 'Tournament'));
+    b.append(mk('b', 'court-code', r.code), who, mk('span', 'court-meta', r.meta), mk('span', 'court-go', r.go));
+    b.setAttribute('aria-label', `Court ${r.code}. ${r.who}.${r.meta ? ' ' + r.meta + '.' : ''} ${r.go}${r.watch ? '. Right arrow to watch' : ''}`); if (r.watch) b.setAttribute('aria-keyshortcuts', 'ArrowRight'); li.append(b);      // Watch is off the Tab order: say how to reach it
+    if (r.watch) { const w = mk('button', 'btn btn-sm is-tall room-watch'); w.innerHTML = EYE_SVG; w.append('Watch'); w.dataset.watch = r.code; w.tabIndex = -1; w.setAttribute('aria-label', `Watch court ${r.code}`); li.append(w); }
+    ul.append(li); });
+  drawState(st, s); roomBar();
+  if (at) { const all = [...ul.querySelectorAll('.court-row, .room-watch')], cr = [...ul.querySelectorAll('.court-row')];      // no selector built from a server string
+    const to = all.find(e => hadWatch && e.dataset.watch === had) || all.find(e => !e.dataset.watch && e.dataset.code === had) || cr[Math.min(idx, cr.length - 1)] || $('court-search');
+    if (to.classList.contains('court-row')) rove(to); to.focus({ preventScroll: true }); }
+}
+function drawState(st, s) {
+  const p = $('room-empty'); if (!p) return; p.textContent = ''; p.dataset.state = st;
+  const btn = (text, fn) => { const b = mk('button', 'btn btn-sm is-tall', text); b.type = 'button'; b.addEventListener('click', fn); return b; };
+  const q = query, other = filter === 'open' ? 'full' : 'open';
+  if (st === 'down') p.append(mk('span', '', 'Courts show again when the game is back.'));
+  else if (st === 'loading') p.append(mk('span', 'vh', 'Loading courts'));
+  else if (st === 'empty-open') p.append(mk('span', '', 'No open courts right now.'), s.full.length ? btn(`${s.full.length} to watch in Full`, () => { setFilter('full'); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); }) : btn('Create court', () => { if (!needName()) lobbyView('create'); }));      // Create court is already beside the list: point at what can be watched instead
+  else if (st === 'empty-full') p.append(mk('span', '', 'Nobody is playing right now.'));
+  else if (st === 'nomatch') {
+    const code = q.length === 4 && cleanCode(q) === q && !s.all.some(r => r.code === q);      // a whole code that is not listed: private courts only join by code
+    p.append(mk('span', '', code ? `${q} isn’t listed. Private courts join by code.` : `No courts match “${q}”.`));
+    if (code) p.append(btn('Use this code', () => useCode(q)));
+    else if (s[other].length) p.append(btn(`${s[other].length} in ${other === 'full' ? 'Full' : 'Open'}`, () => { setFilter(other); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); }));
+    p.append(btn('Clear search', () => { setQuery(''); $('court-search').focus(); }));
+  }
+}
+function setFilter(f) { filter = f === 'full' ? 'full' : 'open'; try { localStorage.setItem('poddle.courts', filter); } catch { /* fine */ } drawCourts(); }
+function setQuery(q) { query = (String(q || '').toUpperCase().match(CODE_OK) || []).join('').slice(0, 8); const i = $('court-search'); if (i && i.value !== query) i.value = query; drawCourts(); }
+function useCode(c) { setCode(c); codeError(''); $('btn-join').focus({ preventScroll: true }); }
+const rove = row => { for (const r of $('room-list').querySelectorAll('.court-row')) r.tabIndex = r === row ? 0 : -1; };      // the list is one Tab stop: the arrows walk it
 // "Court is full. Watch instead?" over the lobby. Yes -> on.watch(code). Either button closes it; so does askWatch(null) and leaving the lobby.
 let askCode = null;
 export const asking = () => askCode != null;
@@ -479,13 +599,16 @@ export function askWatch(code) {
   else if (was != null && slots.menu === 'lobby') setTimeout(() => { if (slots.menu === 'lobby' && !asking()) viewFocus().focus({ preventScroll: true }); }, 0);
 }
 export function lobbyBusy(busy) { $('screen-lobby').setAttribute('aria-busy', busy ? 'true' : 'false'); }
-export function lobbyLink(up) { $('lobby-down').hidden = up; $('screen-lobby').classList.toggle('is-down', !up); if (!up) lobbyRooms([], 0); }      // a list from before the drop is not worth tapping
+export function lobbyLink(up) { if ($('screen-lobby').classList.contains('is-down') === !up && !$('lobby-down').hidden === !up) return;      // called four times a second: only a change does anything
+  $('lobby-down').hidden = up; $('screen-lobby').classList.toggle('is-down', !up); if (!up) { list = { rooms: [], tours: [] }; seen = false; $('lobby-online').hidden = true; } drawCourts(); }      // a list from before the drop is not worth tapping; back up, it is 'loading' until the first list
 export function codeError(text) {
   setText($('code-err'), text); $('code-boxes').classList.toggle('is-bad', !!text);
   if (text) { restart($('code-boxes'), 'is-error'); boxes()[3].focus(); }
 }
-function setCode(code) { boxes().forEach((b, i) => { b.value = code[i] || ''; }); $('btn-join').disabled = code.length < 4; }
+function setCode(code) { boxes().forEach((b, i) => { b.value = code[i] || ''; }); codeReady(); }
 const getCode = () => boxes().map(b => b.value).join('');
+export const typedCode = () => getCode();                                                // what is in the code boxes (a join from them answers under them)
+function codeReady() { const off = getCode().length < 4; for (const id of ['btn-join', 'btn-watch-code']) { const b = $(id); if (b) { if (off && document.activeElement === b) boxes()[3].focus(); b.disabled = off; } } }      // Join and Watch: four letters, or neither
 // room: the code I am seated in (null = none). link: the address to share, or '' when this page is only reachable on this computer.
 // the connection, said quietly: four bars and the round trip. It never turns red and never interrupts; a slow link just shows fewer bars.
 export function setPing(ms) { const el = $('ping-pill'); if (!el) return; el.hidden = !(ms > 0); if (!(ms > 0)) return; const r = Math.round(ms);
@@ -514,12 +637,16 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
 {
   // no name, no seat: every choice on the home view waits for it (the field shakes and takes focus), and so does the last button of each view
   $('btn-quick').addEventListener('click', () => { if (!needName() && on.quick) on.quick(); });
-  $('btn-create').addEventListener('click', () => { if (!needName()) lobbyView('create'); });
-  $('btn-code').addEventListener('click', () => { if (!needName()) lobbyView('code'); });
+  on2('btn-courts', 'click', () => { if (!needName()) lobbyView('courts'); });
+  on2('btn-create', 'click', () => { if (!needName()) lobbyView('create'); });
+  on2('btn-tour', 'click', e => { e.currentTarget.blur?.(); });                         // shown from day one so the layout never shifts; tournaments are coming soon (aria-disabled, still focusable)
+  on2('btn-watch-code', 'click', () => { const c = getCode(); if (c.length === 4 && !needName() && on.watch) on.watch(c); });
   on2('btn-bot', 'click', () => { if (!needName()) lobbyView('bot'); });
   $('btn-create-go').addEventListener('click', () => { if (!needName() && on.create) on.create($('seg').querySelector('[aria-checked="true"]').dataset.public === '1'); });
   on2('bot-levels', 'click', e => { const b = e.target.closest('[data-level]'); if (b && !needName() && on.bot) on.bot(+b.dataset.level); });       // one click plays: no second confirm
-  on2('lobby-bot', 'keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); const bs = [...$('bot-levels').children], i = bs.indexOf(document.activeElement); bs[(i < 0 ? 1 : i + d + 3) % 3].focus(); });
+  on2('lobby-bot', 'keydown', e => { let d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); const bs = [...$('bot-levels').children], i = bs.indexOf(document.activeElement);
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && getComputedStyle($('bot-levels')).gridTemplateColumns.split(' ').length === 2) d *= 2;      // two by two: up and down move a row
+    bs[(i < 0 ? 1 : i + d + bs.length) % bs.length].focus(); });
   on2('name-input', 'input', e => keepName(e.currentTarget));
   on2('name-input', 'blur', e => { e.currentTarget.value = cleanName(e.currentTarget.value); });
   on2('name-input', 'keydown', e => { if (e.key !== 'Enter' && e.key !== 'ArrowDown') return; e.preventDefault(); if (!needName()) viewFocus().focus({ preventScroll: true, focusVisible: true }); });     // Enter: on to Quick play
@@ -535,22 +662,37 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   }
   document.addEventListener('pointerdown', e => { for (const [m] of COPY) if (!e.target.closest('#' + m)) copyOpen(m, false); });
   for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => on.back && on.back());
-  $('room-list').addEventListener('click', e => { const w = e.target.closest('.room-watch'), b = e.target.closest('button.room-row'); if (!w && !b || needName()) return;
-    if (w) { if (on.watch) on.watch(w.dataset.watch); } else if (on.join) on.join(b.dataset.code); });
+  $('room-list').addEventListener('click', e => { const w = e.target.closest('.room-watch'), b = e.target.closest('button.room-row'); if (!w && !b || b && b.getAttribute('aria-disabled') === 'true' || needName()) return;
+    if (w) { if (on.watch) on.watch(w.dataset.watch); } else if (b.dataset.act === 'watch') { if (on.watch) on.watch(b.dataset.code); } else if (on.join) on.join(b.dataset.code); });      // an Ask to play row joins too: the server turns it into watch + ask
+  // the list: one Tab stop. Up / Down walk the rows (Up on the first goes back to search), Home / End, Right = the row's Watch, Left = back to the row
+  $('room-list').addEventListener('keydown', e => { const rs = [...$('room-list').querySelectorAll('.court-row')], a = document.activeElement, row = a.classList.contains('room-watch') ? a.closest('li').firstElementChild : a, i = rs.indexOf(row); if (i < 0) return;
+    const go = r => { e.preventDefault(); rove(r); r.focus(); r.scrollIntoView({ block: 'nearest' }); };
+    if (e.key === 'ArrowDown') { if (rs[i + 1]) go(rs[i + 1]); else e.preventDefault(); } else if (e.key === 'ArrowUp') { if (i > 0) go(rs[i - 1]); else { e.preventDefault(); $('court-search').focus(); } }
+    else if (e.key === 'Home') go(rs[0]); else if (e.key === 'End') go(rs[rs.length - 1]);
+    else if (e.key === 'ArrowRight' && a === row) { const w = row.parentElement.querySelector('.room-watch'); if (w) { e.preventDefault(); w.focus(); } } else if (e.key === 'ArrowLeft' && a !== row) { e.preventDefault(); row.focus(); } });
+  on2('court-search', 'input', e => { const c = e.currentTarget.selectionStart; setQuery(e.currentTarget.value); try { e.currentTarget.setSelectionRange(c, c); } catch { /* fine */ } });
+  on2('court-search', 'keydown', e => { const rs = [...$('room-list').querySelectorAll('.court-row')];
+    if (e.key === 'ArrowDown') { if (rs[0]) { e.preventDefault(); rove(rs[0]); rs[0].focus(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); if (rs.length === 1) rs[0].click(); else if (query.length === 4 && cleanCode(query) === query && !rs.some(r => r.dataset.code === query)) useCode(query); }      // never submits anything by itself
+    else if (e.key === 'Escape' && e.currentTarget.value) { e.preventDefault(); e.stopPropagation(); setQuery(''); } });      // a query is cleared before Esc goes Back (main.js never hears it)
+  on2('court-seg', 'click', e => { const o = e.target.closest('.seg-opt'); if (o) setFilter(o.dataset.filter); });
+  on2('court-seg', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); setFilter(e.key === 'ArrowLeft' ? 'open' : 'full'); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); });
+  document.addEventListener('keydown', e => { if (e.key !== '/' || view !== 'courts' || slots.menu !== 'lobby' || asking() || e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return; e.preventDefault(); $('court-search').focus(); });      // '/' = search, the web's usual key, anywhere on Courts
   const pick = opt => { for (const o of $('seg').children) { const yes = o === opt; o.setAttribute('aria-checked', yes); o.tabIndex = yes ? 0 : -1; } setText($('seg-note'), opt.dataset.public === '1' ? 'Shows in the court list' : 'Join by code only'); };
   $('seg').addEventListener('click', e => { const o = e.target.closest('.seg-opt'); if (o) pick(o); });
   $('lobby-create').addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); const o = $('seg').children[e.key === 'ArrowLeft' ? 0 : 1]; pick(o); if ($('seg').contains(document.activeElement)) o.focus(); });   // Left = Public, Right = Private, from anywhere on the card
   // code boxes: type, paste (a code or a whole link), Backspace walks back, arrows move, Enter joins
   const form = $('lobby-code'), fill = (from, text) => { const bs = boxes(), chars = cleanCode(text); if (chars.length === 4) from = 0;
-    [...chars].forEach((c, i) => { if (bs[from + i]) bs[from + i].value = c; }); (bs[Math.min(3, from + chars.length)] || bs[3]).focus(); $('btn-join').disabled = getCode().length < 4; codeError(''); };
-  form.addEventListener('input', e => { const b = e.target, i = boxes().indexOf(b); if (i < 0) return; const t = b.value; b.value = ''; if (cleanCode(t)) fill(i, t); else $('btn-join').disabled = getCode().length < 4; });
+    [...chars].forEach((c, i) => { if (bs[from + i]) bs[from + i].value = c; }); (bs[Math.min(3, from + chars.length)] || bs[3]).focus(); codeReady(); codeError(''); };
+  form.addEventListener('input', e => { const b = e.target, i = boxes().indexOf(b); if (i < 0) return; const t = b.value; b.value = ''; if (cleanCode(t)) fill(i, t); else codeReady(); });
   form.addEventListener('paste', e => { e.preventDefault(); fill(0, (e.clipboardData || window.clipboardData).getData('text')); });
   form.addEventListener('focusin', e => { if (e.target.select) e.target.select(); });
   form.addEventListener('keydown', e => { const bs = boxes(), i = bs.indexOf(e.target); if (i < 0) return;
-    if (e.key === 'Backspace' && !e.target.value && i > 0) { e.preventDefault(); bs[i - 1].value = ''; bs[i - 1].focus(); $('btn-join').disabled = true; }
-    else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); bs[i - 1].focus(); } else if (e.key === 'ArrowRight' && i < 3) { e.preventDefault(); bs[i + 1].focus(); } });
+    if (e.key === 'Backspace' && !e.target.value && i > 0) { e.preventDefault(); bs[i - 1].value = ''; bs[i - 1].focus(); codeReady(); }
+    else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); bs[i - 1].focus(); } else if (e.key === 'ArrowRight' && i < 3) { e.preventDefault(); bs[i + 1].focus(); }
+    else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); $('btn-watch-code').click(); } });      // Enter = Join (the form), Shift+Enter = Watch
   form.addEventListener('submit', e => { e.preventDefault(); const c = getCode(); if (c.length === 4 && !needName() && on.join) on.join(c); });
-  // arrows walk the tiles and the room list in reading order (Tab works too)
+  // arrows walk the three tiles (Tab works too)
   $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
     const nav = [...$('lobby-home').querySelectorAll('[data-nav]')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });
 }

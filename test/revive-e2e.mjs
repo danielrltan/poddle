@@ -16,7 +16,7 @@ const open = async name => { const ctx = await browser.createBrowserContext(), p
 const st = pg => pg.evaluate(() => ({ screen: document.body.dataset.screen || '', overlay: document.body.dataset.overlay || '', code: document.getElementById('room-code').textContent.trim(), me: document.getElementById('name-me').textContent.trim(), them: document.getElementById('name-them').textContent.trim(), link: document.getElementById('g').textContent.trim(), toasts: window.__toasts || [], search: location.search }));
 const until = async (pg, f, ms = 8000) => { const t = Date.now(); let s; while (Date.now() - t < ms) { s = await st(pg); if (f(s)) return s; await sleep(150); } return s; };
 
-const a = await open('Ann'); await a.click('#btn-create'); await sleep(500);
+const a = await open('Ann'); await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(500);
 await a.evaluate(() => [...document.querySelectorAll('#screen-lobby button')].find(b => b.offsetParent && /^(create|make|start|open)/i.test(b.textContent.trim()) && b.id !== 'btn-create')?.click());
 let sa = await until(a, s => s.code.length === 4); const CODE = sa.code; ok(CODE.length === 4, `Ann made court ${CODE}`);
 const b = await open('Ben'); await b.goto(`http://localhost:${G}/?game=${G}&bridge=${G + 5}&cam=0&court=${CODE}`, { waitUntil: 'domcontentloaded' }); await sleep(2200); await b.click('#btn-start');

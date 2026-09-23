@@ -14,9 +14,12 @@ room (`welcome`, `state`, `hit`, `swing`, `paddle`, `ping`, `net`, ...) do not c
 
 ## Lobby messages
 server -> client
-- `{ type:'lobby', rooms:[{ code, players, open, watch, watchers, score, live }], online }` on entering the lobby, then whenever
-  the list changes (at most once a second). Every **public** room with at least one human in it is listed: `open` = a seat is
-  free (joinable), otherwise it can be watched (docs/SPECTATE.md). An empty room is not listed (nobody is coming to it), but
+- `{ type:'lobby', rooms:[{ code, players, open, ask, bot, watch, watchers, score, live, names }], online, tours }` on entering the lobby, then whenever
+  the list changes (at most once a second). Every **public** room with at least one human in it is listed: `open` = a join
+  seats you directly (its meaning is unchanged), otherwise it can be watched (docs/SPECTATE.md). `ask` = one human is mid-match
+  with Matt (a ball has been struck): a join puts you in the stands and asks them for Matt's seat (docs/SPECTATE.md Asking to
+  play). `bot` = Matt is seated. `names` = the two seats' names as the scoreboard shows them (untrusted text: `textContent` only).
+  `tours` = tournaments signing up (docs/COURTS-TOURNEY.md Feature 2; an empty list until that is built). An empty room is not listed (nobody is coming to it), but
   `quick` still reuses it and its code still joins. `online` = sockets connected in total.
 - `{ type:'room', code, public }` you are now seated in this room. The normal `welcome` follows immediately.
 - `{ type:'joinfail', reason }` with reason `'notfound' | 'full' | 'busy'` (`busy`: the server is at its room cap).
@@ -25,13 +28,18 @@ server -> client
 client -> server (only valid in the lobby, ignored otherwise, except `leave`)
 - `{ type:'quick' }` seat me in the public room that has waited longest for a second human; if none, create a public one.
 - `{ type:'create', public: boolean }` new room, seat me.
-- `{ type:'join', code }` code is case-insensitive, surrounding spaces ignored.
+- `{ type:'join', code }` code is case-insensitive, surrounding spaces ignored. Into a court where one human is mid-match with
+  Matt it is not a seat: the socket is let in to watch (`room` with `asked:true`, role spectator) and the player is asked.
+- `{ type:'watch', code }` watch that court (docs/SPECTATE.md); never asks.
 - `{ type:'leave' }` (valid in a room) back to the lobby; the server sends a fresh `lobby`.
 
 ## Rooms
 - `code`: 4 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no I, L, O, 0, 1), unique among live rooms.
 - 2 human seats. A third joiner gets `joinfail full`. The bot rules inside a room are unchanged: alone for 2.5 s and the
-  bot joins, a second human replaces it, `B` / `1 2 3` still work.
+  bot joins, a second human replaces it, `B` / `1 2 3 4` still work (Rookie, Club, Tour, Pro; the wire levels are 0, 1, 3, 2:
+  Tour was appended at index 3 so `bot=0..2` keep their meaning).
+- Seating: a second human sits down directly until a ball has been struck in the match (share screen, calibrating, the 3-2-1);
+  after that the seat is the player's to give (watch + ask). `quick` never picks a court whose match against Matt is under way.
 - A room with no human for 30 s is deleted. Cap: 40 rooms (`busy` beyond that).
 - Reconnect: a socket arriving with the `cid` of a player still seated in that room takes that seat over (today's
   ghost rule, now per room). A `cid` seated in a *different* room is removed from the old one first.
@@ -46,7 +54,8 @@ client -> server (only valid in the lobby, ignored otherwise, except `leave`)
   does today. Mid-match it is a seat hold or a forfeit: docs/SPECTATE.md.
 
 ## Client flow
-title (Play) -> lobby (Quick play / Create room / Enter code, plus the public room list) -> connect gear -> calibrate
+title (Play) -> lobby (Quick play / Courts / Play a bot; Courts holds the searchable court list with an Open | Full switch, a
+code to Join or Watch, Create court and Create tournament) -> connect gear -> calibrate
 -> play. The game socket is opened with `lobby=1` when the page loads; nothing is seated until the player chooses.
 `?court=CODE` in the page URL joins straight away after Play (shareable link; `?room=CODE` is the old spelling and still
 works; players read "court" everywhere, the wire protocol keeps `room`). `?skiptitle=1` keeps today's legacy path

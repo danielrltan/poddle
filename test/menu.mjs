@@ -83,31 +83,46 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   // Play -> lobby
   await pg.click('#btn-start'); await sleep(700); s = await st(pg);
   ok(s.screen === 'lobby' && s.view === 'home' && s.title === 'Play' && s.focus === 'btn-quick', `${tag} Play -> lobby home, Quick play focused (${s.screen}/${s.view}/${s.focus})`);
-  const tiles = await pg.evaluate(() => [...document.querySelectorAll('#lobby-home .tile')].map(b => b.textContent.trim())); ok(/^Quick play\|Create court\|Enter code\|Play a bot$/.test(tiles.join('|')), `${tag} the choices: ${tiles.join(' | ')}`);
+  const tiles = await pg.evaluate(() => [...document.querySelectorAll('#lobby-home .tile')].map(b => b.querySelector('b').textContent.trim())); ok(/^Quick play\|Courts\|Play a bot$/.test(tiles.join('|')) && !(await pg.$('#btn-code')), `${tag} the choices: ${tiles.join(' | ')} (no Enter code tile)`);
   ok(s.rooms.length === 2 && s.rooms[0].startsWith('KXQ7') && s.rooms[1].startsWith('M3PD') && s.online === '3 online', `${tag} room list from the server: ${s.rooms.join(' | ')}, "${s.online}"`);
   ok((await pg.evaluate(() => getComputedStyle(document.getElementById('glass')).visibility)) === 'visible', `${tag} glass stays under the lobby`);
   if (s.fs) await pg.evaluate(() => document.exitFullscreen()); await shot('2-lobby');
   // back to the title and in again, with the keyboard
   await pg.keyboard.press('Escape'); await sleep(500); ok((await st(pg)).screen === 'title', `${tag} Esc on lobby home -> title`);
   await pg.keyboard.press('Space'); await sleep(700); ok((await st(pg)).screen === 'lobby', `${tag} Space on the title -> lobby`);
-  await pg.keyboard.press('ArrowRight'); await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-code', `${tag} arrows walk the tiles`);
-  // Enter code
-  await pg.keyboard.press('Enter'); await sleep(350); s = await st(pg); ok(s.view === 'code' && s.title === 'Enter code', `${tag} Enter code view (${s.view}, "${s.title}")`);
+  await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-courts', `${tag} arrows walk the tiles`);
+  // Courts: search, Open | Full, the code area (docs/COURTS-TOURNEY.md 2.7)
+  await pg.keyboard.press('Enter'); await sleep(350); s = await st(pg); ok(s.view === 'courts' && s.title === 'Courts' && s.focus === 'court-search', `${tag} Courts view (${s.view}, "${s.title}"), search focused (${s.focus})`);
+  const shown = () => pg.evaluate(() => ({ rows: [...document.querySelectorAll('#room-list .court-row')].map(b => b.dataset.code).join(), n: document.getElementById('n-open').textContent + '/' + document.getElementById('n-full').textContent, q: document.getElementById('court-search').value, focus: document.activeElement.id }));
+  await type(pg, 'm3'); let c = await shown(); ok(c.rows === 'M3PD' && c.q === 'M3' && c.n === '1/0', `${tag} search "m3" -> ${c.rows} (counts ${c.n})`);
+  await pg.keyboard.press('Escape'); await sleep(150); c = await shown(); s = await st(pg); ok(c.q === '' && c.rows === 'KXQ7,M3PD' && s.view === 'courts' && s.screen === 'lobby', `${tag} Esc with a query clears it and stays on Courts (${c.rows})`);
+  await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('ArrowDown'); c = await shown(); ok(await pg.evaluate(() => document.activeElement.dataset.code) === 'M3PD', `${tag} Down from search walks the list`);
+  await pg.keyboard.press('ArrowUp'); await pg.keyboard.press('ArrowUp'); ok((await shown()).focus === 'court-search', `${tag} Up on the first row goes back to search`);
+  { const at = () => pg.evaluate(() => { const a = document.activeElement; return (a.classList.contains('room-watch') ? 'watch:' + a.dataset.watch : a.dataset.code) || a.id; });
+    await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('End'); const end = await at(); await pg.keyboard.press('Home'); const home = await at();
+    const hasW = await pg.evaluate(() => !!document.activeElement.parentElement.querySelector('.room-watch')); await pg.keyboard.press('ArrowRight'); const right = await at(); await pg.keyboard.press('ArrowLeft'); const left = await at();
+    ok(end === 'M3PD' && home === 'KXQ7' && right === (hasW ? 'watch:KXQ7' : 'KXQ7') && left === 'KXQ7', `${tag} End / Home jump to the last / first row, Right = its Watch, Left = back (${end}, ${home}, ${right}, ${left})`);
+    await pg.keyboard.press('ArrowUp'); }
+  await pg.click('#court-seg [data-filter="full"]'); await sleep(100); c = await shown(); ok(c.rows === '' && await pg.evaluate(() => document.getElementById('room-empty').textContent) === 'Nobody is playing right now.', `${tag} Full: no two-human courts here, "Nobody is playing right now."`);
+  await pg.click('#court-seg [data-filter="open"]'); await sleep(100); await pg.evaluate(() => document.activeElement.blur()); await pg.keyboard.press('Slash'); ok((await shown()).focus === 'court-search', `${tag} / focuses search`);
+  await pg.click('#code-boxes input');
   const fs0 = (await st(pg)).fs; await type(pg, 'fo1'); s = await st(pg); ok(s.typed === 'F' && s.screen === 'lobby' && s.fs === fs0, `${tag} F types a letter (no full screen), O and 1 are dropped: "${s.typed}"`);
   await pg.keyboard.press('Backspace'); await pg.keyboard.press('Backspace'); await sleep(80); await type(pg, 'ab2k'); s = await st(pg); ok(s.typed === 'AB2K', `${tag} typed "ab2k" reads ${s.typed}`);
   await pg.keyboard.press('Enter'); await sleep(500); s = await st(pg);
   ok(J(sent('join').at(-1)) === J({ type: 'join', code: 'AB2K', name: NAME }), `${tag} join sent upper case, with the name: ${J(sent('join').at(-1))}`);
-  ok(s.err === 'Court not found' && s.screen === 'lobby' && s.view === 'code' && s.typed === 'AB2K' && !s.busy && !/(court|room)=/.test(s.search), `${tag} joinfail notfound: inline "${s.err}", stays on the code view`); await shot('5-code-error');
+  ok(s.err === 'Court not found' && s.screen === 'lobby' && s.view === 'courts' && s.typed === 'AB2K' && !s.busy && !/(court|room)=/.test(s.search), `${tag} joinfail notfound: inline "${s.err}", stays on Courts`); await shot('5-code-error');
   await pg.evaluate(() => { const dt = new DataTransfer(); dt.setData('text', 'https://poddleball.com/?room=fvvv'); document.querySelector('#code-boxes input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
   await sleep(100); s = await st(pg); ok(s.typed === 'FVVV' && s.err === '', `${tag} pasting a link fills the code and clears the error (${s.typed})`);
+  await pg.click('#btn-watch-code'); await sleep(450); s = await st(pg); ok(J(sent('watch').at(-1)) === J({ type: 'watch', code: 'FVVV', name: NAME }) && s.err === 'Court not found' && s.screen === 'lobby', `${tag} Watch next to Join watches that code: ${J(sent('watch').at(-1))}, "${s.err}" under the boxes`);
+  await pg.focus('#code-boxes input:last-child');
   await pg.keyboard.press('Enter'); await sleep(450); ok((await st(pg)).err === 'Court is full', `${tag} joinfail full, nowhere to watch: inline "${(await st(pg)).err}"`);
   await pg.click('#screen-lobby [data-back]'); await sleep(350); s = await st(pg); ok(s.view === 'home' && s.screen === 'lobby', `${tag} Back button -> lobby home`);
-  // Create room
-  await pg.click('#btn-create'); await sleep(350); s = await st(pg); ok(s.view === 'create' && s.title === 'Create court', `${tag} Create room view`); await shot('3-create');
+  // Create room (inside Courts)
+  await pg.click('#btn-courts'); await sleep(350); await pg.click('#btn-create'); await sleep(350); s = await st(pg); ok(s.view === 'create' && s.title === 'Create court', `${tag} Create room view`); await shot('3-create');
   await pg.click('#btn-create-go'); await sleep(500); s = await st(pg);
   ok(J(sent('create').at(-1)) === J({ type: 'create', public: true, name: NAME }), `${tag} create sent: ${J(sent('create').at(-1))}`);
   ok(s.view === 'share' && s.title === 'Your court' && s.share === 'CRTD' && /court=CRTD/.test(s.search) && s.screen === 'lobby', `${tag} 'room' -> share view shows ${s.share}, url ${s.search}`); await shot('4-share');
-  await pg.keyboard.press('Escape'); await sleep(450); s = await st(pg); ok(s.view === 'home' && sent('leave').length === 1 && !/(court|room)=/.test(s.search), `${tag} Esc on the share view leaves the room (${sent('leave').length} leave, url "${s.search}")`);
+  await pg.keyboard.press('Escape'); await sleep(450); s = await st(pg); ok(s.view === 'courts' && sent('leave').length === 1 && !/(court|room)=/.test(s.search), `${tag} Esc on the share view leaves the room and goes back to Courts (${sent('leave').length} leave, url "${s.search}")`);
   await pg.click('#btn-create'); await sleep(300); await pg.keyboard.press('ArrowRight'); await sleep(80); ok(await pg.evaluate(() => document.getElementById('seg-note').textContent) === 'Join by code only', `${tag} Right selects Private`);
   await pg.keyboard.press('Enter'); await sleep(500); ok(J(sent('create').at(-1)) === J({ type: 'create', public: false, name: NAME }), `${tag} private create sent: ${J(sent('create').at(-1))}`);
   await pg.click('#btn-share-go'); await sleep(800); s = await st(pg); ok(s.screen === 'connect' && s.backs === 1, `${tag} Start -> connect screen with a Back button (${s.screen}, backs=${s.backs})`); await shot('6-connect');
@@ -115,7 +130,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.click('#cal [data-back]'); await sleep(600); s = await st(pg); ok(s.screen === 'lobby' && s.view === 'home' && sent('leave').length === 2 && !/(court|room)=/.test(s.search), `${tag} Back on calibrate -> lobby, leave sent, url cleared`);
   // Quick play, then a room from the list
   await pg.click('#btn-quick'); await sleep(800); s = await st(pg); ok(J(sent('quick').at(-1)) === J({ type: 'quick', name: NAME }) && s.screen === 'connect' && /court=QQQQ/.test(s.search), `${tag} Quick play sent ${J(sent('quick').at(-1))} -> ${s.screen}, url ${s.search}`);
-  await pg.keyboard.press('Escape'); await sleep(600); await pg.click('.room-row[data-code="KXQ7"]'); await sleep(800); s = await st(pg);
+  await pg.keyboard.press('Escape'); await sleep(600); await pg.click('#btn-courts'); await sleep(350); await pg.click('.room-row[data-code="KXQ7"]'); await sleep(800); s = await st(pg);
   ok(J(sent('join').at(-1)) === J({ type: 'join', code: 'KXQ7', name: NAME }) && s.screen === 'connect', `${tag} room row joins KXQ7 -> ${s.screen}`);
   // reload: the URL carries the room, the title says so, Play rejoins
   await pg.reload(); await sleep(1600); s = await st(pg); ok(s.screen === 'title' && s.chip === 'Joining court KXQ7', `${tag} reload: title chip "${s.chip}"`); await shot('7-title-room');
@@ -135,7 +150,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.close(); }
 // a shared link to a room that is gone
 { const pg = await open('gone', '&room=ZZZZ'); await pg.click('#btn-start'); await sleep(900); const s = await st(pg);
-  ok(s.screen === 'lobby' && s.view === 'code' && s.typed === 'ZZZZ' && s.err === 'Court not found' && !/(court|room)=/.test(s.search), `dead link: code view, "${s.err}", url "${s.search}"`); await pg.close(); }
+  ok(s.screen === 'lobby' && s.view === 'courts' && s.typed === 'ZZZZ' && s.err === 'Court not found' && !/(court|room)=/.test(s.search), `dead link: Courts with the code filled in, "${s.err}", url "${s.search}"`); await pg.close(); }
 // server down in the lobby, then back; and a server that never answers
 { const pg = await open('down'); await pg.click('#btn-start'); await sleep(600); await stopFake(); await sleep(1500); let s = await st(pg);
   ok(s.down && !s.rooms.length && s.screen === 'lobby', `server down: the lobby says so (down=${s.down})`); await sleep(300); await pg.screenshot({ path: `${root}test/ui-shots/menu-8-lobby-down-1280x720.png` });
@@ -159,7 +174,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
     await pg.keyboard.press('Escape'); await sleep(600); v = await view(); ok((await st(pg)).screen === 'lobby' && v.attract, 'Back: lobby again, the rally too');
     // no name, no seat
     got.length = 0; await pg.click('#name-input', { clickCount: 3 }); await pg.keyboard.press('Backspace'); await sleep(100); await pg.click('#btn-quick'); await sleep(500); ok(!got.length && (await st(pg)).screen === 'lobby', `empty name: Quick play sends nothing (${J(got)})`);
-    await pg.click('#name-input'); await type(pg, 'Dan'); await pg.click('#btn-code'); await sleep(350); await type(pg, 'fwww'); await pg.keyboard.press('Enter'); await sleep(600);
+    await pg.click('#name-input'); await type(pg, 'Dan'); await pg.click('#btn-courts'); await sleep(350); await pg.click('#code-boxes input'); await type(pg, 'fwww'); await pg.keyboard.press('Enter'); await sleep(600);
     ok(await vis('ask-watch') && await pg.evaluate(() => window.__ui.asking()), 'join a full court -> the watch prompt'); await snap('10-ask-watch');
     await pg.click('#btn-watch-yes'); await sleep(1500); s = await st(pg); v = await view(); let b = await body();
     ok(J(sent('watch').at(-1)) === J({ type: 'watch', code: 'FWWW', name: NAME }) && s.screen === 'hud' && b.role === 'spectator' && v.spectator && !v.menu && !v.attract && v.name === 'broadcast' && /court=FWWW&watch=1/.test(s.search), `Yes -> ${J(sent('watch').at(-1))} -> the court, ${v.name} view, url ${s.search}`);
@@ -201,8 +216,8 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
 // ['ui.name' | 'scene.name', ...args]; a call identical to the last one of the same name is dropped (state arrives 20 x a second),
 // the per-frame ones are only counted (window.__n). The stubs keep just enough state for main.js to find its way.
 if (ONLY.includes('b')) {
-const UI_NAMES = 'backLabel countdown emote emotesOff onEmote setPing showScreen showOverlay currentScreen currentOverlay setNames setScore setServe setRally callout toast toastOff watcherNote notesOff confetti confettiOff setStatus setLink setServerAddress calibrationReset calibration setMode toggle setCamera isVisible setStat fullscreen wake onStart onRetry cleanCode onLobby lobbyView lobbyRooms lobbyBusy lobbyLink codeError setRoom titleRoom pointBanner joinBanner matchResult show playerName askWatch asking onSettings settings setSettings setPaused setSpectator setWatchers onView setView onRematch rematch hold setBot setPaddle padPair onPaddleSwap paddleKind'.split(' ');
-const SCENE_NAMES = 'setCourt setSide setViewer setView getView setMenu startAttract stopAttract setFrozen setDim updatePaddle updateBall hideBall onEvent unlockAudio render resize'.split(' ');
+const UI_NAMES = 'backLabel countdown emote emotesOff onEmote setPing showScreen showOverlay currentScreen currentOverlay setNames setScore setServe setRally callout toast toastOff watcherNote notesOff confetti confettiOff setStatus setLink setServerAddress calibrationReset calibration setMode toggle setCamera isVisible setStat fullscreen wake onStart onRetry cleanCode onLobby lobbyView lobbyRooms lobbyBusy lobbyLink codeError setRoom titleRoom pointBanner joinBanner matchResult show playerName askWatch asking onSettings settings setSettings setPaused setSpectator setWatchers onView setView onRematch rematch hold setBot setPaddle padPair onPaddleSwap paddleKind viewParent typedCode askCard askShowing onAnswer askPlay askCan showAsk onAsk'.split(' ');
+const SCENE_NAMES = 'setCourt setSide setViewer setView getView setMenu startAttract stopAttract setFrozen setDim setSelfBody updatePaddle updateBall hideBall onEvent unlockAudio render resize'.split(' ');
 const REC = `const C = window.__calls = window.__calls || [], N = window.__n = window.__n || {}, lastOf = {}, QUIET = ['ui.setStat', 'ui.setStatus', 'ui.setLink', 'ui.lobbyLink', 'ui.isVisible', 'ui.currentScreen', 'ui.currentOverlay', 'ui.wake', 'ui.asking', 'ui.playerName', 'ui.cleanCode', 'ui.calibration', 'scene.render', 'scene.updateBall', 'scene.updatePaddle', 'scene.setViewer', 'scene.getView'];
   const rec = (n, a) => { N[n] = (N[n] || 0) + 1; if (QUIET.includes(n)) return; const j = JSON.stringify(a, (k, v) => typeof v === 'function' ? 'fn' : v === undefined ? null : v); if (lastOf[n] === j && !/settings|askWatch|toast|rematch|onEvent|pointBanner|joinBanner|setView|Attract|setSide|setMenu|setRoom/.test(n)) return; lastOf[n] = j; C.push([n, ...JSON.parse(j)]); };`;
 const UI_STUB = `${REC}
@@ -249,10 +264,12 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
 
 // B2. a shared link with no name yet: the code is filled in, nothing is sent until there is a name
 { got.length = 0; const pg = await openB('noname', '&room=wxyz', { name: '' }); await h(pg, 'start'); await sleep(600); const cs = await since(pg, 0), i = await info(pg);
-  ok(has(cs, 'ui.lobbyView', (v, o) => v === 'code' && o && o.code === 'WXYZ') && !got.length && i.phase === 'lobby', `?room=WXYZ with no name: code view prefilled, nothing sent (${J(got)})`);
+  ok(has(cs, 'ui.lobbyView', (v, o) => v === 'courts' && o && o.code === 'WXYZ') && !got.length && i.phase === 'lobby', `?room=WXYZ with no name: code view prefilled, nothing sent (${J(got)})`);
   await pg.evaluate(() => { window.__name = '  <b>Zed</b>   the \u0007 Great!! '; }); await h(pg, 'lobby.join', 'WXYZ'); await sleep(600);
   ok(J(got[0]) === J({ type: 'join', code: 'WXYZ', name: 'bZed/b the G' }), `a name typed then Join: sent cleaned and cut to 12 (${J(got[0])})`);
   ok(await pg.evaluate(() => localStorage.getItem('poddle.name')) === 'bZed/b the G', 'the name is kept in localStorage poddle.name'); await pg.close(); }
+{ got.length = 0; const pg = await openB('noname-watch', '&court=wxyz&watch=1', { name: '' }); await h(pg, 'start'); await sleep(600); const cs = await since(pg, 0), i = await info(pg);      // a ?court= watch link: Courts, the code filled in, Watch lit (ui-next checks the focus)
+  ok(has(cs, 'ui.lobbyView', (v, o) => v === 'courts' && o && o.code === 'WXYZ' && o.watch === true) && !got.length && i.phase === 'lobby', `?court=WXYZ&watch=1 with no name: Courts, code prefilled, watch lit, nothing sent (${J(got)})`); await pg.close(); }
 
 // B3. Play a bot, then a whole player's evening against the script: names, pause, hold, points, result, rematch, settings, keys, leave
 { got.length = 0; rest(); const pg = await openB('player', '', { airpod: true }); let m0 = await mark(pg), cs, i;

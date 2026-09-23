@@ -1337,3 +1337,71 @@ Asked for: a small notice in the top-right corner when someone starts watching y
 - test/spin.mjs is the audit: it replays the recordings with the client's and server's own maths (sliced out of their files),
   prints ingredients, correlations, what the player sees, and the synthetic lobsynth anchors; `--candidate x.mjs` scores a
   rival rule side by side.
+
+## 84. Courts: one list with search and Open | Full, a code to Join or Watch, asking to play against Matt, and a Tour Matt
+- "Consolidate the court button and enter code area into one button... a proper court list that is searchable by code name,
+  but also filterable by a simple switch between open / full courts (for those who would like to watch)... spectators should
+  also be able to join as players if they're spectating a bot match, by sending a request to the current player." The home had
+  two ways in (Enter code, Create court) and a strip of at most 12 rows; a court past the twelfth could not be found at all.
+  Spec: docs/COURTS-TOURNEY.md (Feature 1 and the Tour bot: BUILT; Tournaments: NEXT).
+- Home is three tiles: Quick play, Courts ("{n} open" in a corner badge), Play a bot. Courts: search by code (upper-cased,
+  substring, prefix matches first), Open | Full (Open = open courts, tournaments and Ask to play rows; Full = two humans, the
+  row itself is Watch, "Stands full" when nobody else fits), counts that follow the search, every row (no cap; the list box has
+  ONE height in every state so nothing below it ever moves), the four code boxes with Join and Watch side by side, Create court,
+  and Create tournament shown but aria-disabled with "Needs at least 4 players. Up to 16. Tournaments are coming soon." so the
+  layout does not shift when it arrives. Back from Create court or Your court goes to Courts. `/`, Esc-clears-first, arrows.
+- Asking to play (docs/SPECTATE.md): the rule is "a ball has been struck", not "Matt is seated". The server seats Matt within
+  2.5 s of nearly every lone human, so with the naive rule a friend's code during the share screen would become a request and
+  Quick play would never pair two people again (test/joinreq.test.mjs case 1 guards that). One request per court, 10 s, silence
+  is a no, a 10 s cooldown counted from the END of the request (so an expiry still shows its cooldown), 3 s between two
+  requests, 60 s for the new player to get a paddle ready or Matt comes back at the level he had. The cooldown is keyed on the
+  cid AND the address (loopback skipped): on the cid alone a new cid, or none, got round it. It is charged for a no, an expiry,
+  walking out mid-request and a demotion, never for a `gone` the court caused (the player dropped or reloaded, the match ended):
+  a clean reload closes the old socket first, so the seat goes into a hold and the request ends, and the requester was being
+  fined for it. If the one who said yes leaves before the new player is ready, `promo` is dropped: the court's only human is
+  never demoted (it used to be, leaving Matt alone in a court that then closed). After a restart a revived Matt match with points
+  on the board is under way at once (`resumed`), or a stranger could sit in Matt's seat and wipe a 7-5 while the host recalibrated;
+  when a spectator's tab rebuilds the court first, the player arriving with `back=1&bot=` gets Matt back at that level and the same
+  flag (`mattBack`; before, Matt came back at Club after 2.5 s). The address key is global: a neighbour behind the same NAT who
+  asks within 10 s of a no waits too, a small price against a requester rotating cids. A demotion counts as under way too
+  (`resumed` set after Matt is back): addBot restarts the match with nothing struck, so the court used to list as open, and the
+  demoted spectator (or anyone) could press Join and sit straight in Matt's seat with no request, again and again, while the
+  serve waited for the host's swing.
+  The player's card is bottom-left, outside #hud, one row (question beside Accept / Decline, about 5.5rem tall, below the near
+  baseline), beside the settings card when that is open, stacked narrow in the margin left of the result card, up under the
+  Court pill in portrait and in a short landscape window (1280x720: bottom-left covered the near baseline there), just above
+  the key strip at phone width; never takes focus, Y / N only while it shows, Accept is the blue primary. The requester's button
+  (16rem) sits on the bottom row left of the emotes (above them it sat on the near baseline and corner), takes the emotes'
+  corner while a toast hides them, and counts down in place with two words for two clocks: "Waiting · 8s" (the player's time
+  to answer), "Again in 7s" (until you may ask), then "Ask again". The why, with the player's name, is a toast: "Lu said no",
+  "No answer from Lu", "Someone else asked first" (the same "· 7s" used to mean both clocks, and a name would not fit at 390 px).
+  While it cannot be pressed it looks it.
+- Tour: a fourth Matt between Club and Pro on every stat, APPENDED at BOTS[3] so revive's `bot=0..2` keep their meaning; listed
+  Rookie, Club, Tour, Pro everywhere (keys 1-4 send 0, 1, 3, 2; B walks the same order; `botinfo.order`). Tournaments will use it.
+- Courts QA pass: Open lists tournaments, then courts with someone waiting (Join is instant and never refused), then ask rows,
+  then empty courts (ask-first buried every waiting human below the fold with a busy list), and the list fades at the
+  bottom (with room to scroll the last row clear of it); every Join sits in one column (a row with no Watch keeps its slot); the counts read "–" while loading or down; "Can't
+  reach the game" hangs on the header edge and moves nothing; an error hides the code hint instead of sitting on it; Open empty
+  with courts to watch offers "{n} to watch in Full"; a row with Watch says "Right arrow to watch"; the Ask to play pill (#b23f0a)
+  and .court-meta (--ink) pass AA; nothing on Courts, the card, the button or the Courts tile under 12 px at the 10px root
+  (Accept / Decline, Open / Full, "8 open" and "Court not found" had slipped under it; verify.mjs now measures it at 600x900
+  and 390x844); Matt's four levels on one baseline.
+  The mock's emotes load (ui.js resolves emoji/ from its own URL).
+- A spectator's first botinfo no longer toasts "Matt · Pro": it landed in the same breath as "Ann is playing Matt. We asked if
+  you can play." and wiped it (the e2e caught it with a toast recorder); the scoreboard already shows the level.
+- Tests: test/joinreq.test.mjs (every row of the race matrix a socket can drive, plus: the match ending mid-request, the gap
+  between requests, the host leaving before the new player is ready, a demotion's cooldown, no cooldown for a host drop, the
+  cooldown on the address with a new cid or none (fly-client-ip), and a demoted court staying Ask to play until the next strike),
+  revive.test (a stranger joining a revived Matt match watches and asks), bot.test (Tour, the order, every Tour stat between
+  Club's and Pro's; a return-rate run was left out: a scripted rally with the rubber band is too noisy to rank three levels),
+  rooms.test, ui-next (the Open order, 42 rows and search finds the 42nd, down and loading each with their own copy and skeletons,
+  a watch link focuses Watch), menu (End / Home / Right / Left; part B runs again: its scene stub lacked setSelfBody, so main.js
+  threw on load and B stopped at B1; ?court=&watch=1 with no name lands on Courts), verify.mjs (a gate
+  now: one list height in every state, the card takes no focus or key, Y / N only while shown, the bar reaches 0 under reduced
+  motion, #btn-ask one width and nothing cut at 1440, 600 and 390, the card off the court at 1280x720, AA contrast, 44 px
+  targets and the 12 px floor, no-match and Full-empty in the one-height loop), shoot.mjs (the OVERLAP check also against
+  settings, board, corner, watchers, the insets, the result card and the notices, and the button against the toast; also shot at
+  820x1180 and 390x844), spectate-e2e (Cat asks Ann with A, Ann's Space and Enter answer nothing and the ball is still struck
+  while the card shows, N, "Again in" and the "Ann said no" toast, the cooldown, Ask again; then Ann moves to a public court,
+  Cat types two letters in Courts, finds its one Ask to play row, walks to it and presses Enter: watch + ask with its toast; Y,
+  she calibrates and plays Ann), fixes-e2e and revive-e2e run and pass.

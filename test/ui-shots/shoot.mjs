@@ -13,13 +13,16 @@ const srv = http.createServer((q, r) => {
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end('nf'); } r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); });
 }).listen(PORT, '127.0.0.1');
 const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud-airpod-lost', 'hud', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-stats',
-  'hud&bg=grass', 'hud&bg=court', 'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'watch&bg=court', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full'];
+  'hud&bg=grass', 'hud&bg=court', 'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'watch&bg=court', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full',
+  'lobby-courts', 'lobby-courts&tour=1', 'lobby-courts-full', 'lobby-courts-loading', 'lobby-courts-empty', 'lobby-courts-empty-full', 'lobby-courts-nomatch', 'lobby-courts-nomatch&q=KXQ8', 'lobby-courts-down', 'lobby-courts-err', 'lobby-courts-link', 'lobby-courts-many',
+  'hud-ask', 'hud-ask-settings', 'match-ask', 'watch-ask', 'watch-ask&s=sent', 'watch-ask&s=no', 'watch-ask&s=expired', 'watch-ask&s=wait&busy=1'];
 const SIZES = (process.env.UI_SIZES || '1440x900,1280x720,600x900').split(',').map(s => s.split('x').map(Number));      // 600x900: the root font is at its 10px floor there, the layout no longer shrinks with the window
 const args = process.argv.slice(2);
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new', args: ['--hide-scrollbars'] });
 const errs = [];
 async function shot(url, file, w, h, full) {
   const page = await browser.newPage(); await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+  if (process.env.UI_REDUCED === '1') { await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]); file = file.replace(/\.png$/, '-reduced.png'); }      // UI_REDUCED=1: the reduced-motion pass (hud-ask, lobby-courts-loading)
   page.on('console', m => { if (m.type() === 'error') errs.push(`${file}: ${m.text()}`); });
   page.on('pageerror', e => errs.push(`${file}: PAGEERROR ${e.message}`));
   page.on('requestfailed', q => errs.push(`${file}: FAILED ${q.url()}`));
@@ -31,6 +34,11 @@ async function shot(url, file, w, h, full) {
   // overflow check: anything marked data-fit must sit fully inside the viewport
   const clipped = await page.evaluate(() => [...document.querySelectorAll('[data-fit]')].filter(e => { const b = e.getBoundingClientRect(); return b.width && (b.left < 0 || b.top < 0 || b.right > innerWidth + .5 || b.bottom > innerHeight + .5); }).map(e => e.id || e.className));
   if (clipped.length) errs.push(`${file}: CLIPPED ${clipped.join(', ')}`);
+  const OVERLAP = [['ask-card', 'keys'], ['ask-card', 'toast'], ['ask-card', 'settings'], ['ask-card', 'board'], ['ask-card', 'corner'], ['ask-card', 'watchers'], ['ask-card', 'camwrap'], ['ask-card', 'podwrap'], ['ask-card', 'result'], ['ask-card', 'notices'], ['btn-ask', 'emotes'], ['btn-ask', 'views'], ['btn-ask', 'toast']];      // docs/COURTS-TOURNEY.md 2.11: the ask card and button never sit on what is already in those corners
+  const hits = await page.evaluate(pairs => pairs.filter(([a, b]) => { const A = document.getElementById(a), B = document.getElementById(b); if (!A || !B) return false;
+    const r = A.getBoundingClientRect(), q = B.getBoundingClientRect(), vis = e => e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden' && +getComputedStyle(e).opacity > 0.05;
+    return vis(A) && vis(B) && r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top; }).map(p => p.join(' x ')), OVERLAP);
+  if (hits.length) errs.push(`${file}: OVERLAP ${hits.join(', ')}`);
   await page.screenshot({ path: out + file, fullPage: !!full }); await page.close();
 }
 try {
