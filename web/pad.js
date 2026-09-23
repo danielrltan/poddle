@@ -4,7 +4,11 @@ import { PadMotion } from './padmotion.js';
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
-const clean = t => String(t == null ? '' : t).toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, '').slice(0, 6);
+// A paddle code is P- and 4 letters or numbers (NOTES 81). The P- is built into the box, so whatever arrives (typed, pasted as
+// "P-ABCD", or a 'P' typed out of habit before the four) comes down to the four. A 6-character code from before the switch still works.
+const clean = t => { let c = String(t == null ? '' : t).toUpperCase().replace(/^\s*P\s*-\s*/, '').replace(/[^A-HJ-NP-Z2-9]/g, ''); if (c.length === 5 && c[0] === 'P') c = c.slice(1); return c.slice(0, 6); };
+const shown = c => (c.length === 4 ? 'P-' + c : c);
+const ok = c => c.length === 4 || c.length === 6;
 const GAME = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
 const view = v => { document.body.dataset.view = v; };
 const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
@@ -13,11 +17,11 @@ const stats = window.__pad = { sent: 0, hz: 0, rtt: 0, host: false, open: false,
 let code = clean(qs.get('k')), ws = null, started = false, sawMotion = false, peak = 0, fxText = '';
 
 // ---------- the code ----------
-if (code.length === 6) { $('start-code').textContent = code; view('start'); } else { view('code'); if (qs.get('k')) $('code-note').textContent = 'That code didn’t look right. It is 6 letters and numbers.'; }
+if (ok(code)) { $('start-code').textContent = shown(code); view('start'); } else { view('code'); if (qs.get('k')) $('code-note').textContent = 'That code didn’t look right. It is P- and 4 letters or numbers.'; }
 $('code-in').addEventListener('input', e => { e.target.value = clean(e.target.value); });
 $('code-form').addEventListener('submit', e => { e.preventDefault(); const c = clean($('code-in').value);
-  if (c.length !== 6) { $('code-note').textContent = 'The code is 6 letters and numbers.'; return; }
-  code = c; history.replaceState(null, '', 'pad.html?k=' + c); $('start-code').textContent = c; view('start'); });
+  if (!ok(c)) { $('code-note').textContent = 'The code is P- and 4 letters or numbers.'; return; }
+  code = c; history.replaceState(null, '', 'pad.html?k=' + c); $('start-code').textContent = shown(c); view('start'); });
 
 // ---------- the sensors ----------
 const now = e => { const p = performance.now(), t = e && e.timeStamp; return (t > 0 && Math.abs(t - p) < 1000 ? t : p) / 1000; };      // the event's own clock when it is on the page's timeline (some browsers stamp with the wall clock)

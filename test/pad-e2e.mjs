@@ -51,11 +51,11 @@ let s = await game(desk); ok(/Nothing to install/.test(s.note), `title says so: 
 await desk.click('#btn-start'); await sleep(400); await desk.evaluate(() => document.fullscreenElement && document.exitFullscreen());
 await desk.click('#btn-bot'); await sleep(300); await desk.click('#btn-bot-0');
 s = await until(async () => { const v = await game(desk); return v.screen === 'connect' && v.qr ? v : null; }, 5000, 'Play a bot -> the set-up screen with a QR code');
-ok(s && s.pair && s.title === 'Grab your paddle' && /^[A-HJ-NP-Z2-9]{6}$/.test(s.code), `set-up screen: "${s && s.title}", code ${s && s.code}`);
+ok(s && s.pair && s.title === 'Grab your paddle' && /^P-[A-HJ-NP-Z2-9]{4}$/.test(s.code), `set-up screen (the code reads P-XXXX, NOTES 81): "${s && s.title}", code ${s && s.code}`);
 ok(s && /^Phone: Scan the code/.test(s.row) && s.foot === 'Nothing to install.' && s.swap === 'phone' && !s.titleShown && s.tog === 'Show phone', `row "${s && s.row}", footer "${s && s.foot}", the Phone | AirPod switch on ${s && s.swap} in place of the title, settings say "${s && s.tog}"`);
 ok(s && !s.helper, 'phone mode: no Poddle Helper card');
 await sleep(400); await desk.screenshot({ path: `${root}test/ui-shots/pad-1-setup-1280x720.png` });
-const CODE = s.code;
+const CODE = s.code.slice(2);      // the link carries the four alone; the phone page takes P-XXXX too
 await desk.click('#paddle-seg [data-paddle="airpod"]'); await sleep(200); s = await game(desk);
 ok(!s.pair && /^AirPod: Open Poddle Helper, then take one AirPod out/.test(s.row) && s.swap === 'airpod' && s.art === 'airpod' && s.tog === 'Show AirPod', `the AirPod is one press away on the switch: "${s.row}", switch on ${s.swap}, drawing ${s.art}`);
 ok(s.helper && s.get === '/download/Poddle-Helper.zip download', `AirPod mode: the Poddle Helper card and its download (${s.get})`);

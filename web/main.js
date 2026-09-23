@@ -19,7 +19,8 @@ let CID = ''; try { CID = sessionStorage.getItem('cid') || ''; if (!CID) session
 // The code a phone uses to be this tab's paddle (NOTES 34). Made here, shown as a QR on the set-up screen, named on the game
 // socket; the server only matches the two. Kept per tab like the cid, so a reload or a server restart pairs up again by itself.
 const PAD_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let PAD = ''; try { PAD = sessionStorage.getItem('pad') || ''; } catch { /* private window */ }
-if (!/^[A-HJ-NP-Z2-9]{6}$/.test(PAD)) { PAD = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => PAD_ABC[b % 32]).join(''); try { sessionStorage.setItem('pad', PAD); } catch { /* same */ } }
+const newPad = () => { PAD = Array.from(crypto.getRandomValues(new Uint8Array(4)), b => PAD_ABC[b % 32]).join(''); try { sessionStorage.setItem('pad', PAD); } catch { /* same */ } };
+if (!/^[A-HJ-NP-Z2-9]{4}$/.test(PAD)) newPad();      // 4 characters, shown as P-XXXX so everyone knows it is the paddle's code (NOTES 81). The URL carries the 4 alone
 
 const model = new MotionModel();
 const scene = createScene($('stage'));
@@ -302,7 +303,7 @@ const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
   const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
   ui.setPaddle(kind); pod.setKind(kind);
-  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
+  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: 'P-' + PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
     foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.' });
   ui.setSettings({ paddle: CAN_PHONE ? kind : null });
 }
@@ -382,6 +383,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'm') { onSample(m, 'phone'); return; }           // my phone's motion, passed on by the server: 60 a second, so before anything else
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
   if (m.type === 'pong') { net.pong(m); return; }
+  if (m.type === 'padtaken') { newPad(); game.send({ type: 'padcode', code: PAD }); showPair(); return; }      // another live tab drew this code first: pick again (nothing was paired to it yet)
   if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
   if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
   if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect

@@ -990,11 +990,14 @@ function quick(ws) {
 // socket of its own (?padfor=CODE) and its motion samples are passed on to that tab, which feeds them to the same
 // MotionModel an AirPod would. The code is the tab's, not ours: after a restart both sides come back and find each other
 // again with nothing remembered here. A phone is no player: it is in no lobby and no room, and counts nowhere.
-const PAD_CODE = /^[A-HJ-NP-Z2-9]{6}$/, padHosts = new Map(), pads = new Map();      // code -> the tab's socket / the phone's socket
+const PAD_CODE = /^[A-HJ-NP-Z2-9]{4}([A-HJ-NP-Z2-9]{2})?$/,      // shown as P-XXXX (NOTES 81); 6 still accepted so a phone paired before the switch keeps its tab
+      padHosts = new Map(), pads = new Map();      // code -> the tab's socket / the phone's socket
 const PAD_FX = new Set(['hit', 'tint', 'point', 'cal', 'play', 'idle']);                     // what a tab may tell its phone (a buzz on contact, which step calibration is at)
 const vec = (v, n) => Array.isArray(v) && v.length === n && v.every(Number.isFinite);
 function padHost(ws, code) {                                   // a tab says which code its phone will use
   if (!PAD_CODE.test(code)) return;
+  const had = padHosts.get(code);      // 4 characters is a million codes, not a billion: two live tabs can draw the same one. The newer is told to pick again; the same tab reconnecting (same cid) is no clash
+  if (had && had !== ws && had.readyState === 1 && !(ws.cid && had.cid === ws.cid)) return tell(ws, { type: 'padtaken' });
   ws.padCode = code; padHosts.set(code, ws);
   const p = pads.get(code); if (p) { tell(p, { type: 'padhost', on: true }); tell(ws, { type: 'pad', on: true }); }
 }

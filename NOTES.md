@@ -1234,3 +1234,17 @@ Asked for: a small notice in the top-right corner when someone starts watching y
   — that is 77's restructure: "Leave court" left `#settings > .btn` for `.set-foot` and a "Show player model" row arrived,
   so the expected row list and the tab order in test/ui-next.mjs are stale, and two tab stops come back empty. Not mine to
   renumber blind: the empty stops look like a real regression rather than a stale string.
+
+## 81. Paddle codes read P-XXXX, and the phone's box has the P- built in
+- "Make the paddle codes start with P- then 4 chars of numbers / letters, just so players all know. And if you wanted to enter it
+  on the enter screen, the P- is built in before the field." A tab's code is now 4 characters from the same alphabet (no I, O, 0,
+  1), shown everywhere as P-XXXX: the set-up screen ("...and type P-ZM8D") and the phone's start view ("Code P-ZM8D"). The QR
+  link still carries the four alone (pad.html?k=ZM8D); the phone page also takes ?k=P-ZM8D.
+- The phone's code box prints a faded P- inside it and you type the four after it. Whatever arrives comes down to the four:
+  typed, pasted as "P-ABCD", or a P typed out of habit before the four (5 characters starting with P). A 6-character code from
+  before the switch is still accepted by the page and the server, so a phone paired across this deploy keeps its tab.
+- Four characters is a million codes, not a billion, so two live tabs can draw the same one. The server now refuses a code
+  another live tab holds ({ type: 'padtaken' }) unless it is the same tab back (same cid); the tab draws a new one, sends it
+  ({ type: 'padcode' }) and redraws its QR. test/pad.test.mjs covers pairing on 4, the clash, the re-pick and the same tab
+  reconnecting; pad-e2e checks the P-XXXX on screen (its one FAIL, AirPod mode at 1280x720, was there on main). The code never
+  breaks at its hyphen.

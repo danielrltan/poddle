@@ -77,4 +77,14 @@ const tab4 = await sock('lobby=1&cid=tab4&pad=FAST99'), fast = await sock('padfo
 for (let i = 0; i < 180; i++) { fast.send(S(10 + i / 60)); await wait(1000 / 60); }
 await wait(200); ok(tab4.of('m').length === 180, `three seconds at 60 Hz all arrive (${tab4.of('m').length}/180)`);
 
+// P-XXXX (NOTES 81): 4 characters pair a phone; a second live tab that drew the same 4 is told to pick again, the same tab back is not
+const t4 = await sock('lobby=1&cid=t4a&pad=K7M2'), ph4 = await sock('padfor=K7M2'); await until(() => t4.last('pad'));
+ok(t4.last('pad') && t4.last('pad').on === true && ph4.last('padhost').on === true, 'a 4-character code pairs a phone');
+const clash = await sock('lobby=1&cid=t4b&pad=K7M2'); await until(() => clash.last('padtaken'));
+ok(!!clash.last('padtaken'), 'a second tab with the same live code is told it is taken');
+clash.send({ type: 'padcode', code: 'K7M3' }); const ph5 = await sock('padfor=K7M3'); await until(() => clash.last('pad'));
+ok(clash.last('pad') && clash.last('pad').on === true, '...and its next code pairs');
+const back = await sock('lobby=1&cid=t4a&pad=K7M2'); await wait(300);
+ok(!back.last('padtaken'), 'the same tab reconnecting (same cid) keeps its code');
+
 console.log(fails ? `\nFAIL: ${fails}` : '\nPASS'); process.exit(fails ? 1 : 0);

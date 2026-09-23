@@ -9,7 +9,7 @@
    a code is meant to be copied, so one click takes all of it. NOTES 79. */
 html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
-#start-code{-webkit-user-select:all;user-select:all;-webkit-touch-callout:default}
+#start-code{-webkit-user-select:all;user-select:all;-webkit-touch-callout:default;white-space:nowrap}
 html,body{height:100%}
 body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 45%,var(--bg) 100%) fixed;font:500 1.0625rem/1.5 var(--font);-webkit-font-smoothing:antialiased;
   -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;transition:background-color .12s}
@@ -36,6 +36,11 @@ a{color:var(--link);font-weight:800}
 form{display:flex;flex-direction:column;align-items:center;gap:1rem;width:100%}
 input{width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem solid var(--line-soft);background:#fff;color:var(--ink-strong);font:900 2rem/1 var(--font);letter-spacing:.25em;text-align:center;text-transform:uppercase;-webkit-user-select:text;user-select:text}
 input::placeholder{color:#c3dbe8}
+/* the code box: P- is printed in it, you type the four after it (NOTES 81). The box is the label; the input inside it is bare */
+.code-field{display:flex;align-items:center;justify-content:center;gap:.125em;width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem solid var(--line-soft);background:#fff;font:900 2rem/1 var(--font);letter-spacing:.25em;cursor:text}
+.code-field:focus-within{outline:.1875rem solid var(--line);outline-offset:.1875rem}
+.code-pre{color:#9dbccd}
+.code-field input{width:4em;max-width:none;height:100%;padding:0;border:0;border-radius:0;background:none;text-align:left;outline:0}
 /* the one thing worth a glance mid-rally: how hard that swing was, and whether the link is up */
 .ring{position:relative;display:grid;place-items:center;width:11rem;height:11rem;border-radius:50%;border:.375rem solid var(--line-soft);background:#fff;overflow:hidden;box-shadow:0 .1875rem 0 rgba(90,150,185,.25),0 .5rem 1rem rgba(40,80,110,.13)}
 .ring-fill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#bfeaff,var(--line));opacity:.55}
@@ -92,6 +97,7 @@ body{background:var(--bg);background-image:none}
 .btn-hold::before{background:#2a5a70}
 input{background:#121b22;border-color:#274a5c;color:var(--ink-strong)}
 input::placeholder{color:#3a4c58}
+.code-field{background:#121b22;border-color:#274a5c} .code-field input{background:none} .code-pre{color:#4d6878}
 .ring{background:#111a21;border-color:#23394a;box-shadow:none}
 .ring-fill{background:linear-gradient(180deg,#1f5f7d,#2f9fca);opacity:.6}
 body[data-link="on"] .ring{border-color:#23713f}
