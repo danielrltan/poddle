@@ -836,6 +836,12 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .foot-link{flex:none;color:var(--line-deep);font-weight:800;font-size:max(14px,var(--t-sm));text-decoration:none;white-space:nowrap;background:linear-gradient(currentColor,currentColor) 0 100%/0 .125rem no-repeat;transition:background-size var(--d-med) var(--ease-out)}
 .t-note.is-loud{font-size:max(14px,var(--t-sm));font-weight:700}      /* not on a Mac (main.js): the note under Play says so, at a size a phone can read */
 .foot-link:focus-visible{background-size:100% .125rem} @media (hover:hover){ .foot-link:hover{background-size:100% .125rem} }      /* the underline draws in from the left */
+/* the legal links (web/privacy.html, web/terms.html): quieter than How to play, but always there. .foot-links wraps as one unit on a phone */
+.foot-links{flex:none;display:inline-flex;align-items:center;gap:var(--s-4)}
+.foot-link.foot-legal{color:var(--ink-soft);font-weight:700}
+.foot-agree{font-size:max(13px,var(--t-xs));color:var(--ink-soft);line-height:1.35} .foot-agree .foot-link{font-size:inherit;font-weight:800}
+.menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:.5rem;padding-bottom:.5rem}      /* the line may wrap: the bar grows with it, never clips it */
+@media (max-width:520px){ .foot-agree ~ .keyhints-inline{display:none} .foot-agree{flex:1;text-align:center} }      /* a phone has no Esc or F key: the legal line gets the whole bar */
 /* the logo is the page's h1 and reads "Poddle" to crawlers and screen readers: the ball that is drawn for the o holds a real o */
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 

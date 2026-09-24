@@ -25,6 +25,7 @@ h2{margin:0;font-size:1.625rem;font-weight:900;line-height:1.2;color:var(--ink-s
 p{margin:0}
 b{font-weight:800;color:var(--ink-strong)}
 .note{font-size:.9375rem;color:var(--ink-soft);min-height:1.4em}
+.legal{font-size:.8125rem;line-height:1.4;color:var(--ink-soft);max-width:20rem} .legal a{font-weight:700}      /* the Terms and Privacy links, under Start: small, before the motion prompt (web/terms.html) */
 a{color:var(--link);font-weight:800}
 .art{width:12rem;height:auto}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:3.25rem;padding:0 2rem;border-radius:999px;border:.1875rem solid var(--line);background:linear-gradient(180deg,#fff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);

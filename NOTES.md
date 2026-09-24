@@ -1671,3 +1671,31 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
 - Tried the iOS 18 `<input type="checkbox" switch>` label-click tick as an iPhone stand-in for `navigator.vibrate` on hits
   and points. It did not buzz in play (iOS seems to want a real tap, and mid-rally you swing), so it was reverted.
   Android keeps `navigator.vibrate`; real iPhone haptics would need a native app or App Clip.
+
+## 94. Terms of Use and Privacy Policy
+- "Make a Terms of Use and Privacy Policy ... and remember, these should be kept in mind with each update / push. like if
+  i wanted to add google account sign in later on, claude should know to update these docs accordingly."
+- web/terms.html and web/privacy.html (effective September 24, 2026; operator Daniel Tan, Ontario; 13+, under 18 with a
+  parent's permission; hello@danielrltan.com). Plain words, styled with how-to-play.css. Privacy has a short version, a
+  "For teens and parents" box, what we use and why, webcam, what others see, storage table, recipients, retention,
+  rights, and a GDPR legal-basis table in 13. Terms: safety (you swing toward the screen), names and fair play,
+  spectators and tournaments (no prizes from us), Helper (MIT, Open Anyway only for our copy), ownership, as-is,
+  CAD $50 cap with consumer carve-outs, Ontario law, Quebec 30-day change notice.
+- Code made to match the pages: MediaPipe's built-in usage logging to Google (odml.pa.googleapis.com/v1/log, every
+  60 s) is patched off in web/vendor/mp/vision_bundle.js (search "Poddle:"; notice in web/vendor/mp/LICENSE.txt, which
+  also carries the Apache-2.0 text). Checked with a headless Chrome probe and a fake camera: before, OPTIONS to
+  odml.pa.googleapis.com; after, no outside request in 75 s. Tournament log lines count matches and say
+  "champion: Matt | a player" instead of display names. package.json is "UNLICENSED", private; LICENSE says all rights
+  reserved (Helper stays MIT).
+- Links: title footer (How to play · Privacy · Terms, same stopPropagation as How to play so a click does not start the
+  game), lobby footer ("By playing you agree to the Terms and Privacy Policy. Under 18? Ask a parent first."; on a phone
+  it replaces the key hints), pad.html start view under Start (before the motion prompt), how-to-play footer and a line
+  under Download Poddle Helper, 404.html. Both pages are in sitemap.xml. seo.test checks all of it, plus "Last updated"
+  = dateModified and that the MediaPipe patch is still in.
+- Keep-current rule: CLAUDE.md "Legal pages" (trigger list + current data-flow inventory), the comment at the top of
+  both pages, and the memory note poddle-legal-docs. Any change that touches data, logging, storage, permissions, third
+  parties, accounts/sign-in (Google), public features or the age policy updates the pages in the same commit.
+- Known limits, for Daniel: Fly.io's DPA may need signing at fly.io/documents before the SCC sentence is true; the
+  mailbox behind Cloudflare Email Routing is not named; no French version (Quebec Bill 96 risk); choosing Auto does not
+  stop the camera (the page says so; main.js could stop the tracks and close the MediaPipe tasks instead); Helper's
+  README and About box don't link the Terms yet.

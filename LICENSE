@@ -1,0 +1,6 @@
+Copyright (c) 2026 Daniel Tan. All rights reserved.
+
+The Poddle game (this repository) is not open source: see https://poddleball.com/terms.html, section "Who owns what".
+Poddle Helper, the Mac app in its own repository (github.com/danielrltan/poddle-helper), is under the MIT License.
+Third-party code in web/vendor keeps its own licence (three.js: MIT; MediaPipe: Apache-2.0, see web/vendor/mp/LICENSE.txt;
+qrcode-generator: MIT, in its file header).

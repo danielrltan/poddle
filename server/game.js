@@ -1238,7 +1238,7 @@ function tourRound(t, ents) {                                  // the next round
     for (const [mm, other, sd] of [[ma, b, 0], [mb, a, 1]]) if (mm && mm.ws && mm.ws.tour === t)
       tell(mm.ws, { type: 'tmove', round: idx + 1, name, n: k + 1, of: pairs.length, vs: { name: eName(t, other), bot: isMatt(other) }, target, final: last, at: TOUR_VS_S, side: sd });   // the VS card; the room follows in `at` s
   });
-  console.log(`[${t.code}] ${name}: ${pairs.map(p => p.map(x => eName(t, x)).join(' v ')).join(', ')}`);
+  console.log(`[${t.code}] ${name}: ${pairs.length} match${pairs.length === 1 ? '' : 'es'}`);      // counts, never display names: the privacy page promises our logs hold no names (web/privacy.html, CLAUDE.md)
   t.next = round.matches.some(x => !x.w) ? { at: Date.now() + TOUR_VS_S * 1000, what: 'seat' } : null; t.arriveAt = t.readyBy = 0;
   tourDirty(t); if (!t.next) tourCheck(t);                       // every pair was settled at once: straight on
 }
@@ -1259,7 +1259,7 @@ function tourChamp(t, e) {
   const path = []; for (const r of t.rounds) { const x = r.matches.find(o => o.a === e && o.w === 'a' || o.b === e && o.w === 'b'); if (!x) continue;
     const mine = x.a === e, vs = mine ? x.b : x.a; path.push({ round: r.name, vs: eName(t, vs), bot: isMatt(vs), score: mine ? [...x.score] : [x.score[1], x.score[0]], forfeit: x.forfeit }); }
   t.champ = { id: isMatt(e) ? null : e, name: eName(t, e), bot: isMatt(e), path }; t.phase = 'done'; t.doneAt = Date.now(); t.next = null;
-  console.log(`[${t.code}] champion: ${t.champ.name}`); tourFlush(t);
+  console.log(`[${t.code}] champion: ${t.champ.bot ? 'Matt' : 'a player'}`); tourFlush(t);
 }
 function tourSeat(t, ws) {                                     // a member to their match: out of wherever they are (the stands, a court), into the drawn seat
   const m = tmember(ws); if (!m || m.left || t.phase !== 'play' || t.next && t.next.what === 'seat') return;

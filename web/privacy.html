@@ -1,0 +1,346 @@
+<!doctype html>
+<!--
+  KEEP THIS PAGE TRUE (see CLAUDE.md "Legal pages" and NOTES.md 94). It describes exactly what the code does.
+  Update it, terms.html where relevant, "Last updated" and dateModified in the same commit as any change that adds or changes:
+  data sent to the server or shown to other players; server logging (console.log with names, IPs, ids); localStorage /
+  sessionStorage keys or cookies; device permissions (camera, motion, mic, location, local network); third-party origins,
+  CDNs, SDKs, fonts, auth providers or vendored libraries that phone home (a MediaPipe upgrade: re-apply the "Poddle:" patch
+  in web/vendor/mp/vision_bundle.js); accounts or sign-in (e.g. Google); chat, profiles, leaderboards, replays, payments,
+  prizes; the age policy. Sections to check: Short version, For teens and parents, 2 (table + permissions), 3, 4, 5, 6, 7, 13.
+  Important changes also need a notice on the home page.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy · Poddle</title>
+<meta name="description" content="What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.">
+<link rel="canonical" href="https://poddleball.com/privacy.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#dfeef6">
+<meta name="color-scheme" content="light">
+<meta name="application-name" content="Poddle">
+<meta name="apple-mobile-web-app-title" content="Poddle">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poddle">
+<meta property="og:title" content="Poddle Privacy Policy">
+<meta property="og:description" content="What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.">
+<meta property="og:url" content="https://poddleball.com/privacy.html">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://poddleball.com/og.jpg?v=6">
+<meta property="og:image:secure_url" content="https://poddleball.com/og.jpg?v=6">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod!">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Poddle Privacy Policy">
+<meta name="twitter:description" content="What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.">
+<meta name="twitter:image" content="https://poddleball.com/og.jpg?v=6">
+<meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod!">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="preload" href="/vendor/fonts/mplus-rounded-1c-500.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/how-to-play.css">
+<style>
+  /* A legal page is meant to be read, quoted and copied: undo the game's no-select rule from how-to-play.css. */
+  html{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+  .updated{margin:.25rem 0 0;font-size:.9375rem;color:var(--ink-soft)}
+  .toc ol{columns:2 15rem;column-gap:2rem;margin-bottom:0} .toc li{break-inside:avoid}
+  .summary ul{margin-bottom:0}
+  .tbl{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem 0 .75rem}
+  table{width:100%;border-collapse:collapse;font-size:.9375rem;line-height:1.45}
+  th,td{text-align:left;vertical-align:top;padding:.5rem .625rem;border-bottom:.0625rem solid var(--line-soft)}
+  th{font-weight:800;color:var(--ink-strong);background:var(--sky-2)}
+  td code{white-space:nowrap;padding:.0625rem .375rem;border-radius:.375rem;background:#e4eef4;color:var(--ink-strong)}
+  p code{padding:.0625rem .375rem;border-radius:.375rem;background:#e4eef4;color:var(--ink-strong)}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "@id": "https://poddleball.com/privacy.html",
+  "url": "https://poddleball.com/privacy.html",
+  "name": "Poddle Privacy Policy",
+  "description": "What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.",
+  "inLanguage": "en",
+  "dateModified": "2026-09-24",
+  "isPartOf": { "@type": "WebSite", "name": "Poddle", "url": "https://poddleball.com/" }
+}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo-mark" href="/"><span class="vh">Poddle</span><span class="lg-a" aria-hidden="true">P</span><span class="logo-ball" aria-hidden="true"></span><span class="lg-a" aria-hidden="true">d</span><span class="lg-b" aria-hidden="true">dle</span></a>
+    <a class="btn btn-sm" href="/">Play</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro" aria-labelledby="title">
+    <h1 id="title">Privacy Policy</h1>
+    <p class="updated">Last updated: September 24, 2026. Effective: September 24, 2026.</p>
+    <p class="lead">Poddle is a free pickleball game in your browser at poddleball.com. This page explains, in plain words, what information the game uses, why, who can see it, and how long it lasts. It also covers the Poddle Helper app for Mac. The rules for playing are in our <a href="/terms.html">Terms of Use</a>.</p>
+  </section>
+
+  <section class="card summary" aria-labelledby="short">
+    <h2 id="short">The short version</h2>
+    <ul>
+      <li><strong>No accounts, no cookies, no ads, no analytics.</strong> We never sell your information or share it for advertising.</li>
+      <li><strong>Your webcam video stays on your computer.</strong> It is read inside your browser to find roughly where you are standing. No video, image or face data is sent or saved. We don't identify anyone.</li>
+      <li><strong>Your position and your paddle's motion are sent live</strong> to our game server and on to your opponent and anyone watching, so the match can be played. They are not stored.</li>
+      <li><strong>Your display name is public</strong> to other players and spectators. Don't use your full real name.</li>
+      <li><strong>Our server holds your IP address and name in memory only</strong>, to run the game and stop abuse. We keep no database, and it is all gone when the server restarts.</li>
+      <li>Questions or requests: <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</li>
+    </ul>
+  </section>
+
+  <section class="card summary" aria-labelledby="family">
+    <h2 id="family">For teens and parents</h2>
+    <ol>
+      <li><strong>Pick a nickname, not your real name.</strong> Strangers can see it.</li>
+      <li><strong>Camera video never leaves your computer.</strong> Only a rough position is sent.</li>
+      <li><strong>There's no chat, no profile and no account.</strong> The game server forgets your name when the match ends or the server restarts.</li>
+      <li><strong>Anyone with a court code can watch or join an empty seat</strong>, so only share codes with friends. Don't show your phone's pairing code on a stream.</li>
+      <li><strong>Under 18?</strong> Ask a parent before playing or installing Poddle Helper.</li>
+      <li>Questions, or want something deleted: <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</li>
+    </ol>
+  </section>
+
+  <nav class="card toc" aria-labelledby="contents">
+    <h2 id="contents">Contents</h2>
+    <ol>
+      <li><a href="#who">Who runs Poddle</a></li>
+      <li><a href="#collect">What we use and why</a></li>
+      <li><a href="#webcam">Your webcam</a></li>
+      <li><a href="#public">What other players can see</a></li>
+      <li><a href="#storage">Browser storage and cookies</a></li>
+      <li><a href="#sharing">Who else receives information</a></li>
+      <li><a href="#retention">How long we keep things</a></li>
+      <li><a href="#transfers">Where information is processed</a></li>
+      <li><a href="#rights">Your rights and choices</a></li>
+      <li><a href="#children">Children and teens</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#helper">Poddle Helper for Mac</a></li>
+      <li><a href="#laws">Notes for specific places</a></li>
+      <li><a href="#dnt">Do Not Track</a></li>
+      <li><a href="#changes">Changes to this policy</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </nav>
+
+  <section class="card" aria-labelledby="who">
+    <h2 id="who">1. Who runs Poddle</h2>
+    <p><strong>Daniel Tan</strong>, one person in Ontario, Canada, makes Poddle and is responsible for your information. Poddle is not a company. In this policy, "we", "us" and "Poddle" mean Daniel Tan. You can reach him at <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>. His legal titles under Canadian, Quebec, EU and UK law are in <a href="#laws">Notes for specific places</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="collect">
+    <h2 id="collect">2. What we use and why</h2>
+    <p>Poddle has no sign-up. We don't ask for your email, age, location, phone number or payment details. Here is everything the game does use.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th scope="col">What</th><th scope="col">Why</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Display name</strong> you type (up to 12 characters)</td><td>To show who is playing: in the court list, on the scoreboard, in tournaments, and when you watch, ask to play or send an emote.</td></tr>
+          <tr><td><strong>IP address</strong></td><td>To limit how many courts one IP address can have open at once (up to 4), to allow one open tournament per IP address, and to limit how often someone can ask to take a seat. This stops spam and abuse and keeps the game running for everyone.</td></tr>
+          <tr><td><strong>Your position on screen</strong>, worked out from the webcam (only if you allow camera access)</td><td>So your player moves when you step side to side. Only a few numbers are sent (see <a href="#webcam">Your webcam</a>).</td></tr>
+          <tr><td><strong>Paddle motion</strong> from your phone or AirPod: which way it points, how fast it turns and moves, with a timestamp</td><td>To swing your paddle. Phone motion is relayed live from your phone to your game tab only.</td></tr>
+          <tr><td><strong>Game information</strong>: court and tournament codes, whether a court is listed, seats, score, swings, bot level, emotes you pick, pause and rematch choices, connection speed checks</td><td>To run the match and show it to the players and spectators on that court.</td></tr>
+          <tr><td><strong>Random tab ID</strong> (10 characters) and <strong>phone pairing code</strong></td><td>To reconnect you to your court if the connection drops, and to link your phone to the right browser tab. They are random and not tied to who you are.</td></tr>
+          <tr><td><strong>Basic connection details</strong> any website receives: IP address, browser type, requested web address</td><td>To deliver the pages. Our host, Fly.io, handles this (see <a href="#sharing">Who else receives information</a>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>We only use your IP address to keep a free game online without spam, flooding or attacks. We don't use it to find out where you are or who you are.</p>
+    <p>You need to give a display name to take a seat or watch, and your IP address is needed for any website to reach you. Without them you can't play online. Everything else, like the camera and motion, is optional or only used while you play.</p>
+    <p>Behind the scenes, the game's connection to our server includes your display name, tab ID, court code and score, so it can put you back on your court after a reconnect. The link in your address bar only contains the court code.</p>
+
+    <h3>Device permissions the game may ask for</h3>
+    <ul>
+      <li><strong>Camera</strong>, on the computer, only when you take a seat to play. See <a href="#webcam">Your webcam</a>.</li>
+      <li><strong>Motion and orientation</strong>, on your phone, when you tap Start on the phone page. On an iPhone this is the Motion &amp; Orientation prompt. Motion is only read on the secure (https) page.</li>
+      <li><strong>Keep screen awake</strong> on the phone, so it doesn't lock mid-match. The phone may also vibrate as a hit cue.</li>
+      <li><strong>Microphone</strong>, only if you open Settings and ask to choose a sound output (speakers). Browsers only show speaker names after this permission is given. The game stops the microphone at once. No audio is listened to, recorded or sent.</li>
+      <li><strong>Local network</strong> (in Chrome), if you play with an AirPod. This lets the page talk to Poddle Helper on your own Mac. If you have played before and haven't chosen between phone and AirPod, or you chose AirPod, the page may quietly check whether Poddle Helper is running on your Mac, and Chrome may ask about local network access.</li>
+    </ul>
+    <p>You can say no to any of these, or turn them off later in your browser or phone settings. Without the camera, the game moves your player for you (Auto). Without phone motion or an AirPod, you can still watch matches.</p>
+
+    <h3>What we don't do</h3>
+    <p>We don't sell personal information, share it for advertising, build profiles, or make automated decisions about you. We don't use your information to train AI. We run no ads, analytics tools, tracking pixels or social media plug-ins on Poddle.</p>
+  </section>
+
+  <section class="card" aria-labelledby="webcam">
+    <h2 id="webcam">3. Your webcam</h2>
+    <p>If you play with Body movement, the game uses your computer's webcam to see where you are standing. Here is exactly what happens.</p>
+    <ul>
+      <li>Your browser asks your permission first. The camera is only asked for when you take a seat to play. Spectators are never asked. The camera captures video only, with no sound.</li>
+      <li>The video is analysed <strong>inside your browser, on your computer</strong>, by Google's open-source MediaPipe software, which Poddle hosts itself. For each video frame it finds a face and a few points on it (eyes, nose, mouth, ears), or, if it can't see your face, points on your body such as your nose and shoulders.</li>
+      <li>From those points the game keeps just one smoothed centre point: roughly where your head and shoulders are in the picture. The points themselves are discarded straight away, frame by frame, and never leave your browser.</li>
+      <li><strong>No video, photo, frame or list of face or body points is ever sent</strong> to our server or anyone else, and none is saved.</li>
+      <li>We don't recognise or identify anyone. We don't create, collect or store any face template, faceprint, or record of face geometry.</li>
+      <li>MediaPipe, as Google publishes it, can send Google usage statistics. <strong>We have switched that off</strong> in our copy, so it sends nothing to Google or anyone else.</li>
+    </ul>
+    <p><strong>What is sent:</strong> the centre point turns into your player's position on the court. That position, along with your paddle's angle, goes to our game server about 60 times a second. The server passes it on to your opponent and to anyone watching that court, so they can see you move. It is not stored.</p>
+    <p><strong>Your choice:</strong> you don't need the webcam to play. When your browser asks, choose Don't Allow (or Block), and the game moves your player for you (Auto). Choosing Auto in Settings does not turn the camera off: once you allow it, the camera stays on until you close the Poddle tab, though its video still never leaves your computer. You can turn camera access off at any time in your browser's site settings.</p>
+  </section>
+
+  <section class="card" aria-labelledby="public">
+    <h2 id="public">4. What other players can see</h2>
+    <p>Poddle is played with and in front of other people. Please choose a display name you're happy for strangers to see. <strong>Don't use your full real name</strong>, especially if you're under 18.</p>
+    <ul>
+      <li><strong>Listed courts:</strong> anyone who opens the court list sees the names of both players, the score and how many people are watching.</li>
+      <li><strong>Unlisted courts</strong> (made with a code): they don't appear in the list, but anyone who has the 4-character code or link can join an empty seat or watch. A code is short, so treat it like a room number, not a password.</li>
+      <li><strong>Tournaments:</strong> the host's name is listed while players sign up. Anyone with the tournament code sees all players' names and the bracket.</li>
+      <li><strong>On a court:</strong> players and spectators see the players' names, scores, movements and swings. Players also see the name of each spectator who starts watching or asks to play, and everyone on the court sees the name of any spectator who sends an emote.</li>
+    </ul>
+    <p>There is no chat. Emotes are a fixed set of 7 emoji.</p>
+  </section>
+
+  <section class="card" aria-labelledby="storage">
+    <h2 id="storage">5. Browser storage and cookies</h2>
+    <p><strong>Poddle uses no cookies.</strong> It saves a few small settings in your browser's own storage, on your device, so the game remembers your choices. We can't read this storage from our server. It only changes how the game works for you.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th scope="col">Name</th><th scope="col">What it holds</th><th scope="col">How long</th></tr></thead>
+        <tbody>
+          <tr><td><code>poddle.name</code></td><td>The last display name you typed, so you don't retype it</td><td>Until you clear it</td></tr>
+          <tr><td><code>poddle.settings</code></td><td>Your display settings: whether the phone/AirPod view and your own player model are shown, the stats panel, camera range (sensitivity), whether sound is on, and the sound output you picked (a device ID your browser gives)</td><td>Until you clear it</td></tr>
+          <tr><td><code>poddle.view</code></td><td>Your preferred camera view when watching</td><td>Until you clear it</td></tr>
+          <tr><td><code>poddle.airpod</code></td><td>Whether you play with an AirPod or a phone</td><td>Until you clear it</td></tr>
+          <tr><td><code>poddle.courts</code></td><td>Your court list filter (open or full courts)</td><td>Until you clear it</td></tr>
+          <tr><td><code>cid</code></td><td>A random tab ID, so you can rejoin your court after a dropped connection</td><td>Until you close the tab</td></tr>
+          <tr><td><code>pad</code></td><td>Your phone pairing code for this tab</td><td>Until you close the tab</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Every item is there to provide something you asked for, so no consent banner is needed. To clear them, use your browser's "clear site data" option for poddleball.com. If we ever add analytics, ads or any non-essential storage, we'll ask for your consent first and update this policy.</p>
+  </section>
+
+  <section class="card" aria-labelledby="sharing">
+    <h2 id="sharing">6. Who else receives information</h2>
+    <p>Besides other players (see <a href="#public">What other players can see</a>), these companies are involved:</p>
+    <ul>
+      <li><strong>Fly.io, Inc.</strong> (United States) hosts the game server in its Toronto, Canada region. It acts as our service provider. Its network sees your IP address and the web addresses you request, which for the game connection include your display name, tab ID and court code. It also stores the game's activity logs (see <a href="#retention">How long we keep things</a>).</li>
+      <li><strong>Cloudflare, Inc.</strong> (United States) forwards email sent to hello@danielrltan.com to our mailbox, as our service provider. Through its cdnjs service it also supplies a backup copy of the three.js graphics library, used only if our own copy fails to load. When that happens, Cloudflare sees your IP address and browser details.</li>
+      <li><strong>Our email provider</strong> stores the messages you send us, as our service provider.</li>
+      <li><strong>GitHub, Inc.</strong> (United States) hosts Poddle Helper's source code. You only connect to GitHub if you click a GitHub link.</li>
+      <li><strong>Apple</strong> and your phone or computer maker show the permission prompts and supply motion sensor readings on your own device. Poddle sends nothing to them.</li>
+    </ul>
+    <p>All other fonts, images, 3D graphics, game code and the MediaPipe files are served from poddleball.com itself.</p>
+    <p>We may also disclose information if the law requires it, for example in response to a valid court order, or to protect people's safety. Because we keep so little, there is usually little to give.</p>
+  </section>
+
+  <section class="card" aria-labelledby="retention">
+    <h2 id="retention">7. How long we keep things</h2>
+    <ul>
+      <li><strong>Display names, IP addresses, court and tournament details:</strong> held in the game server's memory while your court, tournament or anti-spam cooldown lasts, and at the latest until the server restarts. The server writes none of it to disk. The server restarts when we update the game, or when it sleeps with nobody connected. If you are mid-match during a restart, your own tab sends back your court code, name and score so the match can carry on.</li>
+      <li><strong>Motion, position and swing data:</strong> passed along live and not stored.</li>
+      <li><strong>Webcam video:</strong> never leaves your computer and is never saved.</li>
+      <li><strong>Activity logs:</strong> the server writes short activity lines, such as "court joined" or "tournament started: 4 players", with court codes. Our logs don't include display names, IP addresses or tab IDs. Fly.io's own network and platform logs may record IP addresses and web addresses. We don't export, copy or archive any of these logs. Fly.io keeps them for about 7 days, after which they are deleted automatically.</li>
+      <li><strong>Browser storage:</strong> stays on your device until you clear it, or until you close the tab for the tab ID and pairing code.</li>
+      <li><strong>Emails you send us:</strong> kept until your request is resolved, then deleted within 12 months.</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="transfers">
+    <h2 id="transfers">8. Where information is processed</h2>
+    <p>Poddle is run from Ontario, Canada, and the game server runs in Toronto, Canada. By using Poddle, you understand that your information is handled in Canada.</p>
+    <p>Our host Fly.io, Cloudflare and our email provider are US companies or may use servers outside Canada, and may process information in the United States or elsewhere. <strong>Information handled by them may be accessed by courts, police and national security authorities in those countries</strong> under their laws. For people in the EU, EEA and UK, the safeguards we rely on are in <a href="#laws">Notes for specific places</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="rights">
+    <h2 id="rights">9. Your rights and choices</h2>
+    <p>Depending on where you live, you have the right to:</p>
+    <ul>
+      <li>ask what personal information we have about you and get a copy (access, and portability under the GDPR);</li>
+      <li>ask us to correct it;</li>
+      <li>ask us to delete it;</li>
+      <li>object to or ask us to limit how we use it, including uses based on our legitimate interests;</li>
+      <li>take back a permission you gave, such as camera access, at any time. This doesn't affect what was done before.</li>
+    </ul>
+    <p>To use any of these rights, email <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>. We'll reply within 30 days. We may need to ask a question to make sure the request is really from you, for example which court code or name you used. Because we have no accounts and keep almost nothing, we often won't hold anything we can link to you. If so, we'll tell you.</p>
+    <p>You can also act yourself right away: change your display name before each game, clear your browser storage, turn off camera, motion or microphone access in your browser or phone settings, or decline camera access when your browser asks.</p>
+    <p><strong>Complaints.</strong> Please contact us first, and we'll try to fix it. You can also complain to a privacy regulator: the <a href="https://www.priv.gc.ca/">Office of the Privacy Commissioner of Canada</a>, the Commission d'accès à l'information du Québec if you are in Quebec, the data protection authority where you live in the EU or EEA, or the Information Commissioner's Office in the UK.</p>
+  </section>
+
+  <section class="card" aria-labelledby="children">
+    <h2 id="children">10. Children and teens</h2>
+    <p>Poddle is for people <strong>13 and older</strong>. If you are under 18, you need your parent's or guardian's permission to play. If you live in Quebec and are under 14, a parent or guardian must agree to the information handling described in this policy before you play. We recommend an adult is nearby while anyone under 18 plays, both for safety and because display names are public. See <a href="#family">For teens and parents</a>.</p>
+    <p>We don't knowingly collect personal information from children under 13. If we learn that we have, we'll delete it. If you're a parent and think your child under 13 has used Poddle, email <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="security">
+    <h2 id="security">11. Security</h2>
+    <p>We protect information by keeping as little as possible. The site and the game connection use encrypted connections (HTTPS). Game data is held in memory, not in a database. Webcam video never leaves your device. Phone motion is checked and only passed to the one tab that paired with that phone.</p>
+    <p>No system is perfectly secure. If a breach of security involving personal information creates a real risk of significant harm, we'll notify the privacy regulators as the law requires (within 72 hours where the GDPR applies), including the Office of the Privacy Commissioner of Canada. Since we have no contact details for players, we'll also post a notice on the Poddle home page. We'll keep a record of every breach.</p>
+  </section>
+
+  <section class="card" aria-labelledby="helper">
+    <h2 id="helper">12. Poddle Helper for Mac</h2>
+    <p>Poddle Helper is an optional, free, open-source Mac app that lets an AirPod be your paddle.</p>
+    <ul>
+      <li>It reads only your headphones' motion, using Apple's motion framework: which way the AirPod points, how fast it turns and moves, and which bud it is. macOS asks your permission (Motion &amp; Fitness) first.</li>
+      <li>It passes that motion only to other programs on the same Mac (it never goes over the internet), and only while a page is connected to it. It accepts web pages from Poddle's own addresses (poddleball.com and its older poddle.fly.dev address), pages served from your own Mac, and local apps on your Mac.</li>
+      <li>It makes no internet connections of its own and collects nothing. It has no analytics. Its menu links simply open web pages in your browser.</li>
+      <li>Once the motion reaches Poddle in your browser, it is used like phone motion, as described above.</li>
+    </ul>
+    <p>Its source code is on <a href="https://github.com/danielrltan/poddle-helper">GitHub</a>, under the MIT license.</p>
+  </section>
+
+  <section class="card" aria-labelledby="laws">
+    <h2 id="laws">13. Notes for specific places</h2>
+    <h3>Canada</h3>
+    <p>Daniel Tan is the person accountable for your personal information, and we handle it in line with the Personal Information Protection and Electronic Documents Act (PIPEDA). In Quebec, Daniel Tan is the person in charge of the protection of personal information, and we only collect what the game needs. This policy is written in plain language on purpose.</p>
+    <h3>European Union, EEA and UK</h3>
+    <p>Daniel Tan is the "controller" of your personal data under the General Data Protection Regulation (GDPR and UK GDPR). Our legal bases are:</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th scope="col">Information</th><th scope="col">Legal basis</th></tr></thead>
+        <tbody>
+          <tr><td>Display name, webcam position, paddle motion, game information, tab ID and pairing code</td><td>Needed to provide the game you asked for (contract, Art. 6(1)(b))</td></tr>
+          <tr><td>IP address for abuse limits, and basic connection details</td><td>Our legitimate interest in keeping a free service safe and working (Art. 6(1)(f))</td></tr>
+          <tr><td>Emails you send us</td><td>Our legitimate interest in answering you (Art. 6(1)(f)), or a legal obligation when you use a privacy right (Art. 6(1)(c))</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Canada has an adequacy decision from the European Commission (and a matching UK decision) for organisations subject to PIPEDA, and we handle your information in line with PIPEDA. Where Fly.io processes information outside Canada, we rely on Fly.io's data processing agreement, which incorporates the EU Standard Contractual Clauses (and UK addendum). Cloudflare, Inc. takes part in the EU-US Data Privacy Framework. A copy of the safeguards is available on request.</p>
+    <p>We haven't appointed a representative in the EU or UK, because Poddle's processing is occasional, small and low risk. You can contact us directly at <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</p>
+    <h3>United States, including California</h3>
+    <p>We do not sell or share personal information, as those words are defined in the California Consumer Privacy Act, and we have not done so in the past 12 months. We don't use personal information for targeted advertising. You can review and ask us to correct your information as described in <a href="#rights">Your rights and choices</a>. We don't discriminate against anyone for using their privacy rights.</p>
+    <h3>Biometric laws</h3>
+    <p>Poddle does not identify anyone. It does not create, collect, receive, store or share any face template, faceprint, scan of face geometry, or other biometric identifier. Webcam video is processed only on your own device and only to find your rough position. The face and body points found in each frame exist only for a moment in your browser's memory, are not stored, and are not used to recognise anyone.</p>
+  </section>
+
+  <section class="card" aria-labelledby="dnt">
+    <h2 id="dnt">14. Do Not Track</h2>
+    <p>Poddle doesn't track you across other websites, and doesn't let anyone else do that on Poddle. So "Do Not Track" and Global Privacy Control signals from your browser don't change anything here. We treat everyone as if they had turned them on.</p>
+  </section>
+
+  <section class="card" aria-labelledby="changes">
+    <h2 id="changes">15. Changes to this policy</h2>
+    <p>We'll update this policy when Poddle changes how it handles information. The "Last updated" date at the top will change. For important changes, we'll also put a notice on the Poddle home page before or when the change takes effect. If a change needs your consent, we'll ask for it. Past versions are available on request.</p>
+    <p>If we add sign-in (for example with a Google account), we'll update this policy before it launches to list exactly what we get from the sign-in provider, how long we keep it, and how to delete your account. Signing in will stay optional where we can.</p>
+  </section>
+
+  <section class="card" aria-labelledby="contact">
+    <h2 id="contact">16. Contact</h2>
+    <p>Daniel Tan<br>Ontario, Canada<br><a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a></p>
+    <p>For privacy questions, requests and complaints, email us, and please put "Privacy" in the subject line.</p>
+  </section>
+</main>
+
+<footer class="end wrap">
+  <a class="btn btn-lg" href="/">Play</a>
+  <p><a href="/terms.html">Terms of Use</a> · <a href="/how-to-play.html">How to play</a> · <a href="/">Back to Poddle</a></p>
+</footer>
+
+</body>
+</html>
