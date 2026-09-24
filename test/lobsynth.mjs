@@ -122,6 +122,11 @@ export const STROKES = {
     ['phi', 0, 450, -95],
     ['phi', 550, 300, 150, 0.6], ['rho', 550, 300, 15, 0.6],
     ['phi', 1200, 700, -55], ['rho', 1200, 700, -15]] },
+  // a deep take-back: the paddle 60 deg behind vertical, so at the bet (15-40 deg behind) the hand is still coming DOWN (NOTES 91)
+  deep_lob: { label: 'DEEP take-back lob', expect: 'lob', contact: 830, moves: [
+    ['phi', 0, 450, -135],
+    ['phi', 550, 450, 150, 0.6], ['rho', 550, 450, 15, 0.6],
+    ['phi', 1200, 700, -15], ['rho', 1200, 700, -15]] },
   flick: { label: 'wrist flick', expect: 'tap', contact: 50, moves: [
     ['psi', 0, 100, 40, 0.5], ['phi', 0, 100, 12, 0.5], ['psi', 200, 300, -40], ['phi', 200, 300, -12]] },
 };

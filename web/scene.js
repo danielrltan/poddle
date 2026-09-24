@@ -129,10 +129,14 @@ export function drawBall(b, vA, now, dt, farZ) {
       const g = G * (1 - SPUN.lift * b.spin), vy = b.vel.y - 0.5 * g * SIM_DT, e = b.pos.y - vA.y;   // SIM_DT: the server steps v then p, so its ball runs g dt t / 2 under the closed form (0.14 m by a lob's bounce): one anchor must follow the steps
       // e goes as e (1 - t/tau)^2: drawn vy falls faster than the path's until it is gone, never slower, so it never rises. Taken off a
       // ball drawn too HIGH that curve pulls down at 2e/tau^2 on top of gravity, so tau is long enough for that never to reverse it.
-      Object.assign(a, { t0: now, y: vA.y, vy, g, T: (vy + Math.sqrt(vy * vy + 2 * g * Math.max(0, vA.y - BALL_R))) / g, e, tau: Math.max(b.errDur, Math.sqrt(2 * Math.max(0, e) / g)) });
+      // Drawn too LOW (a late hit: the path has coasted on 1 m or more by the time it lands) the curve only adds to the fall, so any tau
+      // is safe: the ball leaves at 2|e|/tau over the path's vy, once, on the contact frame, and is on the server's ball within 0.25 s.
+      Object.assign(a, { t0: now, y: vA.y, vy, g, T: (vy + Math.sqrt(vy * vy + 2 * g * Math.max(0, vA.y - BALL_R))) / g, e, tau: Math.max(b.errDur, Math.min(e > 0 ? Infinity : 0.25, Math.sqrt(2 * Math.abs(e) / g))) });
     }
-    const t = (now - a.t0) / 1000, y = a.y + a.vy * t - 0.5 * a.g * t * t + (t < a.tau ? a.e * (1 - t / a.tau) ** 2 : 0);
-    if (Math.abs(y - b.core.y) > 1) { b.arc = null; b.blend = true; }   // the path went somewhere a sealed ball cannot: the packets win, next frame
+    const t = (now - a.t0) / 1000, path = a.y + a.vy * t - 0.5 * a.g * t * t, y = path + (t < a.tau ? a.e * (1 - t / a.tau) ** 2 : 0);
+    // The packets went somewhere this contact's path cannot: the packets win, next frame. The path, not the drawn ball: how far the ball
+    // is drawn off it is e, being taken out (a late hit's e is over 1 m on the contact frame, and dropping the arc there WAS the helium).
+    if (Math.abs(path - b.core.y) > 1) { b.arc = null; b.blend = true; }
     else b.pos.y = y;
   }
   b.pos.y = Math.max(BALL_R, b.pos.y);

@@ -49,12 +49,12 @@ class V3 { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z
   lerp(o, a) { this.x += (o.x - this.x) * a; this.y += (o.y - this.y) * a; this.z += (o.z - this.z) * a; return this; }
   distanceToSquared(o) { return (this.x - o.x) ** 2 + (this.y - o.y) ** 2 + (this.z - o.z) ** 2; } }
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-function replay(msgs, hit, { base, jit, fps, seed }) {
+function replay(msgs, hit, { base, jit, fps, seed, hold = 0 }) {
   let rs = seed; const rnd = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
   const madeAt = serverClock().madeAt, vA = new V3();
   const b = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new V3(0, 1, 0), vel: new V3(), core: new V3(0, 1, 0), err: new V3(), errT: 1, errDur: 0.1, blend: false, bounces: 0, kick: 0, curl: 0, held: false, spin: 0, arc: null };
   let prevA = 0, lastT = null; const q = [];                  // arrival (local ms): made + base + jitter, in order (one TCP stream)
-  for (const m of msgs) { const t = m.t != null ? m.t : lastT; if (t == null) continue; lastT = t; prevA = Math.max(prevA, 10000 + t * 1000 + base + rnd() * jit); q.push({ a: prevA, m }); }
+  for (const m of msgs) { const t = m.t != null ? m.t : lastT; if (t == null) continue; lastT = t; prevA = Math.max(prevA, 10000 + t * 1000 + base + rnd() * jit + (m === hit ? hold : 0)); q.push({ a: prevA, m }); }
   const on = (m, now) => {
     if (m.type === 'launch') { if (isFinite(m.spin)) b.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) b.kick = +m.k; if (isFinite(m.c)) b.curl = +m.c;
       if (m.v && m.p && b.seen) { b.p = [...m.p]; b.v = [...m.v]; b.stamp = madeAt(+m.t, now); b.blend = true; } }
@@ -78,7 +78,9 @@ function truth(msgs, t) {                                    // y of the server'
   let a = null; for (const m of msgs) { if (m.type !== 'state' || !m.live) continue; if (m.t <= t) a = m; else { if (!a || a.b || m.b) return null; const w = (t - a.t) / (m.t - a.t); return a.p[1] + (m.p[1] - a.p[1]) * w; } }
   return null;
 }
-const CFG = [{ base: 40, jit: 0, fps: 60 }, { base: 40, jit: 30, fps: 60 }, { base: 80, jit: 60, fps: 60 }, { base: 80, jit: 60, fps: 120 }];
+// hold: the hit itself arrives this late (everything behind it waits: one TCP stream), a stall on the measured wifi. The path has coasted
+// on over 1 m by then, and dropping the arc on that contact frame drew a late lob climbing at up to 16 m/s.
+const CFG = [{ base: 40, jit: 0, fps: 60 }, { base: 40, jit: 30, fps: 60 }, { base: 80, jit: 60, fps: 60 }, { base: 80, jit: 60, fps: 120 }, { base: 80, jit: 0, fps: 60, hold: 150 }, { base: 80, jit: 30, fps: 60, hold: 300 }];
 const res = {};
 for (const st of streams) {
   const hit = st.msgs.find(m => m.type === 'hit' && m.side === 0), key = st.name; res[key] ||= { n: 0, rise: 0, apex: 0, off: 0, offPath: 0 };
@@ -96,7 +98,7 @@ for (const st of streams) {
 }
 for (const [name, r] of Object.entries(res)) console.log(`  ${name.padEnd(26)} ${r.n} replays, drawn apex ${r.apex.toFixed(2)} m, biggest frame-to-frame rise in drawn vy ${r.rise.toFixed(3)} m/s, off the server's height by ${r.off.toFixed(2)} m at most (the packets' own coast: ${r.offPath.toFixed(2)})`);
 ok(PLAN.every(p => res[p.name] && res[p.name].n >= 20), `every shot recorded and replayed (${Object.entries(res).map(([n, r]) => n + ' ' + r.n).join(', ')})`);
-ok(Object.values(res).every(r => r.rise <= 0.05), 'after the contact frame the drawn ball never rises faster than it did the frame before (40+0, 40+30, 80+60 ms, 60 and 120 fps)');
+ok(Object.values(res).every(r => r.rise <= 0.05), 'after the contact frame the drawn ball never rises faster than it did the frame before (40+0, 40+30, 80+60 ms, 60 and 120 fps; a hit held 150 and 300 ms)');
 ok(Object.values(res).every(r => r.off <= r.offPath + 0.05), "and it is drawn where the server has it, as closely as the packets' own coast from 0.25 s after contact (the clock guess on a jittery link is the rest)");
 ok(res['clean lob'] && res['clean lob'].apex > 3.3 && res['lob bet, settled lob'] && res['lob bet, settled lob'].apex > 3.3, 'lobs are still drawn high');
 console.log(fails ? fails + ' FAILURES' : 'DRAWLOB TESTS PASSED'); process.exit(fails ? 1 : 0);

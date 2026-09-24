@@ -1619,3 +1619,40 @@ tap, smash, near-net fixBlock, a serve struck on its first report, a legacy clie
 lightens, the marker is within 0.15 m, every ball clears the net, and lobs (clean or bet-and-settled) still top 3.3 m. The low-lob bet is
 now flown as struck (1.2-1.5 m): that is the bet's to fix. `test/drawlob.mjs` records the real server and replays it into `drawBall()`
 at 40+0, 40+30, 80+60 ms and 60/120 fps: the drawn vy never rises frame to frame from contact to the bounce.
+
+## 91. Lobs from a deep take-back lob on the bet; a late hit is drawn falling too
+
+Found by attacking NOTES 89/90. Two real holes, two that were not.
+
+The bet (web/motion.js). A lob taken back past ~40 deg behind vertical still has the hand coming DOWN at its first report (the paddle
+15-40 deg behind vertical, upward share -0.3 to -0.75): the third pendulum gate turned it away, lob 0, and the sealed ball flew a flat
+drive (1.3-1.5 m) under a settled 'lob' label. Where it did pass, 2.4 rad on from there ended below level (bet 0.50-0.56, under the lofted
+cliff at ~0.6). Now the look-ahead runs to a place in the arc, not a fixed angle: until the paddle points LOB_TOP (60 deg) over level, or
+tops out on a tilted axis, 3 rad at most; and while the hand is still coming down, the path so far and the look-ahead's own descent are
+dropped, so the share is taken from the bottom of the arc. A hand still coming down passes only when it hangs near the bottom (pointer at
+most -0.6 up) on a clean +R turn (>= 0.75) with no forearm roll now (<= 0.3) or so far (|swept twist| <= 0.2): a real waggle down from
+behind (live-play-1 @22317.6: +R 0.68, swept twist 0.37) bet lob 0.73 without the last two. Measured (sweep of perturbed lob strokes, 12
+seeds x AirPod/phone, 720 strokes): settled lobs flying low 15.9% -> 3.1% (phone at 30/100 Hz: 17.0% -> 3.8%); what is left is mostly the
+old power call betting a dink (p 6) under sensor noise. back 135: 5-7/12 low -> 0/12; real server, back 135 and back 125 wide, both grips:
+24/24 lob on the bet, apex 3.9-4.35, ay -9.8 throughout. 394 random plausible lob strokes: flies a lob on the bet 71.3% -> 82.5% (clean
+sensors 80.2% -> 93.7%; pre-NOTES-55 74.1% / 85.0%). Slices, chips, drives, smashes, flicks and 143 real swings: unchanged. What moved: a
+cross-body underhand serve (80 deg sweep, ending 10 deg over level) now settles lofted 11-12/12 (was 8-9) and 1/12 per grip is bet a lob,
+where it flew a drive; ul_wide90 settles lofted 1/11 on the AirPod (was 0). `deep_lob` in test/lobsynth.mjs, in test/lobbet.mjs's lobs.
+
+Not changed: (1) the real deliberate lob (live-play-3 @610.7) looked fragile, a gyro noise of 0.05 flying it a drive 3/20: that is the
+replay's calibration, the capture's FIRST sample (mid-rally) standing in for step 1, which leaves the paddle's pointer along the lob's own
+turn axis (twist 0.99). Calibrated from any pose the player rested in that minute (606.97, 609.61, 610.33) it is 20/20 full lobs at noise
+0.05 and 0.1, on this and on the NOTES 90 tree. test/lobbet.mjs (f) now holds it at >= 19/20. (2) A pendulum push that stops below level
+is bet a lob when it is quick enough (25 of 988 synthetic pushes at p ~20, 3.9-4 m, as on the NOTES 89 tree; the rest are taps that become
+dinks at the same height). The new look-ahead lofts a few more of their bets than NOTES 89's: 128 -> 133 of 249 at 30 deg under level, 138
+-> 147 of 215 at 20, 147 -> 154 of 208 at 10. At the bet it is the first half of a lob (same axis, same pointer, same rate): the base's
+own settled report calls many of them lofted too (200 of the 423 that top out 10-20 deg under level). Dropping the carried look-ahead from
+a settled report whose paddle never rose over level was tried: it un-lofts the settled report of 9 of the 96 lob swings in test/lobbet.mjs
+(a lob's rate peaks near the bottom, before the paddle is up). None of the 143 real swings changes.
+
+The screen (web/scene.js drawBall). A hit that lands late (150 ms or more: the measured wifi stalls) finds the path already 1 m or more
+above the drawn ball; the arc's 1 m guard compared the DRAWN height (path + e) with the packets, so it fired on the contact frame itself,
+dropped the arc, and the old smoothstep drew the ball climbing at up to 16 m/s (10% of lob flights on the measured link at 30 Hz, 37% at
+60 Hz). The guard now compares the path (what the packets must agree with), not e. A ball drawn too low only ever adds to its fall (e (1 -
+t/tau)^2 with e < 0 pulls down at 2e/tau^2), so tau there is capped at 0.25 s: it leaves once at 2|e|/tau over the path's vy and is on the
+server's ball within 0.25 s. test/drawlob.mjs replays a hit held 150 and 300 ms (the old drawBall rises 10.4 m/s there).
