@@ -1666,11 +1666,8 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
 - test/og-card.html draws the whole wordmark in the logo's dark (#39434d, the `P` and `d`), not the site's line blue for `dle`;
   the white haze behind it stays. `node test/make-og.mjs` re-rendered web/og.jpg; og:image is `?v=6` so the unfurlers fetch it
   again. The in-game logo (web/ui.css) is unchanged. A 3:2 version (1800x1200) went to the Devpost gallery as the thumbnail.
-## 93. The phone paddle buzzes on an iPhone too (best effort)
-- "Are you able to add haptic effects?" Android already buzzed on a hit and a point through `navigator.vibrate`; iPhone
-  Safari has no vibrate at all, so iPhones were silent.
-- pad.html now carries a hidden iOS 18 switch checkbox (`<input type="checkbox" switch>`) inside `#tick`. Where there is no
-  `navigator.vibrate`, pad.js `buzz()` clicks its label, which gives one system tick from the Taptic Engine. A tick has no
-  strength or length, so a hit is one tick, a smash (n > SMASH_N) two, a point two. Android keeps its graded buzz.
-- Unverified on a real iPhone: iOS may only honour the tick near a real tap (user activation), and mid-rally you swing,
-  not tap, so it can stay silent. Older iOS just shows nothing. pad.test and padquit pass.
+
+## 93. No iPhone haptics (tried and reverted)
+- Tried the iOS 18 `<input type="checkbox" switch>` label-click tick as an iPhone stand-in for `navigator.vibrate` on hits
+  and points. It did not buzz in play (iOS seems to want a real tap, and mid-rally you swing), so it was reverted.
+  Android keeps `navigator.vibrate`; real iPhone haptics would need a native app or App Clip.
