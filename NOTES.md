@@ -1556,3 +1556,32 @@ the global reduced-motion rule still wins.
 
 test/ui-next.mjs waits a little longer at four places for the new fades (lobby-first, the Watch prompt close, hold(null), Quick play's
 opacity); the checks themselves are unchanged. `#courts-n` hides with an `is-off` class and keeps its last text.
+
+## 89. The bet knows a lob: a pendulum's first report looks ahead
+
+The upstream cure NOTES 86 left open. Bisected: the kink is d6c958a (NOTES 55), where lob moved from the rotation axis (the bet read a
+scoop 0.80) onto the hand's path. At the bet, 30-100 ms before contact, a pendulum's hanging hand is near the bottom of the arc and still
+travels mostly FORWARD, so its path so far reads up 0.12-0.47: the ball left as a drive and the settled report (0.65-0.78) re-aimed it up.
+
+Now (web/motion.js): until the peak, a stroke that turns about +R (>= 0.6 of the rate) with little turn about the forearm itself
+(|twist| <= 0.45) and a hand that is no longer coming down (upward share of its travel >= -0.3) is a pendulum, and its hand is carried
+on round the same axis at the same rate for 2.4 rad (a scoop's arc from the bottom). The lob is the upward share of the path so far plus
+that, never less than the path alone. A fixed angle, not a fixed time: 0.2 s looked too little ahead for a slow scoop (a wide lob bet
+0.73 on the phone) and wrapped a fast one over the top (0.3 s: fast lobs bet 0.53-0.70). The look-ahead weighs as many samples as it
+lasts at the stream's usual step (a running mean of dt), so the phone (60 Hz, also tried at 30 and 100) and the AirPod read alike.
+Later reports keep that lob while the whole stroke still reads as a pendulum: a quick scoop whose settled report comes after contact
+counts the dip through the bottom too (0.53-0.66 up, a drive), and the lob must not be taken back once the ball has left.
+Not pendulums: a backhand slice or chip also turns about +R, by rolling the forearm (twist 0.75-0.95, hand going down); a waggle down
+from behind (two real captures, hand falling at -0.65 and -0.85: without the third gate they bet lob 0.76 and 0.93).
+
+web/main.js: an early report on a pendulum is faded by the smaller of |roll| and |twist|, not |roll| alone: a wide underhand swings its
+hanging arm across as it comes up, which is roll about the forward axis (0.5-0.7 at the bet), not a wrist. The swingEnd stand-in (never
+fired: 0 of 443 synthetic and 142 real swings end without a settled report) sends the path as it was (lobRaw), not the look-ahead.
+
+Measured (`test/lobbet.mjs`, new: 12 seeds x both grips, plus the real captures): wide, straight and a-third-quicker lobs (new
+`fast_wide_lob` / `fast_straight_lob` in test/lobsynth.mjs) are lofted on the bet (up 0.86-1.00, was 0.00-0.61) and on every report
+after it; slices, chips, drives and smashes are never lofted on any report; dinks stay lofted. Real captures (143 swings: data/ and one more
+AirPod session): no bet newly lofted, none lost. Later reports of a lob raise underhand() by at most 0.023 (the bets sit at >= 0.88, where
+it is saturated). The trade: a pendulum that stops at or below level (a flat underhand push or serve, synthetic only) is bet a lob too
+(4-5 of 9 wide ones swept 90 deg); nothing at the bet tells it from a scoop (same speed, 7.5-8.6 vs 7.7-10.6 rad/s, same place in the arc).
+FAST straight lob settles as a dink 5/8 in lobsynth: its power, not its lob.
