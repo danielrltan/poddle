@@ -20,7 +20,7 @@ export const shotName = kind => !kind ? '' : SHOTS[kind] || String(kind).replace
 // ---------- screens ----------
 // Two independent slots. Menu screens (title and lobby on glass over the live court; connect and calibrate opaque) cover everything; overlays (match, server-down,
 // game-full) sit over the court, under any menu screen (ui.css lifts game-full above them: that one cannot wait). The HUD leaves the render tree under a menu screen.
-const MENU = ['title', 'lobby', 'connect', 'calibrate'], OVERLAY = ['match', 'server-down', 'game-full', 'tour-vs'];      // tour-vs: a tournament's VS card, before a match
+const MENU = ['title', 'lobby', 'camera', 'connect', 'calibrate'], OVERLAY = ['match', 'server-down', 'game-full', 'tour-vs'];      // tour-vs: a tournament's VS card, before a match
 const screenEl = name => document.querySelector(`.screen[data-screen="${name}"]`);
 const slots = { menu: null, overlay: null }, hideT = {};
 function swap(slot, name) {
@@ -267,6 +267,48 @@ export function setBot(level) { const on = !!level; show('key-bot', on); show('s
 export function toggle(id) { const el = $(id); if (!el) return false; el.hidden = !el.hidden; return !el.hidden; }
 export function show(id, on) { const el = $(id); if (!el) return false; el.hidden = !on; return !el.hidden; }
 export function setCamera(ready) { show('camwrap', !!ready); }
+
+// ---------- the camera primer (NOTES 94) ----------
+// One screen before the first camera request: why, what stays private, and what the browser is about to ask. When the camera
+// fails it turns into the fix: the steps for THIS browser first, the computer's own privacy switch, the rest folded away.
+// o = { view: 'ask' | 'wait' | 'help', kind: blocked | system | dismissed | nocam | busy | insecure | other, browser: chrome | edge | safari | firefox | '', os: mac | win | ios | '', again }
+const CAM_TEXT = {
+  ask: ['Let the game see where you stand', 'Poddle uses this computer’s webcam, not your phone, to see where you are. Step left or right and your player moves with you.'],
+  wait: ['Press Allow', 'Your browser is asking to use the camera. Look near the address bar.'],
+  blocked: ['The camera is blocked', 'Your browser isn’t letting this page use the camera. Allow it like this, then press Try again.'],
+  system: ['Your computer is blocking the camera', 'The browser asked, but your computer’s privacy settings said no. Turn the camera on for your browser, then press Try again.'],
+  nocam: ['No camera found', 'Plug in a webcam, or check it isn’t switched off or covered, then press Try again.'],
+  busy: ['The camera won’t start', 'Another app may be using it, or your computer may be blocking it. Close any app with the camera on (Zoom, Teams and the like), check the steps below, then press Try again.'],      // Windows' privacy switch in Chrome/Edge also lands here (NotReadableError), so the steps show
+  dismissed: ['You closed the question', 'Press Try again, then choose Allow when your browser asks. If it doesn’t ask, use the steps below.'],      // Chrome blocks after ~3 closes and still says 'dismissed': the steps stay
+  insecure: ['This page can’t use a camera', 'Browsers only share the camera with a secure page. Open poddleball.com, or localhost on this computer.'],
+  other: ['The camera didn’t start', 'Check your browser lets this page use the camera, then press Try again.'],
+};
+const CAM_BROWSER = { chrome: 'Chrome', edge: 'Edge', safari: 'Safari', firefox: 'Firefox' };
+let camH = {};
+export function onCamPrimer(h) { camH = h || {}; }                                        // { allow(), retry(), skip() }
+export function camPrimer(o = {}) {
+  const card = $('cam-card'); if (!card) return; const view = ['ask', 'wait', 'help'].includes(o.view) ? o.view : 'ask', kind = CAM_TEXT[o.kind] ? o.kind : 'other', was = card.dataset.view;
+  const [title, lead] = CAM_TEXT[view === 'help' ? kind : view]; card.dataset.view = view; card.dataset.kind = view === 'help' ? kind : '';
+  setText($('cam-title'), title); setText($('cam-lead'), lead); $('cam-title').classList.toggle('is-bad', view === 'help'); card.classList.toggle('is-error', view === 'help');
+  show('btn-cam-allow', view !== 'help'); $('btn-cam-allow').disabled = view === 'wait'; show('btn-cam-retry', view === 'help' && kind !== 'insecure');
+  setText($('cam-note'), view === 'wait' ? 'Nothing is recorded, saved or sent.' : view === 'help' && o.again ? 'Still not working. Check the steps above.' : '');
+  // the help: the steps for the browser in use (and its computer's privacy switch) first, every other one folded under 'Using something else?'
+  const help = $('cam-help'), steps = ['blocked', 'system', 'dismissed', 'busy', 'other'].includes(kind) && view === 'help'; help.hidden = !steps;
+  if (steps) { const b = CAM_BROWSER[o.browser] ? o.browser : 'chrome', os = ['mac', 'win', 'ios'].includes(o.os) ? o.os : '', more = $('cam-more-list'), mine = os === 'ios' ? ['ios'] : [b];      // an iPad: only its Settings app, the desktop menus don't exist there
+    if (os && os !== 'ios' && !(os === 'mac' && b === 'safari')) mine[kind === 'system' || kind === 'busy' ? 'unshift' : 'push'](os);      // Safari needs no switch in macOS's Camera list (it is Apple's own). A 'denied by system' error: the computer's switch first
+    for (const el of help.querySelectorAll('.cam-browser')) setText(el, CAM_BROWSER[b]);
+    for (const el of help.querySelectorAll('.cam-host')) setText(el, location.hostname || 'poddleball.com');      // a local copy is 'Settings for localhost'
+    for (const f of mine) help.insertBefore(help.querySelector(`.cam-how[data-for="${f}"]`), $('cam-more'));
+    for (const f of ['chrome', 'edge', 'safari', 'firefox', 'mac', 'win', 'ios']) if (!mine.includes(f)) more.appendChild(help.querySelector(`.cam-how[data-for="${f}"]`));
+    for (const el of help.querySelectorAll('.cam-how')) el.classList.toggle('is-main', mine.includes(el.dataset.for)); }
+  if (view === 'help' && (was === 'help' || o.again)) restart(card, 'lob-nope');      // Try again against a block fails at once: the card shakes, so the press was not for nothing
+  const f = view === 'help' ? (kind === 'insecure' ? 'btn-cam-skip' : 'btn-cam-retry') : view === 'ask' ? 'btn-cam-allow' : 'btn-cam-skip';
+  if (slots.menu === 'camera' && !$(f).hidden && document.activeElement?.tagName !== 'INPUT') $(f).focus({ preventScroll: true });      // Enter does the likely thing
+}
+on2('btn-cam-allow', 'click', e => { e.stopPropagation(); if (camH.allow) camH.allow(); });      // stopPropagation: main.js's pointerdown/keys must not read this press as anything else
+on2('btn-cam-retry', 'click', e => { e.stopPropagation(); if (camH.retry) camH.retry(); });
+on2('btn-cam-skip', 'click', e => { e.stopPropagation(); if (camH.skip) camH.skip(); });
+export function onCamOn(fn) { on2('btn-cam-on', 'click', e => { e.stopPropagation(); fn(); }); }      // the connect screen's Camera row: Turn on, after a 'Play without camera' or a failure
 export const isVisible = id => { const el = $(id); return !!el && !el.hidden; };
 export function setStat(id, text) { setText($(id), String(text)); }                     // stats panel numbers (#pw, #px, #py, …)
 export function fullscreen(on) {
@@ -356,7 +398,8 @@ export function setSettings(o = {}) {
   if ('forfeit' in o) { const b = $('btn-leave-room'); if (swapText(b, o.forfeit ? 'Forfeit' : 'Leave court') && setOpen && !b.hidden) restart(b, 'ov-nudge'); }      // mid-match against a person, leaving is a forfeit: the button says so
   if ('canPause' in o) show('set-note', o.canPause === false);
   if ('tourMatch' in o) setText($('set-note'), o.tourMatch ? 'Tournament matches can’t pause' : 'Online games can’t pause');
-  if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }      // no camera: Body cannot be picked, and the row says why
+  if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }
+  if ('bodyNote' in o) { const n = $('move-note'); if (n) { setText(n, o.bodyNote || 'Body needs a camera'); if (o.bodyNote) n.hidden = false; } }      // the camera is off but can be asked for: picking Body asks, and the row says so      // no camera: Body cannot be picked, and the row says why
   if ('spectator' in o) $('settings')?.classList.toggle('is-spectator', !!o.spectator);
   if ('paddle' in o) { show('set-paddle', !!o.paddle); for (const b of $('paddle-seg2')?.children || []) b.setAttribute('aria-checked', String(b.dataset.paddle === o.paddle)); }      // null: only an AirPod can be the paddle here, nothing to pick
 }

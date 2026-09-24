@@ -18,6 +18,7 @@ const browser = await puppeteer.launch({ executablePath: '/Applications/Google C
 const errs = [];
 async function open(name, query) {
   const page = await browser.newPage();
+  await page.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.camPrimer', 'allow'); } catch { /* */ } });      // has seen the camera primer (NOTES 94): straight on, as before it existed
   page.on('console', m => { if (m.type() === 'error') errs.push(`[${name}] ${m.text()}`); });
   page.on('pageerror', e => errs.push(`[${name}] PAGEERROR ${e.message}`));
   await page.goto(`http://localhost:${W}/?bridge=${B}&game=${G}${query}`);
@@ -76,7 +77,7 @@ console.log('p0', JSON.stringify(st)); console.log('camera', JSON.stringify(awai
   const pg = await browser.newPage();
   pg.on('console', m => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|WebSocket connection/.test(m.text())) errs.push(`[title] ${m.text()}`); });
   pg.on('pageerror', e => errs.push(`[title] PAGEERROR ${e.message}`));
-  await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Dan'); } catch { /* */ } });      // a returning player: the lobby asks a first visitor for a name before anything can be chosen (test/spectate-e2e.mjs walks that)
+  await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Dan'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch { /* */ } });      // a returning player: the lobby asks a first visitor for a name before anything can be chosen (test/spectate-e2e.mjs walks that)
   await pg.goto(`http://localhost:${W}/?bridge=${DEAD}&game=${G}`); await sleep(1500);
   check((await ui(pg)).screen === 'title', 'title screen not showing on a plain load'); await shot(pg, 'ui-1-title.png');
   await pg.keyboard.press('Space'); await sleep(900);

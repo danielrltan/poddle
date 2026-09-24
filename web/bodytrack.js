@@ -11,8 +11,14 @@ function oneEuro(minCut, beta) {
 }
 const EDGE = 0.08;                                    // keep this much of the frame as margin so you never have to leave it
 
-export async function createBodyTracker(video, canvas) {
-  const T = { ready: false, error: null, reach: 0.3, reachY: 0.14, seenAt: 0, cx: 0.5, cx0: 0.5, cy: 0.5, cy0: 0.5, fps: 0, via: '-' };
+// onStream: called the moment the browser hands over the video (the player pressed Allow), before the models load. It returns false when the video is no longer wanted.
+export async function createBodyTracker(video, canvas, onStream) {
+  const T = { ready: false, error: null, errorName: '', granted: false, stopped: false, reach: 0.3, reachY: 0.14, seenAt: 0, cx: 0.5, cx0: 0.5, cy: 0.5, cy0: 0.5, fps: 0, via: '-' };
+  let stream = null;
+  // let go of the camera for good: its light goes off, the frame loop ends. A Try again makes a new tracker rather than restarting this one
+  T.stop = () => { T.stopped = true; T.ready = false; const s = stream; if (s) for (const t of s.getTracks()) t.stop(); stream = null;
+    if (s && video.srcObject === s) video.srcObject = null;                        // the <video> is shared: a stale tracker stopped late must not blank the newer one's picture
+    try { if (detector) detector.close(); if (poser) poser.close(); } catch { /* already gone */ } detector = poser = null; };      // the MediaPipe graphs hold WASM and GPU memory: every Try again / Body again would leak a pair
   const fx = oneEuro(0.7, 9), fy = oneEuro(0.7, 9);
   let detector, poser, ctx = canvas.getContext('2d'), lastT = 0, lastPose = 0;
   T.seen = () => T.ready && performance.now() - T.seenAt < 400;
@@ -24,16 +30,22 @@ export async function createBodyTracker(video, canvas) {
   // paddle height, metres: standing as calibrated = 1.0; duck to go low, stretch up to go high (image y grows downward)
   T.y = () => 1.0 - (T.cy - T.cy0) / T.reachY * 0.8;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360, facingMode: 'user', frameRate: { ideal: 60 } }, audio: false });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { const e = new Error('no camera API here (the page needs https or localhost)'); e.name = 'NoMediaDevices'; throw e; }
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360, facingMode: 'user', frameRate: { ideal: 60 } }, audio: false });
+    if (T.stopped) { T.stop(); return T; }                                       // given up on while the browser was asking: hand it straight back
+    if (onStream && onStream() === false) { T.stop(); return T; }                // allowed, but no longer wanted (Play without camera was pressed while the browser asked)
+    T.granted = true;
     video.srcObject = stream; await video.play();
     const { FilesetResolver, FaceDetector, PoseLandmarker } = await import('./vendor/mp/vision_bundle.js');
     const files = await FilesetResolver.forVisionTasks('./vendor/mp/wasm');
     detector = await FaceDetector.createFromOptions(files, { baseOptions: { modelAssetPath: './vendor/mp/face.tflite', delegate: 'GPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.5 });
     poser = await PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: './vendor/mp/pose.task', delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }).catch(() => null);
+    if (T.stopped) { T.stop(); return T; }                                       // stopped while the models loaded: close them now, they were made after stop() ran
     T.ready = true;
-  } catch (e) { T.error = e.message || String(e); return T; }
+  } catch (e) { T.error = e.message || String(e); T.errorName = e.name || 'Error'; return T; }      // errorName says WHY (NotAllowedError, NotFoundError, NotReadableError...): main.js picks the help to show from it
 
   function frame() {
+    if (T.stopped) return;
     const now = performance.now();
     if (video.readyState >= 2 && now - lastT > 12) {
       const res = detector.detectForVideo(video, now), d = res.detections && res.detections[0], W = video.videoWidth || 640;

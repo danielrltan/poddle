@@ -1699,3 +1699,52 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
   mailbox behind Cloudflare Email Routing is not named; no French version (Quebec Bill 96 risk); choosing Auto does not
   stop the camera (the page says so; main.js could stop the tracks and close the MediaPipe tasks instead); Helper's
   README and About box don't link the Terms yet.
+
+## 95. The camera is explained before it is asked for
+- "There is not any good UX pertaining to disclaiming why camera will be needed … a whole screen as part of the very first
+  initial calibration process (cached so it doesn't show you it again), explaining what you need to do to enable camera on
+  browsers and why it's needed. Otherwise it just seems invasive."
+- Before: taking a seat called `startCam()` straight away, so the browser's camera question popped up over the connect screen with
+  no click and no reason given. The only explanation was a small line under the status rows, and it said "read on this Mac".
+- Now the first seat opens a new screen, `camera` (web/index.html `#screen-camera`, ui.js `camPrimer()`). It is its own phase in
+  main.js, so a paddle that is already live behind it cannot jump to calibration: `onSample` returns for it, and the keys stop at
+  it the way they do in the lobby. It says why the camera is needed (this computer's webcam, not the phone, sees where you stand
+  so that stepping moves you; without it the game runs you to the ball), what stays private (read in this browser, never
+  recorded, saved or sent, only your position is used) and what happens next (the browser will ask: press Allow). **Allow camera**
+  is a click, so the browser's question follows a user gesture. **Play without camera** sets Auto and asks for nothing. Either
+  way the rest of `begin()` carries on (calibrated and live -> court, live -> calibration, else connect). Back leaves the court,
+  as it does from the connect screen. Spectators and `?cam=0` never reach it.
+- The answer is kept under its own key, `poddle.camPrimer` = `allow` | `skip`. It is not in `poddle.settings`, because
+  `savePrefs` rebuilds that from a fixed list and would drop it. `skip` loads as Auto and is never asked again. Settings -> Move ->
+  Body can now be picked with the camera off: it asks for the camera and switches to Body once it is up. The connect screen's
+  Camera row says Off (not "Waiting") and has a **Turn on** button.
+- `navigator.permissions.query({name:'camera'})`, in a try (Firefox and older Safari throw): `granted` skips the primer and just
+  starts the camera; `denied` opens the primer straight in its help state instead of offering an Allow that cannot work. If the
+  permission changes while the help is up, it moves on by itself.
+- Help when the camera fails: bodytrack.js now keeps `e.name` (`T.errorName`) as well as the message. NotAllowed/Security means
+  blocked ("denied by system" means the computer's switch, "dismissed" means the question was closed). NotFound/Overconstrained
+  means no camera. NotReadable means another app has it. No `mediaDevices` means not https. The steps for the browser in use come
+  first (Chrome, Edge, Safari's "Settings for <host>", Firefox), then macOS or Windows privacy settings (left out for Safari, which
+  macOS does not list). The rest are folded under "Using something else?". There are **Try again** and **Play without camera**
+  buttons. It shows on the primer, and on the connect screen when a request made there fails.
+- Try again really asks again. Before, `camOn` stayed true for good after the first request. Now `stopCam()` stops the old
+  tracker's tracks and loop (`T.stop()`), bumps a generation counter so a late answer to an old request is handed back, and
+  clears `camOn`. A stream that arrived but whose models failed to load is stopped too; before, it kept the camera light on.
+- The connect screen's camera line is now one sentence and says "this computer". test/camprimer.mjs covers the new flow: first seat,
+  a live AirPod behind the primer, Allow, Play without camera, reload, denied, Try again, Back, granted, spectator. It also saves
+  test/ui-shots/cam-*.png. The e2e harnesses set `poddle.camPrimer=allow`, as they already set a name, so they run as before. No
+  new data is collected, so privacy.html and terms.html are unchanged.
+- Review fixes. Settings -> Move -> Body with the camera already working (Move was Auto) now just switches to Body. Before, it
+  restarted the camera: a second request, the light blinking, the models built again. `T.stop()` now closes the MediaPipe face
+  and pose graphs (they hold WASM/GPU memory), and it clears the shared `<video>` only if it still shows this tracker's stream, so
+  a stale tracker stopped late cannot blank a newer one. `stopCam()` keeps the range (`prefs.reach`) for the next tracker.
+  NotReadableError ('busy') shows the fix steps with the computer's switch first, because Chrome and Edge on Windows report the
+  privacy switch that way. 'dismissed' has its own text (press Try again, then Allow); after about three closes Chrome blocks it
+  and still says 'dismissed', so the steps stay. iPads (iPadOS says 'MacIntel') and Chrome/Edge/Firefox on iOS get the Settings
+  app steps instead of Mac menus. The primer says the position goes to the game, and that Auto in Settings is the way to play
+  without it later (Auto does not turn the camera off, so the copy doesn't promise that). On a phone-width window "Play without camera" is a link
+  under the one big Allow pill, the primer's buttons do not grow on hover (they clipped in its scroll box), and the connect
+  screen's Turn on gets its own line.
+
+Play without camera says what replaces it: a line under the buttons ("Without the camera, Poddle plays in Auto: the game runs you to the ball and you just swing.") and a toast when it is picked, so saying no never feels like breaking the game.
+- Privacy updated with it: the primer before the browser asks (section 3), Play without camera remembered, and the `poddle.camPrimer` row in the storage table; CLAUDE.md inventory too.

@@ -24,7 +24,7 @@ Important changes also need a notice on the home page. Open questions for the op
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
   tournament host and player names, bracket; listed courts in the court list.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,
   poddle.courts; sessionStorage cid, pad. No cookies.
 - Third parties: Fly.io (host, logs ~7 days), Cloudflare (cdnjs three.js fallback; email forwarding for
   hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click). No analytics, no ads.

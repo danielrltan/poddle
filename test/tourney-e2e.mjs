@@ -45,7 +45,7 @@ async function until(pg, test, ms, what) { const end = Date.now() + ms; let s; d
 async function open(tag, name, query = '', w = 1280, h = 720) { const pg = (await (await launch()).pages())[0]; await pg.setViewport({ width: w, height: h }); pg.tag = tag;
   pg.on('pageerror', e => errs.push(`[${tag}] PAGEERROR ${e.message}`)); pg.on('response', r => { if (r.status() >= 400) errs.push(`[${tag}] ${r.status()} ${r.url()}`); });
   pg.on('console', m => { if (m.type() === 'error' && !/WebSocket|ERR_CONNECTION/.test(m.text())) errs.push(`[${tag}] ${m.text()}`); });
-  await pg.evaluateOnNewDocument(name => { try { localStorage.setItem('poddle.name', name); } catch { /* */ } }, name);
+  await pg.evaluateOnNewDocument(name => { try { localStorage.setItem('poddle.name', name); localStorage.setItem('poddle.camPrimer', 'allow'); } catch { /* */ } }, name);
   await pg.goto(`http://localhost:${G}/?bridge=${B}/${tag}&game=${G}&uitest=1${query}`); await sleep(1500); return pg; }
 const shot = async (pg, n, sizes = [[1280, 720]]) => { const was = pg.viewport();
   for (const [w, h] of sizes) { if (pg.viewport().width !== w || pg.viewport().height !== h) { await pg.setViewport({ width: w, height: h }); await sleep(500); }

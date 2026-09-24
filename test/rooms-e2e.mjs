@@ -41,7 +41,7 @@ const NAME = { a: 'Ada', b: 'Bo', c: 'Cy', d: 'Dee', e: 'Eve', f: 'Fay' };
 async function open(tag, query = '', w = 1280, h = 720) { const pg = (await (await launch()).pages())[0]; await pg.setViewport({ width: w, height: h }); pg.tag = tag;
   pg.on('pageerror', e => errs.push(`[${tag}] PAGEERROR ${e.message}`)); pg.on('response', r => { if (r.status() >= 400) errs.push(`[${tag}] ${r.status()} ${r.url()}`); });
   pg.on('console', m => { if (m.type() === 'error') errs.push(`[${tag}] ${m.text()}`); });
-  await pg.evaluateOnNewDocument(n => { try { if (!localStorage.getItem('poddle.name')) localStorage.setItem('poddle.name', n); } catch { /* */ } }, NAME[tag]);      // the lobby asks a first-time visitor for a name (test/spectate-e2e.mjs walks that); these tabs have played before
+  await pg.evaluateOnNewDocument(n => { try { if (!localStorage.getItem('poddle.name')) localStorage.setItem('poddle.name', n); localStorage.setItem('poddle.camPrimer', 'allow'); } catch { /* */ } }, NAME[tag]);      // the lobby asks a first-time visitor for a name (test/spectate-e2e.mjs walks that); these tabs have played before
   await pg.goto(`http://localhost:${G}/?bridge=${B}/${tag}&game=${G}${query}`); await sleep(1500); return pg; }
 const shot = async (pg, n) => { await sleep(450); const [w, h] = [pg.viewport().width, pg.viewport().height]; await pg.screenshot({ path: `${root}test/ui-shots/rooms-${n}-${w}x${h}.png` });
   const c = (await st(pg)).clipped; ok(!c.length, `${pg.tag} ${n} ${w}x${h}: nothing off screen ${c}`); };

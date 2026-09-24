@@ -33,7 +33,7 @@ const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, scree
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
 else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
-const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get cam() { return body ? { ready: body.ready, error: body.error, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
+const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get cam() { return body ? { ready: body.ready, error: body.error, errorName: body.errorName, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, get camView() { return phase === 'camera' ? camView : ''; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let side = 0, role = 'player', names = [null, null], state = null, players = 0, calibrating = true;      // role: 'player' | 'spectator' (docs/SPECTATE.md). names: the server's truth, null = empty seat
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
@@ -57,17 +57,62 @@ const MODES = ['body', 'auto'], MODE_TEXT = { body: 'Body: step to move, tilt th
 let bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
 // critically damped follow (frame-rate independent): smooth, no overshoot
 function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
-let mode = MODES.includes(qs.get('move')) ? qs.get('move') : qs.get('cam') === '0' ? 'auto' : 'body', body = null, bodyX = 0;      // ?cam=0: there will be no camera, so not Body
-let camOn = false;
+// ---------- the camera (NOTES 94) ----------
+// Never asked for out of nowhere: the first seat shows the primer screen (why, what stays private, what the browser will ask), and
+// only its Allow button (a click, so the browser's question follows a gesture) makes the request. The answer is kept under its OWN
+// key: savePrefs rebuilds poddle.settings from a fixed list and would drop it. 'allow' | 'skip' (Play without camera: Auto, never asked again).
+const CAM_KEY = 'poddle.camPrimer', NO_CAM = qs.get('cam') === '0';
+let camPerm = '', permKnown = false;      // the browser's own answer: 'granted' | 'denied' | 'prompt'; '' where it will not say (Firefox and older Safari throw on 'camera')
+const permReady = (async () => { try { const st = await Promise.race([navigator.permissions.query({ name: 'camera' }), new Promise((_, no) => setTimeout(no, 800))]); camPerm = st.state; st.onchange = () => { camPerm = st.state; camPermChanged(); }; } catch { /* no answer: the primer asks as if 'prompt' */ } permKnown = true; })();
+const UA = navigator.userAgent, IOS = /iPad|iPhone/.test(UA) || (/Mac/.test(navigator.platform) && navigator.maxTouchPoints > 1);      // iPadOS says 'MacIntel': it has no System Settings > Privacy or Safari menu bar, its fix is in the Settings app
+const CAM_FOR = { browser: /Edg\/|EdgiOS\//.test(UA) ? 'edge' : /Firefox\/|FxiOS\//.test(UA) ? 'firefox' : /Chrome\/|Chromium\/|CriOS\//.test(UA) ? 'chrome' : /Safari\//.test(UA) ? 'safari' : 'chrome', os: IOS ? 'ios' : /Mac/.test(navigator.platform) ? 'mac' : /Win/.test(navigator.platform) ? 'win' : '' };      // whose unblock steps go first on the help
+const camKind = t => { const n = t && t.errorName || 'NotAllowedError', m = t && t.error || '';      // why the camera failed -> which help (ui.js CAM_TEXT)
+  if (n === 'NoMediaDevices') return 'insecure';
+  if (['NotAllowedError', 'SecurityError', 'PermissionDeniedError'].includes(n)) return /system/i.test(m) ? 'system' : /dismiss/i.test(m) ? 'dismissed' : 'blocked';      // Chrome: 'Permission denied by system' = the OS switch; 'Permission dismissed' = the question was closed, not answered (after ~3 of those Chrome blocks it, still saying 'dismissed')
+  if (['NotFoundError', 'OverconstrainedError', 'DevicesNotFoundError'].includes(n)) return 'nocam';
+  if (['NotReadableError', 'TrackStartError', 'AbortError'].includes(n)) return 'busy';
+  return 'other'; };
+let mode = MODES.includes(qs.get('move')) ? qs.get('move') : NO_CAM || ls.get(CAM_KEY) === 'skip' ? 'auto' : 'body', body = null, bodyX = 0;      // ?cam=0, or Play without camera: there will be no camera, so not Body
+let camOn = false, camGen = 0, camWant = false, camAsked = false, camView = '', camAgain = false;      // camGen: the request that counts (Try again and No start a new one; an older answer is let go). camWant: switch to Body once it is up. camAsked: the player pressed something for it (a failure is worth telling)
 function startCam() {                              // the webcam is asked for when a seat is taken, never on the way to watching (docs/SPECTATE.md: spectators get no camera prompt)
-  if (camOn || qs.get('cam') === '0') return; camOn = true;
-  createBodyTracker($('camv'), $('camc')).then(t => {
+  if (camOn || NO_CAM) return; camOn = true; const g = ++camGen;
+  createBodyTracker($('camv'), $('camc'), () => { if (g !== camGen) return false; if (phase === 'camera') primerDone(); }).then(t => {      // Allowed: on with the set-up while the models load. false: turned down meanwhile, hand the stream back
+    if (g !== camGen) { t.stop(); return; }
     body = t; ui.setCamera(t.ready); if (Number.isFinite(prefs.reach)) t.reach = Math.max(0.08, Math.min(0.42, prefs.reach)); syncSettings();
     loadSinks();                                   // a camera grant does NOT name audio devices (NOTES 64); harmless to retry, the Sound row asks for audio permission itself
-    if (!t.ready) { console.warn('camera tracking unavailable:', t.error); if (mode === 'body') setMode('auto', !inPlay()); return; }       // quiet on the set-up screens: nobody asked yet
+    if (!t.ready) { console.warn('camera tracking unavailable:', t.errorName, t.error); t.stop(); if (!t.granted) camOn = false;      // stop(): a stream that came but whose models did not load kept the camera light on for good. Not granted: the next seat (or Try again) may ask again
+      camWant = false; if (mode === 'body') setMode('auto', !inPlay()); camTrouble(t); return; }
+    if (camWant) { camWant = false; if (mode !== 'body') setMode('body', !inPlay()); }      // turned on after a No: that was to play with it
     if (stats.calibrated) { const c = setInterval(() => { if (t.seen()) { clearInterval(c); t.center(); } }, 100); }      // calibration finished before the camera was up: centre on the first sight of the player instead
   });
 }
+function stopCam() { camGen++; if (body) { prefs.reach = body.reach; body.stop(); } body = null; camOn = false; ui.setCamera(false); syncSettings(); }      // let go of it, and of any question still open: camOn no longer latches, so the next startCam really asks again
+function camRestart() { stopCam(); startCam(); }
+function camTrouble(t) {                           // the camera said no. On a set-up screen that earns the help screen; over the court a toast, and only when they asked for it
+  if (t.granted) return;                           // it was allowed and the tracking failed to load: nothing the player can fix, the game moves them
+  const k = camKind(t);
+  if (phase === 'camera' || phase === 'connect') { primer('help', k); return; }
+  if (camAsked) say({ nocam: 'No camera found', busy: 'The camera won’t start. Close any app using it, then pick Body again.', insecure: 'This page can’t use a camera', dismissed: 'The camera question was closed. Pick Body again, then Allow.' }[k] || 'The camera is blocked. Allow it for this site, then pick Body again.', null, 3600);
+}
+// '' = no primer; 'ask'; 'help' (the browser already says no); 'wait' (its answer is not in yet)
+function camAsk() { if (NO_CAM) return ''; const c = ls.get(CAM_KEY); if (c === 'skip') return ''; if (!permKnown) return 'wait'; if (camPerm === 'denied') return 'help';
+  if (c === 'allow') return ''; if (camPerm === 'granted') { ls.set(CAM_KEY, 'allow'); return ''; } return 'ask'; }      // already allowed for this site: nothing to explain, it just starts
+function primer(view, kind) {                      // the primer screen: its own phase, so a paddle that wakes up behind it cannot skip ahead to calibration
+  camView = view; if (phase !== 'camera') { phase = 'camera'; screen('camera'); padPhase(); }
+  ui.camPrimer({ view, kind, ...CAM_FOR, again: view === 'help' && camAgain }); camAgain = false;
+}
+function primerDone() { camView = ''; phase = 'connect'; goOn(); }      // answered: the rest of begin()
+function camPermChanged() {                        // changed in the browser's site settings while the help is up: take it from there
+  if (phase !== 'camera' || camView !== 'help' || camOn) return;
+  if (camPerm === 'granted') { ls.set(CAM_KEY, 'allow'); camWant = true; camRestart(); } else if (camPerm === 'prompt') primer('ask');
+}
+function camTurnOn() { if (NO_CAM) return; ls.set(CAM_KEY, 'allow'); camWant = camAsked = true; camRestart(); }      // Settings -> Body, or the connect screen's Turn on, after a No or a failure
+ui.onCamPrimer({
+  allow: () => { ls.set(CAM_KEY, 'allow'); camWant = camAsked = true; camRestart(); if (phase === 'camera') primer('wait'); },      // the click IS the gesture the browser's question follows. Even an instant grant answers after this line
+  retry: () => { camAgain = true; ui.camPrimer({ view: 'wait' }); camView = 'wait'; ls.set(CAM_KEY, 'allow'); camWant = camAsked = true; camRestart(); },
+  skip: () => { ls.set(CAM_KEY, 'skip'); camWant = false; stopCam(); setMode('auto', true); if (phase === 'camera') primerDone(); say('No camera: Auto movement is on. The game runs you to the ball, you swing.', null, 3600); },      // say what replaces it, after primerDone so the toast lands on the next screen      // Auto, kept: never asked again (Settings -> Move -> Body still turns it on)
+});
+ui.onCamOn(camTurnOn);
 function setMode(m, quiet) {                       // chosen in the settings panel (the M key is gone from the court). Every switch starts the mode from rest, in this ONE place: nothing of the last mode's motion is carried in
   if (m !== mode) { vX = vY = walkV = 0; walkHold = 0; bodyZ = 6.5; const mine = state && state.paddles[side]; if (mine) { bodyX = mine.x * s(); bodyY = mine.y; } }
   mode = m; ui.setMode(MODE_NAME[m]); syncSettings(); if (!quiet) say(MODE_TEXT[m], null, 2400);
@@ -126,7 +171,7 @@ let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? p
 const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
-function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !!(body && body.ready), tourMatch: tourKind === 'match',
+function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !NO_CAM, bodyNote: NO_CAM || (body ? body.ready : camOn) ? '' : 'Body turns the camera on', tourMatch: tourKind === 'match',      // bodyOk: Body can be picked wherever a camera can be asked for
   sound: soundOn, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
   sinkWhy: !scene.audio.canSwitch() ? 'browser' : sinks.length ? '' : sinkDenied ? 'denied' : 'devices' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
@@ -215,10 +260,14 @@ function play() {                                  // leave the title for the lo
   phase = 'lobby'; screen('lobby');
   if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
-function begin() {                                 // seated: straight to calibration if the AirPod is already streaming, straight to the court if that is done too
-  phase = 'connect'; startCam();
-  if (stats.calibrated && airpodLive()) { phase = 'play'; openCourt(); } else if (airpodLive()) startCal(); else screen('connect');
+function begin() {                                 // seated: the camera primer first (once ever), then straight to calibration if the paddle is already streaming, straight to the court if that is done too
+  phase = 'connect'; const ask = camAsk();
+  if (ask === 'wait') { phase = 'camera'; camView = ''; permReady.then(() => { if (phase === 'camera' && !camView) begin(); }); return; }      // the browser's answer takes a few ms: a first seat must not start the camera before the primer
+  if (ask) { primer(ask, 'blocked'); return; }      // 'help': blocked in this browser already, so the help instead of an Allow that cannot work
+  if (ls.get(CAM_KEY) !== 'skip') startCam();
+  goOn();
 }
+function goOn() { if (stats.calibrated && airpodLive()) { phase = 'play'; openCourt(); } else if (airpodLive()) startCal(); else { screen('connect'); padPhase(); } }
 function enterWatch() { phase = 'watch'; openCourt(); }      // a spectator: no AirPod, no bridge, no calibration, no camera. Lobby -> court.
 let pendT = 0;
 function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
@@ -301,13 +350,14 @@ function toLobby(msg) {                            // out of a room, back to the
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
   if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
-  else if (undo && (phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court
-  else if (phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }
+  else if (undo && (phase === 'camera' || phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court (the help can come up there too, after a Turn on)
+  else if (phase === 'camera' || phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }      // the primer is a set-up screen like the others: Back leaves the court
 }
 function refreshStatus() {
-  const setup = phase === 'title' || phase === 'lobby' || phase === 'connect', off = phase === 'watch';      // watching needs no AirPod and no camera: never 'signal lost'
-  ui.setStatus({ airpod: off ? 'off' : airpodLive() ? 'ok' : setup ? 'wait' : 'bad', game: link.g ? 'ok' : setup && !gameEver ? 'wait' : 'bad',
-    camera: off || qs.get('cam') === '0' ? 'off' : !body ? 'wait' : body.ready ? 'ok' : 'off' });
+  const setup = phase === 'title' || phase === 'lobby' || phase === 'camera' || phase === 'connect', off = phase === 'watch';      // watching needs no AirPod and no camera: never 'signal lost'
+  const cam = off || NO_CAM ? 'off' : !body ? (!camOn && ls.get(CAM_KEY) === 'skip' ? 'off' : 'wait') : body.ready ? 'ok' : 'off';      // Play without camera is 'off', not 'waiting' for an Allow nobody will press
+  ui.setStatus({ airpod: off ? 'off' : airpodLive() ? 'ok' : setup ? 'wait' : 'bad', game: link.g ? 'ok' : setup && !gameEver ? 'wait' : 'bad', camera: cam });
+  ui.show('btn-cam-on', cam === 'off' && !off && !NO_CAM && phase === 'connect');      // the Camera row's Turn on: changed their mind
   if (phase === 'calibrate' && !airpodLive()) ui.calibrationReset();      // stream dropped mid-calibration: say so
   if (LOBBY) ui.lobbyLink(link.g || !gameEver && performance.now() < 2500);       // the lobby sits above the 'server down' card, so it says so itself (not in the first moments of a page load)
   const n = myName(); if (n !== polledName) { polledName = n; if (room) rename(n); }      // the name was changed in the settings panel while in a room
@@ -315,7 +365,7 @@ function refreshStatus() {
 
 scene.setSelfBody(showBody); show('podwrap', showPod); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
 if (LOBBY && qs.get('room')) setUrl(wantRoom.length === 4 ? wantRoom : null, wantWatch);      // an old ?room= link: same court, the address bar now says ?court=
-if (!LOBBY) { phase = 'connect'; screen('connect'); startCam(); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
+if (!LOBBY) { phase = 'connect'; screen('connect'); setTimeout(begin); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
 refreshStatus(); setInterval(refreshStatus, 250);
 
 // ---------- sockets (auto-reconnect) ----------
@@ -362,7 +412,7 @@ let chose = false, undo = null;      // undo: a swap made mid-game, until the ne
 function openBridge() { if (!bridge) bridge = connect(BRIDGE, 'm', sample => onSample(sample, 'airpod')); }
 let myKind = null, myBet = null;      // my last hit's kind (a re-aim names it only when it changed) and its bet-fallback timer
 const padFx = (fx, n, b) => { if (padOn && !useAirpod) game.send({ type: 'padfx', fx, n, b }); };      // the phone buzzes on my hits and says which step we are at
-const padPhase = () => padFx(phase === 'calibrate' ? 'cal' : phase === 'play' ? 'play' : 'idle');
+const padPhase = () => padFx(phase === 'calibrate' || phase === 'camera' ? 'cal' : phase === 'play' ? 'play' : 'idle');      // camera: the primer is up, the phone says 'Follow the steps on your computer'
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
   const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
   ui.setPaddle(kind); pod.setKind(kind);
@@ -406,7 +456,7 @@ function onSample(sample, from) {
   lastSample = performance.now();
   ui.setStat('pw', power.toFixed(1));
   if (phase === 'title') { if (power > 12) play(); return; }         // a swing presses Play. The model is not fed until calibration
-  if (phase === 'lobby' || phase === 'watch') return;                //  A spectator's AirPod is nobody's paddle.
+  if (phase === 'lobby' || phase === 'watch' || phase === 'camera') return;      //  A spectator's AirPod is nobody's paddle. Behind the primer it only counts as live (airpodLive): its answer goes on to calibration
   if (phase === 'connect') startCal();                              //  begins, so a bud lying on the desk cannot calibrate itself.
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
@@ -615,7 +665,7 @@ ui.onSettings({
   open: () => { pause(true); setDim(); loadSinks(); },
   close: () => { pause(false); setDim(); },
   sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
-  move: m => { if (MODES.includes(m) && m !== mode && (m !== 'body' || body && body.ready)) setMode(m); },      // how you move is chosen here now, not on the court
+  move: m => { if (!MODES.includes(m)) return; if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); },      // how you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onView(name => setView(name, true));
@@ -637,7 +687,7 @@ addEventListener('keydown', e => {
   if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
   if (k === 't' && tour && !e.repeat) { tourKey(); return; }     // T: the tournament (its card in a warm-up; back to the bracket while watching; its screen from the lobby)
-  if (phase === 'lobby') return;                                 // the lobby's keys live in ui.js; game keys wait for a room
+  if (phase === 'lobby' || phase === 'camera') return;           // the lobby's keys live in ui.js; game keys wait for a room. On the primer C, B and 1-4 would calibrate or call Matt behind it
   if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
   if (k === 'h') setStats(!showStats);
   if (spec()) { if ('1234'.includes(k) && !e.repeat) setView(VIEWS[+k - 1], true); else if (k === 'a' && !e.repeat && ui.askCan()) askPlay(); return; }      // A: Ask to play      // watching: 1-4 pick the view (3 again = the other player), F, H, Q Q and Esc. Nothing else

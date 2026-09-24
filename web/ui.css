@@ -151,7 +151,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .btn-lg{height:4.5rem;padding:0 3.5rem;font-size:var(--t-xl)}
 .btn-sm{height:2.75rem;padding:0 1.5rem;font-size:var(--t-md)}
 .btn:active,.btn.is-pressed{transition-duration:90ms, 240ms, var(--d-med)}      /* snappy in, springy out */
-@media (hover:hover){ .btn:hover:where(:not(:disabled,[aria-disabled="true"])){scale:1.04} .btn:hover:active,.btn:hover.is-pressed{scale:1} .court-list .btn:hover,.settings .btn:hover{scale:none} }      /* 'scale', not transform: it composes with .is-focus's breathing (0,2,0 so the resets win). A pill in a scroll box (court list, settings card) would clip its halo */
+@media (hover:hover){ .btn:hover:where(:not(:disabled,[aria-disabled="true"])){scale:1.04} .btn:hover:active,.btn:hover.is-pressed{scale:1} .court-list .btn:hover,.settings .btn:hover,.cam-btns .btn:hover{scale:none} }      /* 'scale', not transform: it composes with .is-focus's breathing (0,2,0 so the resets win). A pill in a scroll box (court list, settings card, the camera primer) would clip its halo */
 
 /* key-cap hint chip */
 .keycap{display:inline-flex;align-items:center;justify-content:center;min-width:1.625rem;height:1.625rem;white-space:nowrap;padding:0 .4375rem;border-radius:.4375rem;border:.09375rem solid var(--sky-4);border-bottom-width:.1875rem;
@@ -1326,3 +1326,61 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
   #champ-acts{flex-direction:column;align-items:stretch} .tour-res .btn,#champ-acts .btn{min-width:0}
 }
 @media (prefers-reduced-motion: reduce){ .br-dot{animation:none} .tour-chip.is-new{animation:none} }
+
+/* ==========================================================================================================
+   CAMERA PRIMER (NOTES 94): the screen before the first camera request. #cam-card[data-view] = ask | wait | help.
+   Font sizes carry px floors: at phone width 1rem is 10px, and this is the one screen that must be read in full, not glanced at.
+   ========================================================================================================== */
+.cam-body{justify-content:safe center;overflow-y:auto;overscroll-behavior:contain}      /* the help can run taller than the window: it scrolls, never shrinks */
+.cam-card{display:flex;flex-direction:column;align-items:center;gap:var(--s-4);width:min(54rem,92vw);padding:var(--s-5) var(--s-7) var(--s-5)}
+.cam-card .t-title{font-size:max(var(--t-2xl),24px)} .cam-card .t-lead{max-width:44rem;font-size:max(var(--t-lg),16px)}
+.cam-card .t-title,.cam-card .t-lead{text-wrap:balance}      /* no one-word last lines ('Try / again.') */
+.cam-card .t-title.is-bad::before{vertical-align:.1em}
+.screen.is-active .cam-card.lob-nope{animation:nudge 420ms var(--ease-soft) 1}      /* Try again met the same block: shake once more (ui.js restart) */
+.cam-art{width:min(24rem,100%);aspect-ratio:12/5;padding:.5rem 1rem;display:grid;place-items:center}
+.cam-art svg{width:100%;height:100%;overflow:visible}
+.cam-art .art-line,.cam-art .art-fill,.cam-art .art-skin{stroke-width:4} .cam-art .art-faint{stroke-width:3}
+.screen.is-active .cam-steps-l{animation:cam-step-l 1800ms var(--ease-soft) infinite} .screen.is-active .cam-steps-r{animation:cam-step-r 1800ms var(--ease-soft) infinite}      /* the arrows beside you breathe out: step this way, or that */
+@keyframes cam-step-l{0%,100%{translate:0 0}50%{translate:-4px 0}} @keyframes cam-step-r{0%,100%{translate:0 0}50%{translate:4px 0}}
+.cam-card[data-view="help"] .cam-art{display:none}                                      /* the fix is the news now: the drawing gives it the room */
+.cam-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.625rem;width:100%;text-align:left}
+.cam-points li{display:flex;align-items:flex-start;gap:1rem;padding:.875rem 1.25rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
+.cam-points svg{flex:none;width:max(2.25rem,26px);height:max(2.25rem,26px);margin-top:.125rem;fill:none;stroke:var(--line-deep);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.cam-points div{display:flex;flex-direction:column;gap:.125rem;font-size:max(var(--t-md),14px);line-height:1.45;color:var(--ink)}
+.cam-points div > b{font-size:max(var(--t-lg),16px);font-weight:800;color:var(--ink-strong);line-height:1.25}
+.cam-card[data-view="help"] .cam-points{display:none}
+.cam-help{width:100%;display:flex;flex-direction:column;gap:.625rem;text-align:left}
+.cam-how{padding:.875rem 1.25rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
+.cam-how.is-main{border-color:var(--line)}
+.cam-how h3{margin:0 0 .375rem;font-size:max(var(--t-lg),16px);font-weight:800;color:var(--ink-strong)}
+.cam-how ol{margin:0;padding-left:1.4em;font-size:max(var(--t-md),14px);line-height:1.5;color:var(--ink)} .cam-how li+li{margin-top:.1875rem}
+.cam-more{border-radius:var(--r-lg)}
+.cam-more summary{cursor:pointer;width:fit-content;padding:.375rem .25rem;font-size:max(var(--t-md),14px);font-weight:800;color:var(--line-deep);list-style-position:inside;border-radius:var(--r-sm);outline:0}
+.cam-more summary:focus-visible{box-shadow:var(--glow)} @media (hover:hover){ .cam-more summary:hover{text-decoration:underline} }
+.cam-more-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(20rem,100%),1fr));gap:.5rem;margin-top:.375rem}
+.cam-more-list .cam-how{box-shadow:none;background:rgba(255,255,255,.6);border-color:var(--line-faint)} .cam-more-list .cam-how h3{font-size:max(var(--t-md),14px)} .cam-more-list .cam-how ol{font-size:max(var(--t-sm),13px)}      /* the other browsers: smaller, and only when asked for */
+.cam-btns{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--s-3) var(--s-4);margin:var(--s-2) 0 0}
+.cam-btns .btn:not(.btn-sm){min-width:16rem;min-height:44px} .cam-btns .btn svg{width:1.625rem;height:1.625rem;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.cam-skip{min-height:44px;border-color:var(--line-soft);box-shadow:var(--sh-1), var(--inner-hi);color:var(--ink)}      /* the way out is always there, just quieter than Allow */
+.cam-note{min-height:1.5em;font-size:max(var(--t-sm),13px)} .cam-note:empty{min-height:0}
+.cam-alt{font-size:max(var(--t-sm),13px);margin-top:.35rem}      /* what Play without camera means, next to the button that picks it */
+.cam-card[data-view="wait"] #btn-cam-allow{opacity:.6} .cam-card[data-view="wait"] #btn-cam-allow::after{opacity:0;animation:none}
+#screen-camera .menu-foot > span{font-size:max(var(--t-sm),12px)}
+.cam-on{flex:none;height:2.5rem;min-height:36px;padding:0 1.25rem;font-size:max(var(--t-md),13px)}      /* the connect screen's Camera row: Turn on */
+#row-camera:has(> .cam-on:not([hidden])) .status-state{display:none}      /* the button says it's off: the word 'Off' only took the text's room */
+@media (max-aspect-ratio: 1/1){
+  .cam-body{padding:var(--s-4)}
+  .cam-card{padding:var(--s-5) var(--s-4);width:100%}
+  .cam-btns{flex-direction:column;align-items:stretch;width:100%} .cam-btns .btn:not(.btn-sm){min-width:0}
+  .cam-btns .cam-skip,.cam-btns .cam-skip:hover{align-self:center;min-height:40px;background:none;border-color:transparent;box-shadow:none;color:var(--line-deep);text-decoration:underline;text-underline-offset:.2em} .cam-btns .cam-skip::before{display:none}      /* stacked, Allow is the one big pill; the way out reads as a link under it (no gloss either) */
+  #row-camera:has(> .cam-on:not([hidden])){flex-wrap:wrap} #row-camera .cam-on{flex-basis:100%}      /* phone width: Turn on gets its own line, the text keeps the row's width */
+  #screen-camera .menu-foot{height:auto;min-height:3.5rem;padding:.5rem var(--s-4)} #screen-camera .menu-foot .keyhints-inline{display:none}
+}
+@media (min-aspect-ratio: 1/1){      /* a computer's window: everything, Allow included, above the fold. The three points side by side */
+  .cam-card{width:min(64rem,92vw);gap:var(--s-3);padding-top:var(--s-4)}
+  .cam-card[data-view="help"]{gap:var(--s-2)} .cam-card[data-view="help"] .cam-how{padding:.625rem 1.125rem}      /* the help, and a 'Still not working' line, fit above the footer */
+  .cam-card .t-title{font-size:max(2.625rem,24px)} .cam-card .t-lead{max-width:52rem}
+  .cam-art{width:min(16rem,100%)}
+  .cam-points{flex-direction:row;align-items:stretch} .cam-points li{flex:1 1 0;flex-direction:column;gap:.5rem;padding:1rem 1.125rem}
+}
+@media (prefers-reduced-motion: reduce){ .screen.is-active .cam-steps-l,.screen.is-active .cam-steps-r{animation:none} }

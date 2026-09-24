@@ -393,12 +393,51 @@
       <ul class="status-list">
         <li class="status-row is-wait" id="row-airpod"><span class="light light-lg"></span><b class="status-name" id="row-airpod-name">AirPod</b><span class="status-text" id="row-airpod-text">Open Poddle Helper, then take one AirPod out and hold it.</span><em class="status-state" id="row-airpod-state">Waiting</em></li>
         <li class="status-row is-wait" id="row-game"><span class="light light-lg"></span><b class="status-name">Game</b><span class="status-text" id="row-game-text">Finding the game</span><em class="status-state" id="row-game-state">Waiting</em></li>
-        <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Allow the camera so stepping moves you on court.</span><em class="status-state" id="row-camera-state">Waiting</em></li>
+        <li class="status-row is-wait" id="row-camera"><span class="light light-lg"></span><b class="status-name">Camera</b><span class="status-text" id="row-camera-text">Allow the camera so stepping moves you on court.</span><button class="btn btn-sm cam-on" id="btn-cam-on" hidden>Turn on</button><em class="status-state" id="row-camera-state">Waiting</em></li>
       </ul>
-      <p class="pad-alt">The camera is how the game sees where you stand, so you move by stepping instead of being run to the ball. It watches for you in the frame and nothing else: the video is read on this Mac and never recorded, saved or sent anywhere. Say no and the game runs you to the ball instead.</p>
+      <p class="pad-alt">The camera only looks for where you stand. The video stays on this computer and is never recorded, saved or sent.</p>
     </div>
   </div>
   <footer class="menu-foot"><span id="connect-foot"><span id="connect-foot-text">Still waiting? Open Poddle Helper on this Mac.</span></span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
+</section>
+
+<!-- ============================================== CAMERA PRIMER (NOTES 94): once, before the first camera request, so the browser's question never comes out of nowhere ============================================== -->
+<!-- #cam-card[data-view]: ask (why, privacy, what happens) | wait (the browser is asking) | help (blocked, no camera, busy: how to fix it). ui.js camPrimer() fills it -->
+<section class="screen menu-bg" id="screen-camera" data-screen="camera" hidden>
+  <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg><span class="back-text">Back</span></button><span class="menu-title">Getting ready</span></header>
+  <div class="menu-body cam-body">
+    <div class="panel panel-mid cam-card" id="cam-card" data-view="ask" role="region" aria-labelledby="cam-title" data-fit>
+      <div class="cam-art well" aria-hidden="true">
+        <svg viewBox="0 0 240 100">
+          <g class="cam-laptop"><rect class="art-fill" x="22" y="14" width="96" height="62" rx="7"/><rect x="31" y="23" width="78" height="44" rx="3" fill="#eaf6fc" stroke="none"/><path class="art-line" d="M10 84h120"/><circle cx="70" cy="18.5" r="2.6" fill="#34beed" stroke="none"/></g>
+          <path class="art-faint" d="M74 20 168 22M74 20 168 90"/>
+          <g class="cam-you"><circle class="art-skin" cx="190" cy="30" r="8"/><path class="art-line" d="M190 40v22M190 62l-8 18M190 62l8 18M177 47l13 5 13-5"/></g>
+          <g class="art-accent cam-steps-l" style="stroke-width:5"><path d="M160 58h-14M152 51l-7 7 7 7"/></g><g class="art-accent cam-steps-r" style="stroke-width:5"><path d="M220 58h14M228 51l7 7-7 7"/></g>
+        </svg>
+      </div>
+      <h2 class="t-title" id="cam-title">Let the game see where you stand</h2>
+      <p class="t-lead" id="cam-lead">Poddle uses this computer’s webcam, not your phone, to see where you are. Step left or right and your player moves with you.</p>
+      <ul class="cam-points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><path d="M12 8.5v6M12 14.5l-3 6M12 14.5l3 6M8 11h8M4.5 10 2 12.5 4.5 15M19.5 10l2.5 2.5-2.5 2.5"/></svg><div><b>Why it’s needed</b><span>Stepping moves you on court. Without the camera, the game runs you to the ball and you only swing.</span></div></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.5v2"/></svg><div><b>Stays on this computer</b><span>The video is read in this browser and never recorded, saved or sent anywhere. Only where you stand goes to the game, as your player’s position.</span></div></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 10.5l2.8 2.8L16 8M9 21h6"/></svg><div><b>Your browser will ask</b><span>Press <b>Allow</b> when it does. To play without it later, pick Auto in Settings, under Move.</span></div></li>
+      </ul>
+      <div class="cam-help" id="cam-help" hidden>
+        <div class="cam-how" data-for="chrome"><h3>In Chrome</h3><ol><li>Click the icon at the left of the address bar.</li><li>Turn <b>Camera</b> on, or open <b>Site settings</b> and set Camera to <b>Allow</b>.</li><li>Come back here and press <b>Try again</b>.</li></ol></div>
+        <div class="cam-how" data-for="edge"><h3>In Edge</h3><ol><li>Click the icon at the left of the address bar.</li><li>Open <b>Permissions for this site</b> and set Camera to <b>Allow</b>.</li><li>Come back here and press <b>Try again</b>.</li></ol></div>
+        <div class="cam-how" data-for="safari"><h3>In Safari</h3><ol><li>In the menu bar, choose <b>Safari</b> &gt; <b>Settings for <span class="cam-host">poddleball.com</span></b>.</li><li>Set Camera to <b>Allow</b>.</li><li>Come back here and press <b>Try again</b>.</li></ol></div>
+        <div class="cam-how" data-for="firefox"><h3>In Firefox</h3><ol><li>Click the crossed-out camera icon in the address bar.</li><li>Next to <b>Use the camera</b>, click the <b>×</b> beside Blocked.</li><li>Come back here and press <b>Try again</b>.</li></ol></div>
+        <div class="cam-how" data-for="mac"><h3>On a Mac</h3><ol><li>Open <b>System Settings</b> &gt; <b>Privacy &amp; Security</b> &gt; <b>Camera</b>.</li><li>Turn on <b class="cam-browser">your browser</b>.</li><li>If it says so, quit the browser and open it again.</li></ol></div>
+        <div class="cam-how" data-for="win"><h3>On Windows</h3><ol><li>Open <b>Settings</b> &gt; <b>Privacy &amp; security</b> &gt; <b>Camera</b>.</li><li>Turn on <b>Camera access</b> and <b>Let desktop apps access your camera</b>.</li><li>Come back here and press <b>Try again</b>.</li></ol></div>
+        <div class="cam-how" data-for="ios"><h3>On an iPad</h3><ol><li>Open the <b>Settings</b> app, then <b>Apps</b> &gt; <b class="cam-browser">your browser</b> &gt; <b>Camera</b>.</li><li>Choose <b>Allow</b>.</li><li>Come back here and reload the page.</li></ol></div>
+        <details class="cam-more" id="cam-more"><summary>Using something else?</summary><div class="cam-more-list" id="cam-more-list"></div></details>
+      </div>
+      <p class="cam-btns"><button class="btn is-focus" id="btn-cam-allow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h8A2.5 2.5 0 0 1 16 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-8A2.5 2.5 0 0 1 3 15.5Z"/><path d="m16 10.5 5-3v9l-5-3"/></svg><span>Allow camera</span></button><button class="btn is-focus" id="btn-cam-retry" hidden>Try again</button><button class="btn btn-sm cam-skip" id="btn-cam-skip">Play without camera</button></p>
+      <p class="t-note cam-alt" id="cam-alt">Without the camera, Poddle plays in <b>Auto</b>: the game runs you to the ball and you just swing.</p>
+      <p class="t-note cam-note" id="cam-note" aria-live="polite"></p>
+    </div>
+  </div>
+  <footer class="menu-foot"><span>Only where you stand goes to the game. The video never leaves this computer.</span><ul class="keyhints-inline"><li><span class="keycap">F</span>Full screen</li></ul></footer>
 </section>
 
 <!-- ============================================== CALIBRATE ============================================== -->
