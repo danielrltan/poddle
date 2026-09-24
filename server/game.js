@@ -302,7 +302,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
     ball.p[1] = Math.max(ball.p[1], R);
     if (!started && pub) lobbyChanged();                          // the first strike turns a Matt court from Join to Ask to play in the list (sent on its timer, after this)
-    ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
+    ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.lofted = lofted(lob) > 0.5; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
     ball.land = sol.land;                                         // where it comes down: a re-aim that cannot move it says so again
     planFootwork(1 - side);
     if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
@@ -322,6 +322,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // it (or more, if the settled aim needs more bend that same way); the marker says where that lands, kept on the court.
   function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
+    if (kind && (kind === 'lob' || kind === 'dink') !== ball.lofted) kind = undefined;   // the arc was chosen at contact: a flat ball is never announced as a lob (a white trail on a drive), a lofted one never as a drive or a smash
     const x = ball.p[0], y = Math.max(ball.p[1], R), pz = ball.p[2], vy = ball.v[1], g = ball.bounces ? G : gOf(ball.spin);
     const T = Math.max(DT, fallLeft(y, vy, g)), clear = lerp(0.25, SLICE.clear, ball.spin);
     // The net, never by adding height: the pace eases from the one it has to the new one, so it crosses somewhere between the two and

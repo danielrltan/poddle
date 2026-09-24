@@ -1656,3 +1656,7 @@ dropped the arc, and the old smoothstep drew the ball climbing at up to 16 m/s (
 60 Hz). The guard now compares the path (what the packets must agree with), not e. A ball drawn too low only ever adds to its fall (e (1 -
 t/tau)^2 with e < 0 pulls down at 2e/tau^2), so tau there is capped at 0.25 s: it leaves once at 2|e|/tau over the path's vy and is on the
 server's ball within 0.25 s. test/drawlob.mjs replays a hit held 150 and 300 ms (the old drawBall rises 10.4 m/s there).
+
+The label (server/game.js reaim). The arc is chosen at contact, so a re-aim's `kind` is only announced when it agrees with it:
+`launch()` remembers `ball.lofted`, and a settled 'lob' or 'dink' on a flat ball (or a 'drive'/'smash' on a lofted one) is dropped. A
+bet that flew a drive and settled as a lob no longer burns the lob's white trail on a 1.3 m ball.
