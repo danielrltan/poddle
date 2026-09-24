@@ -13,14 +13,14 @@
 html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#dfeef6}
 body{position:relative;font-family:"Poddle Rounded",sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"palt" 0}
 #scene{position:absolute;inset:0;width:1200px;height:630px;object-fit:cover}
-/* a bright haze behind the wordmark (the blue "dle" would sink into the sky), a deep one under the tagline */
+/* a bright haze behind the wordmark, a deep one under the tagline */
 #haze{position:absolute;inset:0;background:
   radial-gradient(ellipse 440px 150px at 600px 124px, rgba(255,255,255,.7), rgba(255,255,255,.42) 50%, rgba(255,255,255,0) 100%),
   linear-gradient(180deg, rgba(8,32,58,0) 58%, rgba(8,32,58,.6) 80%, rgba(8,32,58,.78) 100%)}
 .logo{position:absolute;left:0;right:0;top:50px;display:flex;flex-direction:column;align-items:center}
 /* web/ui.css .logo-mark, .lg-a, .lg-b, .logo-ball and .menu-glass .logo-mark, unchanged but for the px size */
 .logo-mark{display:flex;align-items:center;font-size:150px;font-weight:900;line-height:1;letter-spacing:-.01em;filter:drop-shadow(0 .05em 0 rgba(255,255,255,.9)) drop-shadow(0 .09em .12em rgba(30,70,100,.28))}
-.logo-mark .lg-a{color:#39434d} .logo-mark .lg-b{color:var(--line)}
+.logo-mark .lg-a{color:#39434d} .logo-mark .lg-b{color:#39434d}      /* all dark: the site's blue "dle" sank into the sky */
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
   background:radial-gradient(circle at 30% 32%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 62% 24%, var(--ball-deep) 0 8%, transparent 9%), radial-gradient(circle at 50% 52%, var(--ball-deep) 0 8%, transparent 9%),
     radial-gradient(circle at 22% 62%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 78% 54%, var(--ball-deep) 0 7%, transparent 8%), radial-gradient(circle at 48% 82%, var(--ball-deep) 0 7%, transparent 8%),

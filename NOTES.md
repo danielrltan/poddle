@@ -1660,3 +1660,9 @@ server's ball within 0.25 s. test/drawlob.mjs replays a hit held 150 and 300 ms 
 The label (server/game.js reaim). The arc is chosen at contact, so a re-aim's `kind` is only announced when it agrees with it:
 `launch()` remembers `ball.lofted`, and a settled 'lob' or 'dink' on a flat ball (or a 'drive'/'smash' on a lofted one) is dropped. A
 bet that flew a drive and settled as a lob no longer burns the lob's white trail on a 1.3 m ball.
+
+## 92. The share card's wordmark is all dark
+- "The 'poddle' text is partly blue and isn't good with contrast against the blue sky. Make it black / dark."
+- test/og-card.html draws the whole wordmark in the logo's dark (#39434d, the `P` and `d`), not the site's line blue for `dle`;
+  the white haze behind it stays. `node test/make-og.mjs` re-rendered web/og.jpg; og:image is `?v=6` so the unfurlers fetch it
+  again. The in-game logo (web/ui.css) is unchanged. A 3:2 version (1800x1200) went to the Devpost gallery as the thumbnail.
