@@ -130,12 +130,18 @@ function glow(n, fresh) {
     { duration: smash ? 900 : 420 + 380 * n, easing: 'cubic-bezier(.2,.7,.3,1)' }); glowAnim.smash = smash;
 }
 window.__glow = glow;      // test/pad-glow shots
+// A buzz: navigator.vibrate where there is one (Android). iPhone Safari has none, so there a click on the hidden switch's
+// label gives one fixed-strength system tick (iOS 18+); iOS may only allow it close to a tap, so mid-rally it can stay silent.
+const tickEl = $('tick'), CAN_VIBRATE = typeof navigator.vibrate === 'function';
+function buzz(ms, ticks = 1) {
+  if (CAN_VIBRATE) { try { navigator.vibrate(ms); } catch { /* blocked */ } return; }
+  for (let i = 0; i < ticks; i++) setTimeout(() => { try { tickEl && tickEl.click(); } catch { /* no switch (older iOS) */ } }, i * 90);
+}
 const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '' };
 function fx(m) {
-  if (m.fx === 'hit') { try { navigator.vibrate && navigator.vibrate(20 + Math.round(50 * (m.b != null ? m.b : m.n || 0))); } catch { /* no buzzer (iOS) */ }
-    glow(m.n || 0, true); }
+  if (m.fx === 'hit') { buzz(20 + Math.round(50 * (m.b != null ? m.b : m.n || 0)), (m.n || 0) > SMASH_N ? 2 : 1); glow(m.n || 0, true); }      // a smash ticks twice on an iPhone (a tick has no strength)
   else if (m.fx === 'tint') glow(m.n || 0, false);      // the settled swing, a moment after the hit went out on the early guess: recolour, no second buzz
-  else if (m.fx === 'point') { try { navigator.vibrate && navigator.vibrate([30, 60, 30]); } catch { /* same */ } }
+  else if (m.fx === 'point') buzz([30, 60, 30], 2);
   else if (m.fx in FX_TEXT) { fxText = FX_TEXT[m.fx]; render(); }
 }
 
