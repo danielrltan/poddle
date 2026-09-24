@@ -1556,3 +1556,37 @@ the global reduced-motion rule still wins.
 
 test/ui-next.mjs waits a little longer at four places for the new fades (lobby-first, the Watch prompt close, hold(null), Quick play's
 opacity); the checks themselves are unchanged. `#courts-n` hides with an `is-off` class and keeps its last text.
+
+## 89. The ball is sealed at contact: after the paddle, until the first bounce, it only ever falls (server and screen)
+
+"Lobs get a boost upwards after contact, helium." NOTES 86 took the ease out of the height but kept one step: a scoop struck on its bet
+(the upward share is still low then, a drive) and settled 60-250 ms later as a lob was handed the lob's apex in one go, vy +5 to +7.7 m/s
+in mid-air. Smaller copies: the re-aim's net loop gave a hard bet that settled as a tap up to +1.2 m/s, and the settled spin was swapped
+in mid-flight, so gravity got lighter. The cause upstream is the bet (motion.js reads the upward share at bet time; another branch), but
+nothing in the air may lift the ball whatever the reports say.
+
+Now (server/game.js):
+- `reaim()` is the one choke point (the rally fix, `fixBlock()`, the late push, the serve's settled swing and the legacy no-`final`
+  client all come through it). The ball's vy, its spin and so its gravity are the paddle's. A re-aim moves only the landing: x and z are
+  eased onto it in the hang the ball has left (`fallLeft()`), so the time is the ball's own. `remaining()`, `ball.from` and the step are gone.
+- The net is never cleared by adding height. The pace eases from the one it has to the new one, so it crosses between the two and both
+  must clear; a settled landing the sealed ball cannot reach over the net is moved deeper (the only way a fixed hang crosses sooner, so
+  higher), and if none works it flies as struck. Either way the marker goes where it really lands (`ball.land`).
+- The kick (the first bounce's sideways throw) follows the settled swing's way, sized by the spin the ball really carries: it never
+  touches the flight.
+- A lob carries no lift: `solve()` fades the in-air spin out as the shot turns into a lob (lofted 0.3 -> 0.5 of the way), so a lob is a
+  plain parabola at G. `sliced()` is untouched, so a scoop cut hard enough is still CALLED a slice and never lobs.
+
+Client (web/scene.js): measured on the real server's stream, with a CLEAN lob the drawn vy still rose after contact: the hit's smoothstep
+put it 2-4 m/s over the path for a few frames (7.7 m/s frame to frame on a re-aimed lob), and state packets re-stamped on a jittery link
+(80+60 ms) bobbed it up by up to 0.9 m/s a frame. `drawBall()` (exported, the frame's live-ball step) now draws the height from a hit to
+its first bounce as the path the contact frame sees, on the local clock, with what was off taken out as e (1 - t/tau)^2: a curve that only
+ever pulls down, tau long enough that pulling a ball drawn too high never outruns gravity. The anchor follows the server's steps (v then p:
+g dt t / 2 under the closed form), so it stays within 1 cm of the server's ball, closer than the packets' own coast. Across and along keep
+the smoothstep. The re-aim's `launch` still carries p v t (its curl bends the ball from where it really is); its vy is the struck one.
+
+Tests: `test/helium.test.mjs` is rewritten on the wire (SWING_SERVE on): low-lob bet -> lob, lob bet -> drive, lob bet -> lob, hard bet ->
+tap, smash, near-net fixBlock, a serve struck on its first report, a legacy client. After the contact packet vy never rises, gravity never
+lightens, the marker is within 0.15 m, every ball clears the net, and lobs (clean or bet-and-settled) still top 3.3 m. The low-lob bet is
+now flown as struck (1.2-1.5 m): that is the bet's to fix. `test/drawlob.mjs` records the real server and replays it into `drawBall()`
+at 40+0, 40+30, 80+60 ms and 60/120 fps: the drawn vy never rises frame to frame from contact to the bounce.
