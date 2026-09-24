@@ -57,7 +57,7 @@ try {
   console.log('home page head');
   const home = (await req('/')).body.toString(), attr = (tag, k, v, want = 'content') => { const m = [...home.matchAll(new RegExp(`<${tag}\\b[^>]*\\b${k}="${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`, 'g'))]; return m.map(x => (x[0].match(new RegExp(`\\b${want}="([^"]*)"`)) || [])[1]); };
   const one = (tag, k, v, want) => { const a = attr(tag, k, v, want); return a.length === 1 ? a[0] : null; };
-  { const titles = [...home.matchAll(/<title>([^<]*)<\/title>/g)].map(m => m[1]); ok(titles.length === 1 && titles[0].length >= 10 && titles[0].length <= 60 && /Poddle/.test(titles[0]) && /phone/i.test(titles[0]) && !/AirPod/.test(titles[0]), `one <title>, ${titles[0] && titles[0].length} chars: ${titles[0]}`);
+  { const titles = [...home.matchAll(/<title>([^<]*)<\/title>/g)].map(m => m[1]); ok(titles.length === 1 && titles[0] === 'Poddle', `one <title>, just the name (the owner's call): ${titles[0]}`);
     const d = one('meta', 'name', 'description'); ok(d && d.length >= 70 && d.length <= 160 && /phone/.test(d) && /any computer/i.test(d) && /friends/.test(d), `one meta description, ${d && d.length} chars (70 to 160), says phone, any computer and friends`);
     ok(one('link', 'rel', 'canonical', 'href') === ORIGIN + '/', `one canonical: ${attr('link', 'rel', 'canonical', 'href')}`);
     const robots = one('meta', 'name', 'robots'); ok(robots && /\bindex\b/.test(robots) && !/noindex/.test(robots), `meta robots: ${robots}`);

@@ -1746,3 +1746,8 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
   screen's Turn on gets its own line.
 - Play without camera says what replaces it: a line under the buttons ("Without the camera, Poddle plays in Auto: the game runs you to the ball and you just swing.") and a toast when it is picked, so saying no never feels like breaking the game.
 - Privacy updated with it: the primer before the browser asks (section 3), Play without camera remembered, and the `poddle.camPrimer` row in the storage table; CLAUDE.md inventory too.
+
+## 96. The tab just says Poddle
+- "I just want Poddle" in the tab, not "Poddle | Pickleball You Swing With Your Phone". The home page's <title> is now
+  `Poddle`; seo.test checks for exactly that. og:title and the meta description still describe the game for share cards
+  and search results. The other pages (How to play, paddle, privacy, terms, 404) keep their own titles.
