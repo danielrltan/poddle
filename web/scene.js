@@ -10,6 +10,7 @@ const G = 9.81, BALL_R = 0.11;
 // form, for up to COAST_MAX seconds with no news. The curl c (m/s^2) is the server's own number, sent on hit/launch/state.
 // The next packet or hit event is the truth again; nothing here decides a hit, a bounce call or a point.
 const COAST_MAX = 0.6;
+const SIM_DT = 1 / 60;                    // = DT in server/game.js: the server's tick
 const FLOOR = { up: 0.7, along: 0.78 }, SPUN = { lift: 0.3, up: 0.55, along: 0.45 };       // = BOUNCE / SLICE in server/game.js
 // coast(), but it will not carry the ball through the far player. With no news for over 100 ms and the ball arriving at
 // their paddle (farZ, signed), the likeliest truth is that they are hitting it: wait there for the packet. Guessing wrong
@@ -99,6 +100,44 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = t => t * t * (3 - 2 * t);
 const sgn = side => (side === 0 ? 1 : -1);
 const damp = (dt, tau) => 1 - Math.exp(-dt / tau);
+// The drawn ball while it is live (updateBallVis; test/drawlob.mjs drives this very function). vA: scratch. true: it snapped (the trail starts over).
+// core follows the packets, err is what is left of a correction, eased out: a hit moved the truth (a late swing meets the ball where it WAS),
+// so the ball takes the new velocity at once and slides onto the new path instead of teleporting. Across and along only, once struck:
+// the server seals the ball at contact (NOTES 90), so from a hit to its first bounce the drawn HEIGHT is the path as the contact frame
+// sees it (one parabola at the ball's own gravity, on the local clock) with what was off taken out on a curve that only ever pulls
+// down. Nothing after the hit can lift it. The smoothstep on the height put the drawn vy 2-4 m/s over the path for a few frames after
+// every hit (a lob's little helium kick even with a perfect server), and packets re-stamped on a jittery link bobbed it up by up to
+// 0.9 m/s a frame.
+export function drawBall(b, vA, now, dt, farZ) {
+  const age = clamp((now - b.stamp) / 1000, 0, b.held ? HOVER_MAX : COAST_MAX);
+  if (b.held) hover(vA, b.vel, b.p, b.v, age);
+  else coastTo(vA, b.vel, b.p, b.v, age, b.spin, b.bounces, b.kick, farZ, b.curl);
+  const arc = b.arc;
+  if (arc && arc.t0 != null && (b.held || b.bounces || now - arc.t0 >= arc.T * 1000)) { b.arc = null; b.blend = true; }   // down: the packets have the height back, eased from where it is drawn
+  let snapped = false;
+  if (b.blend) {
+    b.blend = false; b.err.copy(b.pos).sub(vA);
+    const e = b.err.length(); if (e > 5) b.snap = true; else { b.core.copy(vA); b.errT = 0; b.errDur = clamp(0.08 + 0.05 * e, 0.08, 0.18); }
+  }
+  if (b.snap || vA.distanceToSquared(b.core) > 2.2) { b.core.copy(vA); b.errT = 1; b.snap = false; snapped = true; }
+  else if (b.errT > 0) { b.core.addScaledVector(b.vel, dt); b.core.lerp(vA, damp(dt, 0.018)); }     // predict, then pull to the packet: hides LAN jitter, no lag
+  b.errT += dt / b.errDur;
+  b.pos.copy(b.core); if (b.errT < 1) b.pos.addScaledVector(b.err, 1 - ease(b.errT));
+  if (b.arc) {
+    const a = b.arc;
+    if (a.t0 == null) {                                    // the contact frame: the path as it stands now, and how far off it the ball is drawn
+      const g = G * (1 - SPUN.lift * b.spin), vy = b.vel.y - 0.5 * g * SIM_DT, e = b.pos.y - vA.y;   // SIM_DT: the server steps v then p, so its ball runs g dt t / 2 under the closed form (0.14 m by a lob's bounce): one anchor must follow the steps
+      // e goes as e (1 - t/tau)^2: drawn vy falls faster than the path's until it is gone, never slower, so it never rises. Taken off a
+      // ball drawn too HIGH that curve pulls down at 2e/tau^2 on top of gravity, so tau is long enough for that never to reverse it.
+      Object.assign(a, { t0: now, y: vA.y, vy, g, T: (vy + Math.sqrt(vy * vy + 2 * g * Math.max(0, vA.y - BALL_R))) / g, e, tau: Math.max(b.errDur, Math.sqrt(2 * Math.max(0, e) / g)) });
+    }
+    const t = (now - a.t0) / 1000, y = a.y + a.vy * t - 0.5 * a.g * t * t + (t < a.tau ? a.e * (1 - t / a.tau) ** 2 : 0);
+    if (Math.abs(y - b.core.y) > 1) { b.arc = null; b.blend = true; }   // the path went somewhere a sealed ball cannot: the packets win, next frame
+    else b.pos.y = y;
+  }
+  b.pos.y = Math.max(BALL_R, b.pos.y);
+  return snapped;
+}
 // The trail's heat: n -> 0..1 along white -> yellow -> orange -> red (u = 3*heat). Real strokes (data/*.jsonl, 63 at >= 9 rad/s, settled n:
 // p25 0.25, median 0.44, p75 0.79) used to hit red at n 0.59, so 37% burned red and 8 of those 23 were not smashes. Now below SMASH_N the ramp
 // stops at orange (0.18 cream, 0.30 pale yellow, 0.52 amber, 0.76 -> u 2.1 deep orange). A smash steps over into orange-red (u 2.4, 255,89,27)
@@ -466,7 +505,7 @@ export function createScene(containerEl) {
   blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; blob.renderOrder = 3; blob.visible = false; scene.add(blob);
   const ball = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new THREE.Vector3(0, 1, 0), vel: new THREE.Vector3(), lastBy: -1,
     spin: 0, cool: 0, pulse: 0,                                      // backspin of a sliced ball (0..1) and the trail tint easing toward it
-    core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false,
+    core: new THREE.Vector3(0, 1, 0), err: new THREE.Vector3(), errT: 1, errDur: 0.1, blend: false, ext: false, arc: null,
     bounces: 0, kick: 0, curl: 0, held: false };                              // what coast() needs beyond p and v; they ride on the state packet
   const clock = serverClock(), madeAt = clock.madeAt;   // pos = core (tracks the packets) + err (what is left of a correction, eased out)
   // attract: the endless rally behind the menus (docs/NEXT.md 11). All of it lives here: no server, no score, no sound.
@@ -783,18 +822,8 @@ export function createScene(containerEl) {
     }
     if (at.on) { coast(b.pos, b.vel, at.p, at.v, at.t - at.t0, at.spin, 0, at.kick); b.core.copy(b.pos); b.errT = 1; }      // one closed-form flight from the last contact: it cannot drift
     else if (b.live) {
-      const age = clamp((now - b.stamp) / 1000, 0, b.held ? HOVER_MAX : COAST_MAX), far = pads[1 - localSide];
-      if (b.held) hover(vA, b.vel, b.p, b.v, age);
-      else coastTo(vA, b.vel, b.p, b.v, age, b.spin, b.bounces, b.kick, far && far.has ? far.pos.z : 0, b.curl);
-      if (b.blend) {                                       // a hit moved the truth (a late swing meets the ball where it WAS): the drawn ball takes the new
-        b.blend = false; b.err.copy(b.pos).sub(vA);        // velocity on this frame and slides onto the new path, instead of teleporting
-        const e = b.err.length(); if (e > 5) b.snap = true; else { b.core.copy(vA); b.errT = 0; b.errDur = clamp(0.08 + 0.05 * e, 0.08, 0.18); }
-      }
-      if (b.snap || vA.distanceToSquared(b.core) > 2.2) { b.core.copy(vA); b.errT = 1; b.snap = false; trail.pts.length = 0; }
-      else if (b.errT > 0) { b.core.addScaledVector(b.vel, dt); b.core.lerp(vA, damp(dt, 0.018)); }     // predict, then pull to the packet: hides LAN jitter, no lag
-      b.errT += dt / b.errDur;
-      b.pos.copy(b.core); if (b.errT < 1) b.pos.addScaledVector(b.err, 1 - ease(b.errT));
-      b.pos.y = Math.max(BALL_R, b.pos.y);
+      const far = pads[1 - localSide];
+      if (drawBall(b, vA, now, dt, far && far.has ? far.pos.z : 0)) trail.pts.length = 0;
     } else {                                               // rally over: let it bounce away on its own
       b.vel.y -= G * dt; b.pos.addScaledVector(b.vel, dt);
       if (b.pos.y < BALL_R) { b.pos.y = BALL_R; b.vel.y = Math.abs(b.vel.y) * 0.6; b.vel.x *= 0.75; b.vel.z *= 0.75; if (b.vel.y < 0.6) b.vel.y = 0; }
@@ -1038,7 +1067,7 @@ export function createScene(containerEl) {
       ball.lastBy = m.by; if (isFinite(m.spin)) ball.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) ball.kick = +m.k; if (isFinite(m.c)) ball.curl = +m.c;      // c: a settled hard swing starts curling from here (the next state packet carries it too)
       if (m.kind) ball.kind = m.kind;      // before the power: a re-aim into a smash (or into a lob) is shown as one
       if (m.n != null && isFinite(m.n)) { ball.power = shownN(clamp(+m.n, 0, 1), ball.kind); ball.betN = null; }      // a re-aim: the hit went out on the early bet, this is the settled swing. The trail burns for THAT (a tap that was called 30 rad/s loses its flame)
-      if (m.v && m.v.length === 3 && m.p && ball.seen && isFinite(m.v[0] + m.v[1] + m.v[2] + m.p[0] + m.p[1] + m.p[2])) {   // a re-aim carries the ball: a lob's one step up is drawn on this frame, never pulled in over the next packets (NOTES 86)
+      if (m.v && m.v.length === 3 && m.p && ball.seen && isFinite(m.v[0] + m.v[1] + m.v[2] + m.p[0] + m.p[1] + m.p[2])) {   // a re-aim carries the ball: its new curl bends it from where it really is. Its vy is the one it was struck with (the server seals it, NOTES 90), and the drawn height stays on its arc
         ball.p = [m.p[0], m.p[1], m.p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now()); ball.blend = true; }
       if (m.kind === 'smash' && ball.seen) { if (timeS - smashAt > 0.3) igniteFx(m.by, ball.spin, hitLook(m.by)[0]); trail.glow = 1; }      // the settled swing, up to 0.25 s after the hit: the ball takes fire (unless the impact itself was already called a smash)
       if (m.land && !menu) { marker.visible = true; mk.t = 0; mk.fade = 0; marker.position.set(m.land[0], 0.025, m.land[1]);
@@ -1056,7 +1085,7 @@ export function createScene(containerEl) {
       flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = ball.hot = shown;      // the trail takes this shot's colour at once, not eased up from the last one
       if (m.kind === 'smash') smashFx(p, m.side, m.spin, rs, sk);
       ball.spin = clamp(+m.spin || 0, 0, 1);
-      trail.glow = 0.8 + 0.2 * shown; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side;
+      trail.glow = 0.8 + 0.2 * shown; ball.blend = ball.seen; ball.snap = !ball.seen; ball.lastBy = m.side; ball.arc = m.v ? { t0: null } : null;   // arc: the height from here to the bounce is this contact's (drawBall)
       if (m.v && m.v.length === 3 && isFinite(m.v[0] + m.v[1] + m.v[2] + p[0] + p[1] + p[2])) {   // the launch rides on the hit: no waiting for the next state packet
         ball.p = [p[0], p[1], p[2]]; ball.v = [m.v[0], m.v[1], m.v[2]]; ball.stamp = ball.ext ? lastMs : madeAt(+m.t, performance.now());
         ball.bounces = 0; ball.kick = +m.k || 0; ball.curl = +m.c || 0; ball.held = false; }
@@ -1073,7 +1102,7 @@ export function createScene(containerEl) {
       burst([p[0], 0.06, p[2]], 0, 5, 1.2, [0xd8e6f5, 0xffffff]);
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       sfx.bounce(p[0]);
-    } else if (m.type === 'serve') { ball.snap = true; ball.spin = 0; ball.curl = 0; ball.power = 0; ball.kind = ball.betN = null; trail.glow = 0.35; }
+    } else if (m.type === 'serve') { ball.snap = true; ball.arc = null; ball.spin = 0; ball.curl = 0; ball.power = 0; ball.kind = ball.betN = null; trail.glow = 0.35; }
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }
@@ -1096,6 +1125,7 @@ export function createScene(containerEl) {
     if (!p || !v || at.on) return;                         // m optional: the state packet itself ({ t, b, k, serving }), for the clock and for coast()
     if (isFinite(spin) && spin != null) ball.spin = clamp(+spin, 0, 1);
     if (live && !ball.live) ball.snap = true;
+    if (!live) ball.arc = null;                            // the rally is over: no arc waits for the next one
     if (m) { ball.bounces = m.b | 0; ball.kick = +m.k || 0; ball.curl = +m.c || 0; ball.held = m.serving != null; ball.heldBy = m.serving != null ? +m.serving : -1; }
     ball.p = p; ball.v = v; ball.live = !!live; ball.ext = tMs != null; ball.stamp = tMs == null ? madeAt(m ? +m.t : NaN, performance.now()) : tMs;
     if (live) ball.seen = true;
@@ -1185,7 +1215,7 @@ export function createScene(containerEl) {
   }
   function setFrozen(on) {
     on = !!on; if (on === frozen) return; frozen = on;
-    if (!on) { clock.reset(); ball.snap = true; if (!ball.ext) ball.stamp = performance.now(); }      // the server's t stood still while wall time ran: a stale offset would age every packet by the whole pause.
+    if (!on) { clock.reset(); ball.snap = true; ball.arc = null; if (!ball.ext) ball.stamp = performance.now(); }      // the server's t stood still while wall time ran: a stale offset would age every packet by the whole pause.
     // The stamp too: every paused packet was dated to when the pause BEGAN, so the frame drawn before the next packet coasted the ball up to 0.6 s ahead and back (seen as a 3 m flick in test/spectate-e2e.mjs). Time starts again now.
   }
   // Free cam input lives here (MAIN forwards nothing): drag = orbit, wheel = zoom, right-drag / shift-drag / arrow keys = slide along the court, only while a spectator is in the free view with no menu up.

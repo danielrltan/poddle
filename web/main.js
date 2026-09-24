@@ -435,9 +435,13 @@ function onSample(sample, from) {
         // (the old turn gate zeroed it, and at full power it went out a low smash). What stays: a stroke that turns mostly about the
         // forward axis (|roll| 0.45 -> 0.75) is a wrist roll or a sideways sweep, not a pendulum; if the paddle's pointer is a little off
         // the forearm, that roll leaks into the path. A pendulum underhand rolls 0.1-0.4 (recorded: the deliberate lob 0.39).
-        const k = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.45) / 0.3)), g = k * k * (3 - 2 * k), lob = e.lob * (1 - g);
+        // An early report on a pendulum (e.pend: motion.js looked ahead) is faded by the smaller of roll and twist (the turn about the forearm
+        // itself): a wide underhand swings its hanging arm across as it comes up, and that sideways turn is 'roll' about the forward axis
+        // (0.5-0.7 at the bet), not a wrist. The settled report keeps the roll alone.
+        const fade = r => { const k = Math.max(0, Math.min(1, (r - 0.45) / 0.3)); return 1 - k * k * (3 - 2 * k); }, rl = Math.abs(e.roll || 0);
+        const g = 1 - fade(e.final === false && e.pend && e.twist != null ? Math.min(rl, Math.abs(e.twist)) : rl), lob = e.lob * (1 - g);
         game.send({ type: 'swing', power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
-        unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, slice };
+        unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob: (e.lobRaw != null ? e.lobRaw : e.lob) * fade(rl), chop: e.chop, age: e.age, slice };   // standing in for a settled report, the lob is the path as it was, not the look-ahead
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);

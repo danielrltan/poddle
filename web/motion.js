@@ -34,6 +34,7 @@ export const DEFAULTS = {
   RATE_GAIN: 1,                                                         // the paddle's rate gain (main.js: PHONE_GAIN on a phone). The effortless part reads pace x it, the speed part x its square root only: a phone (1.5) smashes from ~19 rad/s, an AirPod from ~23.4
   ROM_IDLE: 4, ROM_MIN: 35, ROM_FULL: 110, ROM_T_MIN: 0.10, ROM_T_FULL: 0.18,   // deg swept from the start of the movement to its peak: below MIN a swing scores nothing, from FULL all it can. ROM_T_*: the old rise credit (s), kept for test/effort.mjs and strokes.js
   LOB_GAIN: 0.8,
+  LOB_AHEAD: 2.4, LOB_AHEAD_N: 6, LOB_PEND: [0.6, 0.45, -0.3],   // before its peak, a pendulum's hand is carried on this far round (rad, in N steps) before its upward share is taken. Pendulum: turning about +R (>= [0] of the rate), hardly about the forearm (<= [1]), the hand no longer coming down (upward share of its travel >= [2])
   ARM: [0.10, -0.12, -0.70],                // virtual forearm, player frame (x right, y up, z toward player)
   REF_TAU: 0.08,                            // arm reference follows the hand: 2 cascaded stages of this
   PUNCH_TAU: 0.2, PUNCH_GAIN: 0.03, PUNCH_CAP: 0.3, BIAS_TAU: 1.5,
@@ -237,6 +238,7 @@ export class MotionModel {
   _track(s, dt, ev) {
     const c = this.c, L = this.last, t = s.t;
     const rate = len(s.r);
+    this.dtN = this.dtN ? this.dtN + (Math.min(dt, 0.05) - this.dtN) * 0.1 : Math.min(dt, 0.05);   // the stream's usual step: one late or bunched sample must not weigh the lob's look-ahead
     const P = this._P(s.q);
     const rP = this._vecP(qrot(this.calib, s.r));                     // body-frame rate of P (P' = P * exp(rP dt / 2))
     const wP = this._vecP(qrot(qmul(this.yawFix, s.q), s.r));         // world angular velocity, player axes
@@ -275,11 +277,11 @@ export class MotionModel {
     }
     this.w2 = w1; this.w1 = wP;
     if (!sw && rate > c.TRIGGER && rate >= (this.lo == null ? 0 : this.lo + c.REARM_RISE)) { const m = (this.mvR && len(this.wB) >= c.ROM_IDLE ? this.mvR : this.mvI || this.mvR) || { t, ang: this.ang };   // mvR only when the hand really was moving before
-      sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), hand: [0, 0, 0], sent: false, fixed: false, eff: 0, sweep: 0, k: 1, from: (this.aimH.find(h => h.t >= m.t - 1e-4) || this.aimH[this.aimH.length - 1]) }; }
+      sw = this.sw = { t0: t, tI: Math.min(m.t, this.mvI ? this.mvI.t : t), mv0: m.t, ang0: m.ang, peak: 0, tPk: t, romPk: 0, sum: add(mul(w1, r1), mul(w2, r0)), hand: [0, 0, 0], tw: 0, sent: false, fixed: false, eff: 0, sweep: 0, k: 1, from: (this.aimH.find(h => h.t >= m.t - 1e-4) || this.aimH[this.aimH.length - 1]) }; }
     if (sw) {
       // sweep direction (and the hand's path), weighted by rate: the slow first samples are mostly noise. The hand's is not seeded with the
       // two samples before the trigger: those are the end of the take-back, which for an underhand goes DOWN (a short lob read 0 with them).
-      if (!sw.fixed) { sw.sum = add(sw.sum, mul(wP, rate)); sw.hand = add(sw.hand, mul(hv, rate)); }
+      if (!sw.fixed) { sw.sum = add(sw.sum, mul(wP, rate)); sw.hand = add(sw.hand, mul(hv, rate)); sw.tw += dot(wP, lh) * rate; }   // tw: turn about the forearm itself (a wrist roll)
       // Curl: a straight swing keeps turning about one axis; a "C" shaped swing (or a rolling wrist) swings that axis
       // round as it goes. turn = how far the axis has wandered (rad), curl = which way (+ = curling to the player's right).
       if (!sw.fixed && rate > 5) { const u = mul(wP, 1 / rate);
@@ -317,8 +319,25 @@ export class MotionModel {
       // lob: the upward share of the HAND's path, not of the rotation axis. About +R was "upward" only for a paddle pointing ahead:
       // a backhand slice points the arm left, and the forearm roll that opens its face is a turn about +R too (it read as a scoop,
       // up 0.80, and flew 3-4 m high). A pendulum underhand still reads ~0.9 however wide it curves (the hanging arm's yaw moves it little).
-      const shot = () => { const n = len(sw.sum) || 1, nh = len(sw.hand) || 1; return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: clamp(sw.hand[1] / nh, 0, 1) * c.LOB_GAIN, chop: clamp(-sw.sum[0] / n, 0, 1),
-        roll: sw.sum[2] / n, turn: sw.turn || 0, curl: sw.curl || 0, ...aimed() }; };   // chop: downward share of the rotation (an overhead)
+      // A pendulum's first report comes 30-100 ms before contact, near the bottom of the arc, where the hanging hand still travels mostly
+      // FORWARD: its path so far read up 0.12-0.47, so the bet went out a drive, and the settled report (0.65-0.78) then re-aimed it up
+      // 5-8 m/s after it had left (the helium lob, since NOTES 55 moved lob onto the hand's path). So until the peak, a stroke turning about +R
+      // with the hand on its way up is carried on round the same axis at the same rate for LOB_AHEAD (a scoop has ~2.4 rad to go from the
+      // bottom, however fast it is: a fixed time looked too little ahead for a slow one and wrapped a fast one over the top), and its lob is
+      // the upward share of the path so far plus that, never less than the path alone. The look-ahead weighs as many samples as it lasts at
+      // the stream's usual step, so the phone (60 Hz) and the AirPod (50 Hz) read alike. Not a pendulum: a backhand slice or chip also turns
+      // about +R, by rolling the forearm (|twist| 0.75-0.95, and the hand going down); a waggle down from behind (the hand still falling).
+      const ahead = () => { if (past || rate < 1e-6 || wP[0] / rate < c.LOB_PEND[0] || Math.abs(dot(wP, lh)) / rate > c.LOB_PEND[1] || hv[1] / (len(hv) || 1) < c.LOB_PEND[2]) return null;
+        const h = c.LOB_AHEAD / rate / c.LOB_AHEAD_N, step = qexp(mul(wP, h)), w = rate * h / (this.dtN || dt); let p = sw.hand, l = lh;
+        for (let i = 0; i < c.LOB_AHEAD_N; i++) { const l2 = qrot(step, l); p = add(p, mul(handVel(wP, mul(add(l, l2), 0.5)), w)); l = l2; }
+        return p; };
+      const upOf = v => clamp(v[1] / (len(v) || 1), 0, 1);
+      // Later reports keep what the look-ahead said for as long as the whole stroke still reads as a pendulum: a quick scoop whose settled
+      // report comes after contact counts the dip through the bottom too (0.53-0.66 up), and the lob must not be taken back after the ball left.
+      const shot = () => { const n = len(sw.sum) || 1, a = ahead(), lobRaw = upOf(sw.hand) * c.LOB_GAIN, lobA = Math.max(a ? upOf(a) * c.LOB_GAIN : 0, sw.lobA || 0);
+        const pend = !!a || (lobA > 0 && sw.sum[0] / n >= c.LOB_PEND[0] && Math.abs(sw.tw) / n <= c.LOB_PEND[1]);
+        return { dir: clamp(-sw.sum[1] / n, -1, 1), lob: pend ? Math.max(lobRaw, lobA) : lobRaw, lobRaw, lobA: pend ? lobA : 0, pend: pend ? 1 : 0, chop: clamp(-sw.sum[0] / n, 0, 1),   // chop: downward share of the rotation (an overhead)
+          roll: sw.sum[2] / n, twist: sw.tw / n, turn: sw.turn || 0, curl: sw.curl || 0, ...aimed() }; };   // lobRaw: the path so far, for a report that must stand on what happened (main.js swingEnd)
       const age = Math.round((s.arr - sw.mv0) * 1000);   // ms since the hand started moving, incl. how late this sample arrived
       // The real score needs the peak, and waiting for it is 150-300 ms of dead air. But the two movements part ways in
       // the first 40-60 ms: a flick takes off at 250-500 rad/s^2, an arm swing at 25-125. So a hard take-off is called
@@ -337,7 +356,7 @@ export class MotionModel {
         // every swing counts; how much ARM went into it decides how far up to a drive it goes, and only SPEED on top of a real arm
         // stroke makes a smash. A quick wrist flick is a soft tap (a dink), never a smash, however fast; a slow sweep, however wide, is a drive.
         sw.eff = call(); Object.assign(sw, shot());
-        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, chop: sw.chop || 0, roll: sw.roll || 0, turn: sw.turn || 0, curl: sw.curl || 0, back: sw.back, off: sw.off, age, final: past });
+        ev.push({ type: 'swing', power: sw.eff, raw: sw.peak, rom: sw.sweep / DEG, dir: sw.dir, lob: sw.lob, lobRaw: sw.lobRaw, pend: sw.pend, chop: sw.chop || 0, roll: sw.roll || 0, twist: sw.twist, turn: sw.turn || 0, curl: sw.curl || 0, back: sw.back, off: sw.off, age, final: past });
       } else if (sw.sent && !sw.fixed) {                              // the call moved, or the real peak is in and the call was off
         const eff = call(), sh = shot();
         // Once the peak is in, the settled score ALWAYS goes out (final: true), however little it moved: the server lets only a settled

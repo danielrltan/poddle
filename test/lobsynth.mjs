@@ -40,7 +40,7 @@ const SRC = fs.readFileSync(new URL('../server/game.js', import.meta.url), 'utf8
 const F0 = SRC.indexOf('const COURT'), F1 = SRC.indexOf('// how underhand was the swing?'), F2 = SRC.indexOf('// ---------- a room: one match');
 if (F0 < 0 || F1 < F0 || F2 < F1) throw new Error('server/game.js: the solver moved (anchors: "const COURT", "// how underhand was the swing?", "// ---------- a room: one match")');
 const pre = SRC.slice(F0, F1).replace(/^const httpServer[\s\S]*?^\}\);$/m, ''), fns = SRC.slice(F1, F2);   // (constants .. helpers .. solve/fly; no sockets)
-export const server = new Function(pre + '\n' + fns + '\nreturn { underhand, sliced, shotKind, solve, gOf, COURT, SMASH };')();
+export const server = new Function(pre + '\n' + fns + '\nreturn { underhand, lofted, sliced, shotKind, solve, gOf, COURT, SMASH };')();
 const chopRule = /m\.chop, 0\), 0, 1\) > ([\d.]+) && pw > ([\d.]+)\) pw = Math\.min\(1, pw \+ ([\d.]+)\)/.exec(SRC);
 export const [CHOP, CHOP_N, CHOP_ADD] = chopRule ? chopRule.slice(1).map(Number) : [0.45, 0.55, 0];   // the server's overhead bonus, if it has one (gone since NOTES 79: + 0)
 const MAIN = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8');
@@ -113,6 +113,15 @@ export const STROKES = {
     ['phi', 0, 550, 125], ['psi', 0, 550, 15],                                     // cock it up and back behind the head
     ['phi', 650, 380, -175, 0.65], ['psi', 650, 380, 35, 0.65], ['rho', 650, 380, -40, 0.65],   // down through the ball, pronating
     ['phi', 1200, 700, 50], ['psi', 1200, 700, -50], ['rho', 1200, 700, 40]] },
+  // the same two pendulums a third quicker: their bet comes 30-55 ms before contact, while the hand is still going forward
+  fast_wide_lob: { label: 'FAST wide lob', expect: 'lob', contact: 736, moves: [
+    ['phi', 0, 450, -95], ['psi', 0, 450, -35],
+    ['phi', 550, 300, 150, 0.6], ['psi', 617, 280, 75, 0.55], ['rho', 550, 300, 15, 0.6],
+    ['phi', 1200, 700, -40], ['psi', 1200, 700, -40], ['rho', 1200, 700, -15]] },
+  fast_straight_lob: { label: 'FAST straight lob', expect: 'lob', contact: 736, moves: [
+    ['phi', 0, 450, -95],
+    ['phi', 550, 300, 150, 0.6], ['rho', 550, 300, 15, 0.6],
+    ['phi', 1200, 700, -55], ['rho', 1200, 700, -15]] },
   flick: { label: 'wrist flick', expect: 'tap', contact: 50, moves: [
     ['psi', 0, 100, 40, 0.5], ['phi', 0, 100, 12, 0.5], ['psi', 200, 300, -40], ['phi', 200, 300, -12]] },
 };

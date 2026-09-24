@@ -209,6 +209,7 @@ function blockShot(n, spd) {
 }
 const pushKind = n => (n < PUSH.name ? 'block' : 'punch');      // what the player is told they just played
 const gOf = spin => G * (1 - SLICE.lift * spin);                // gravity a spinning ball feels until it first lands
+const fallLeft = (py, vy, g) => (vy + Math.sqrt(vy * vy + 2 * g * Math.max(0, py - R))) / g;   // s until a ball at py, rising or falling at vy, is back down: the hang it has LEFT
 // the bounce, in place on v. spin/kick only bite on the first one. Shared by the sim and by everything that predicts it.
 function bounceV(v, spin, kick) {
   v[1] *= -lerp(BOUNCE.up, SLICE.up, spin); const al = lerp(BOUNCE.along, SLICE.along, spin);
@@ -226,8 +227,10 @@ function solve(p, side, n, dir, lob, slice, blk, curl = 0) {   // curl: 1 lets a
   //                       a big one is a lob that floats high and lands deep
   // What is CALLED a slice (shotKind: spin wins over lob) flies like one, never on the lob's arc: a scoop with that much spin
   // (upward share 0.75, |roll| 0.5: live-play-1) went up 2.3 m for 1.3 s. The last 0.05 of spin under the label hands it over.
-  const spin = sliced(slice, lob), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
-  const u = lofted(lob) * (1 - smooth(spin, SLICE.at - 0.05, SLICE.at)), nu = n < 0.2 ? n * 0.6 : lerp(0.45, 1, (n - 0.2) / 0.8);   // gentle = dink in the kitchen; anything more = a proper lob, deep and high. u: lofted(), not underhand(): past u 0.5 it IS a lob, not half of one
+  const cut = sliced(slice, lob), u = lofted(lob) * (1 - smooth(cut, SLICE.at - 0.05, SLICE.at)), nu = n < 0.2 ? n * 0.6 : lerp(0.45, 1, (n - 0.2) / 0.8);   // gentle = dink in the kitchen; anything more = a proper lob, deep and high. u: lofted(), not underhand(): past u 0.5 it IS a lob, not half of one
+  // A lob carries no lift (NOTES 90): what flies like a lob (u 0.5 and up) is a plain parabola at G, however the wrist rolled on the scoop.
+  // sliced() itself is untouched, so the label still reads it (a scoop cut hard enough is a slice and never lobs).
+  const spin = cut * (1 - smooth(u, 0.3, 0.5)), g = gOf(spin), kick = s * ((slice || 0) < 0 ? -1 : (slice || 0) > 0 ? 1 : dir >= 0 ? 1 : -1) * (0.55 + 0.45 * Math.abs(dir)) * SLICE.kick * spin;   // always a real break, the way the paddle cut across it
   const depth = lerp(lerp(2.6, 5.9, n), lerp(1.2, 6.0, nu), u);
   const tz = -s * Math.min(6.2, blk ? lerp(depth, blk.depth, blk.w) : depth);
   const px = p[0], py = Math.max(p[1], R), pz = s * Math.max(p[2] * s, 0.3);   // never launch from the far side of the net
@@ -300,59 +303,54 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     ball.p[1] = Math.max(ball.p[1], R);
     if (!started && pub) lobbyChanged();                          // the first strike turns a Matt court from Join to Ask to play in the list (sent on its timer, after this)
     ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
-    ball.from = { p: [...ball.p], t: now };                       // where and when it left the paddle: a re-aim flies what is LEFT of the shot struck from here
+    ball.land = sol.land;                                         // where it comes down: a re-aim that cannot move it says so again
     planFootwork(1 - side);
     if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
     broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, c: sol.curl });
   }
 
-  // A corrected power arrived just after the hit. Never swap the velocity: steer onto the new landing spot over FIX_EASE.
+  // A corrected power arrived just after the hit (the settled report of a swing struck on its bet, a block's push, a serve's settled
+  // swing, the legacy no-final client: every one comes through here). The ball is SEALED at contact (NOTES 90): its height and its
+  // gravity are the paddle's, and nothing in the air changes them. A re-aim moves only where it comes down: x and z are eased onto
+  // the settled landing in the hang the ball has LEFT (fallLeft), so the time is its own. It used to hand the ball more vy too, the
+  // lob's apex in one step (NOTES 86) or what the net asked of a slower pace, and to swap the spin (lighter gravity mid-flight): every
+  // one of those was the ball going up after it was struck. The kick (the first bounce's sideways throw) follows the settled swing's
+  // way, sized by the spin the ball really has; it never touches the flight.
   // curl: the settled swing is the first that may bend it (a bet never does), so a hard one curls from here as ONE swoop: its sideways
   // speed is never eased (that swung it out wide and the pull hooked it back, a zig-zag: NOTES 72). The pull alone carries it from where
   // it is, on the heading it has, onto the marker: c = 2 (land - x - vx T) / T^2. At least CURVE.swoop m of bow, the way solve() hooks
   // it (or more, if the settled aim needs more bend that same way); the marker says where that lands, kept on the court.
-  // Height is never eased (NOTES 86). Easing vy up onto a lob's solution over 0.45 s WAS the helium ball: a scoop is struck on its
-  // bet (the upward share is still low then, lob 0.12-0.47: a drive), the settled report says lob, and the ball climbed faster and
-  // faster for half a second, +6 to +14 m/s^2 against gravity. Now the vertical is ballistic from the paddle: if the settled shot
-  // wants more height than the ball has, it gets it in ONE step here (the lob's apex, from where it is), and from then on vy only
-  // ever falls at g (easeAim clamps it). T is what is LEFT of the settled shot struck from the contact point, not a fresh full flight
-  // from here: that asked every corrected drive to climb again (under half gravity for 0.45 s), and an unchanged shot now steps by 0.
-  function remaining(side, n, dir, lob, slice, blk, curl, sol) {
-    const f = ball.from || { p: ball.p, t: now }, clean = solve(f.p, side, n, dir, lob, slice, blk, curl), g = gOf(sol.spin);
-    const e = now - f.t, y = Math.max(ball.p[1], R), vy = ball.v[1], down = (vy + Math.sqrt(vy * vy + 2 * g * Math.max(0, y - R))) / g;   // down: when it lands as it flies now
-    const H = Math.max(f.p[1], R) + Math.max(0, clean.v[1]) ** 2 / (2 * g), apexNow = y + Math.max(0, vy) ** 2 / (2 * g);
-    if (lofted(lob) > 0.5 && H > apexNow + 0.05 && clean.v[1] - g * e > 0) { const up = Math.sqrt(2 * g * (H - y)); return (up + Math.sqrt(up * up + 2 * g * (y - R))) / g; }   // a lob: it tops out where the clean lob would have
-    return Math.max(0.3, Math.min(clean.T - e, down));           // anything else keeps the height it has (fly() adds only what the net needs); sooner is fine, it only drops harder
-  }
   function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
-    const g = gOf(sol.spin), clear = lerp(0.25, SLICE.clear, sol.spin), y = Math.max(ball.p[1], R), pz = ball.p[2], vFly = [0, 0, 0];
-    let T = fly(vFly, ball.p[0], y, pz, sol.land[0], sol.land[1], remaining(side, n, dir, lob, slice, blk, curl, sol), g, clear);
-    for (let i = 0; i < 40 && pz * sol.land[1] < 0; i++, T = fly(vFly, ball.p[0], y, pz, sol.land[0], sol.land[1], T + 0.05, g, clear)) {   // the net, at the SLOWER of the pace it has and the pace it eases to: the ease never re-solves the height, so it has to clear from here
-      const vz = Math.min(Math.abs(ball.v[2]), Math.abs(vFly[2])), tn = Math.abs(pz) / Math.max(vz, 0.1);
-      if (y + vFly[1] * tn - 0.5 * g * tn * tn >= COURT.net + clear) break;
-    }
-    sol.T = T; sol.v = [vFly[0] - 0.5 * sol.curl * T, vFly[1], vFly[2]];
-    if (sol.v[1] > ball.v[1]) ball.v[1] = sol.v[1];               // the one step up (a scoop that met the ball on its bet); never eased
-    let land = sol.land, v = sol.v;
+    const x = ball.p[0], y = Math.max(ball.p[1], R), pz = ball.p[2], vy = ball.v[1], g = ball.bounces ? G : gOf(ball.spin);
+    const T = Math.max(DT, fallLeft(y, vy, g)), clear = lerp(0.25, SLICE.clear, ball.spin);
+    // The net, never by adding height: the pace eases from the one it has to the new one, so it crosses somewhere between the two and
+    // y is concave, so both ends must clear. The one it has was solved to clear (slack: a smash clears by a hair). A settled landing the
+    // sealed ball cannot reach over the net is moved deeper, the only way a fixed hang crosses sooner and so higher; none: it flies as struck.
+    const over = (vz, slack) => { const tn = -pz / vz; return tn > 0 && tn < T && y + vy * tn - 0.5 * g * tn * tn >= COURT.net + clear - slack; };
+    let land = sol.land; const net = pz * land[1] < 0;            // still to cross it
+    if (net && !over(ball.v[2], 0.05)) land = null;
+    for (let d = Math.abs(land ? land[1] : 0); net && land && !over((land[1] - pz) / T, 0); d += 0.1) land = d + 0.1 > 6.2 ? null : [land[0], Math.sign(land[1]) * (d + 0.1)];
+    if (!land) { broadcast({ type: 'launch', by: side, land: ball.land, spin: ball.spin, k: ball.kick, c: ball.curl, n, p: ball.p, v: ball.v, t: now }); return; }   // flies as struck: the marker stays where it really lands. n: the trail still burns for the real power
+    let v = [(land[0] - x) / T, vy, (land[1] - pz) / T];
     if (sol.curl) {
-      const T = sol.T, x = ball.p[0], vx = ball.v[0], cReq = 2 * (land[0] - x - vx * T) / (T * T), cMin = Math.abs(sol.curl) * CURVE.swoop / CURVE.bow;
+      const vx = ball.v[0], cReq = 2 * (land[0] - x - vx * T) / (T * T), cMin = Math.abs(sol.curl) * CURVE.swoop / CURVE.bow;
       const c = Math.sign(cReq) === Math.sign(sol.curl) && Math.abs(cReq) >= cMin ? cReq : Math.sign(sol.curl) * cMin;
-      land = [clamp(x + vx * T + 0.5 * c * T * T, -2.5, 2.5), land[1]]; v = [vx, sol.v[1], sol.v[2]];
+      land = [clamp(x + vx * T + 0.5 * c * T * T, -2.5, 2.5), land[1]]; v = [vx, vy, v[2]];
       ball.curl = 2 * (land[0] - x - vx * T) / (T * T);
     } else ball.curl = 0;
-    ball.aim = { land, T: sol.T, k: Math.max(1, Math.round(clamp(FIX_SHARE * sol.T, FIX_EASE, FIX_EASE_MAX) / DT)), side, swoop: !!sol.curl };
-    ball.spin = sol.spin; ball.kick = sol.kick;
+    ball.land = land; ball.aim = { land, T, k: Math.max(1, Math.round(clamp(FIX_SHARE * T, FIX_EASE, FIX_EASE_MAX) / DT)), side, swoop: !!sol.curl };
+    if (ball.spin > 0 && sol.spin > 0) ball.kick = sol.kick * ball.spin / sol.spin;
     planFootwork(1 - side, v);
-    broadcast({ type: 'launch', by: side, land, spin: sol.spin, k: sol.kick, c: ball.curl, n, kind, p: ball.p, v: ball.v, t: now });     // p v t: the step up (if any) is drawn now, not a state packet later     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet)
+    broadcast({ type: 'launch', by: side, land, spin: ball.spin, k: ball.kick, c: ball.curl, n, kind, p: ball.p, v: ball.v, t: now });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet). p v t: vy is the one it was struck with, only the curl is new
   }
   const aimV = [0, 0, 0];
-  // The ease steers only across and along: the height is the ball's own, ballistic since the re-aim (NOTES 86), so the landing time is
+  // The ease steers only across and along: the height is the ball's own, ballistic from the paddle (NOTES 90), so the landing time is
   // read off it every tick and x / z are eased to meet the marker then. It used to re-solve fly() here, whose net loop could ask for
-  // more height mid-ease (a one-tick hop), and blending vy was the helium itself.
+  // more height mid-ease (a one-tick hop), and blending vy was the helium itself (NOTES 86).
   function easeAim() {
-    const a = ball.aim, g = gOf(ball.spin), y = Math.max(ball.p[1], R), vy = ball.v[1];
-    a.T = Math.max(DT, (vy + Math.sqrt(vy * vy + 2 * g * (y - R))) / g);
+    const a = ball.aim, g = ball.bounces ? G : gOf(ball.spin);
+    a.T = Math.max(DT, fallLeft(Math.max(ball.p[1], R), ball.v[1], g));
     aimV[0] = (a.land[0] - ball.p[0]) / a.T; aimV[2] = (a.land[1] - ball.p[2]) / a.T;
     if (a.swoop) { aimV[0] = ball.v[0]; ball.curl = 2 * (a.land[0] - ball.p[0] - ball.v[0] * a.T) / (a.T * a.T); }   // sideways: never eased, the pull alone swoops it in (re-sized as T is read, so it still lands on the marker)
     for (const i of [0, 2]) ball.v[i] += (aimV[i] - ball.v[i]) / a.k;   // equal shares: the last one lands exactly on the marker
