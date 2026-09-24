@@ -1732,8 +1732,7 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
   clears `camOn`. A stream that arrived but whose models failed to load is stopped too; before, it kept the camera light on.
 - The connect screen's camera line is now one sentence and says "this computer". test/camprimer.mjs covers the new flow: first seat,
   a live AirPod behind the primer, Allow, Play without camera, reload, denied, Try again, Back, granted, spectator. It also saves
-  test/ui-shots/cam-*.png. The e2e harnesses set `poddle.camPrimer=allow`, as they already set a name, so they run as before. No
-  new data is collected, so privacy.html and terms.html are unchanged.
+  test/ui-shots/cam-*.png. The e2e harnesses set `poddle.camPrimer=allow`, as they already set a name, so they run as before.
 - Review fixes. Settings -> Move -> Body with the camera already working (Move was Auto) now just switches to Body. Before, it
   restarted the camera: a second request, the light blinking, the models built again. `T.stop()` now closes the MediaPipe face
   and pose graphs (they hold WASM/GPU memory), and it clears the shared `<video>` only if it still shows this tracker's stream, so
@@ -1745,6 +1744,5 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
   without it later (Auto does not turn the camera off, so the copy doesn't promise that). On a phone-width window "Play without camera" is a link
   under the one big Allow pill, the primer's buttons do not grow on hover (they clipped in its scroll box), and the connect
   screen's Turn on gets its own line.
-
-Play without camera says what replaces it: a line under the buttons ("Without the camera, Poddle plays in Auto: the game runs you to the ball and you just swing.") and a toast when it is picked, so saying no never feels like breaking the game.
+- Play without camera says what replaces it: a line under the buttons ("Without the camera, Poddle plays in Auto: the game runs you to the ball and you just swing.") and a toast when it is picked, so saying no never feels like breaking the game.
 - Privacy updated with it: the primer before the browser asks (section 3), Play without camera remembered, and the `poddle.camPrimer` row in the storage table; CLAUDE.md inventory too.

@@ -77,6 +77,8 @@ podOn = false; await pg.ctx.close();
 pg = await open('skip', { perm: 'prompt' });
 await seat(pg); s = await st(pg); ok(s.screen === 'camera', `first seat -> the primer (${s.screen})`);
 await pg.click('#btn-cam-skip'); await sleep(900); s = await st(pg);
+const toast = await pg.evaluate(() => { const t = document.getElementById('toast'); return t.classList.contains('on') && getComputedStyle(t).visibility !== 'hidden' ? t.textContent : ''; }); await shot(pg, 'skip-toast-1440x900');
+ok(/Auto/.test(toast), `Play without camera says Auto movement takes over (toast: ${toast || 'none shown'})`);
 ok(s.screen === 'connect' && s.gum === 0 && s.key === 'skip' && s.mode === 'Auto', `Play without camera -> connect, Auto, no camera request (screen ${s.screen}, mode ${s.mode}, gum ${s.gum}, key ${s.key})`);
 ok(s.camRow === 'Off' && s.camOn, `the connect screen's Camera row says Off and offers Turn on (${s.camRow}, button ${s.camOn})`);
 await pg.reload(); await sleep(1600); await seat(pg); s = await st(pg);
