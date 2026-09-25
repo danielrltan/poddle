@@ -38,7 +38,7 @@ const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 }, LIST = { ty
 const wss = new WebSocketServer({ port: G, host: '127.0.0.1' });
 wss.on('connection', (ws, req) => { const s = { ws, url: req.url, frames: [] }; socks.push(s); ws.send(J(LIST));
   ws.on('message', raw => { let m; try { m = JSON.parse(raw); } catch { return; } if (m.type === 'ping') return ws.send(J({ type: 'pong', c: m.c })); s.frames.push(m);
-    if (m.type === 'quick' || m.type === 'join') { ws.send(J({ type: 'room', code: 'QQQQ', public: true, role: 'player' })); ws.send(J({ type: 'welcome', side: 0, role: 'player', court: COURT, names: [m.name || 'Player 1', null], reg: [false, false] })); } }); });
+    if (m.type === 'quick' || m.type === 'join' || m.type === 'create') { ws.send(J({ type: 'room', code: 'QQQQ', public: m.type !== 'create', role: 'player' })); ws.send(J({ type: 'welcome', side: 0, role: 'player', court: COURT, names: [m.name || 'Player 1', null], reg: [false, false] })); } }); });      // create: Play a bot's private court (the Next button); the page sends 'bot' with the level right after the welcome });
 const last = () => socks[socks.length - 1], push = m => { const s = last(); if (s && s.ws.readyState === 1) s.ws.send(J(m)); };
 
 const CHROME = process.env.CHROME || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(p => fs.existsSync(p));
@@ -140,17 +140,21 @@ const rows = () => ev(pg, () => { const t = [...document.querySelectorAll('#lobb
   ok(!bad.length, `home tiles: 4 in one row, 2x2 or one column at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 await pg.setViewport({ width: 1280, height: 720 }); await sleep(250);
 await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500);
-r = await ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.pf-chip')?.textContent]),
-  next: document.getElementById('btn-pf-next').textContent, bests: document.getElementById('pf-bests').textContent, human: document.getElementById('pf-human').textContent }));
+r = await ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.st-tag')?.textContent, l.className]),
+  next: document.getElementById('btn-pf-next').textContent, nextIn: document.getElementById('btn-pf-next').closest('li')?.dataset.level, lvl: document.getElementById('btn-pf-next').dataset.level, bests: document.getElementById('pf-bests').textContent, human: document.getElementById('pf-human').textContent,
+  w: document.getElementById('st-w').textContent, l: document.getElementById('st-l').textContent, rank: document.getElementById('st-rank').textContent, streak: document.getElementById('st-streak').textContent.replace(/\s+/g, ' ').trim(), crest: document.getElementById('st-crest').className, stars: document.querySelectorAll('#st-stars .is-on').length }));
 ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie Matt', 'Club Matt', 'Tour Matt', 'Pro Matt']), `Your stats: four rungs, Rookie, Club, Tour, Pro (${J(r.rungs.map(x => x[0]))})`);
-ok(/^Beaten on/.test(r.rungs[0]?.[1]) && /^Beaten on/.test(r.rungs[1]?.[1]) && r.rungs[2]?.[1] === 'Not beaten yet' && r.rungs[3]?.[1] === 'Not beaten yet' && r.next === 'Next: beat Tour Matt', `chips: beaten / not beaten yet, next is Tour (${J(r.rungs.map(x => x[1]))}, ${r.next})`);
-ok(r.bests.includes('14 hits') && r.bests.includes('540°/s') && !r.bests.includes('Hardest') && r.human.includes('3-2'), `bests and the human record drawn (${r.bests.slice(0, 80)} | ${r.human.slice(0, 60)})`);
+ok(/^Beaten /.test(r.rungs[0]?.[1]) && /^Beaten /.test(r.rungs[1]?.[1]) && r.rungs[2]?.[1] === 'Up next' && r.rungs[3]?.[1] === 'The final boss' && r.next === 'Next: beat Tour Matt' && r.nextIn === '3' && r.lvl === '3', `road tags: beaten, beaten, up next, the final boss; the Next button sits in the Tour node with data-level 3 (${J(r.rungs.map(x => x[1]))}, ${r.next} in level ${r.nextIn}, data-level ${r.lvl})`);
+ok(r.rungs[0][2].includes('is-won') && r.rungs[1][2].includes('is-won') && r.rungs[2][2].includes('is-next') && r.rungs[3][2].includes('is-locked'), `road nodes: won, won, next, locked (${J(r.rungs.map(x => x[2]))})`);
+ok(r.rank === 'Club player' && r.stars === 2 && r.crest === 'st-crest' && /^3 win streak vs Rookie Matt · best 3$/.test(r.streak), `hero: Club player, 2 stars, gold crest, the hottest streak is 3 vs Rookie Matt (${r.rank}, ${r.stars}, ${r.crest}, "${r.streak}")`);
+ok(r.bests.includes('14 hits') && r.bests.includes('540°/s') && !r.bests.includes('Hardest') && r.w === '3' && r.l === '2' && r.human.includes('60% won') && r.human.includes('50-41') && r.human.includes('Streak 1') && r.human.includes('Best 2'), `bests and the human record drawn (${r.bests.slice(0, 80)} | ${r.human.slice(0, 80)})`);
 ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your stats asks /api/stats with the device id in the body');
 { // the panel fits every window: inside the viewport's width, and no rung line or chip cut short with an ellipsis
   const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);
-    const r = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(), cut = [...v.querySelectorAll('.pf-level b, .pf-level small, .pf-chip, .pf-row dd, .pf-row dt')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.slice(0, 30));
-      return { left: Math.round(b.left), right: Math.round(b.right), w: innerWidth, cut }; });
-    if (r.left < 0 || r.right > r.w || r.cut.length) bad.push(`${w}x${h}: ${J(r)}`); }
+    const r = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(), cut = [...v.querySelectorAll('.pf-level b, .pf-level small, .st-tag, .st-cap > span, .st-rank-name, .st-ribbon, .st-chip, .st-bar-l, .st-bar-r')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.slice(0, 30));
+      const wide = [...v.querySelectorAll('*')].filter(e => { const q = e.getBoundingClientRect(); return q.width && (q.left < b.left - 1 || q.right > b.right + 1); }).map(e => (e.id || e.className || e.tagName).toString().slice(0, 30));      // nothing pokes out of the panel (the crest's rays are masked, they may)
+      return { left: Math.round(b.left), right: Math.round(b.right), w: innerWidth, cut, wide: wide.filter(c => !/st-rays/.test(c)) }; });
+    if (r.left < 0 || r.right > r.w || r.cut.length || r.wide.length) bad.push(`${w}x${h}: ${J(r)}`); }
   ok(!bad.length, `Your stats fits at ${SIZES.length} window sizes, nothing clipped${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
   await pg.setViewport({ width: 1280, height: 720 }); await sleep(250); }
 
@@ -201,8 +205,20 @@ await pg.close();
     rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.pf-level small')?.textContent]), exp: !!document.querySelector('.pf-foot a[href^="/privacy.html#your-data"]') }));
   await openStats(); let r = await panel();
   ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie Matt', 'Club Matt', 'Tour Matt', 'Pro Matt']) && /^3-0/.test(r.rungs[0][1]) && /^1-1/.test(r.rungs[1][1]) && /^0-2/.test(r.rungs[2][1]), `saved profile: four rungs in order with their records (${J(r.rungs)})`);
+  { // out of order (every level is free to pick): Rookie and Pro beaten, Club not. The rank is the hardest beaten, the Next button and the caption point at the gap, and the gold track stops at Rookie
+    const reopen = async () => { await ev(pg, () => window.__ui.lobbyView('home')); await sleep(200); await openStats(); };
+    API.profile = { ...FIXTURE, matt: [rung(0, 'Rookie', 3, 0, 3, 3, day), rung(1, 'Club', 0, 1, 0, 0, null), rung(3, 'Tour', 0, 0, 0, 0, null), rung(2, 'Pro', 1, 0, 1, 1, day + 7200e3)] }; await reopen();
+    const o = await ev(pg, () => ({ rank: document.getElementById('st-rank').textContent, cap: document.getElementById('st-rank-cap').textContent, p: document.getElementById('pf-rungs').style.getPropertyValue('--p'), crest: document.getElementById('st-crest').className, stars: document.querySelectorAll('#st-stars .is-on').length,
+      nodes: [...document.querySelectorAll('#pf-rungs > li')].map(l => l.className.replace('st-node ', '')), lvl: document.getElementById('btn-pf-next').dataset.level, nextIn: document.getElementById('btn-pf-next').closest('li')?.dataset.level }));
+    ok(o.rank === 'Pro player' && o.cap === '2 of 4 Matts beaten · beat Club Matt to fill the road' && o.p === '0' && o.crest === 'st-crest' && o.stars === 2 && J(o.nodes) === J(['is-won', 'is-next', 'is-locked', 'is-won']) && o.lvl === '1' && o.nextIn === '1',
+      `Rookie + Pro beaten: Pro player, 2 stars, no crown, the caption points at Club without promising a rank, --p 0, Next on Club (${J(o)})`);
+    API.profile = FIXTURE; await reopen(); }
   for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-${w}x${h}.png`) }); }
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();
+  { // the Next button plays Matt at its own level: a private court, then 'bot' with the level right after the welcome (main.js playBot)
+    const s = last(), k = s ? s.frames.length : 0, n = socks.length; await pg.click('#btn-pf-next'); await sleep(1500);
+    const f = [...(s ? s.frames.slice(k) : []), ...socks.slice(n).flatMap(x => x.frames)].filter(x => x.type !== 'ping');
+    ok(f.some(x => x.type === 'create' && x.public === false) && f.some(x => x.type === 'bot' && x.level === 3), `the Next button: a private create, then bot level 3 (${J(f.map(x => x.type + (x.level != null ? ':' + x.level : '')))})`); }
   // Download and delete live on the privacy page (web/data-tools.js), same origin as the game: the device id comes from localStorage
   const PRIV = `http://127.0.0.1:${W}/web/privacy.html#your-data`; await pg.goto(PRIV); await sleep(900);
   const n0 = API.log.length; await ev(pg, () => document.getElementById('btn-export').click());
@@ -218,7 +234,14 @@ await pg.close();
   const del = API.log.slice(n1).find(l => l[0] === 'DELETE' && l[1] === '/api/account'); const st = await ev(pg, () => document.getElementById('data-status').textContent);
   ok(!!del && del[2]?.dev === ID && del[2]?.confirm === 'delete' && await dev(pg) === null && /have been deleted/.test(st), `delete: DELETE /api/account with the id and confirm (${J(del && del[2])}), poddle.device gone (${await dev(pg)}), "${st}"`);
   await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900); await openStats(); r = await panel();
-  ok(r.view && r.msg === 'Play a match to start your record' && r.rungs.every(x => /^0-0/.test(x[1] || '')), `delete: Your stats is empty again ("${r.msg}", ${J(r.rungs.map(x => x[1]))})`);
+  ok(r.view && r.msg === '' && r.rungs.every(x => /^0-0/.test(x[1] || '')), `delete: Your stats is empty again, and no #pf-msg bar over the card's own lines ("${r.msg}", ${J(r.rungs.map(x => x[1]))})`);
+  r = await ev(pg, () => ({ crest: document.getElementById('st-crest').className, rank: document.getElementById('st-rank').textContent, cap: document.getElementById('st-rank-cap').textContent, streak: document.getElementById('st-streak').className, n: document.getElementById('st-streak-n').textContent,
+    tags: [...document.querySelectorAll('#pf-rungs .st-tag')].map(e => e.textContent), next: document.getElementById('btn-pf-next').textContent, nextIn: document.getElementById('btn-pf-next').closest('li')?.dataset.level, lvl: document.getElementById('btn-pf-next').dataset.level, hint: !document.getElementById('st-people-hint').hidden, chips: document.getElementById('st-chips').hidden,
+    tiles: [...document.querySelectorAll('.st-tile')].map(t => [t.querySelector('.st-num b').textContent, t.querySelector('.st-cap').textContent, t.querySelector('.st-cap').classList.contains('is-hint'), t.querySelector('.st-chip').hidden]) }));
+  ok(r.crest === 'st-crest is-none' && r.rank === 'Unranked' && r.cap === 'Beat Rookie Matt to start your road' && r.streak === 'st-streak' && r.n === '0' && J(r.tags) === J(['Start here', 'Beat Rookie first', 'Beat Club first', 'The final boss']) && r.next === 'Next: beat Rookie Matt' && r.nextIn === '0' && r.lvl === '0' && r.hint && r.chips && r.tiles.every(t => t[0] === '0' && t[2] && t[3]),
+    `empty state: the ? crest, Unranked, Start here on Rookie with the Next button, the people hint, blue zeros with coaching captions (${J(r)})`);
+  for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-empty-${w}x${h}.png`) }); }
+  await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();
   // the result card with its stats line, forced on screen (the fake game never plays a point), at both sizes
   await ev(pg, () => window.__ui.lobbyView('home')); await sleep(400); const s0 = last(); await pg.click('#btn-quick').catch(() => {}); await sleep(400);
   if (last() === s0 && !s0.frames.some(f => f.type === 'quick')) { await pg.keyboard.press('Enter'); await sleep(300); await pg.keyboard.press('Enter'); } await sleep(1200);

@@ -1496,8 +1496,8 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .result-notice{font-size:var(--t-sm);font-weight:600;line-height:1.45;color:var(--ink)} .result-notice .foot-link{font-size:inherit}
 .result-save .btn{margin-top:.125rem}
 
-/* Your stats (9.4): the lobby view. Matt's ladder on the left, people and bests on the right; one column on a narrow window */
-.pf-view{gap:var(--s-4)!important;text-align:left}
+/* Your stats (9.4): the lobby view's header (name, pen, subtitle, sign in / out) and footer; the card itself is the .st- block below */
+.pf-view{text-align:left}      /* the gap and padding are .st's below: one !important per property */
 .pf-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3) var(--s-5);width:100%}
 .pf-who{margin:0;display:flex;flex-direction:column;gap:.125rem;min-width:0}
 .pf-name-row{display:inline-flex;align-items:center;gap:.5rem;font-size:var(--t-xl);line-height:1.15}
@@ -1511,29 +1511,86 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .pf-signin{height:auto;min-height:3.75rem;padding:.5rem 1.25rem .5rem 1rem;gap:.75rem;text-align:left} .pf-signin .g-logo{width:1.75rem;height:1.75rem}
 .pf-signin span{display:flex;flex-direction:column;line-height:1.2} .pf-signin b{font-weight:800} .pf-signin small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}      /* the call to action under the name of the button */
 .pf-msg{margin:0;width:100%;padding:.625rem 1rem;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-md);font-weight:700;color:var(--ink);text-align:center}
-.pf-cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:var(--s-5);width:100%}
-.pf-cols h2{margin:0 0 .5rem .25rem}
-.pf-side h2 + .pf-stats{margin-bottom:var(--s-4)} .pf-side .pf-stats:last-child{margin-bottom:0}
-.pf-rungs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
-.pf-rung{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.75rem;min-height:3.5rem;padding:.5rem .75rem .5rem .625rem;border-radius:var(--r-md);background:rgba(255,255,255,.78);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1), inset 0 0 0 .0625rem rgba(255,255,255,.9)}
-.pf-dot{position:relative;width:2rem;height:2rem;border-radius:50%;border:.1875rem solid #fff;background:var(--sky-3);box-shadow:0 .0625rem .25rem rgba(10,30,50,.25)}
-.pf-dot::after{content:"";position:absolute;left:50%;top:50%;width:.625rem;height:.1875rem;margin:-.09375rem 0 0 -.3125rem;border-radius:var(--r-pill);background:var(--ink-faint)}      /* locked: a flat dash */
-.pf-rung.is-won .pf-dot{background:radial-gradient(circle at 50% 50%, var(--gold-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--gold-1), var(--gold-3), var(--gold-1), var(--gold-4), var(--gold-1))}
-.pf-rung.is-won .pf-dot::after{width:.6875rem;height:.375rem;margin:-.3125rem 0 0 -.34375rem;border-radius:0;background:none;border:solid var(--gold-4);border-width:0 0 .1875rem .1875rem;rotate:-45deg}      /* won: a gold disc with a tick */
-.pf-level{display:flex;flex-direction:column;min-width:0}
-.pf-level b{font-size:var(--t-md);font-weight:800;color:var(--ink-strong)}
-.pf-level small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}      /* wraps, never cut: a long record beside the 'Beaten on' chip. The view is panel-wide, not 9.4's panel-mid: at 50rem this line lost its streaks (test/profile-ui.mjs checks 9 window sizes) */
-.pf-chip{justify-self:end;padding:.25rem .625rem;border-radius:var(--r-pill);background:var(--sky-2);font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap}
-.pf-chip.is-medal{background:linear-gradient(180deg,#fff8d0,var(--gold-1));color:var(--warn-deep);box-shadow:inset 0 0 0 .0625rem rgba(201,127,8,.35)}
-.pf-next{margin-top:.75rem;width:100%}
-.pf-stats{margin:0;padding:.25rem 1rem}
-.pf-row{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;padding:.4375rem 0} .pf-row + .pf-row{box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
-.pf-row dt{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
-.pf-row dd{margin:0;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
-.pf-row dd small{margin-left:.5rem;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
 .pf-foot .foot-link{font-size:inherit} .pf-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3);width:100%}
 .pf-foot-btns{display:flex;flex-wrap:wrap;gap:var(--s-3)}
-@media (max-width:760px){ .pf-cols{grid-template-columns:minmax(0,1fr)} .pf-view{padding:var(--s-5)!important} .pf-foot{justify-content:center;text-align:center} .pf-foot-btns{justify-content:center} }
+/* ---------- Your stats (9.4): the player card. st- = stats. Hero (crest | rank | streak), the Trophy Road, the people strip, three number tiles ---------- */
+/* the player's own colours: rank in --me-ink blue, the streak ribbon gold (orange is the opponent's), gold otherwise only where something was won */
+.st{gap:var(--s-2)!important;padding:var(--s-3) var(--s-6) var(--s-1)!important} .st .pf-msg{padding:.3125rem 1rem;font-size:var(--t-sm)}      /* the whole card has 41rem at 1280x800 (menu head + foot + the body padding): every size below is chosen to fit it without a scroll */
+.st .caps{margin:0;display:flex;align-items:center;gap:.4rem} .st .caps svg{width:1.25rem;height:1.25rem;fill:none;stroke:var(--line-deep);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.st-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--s-3) var(--s-5);width:100%;padding:.5rem 1rem}      /* the crest is the biggest thing on the card: bigger than any road medal */
+.st-crest{position:relative;isolation:isolate;width:6.25rem;height:6.25rem;display:grid;place-items:center;animation:medal-drop 900ms var(--ease-bounce) 120ms both}
+.st-crest .st-disc{position:relative;width:5.5rem;height:5.5rem;border-radius:50%;display:grid;place-items:center;overflow:hidden;border:.1875rem solid #fff;
+  background:radial-gradient(circle at 50% 50%, var(--gold-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--gold-1), var(--gold-3), var(--gold-1), var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-1));
+  box-shadow:0 .25rem .75rem rgba(120,80,0,.35), inset 0 0 0 .0625rem rgba(140,90,0,.35)}      /* the result card's medal disc: every rank is gold, the tier is the name and the stars */
+.st-crest .st-disc::after,.st-node.is-won .st-disc::after{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.75),rgba(255,255,255,0));transform:translateX(-160%) skewX(-20deg);animation:shine 2600ms var(--ease-soft) 900ms infinite}
+.st-star{width:2.75rem;height:2.75rem;fill:#fff7c9;stroke:var(--gold-4);stroke-width:2.5;stroke-linejoin:round;animation:num-pop 600ms var(--ease-bounce) 900ms both}
+.st-crown{display:none;width:2.75rem;height:2.1rem;fill:var(--gold-2);stroke:var(--gold-4);stroke-width:1.4;stroke-linejoin:round} .st-q{display:none;font-size:2rem;font-weight:900;line-height:1;color:var(--silver-4)}
+.st-rays{position:absolute;inset:-3rem;z-index:-1;border-radius:50%;pointer-events:none;background:repeating-conic-gradient(rgba(255,211,74,.55) 0 7deg,transparent 7deg 20deg);-webkit-mask:radial-gradient(circle closest-side,#000 25%,transparent 60%);mask:radial-gradient(circle closest-side,#000 25%,transparent 60%);scale:0;animation:st-rays 700ms var(--ease-bounce) 500ms forwards}      /* one shot, no spin: a page that settles. closest-side: the halo is gone by the well's edge (3.6rem out), never a streak under the header */
+.st-crest.is-pro .st-star{display:none} .st-crest.is-pro .st-crown{display:block} .st-crest.is-pro .st-rays{background:repeating-conic-gradient(rgba(255,211,74,.65) 0 6deg,transparent 6deg 14deg)}      /* the Pro halo is denser, not wider: wider would leave the well */
+.st-crest.is-none .st-disc{background:linear-gradient(180deg,var(--silver-1),var(--silver-2));border:.1875rem dashed var(--silver-3);box-shadow:var(--sh-1)} .st-crest.is-none .st-disc::after,.st-crest.is-none .st-star,.st-crest.is-none .st-rays{display:none} .st-crest.is-none .st-q{display:block}
+.st-rank{display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.st-rank-name{margin:0;font-size:2.5rem;font-weight:900;line-height:1;letter-spacing:.02em;color:var(--me-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .st-rank-name.is-none{color:var(--ink-strong)}
+.st-rank-cap{margin:0;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}      /* the stars sit on the Rank label's row, not here: with the caption they need two lines at 1280 and the card scrolls */
+.st-stars{display:inline-flex;gap:.125rem;margin-left:.125rem} .st-stars svg{width:1.5rem;height:1.5rem;fill:var(--sky-3);stroke:#fff;stroke-width:2;stroke-linejoin:round}
+.st-stars svg.is-on{fill:var(--gold-2);stroke:var(--gold-4);animation:num-pop 500ms var(--ease-bounce) both} .st-stars svg:nth-child(2){animation-delay:120ms} .st-stars svg:nth-child(3){animation-delay:240ms} .st-stars svg:nth-child(4){animation-delay:360ms}
+.st-streak{display:flex;flex-direction:column;align-items:center;gap:.25rem;min-width:15rem;text-align:center;animation:st-swing 800ms var(--ease-bounce) 300ms both;transform-origin:50% 0}
+.st-ribbon{display:inline-flex;align-items:center;gap:.5rem;height:3rem;padding:0 1.5rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--line-faint);box-shadow:var(--sh-1);color:var(--ink-strong);font-size:var(--t-lg);font-weight:900;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}      /* a pill, not a notched banner: the game's own vocabulary */
+.st-ribbon b{font-size:2.25rem;line-height:1;font-variant-numeric:tabular-nums;animation:num-pop 500ms var(--ease-bounce) 700ms both}
+.st-flame{width:1.75rem;height:1.75rem;fill:var(--silver-3);stroke:#fff;stroke-width:1.5;stroke-linejoin:round;flex:none} .is-one .st-flame,.is-hot .st-flame{fill:var(--them);stroke:var(--them-deep)}
+.st-streak.is-hot .st-ribbon{background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 55%,var(--gold-3));border-color:var(--gold-3);color:var(--warn-deep);text-shadow:0 .0625rem 0 rgba(255,255,255,.6);box-shadow:0 .1875rem 0 rgba(201,127,8,.28), var(--sh-1)}      /* gold from two wins up: never for one */
+.st-streak.is-hot .st-flame{animation:st-flicker 700ms var(--ease-soft) 900ms 3}      /* three flickers, then still */
+.st-streak small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .st-streak small b{color:var(--warn-deep)}
+/* the road: four bosses on a track, the gold fill runs to the last one beaten, the Next button hangs off the next one */
+.st-road{width:100%;padding:.375rem .875rem;border-radius:var(--r-lg);background:rgba(255,255,255,.72);border:.125rem solid var(--line-faint);box-shadow:var(--sh-1)}
+.st-road-h span{margin-left:.25rem;color:var(--ink-soft)}      /* soft, not faint: 13px caps have to pass AA */
+.st-nodes{position:relative;list-style:none;margin:.5rem 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s-3)}
+.st-nodes::before,.st-nodes::after{content:"";position:absolute;left:12.5%;right:12.5%;top:1.75rem;height:.875rem;margin-top:-.4375rem;border-radius:var(--r-pill);background:var(--sky-3);box-shadow:inset 0 .125rem .25rem rgba(120,170,200,.35)}      /* sky-3, not white: the fill has to read against it */
+.st-nodes::after{right:auto;width:calc(75% * var(--p,0));background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 50%,var(--gold-3));box-shadow:inset 0 -.125rem 0 rgba(201,127,8,.4);transform-origin:0 50%;animation:st-track 900ms var(--ease-out) 300ms backwards}
+.st-node{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;min-width:0;text-align:center;animation:hm-tile 560ms var(--ease-bounce) 200ms backwards} .st-node:nth-child(2){animation-delay:290ms} .st-node:nth-child(3){animation-delay:380ms} .st-node:nth-child(4){animation-delay:470ms}
+.st-node .st-disc{position:relative;z-index:1;width:3.5rem;height:3.5rem;flex:none;border-radius:50%;display:grid;place-items:center;overflow:hidden;border:.25rem solid #fff;background:linear-gradient(180deg,var(--sky-2),var(--sky-4));box-shadow:0 .125rem .375rem rgba(40,80,110,.2)}
+.st-node .st-disc svg{width:1.75rem;height:1.75rem;fill:none;stroke:var(--ink-soft);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}      /* the padlock in soft ink, not faint: it has to be readable */
+.st-node .pf-level{display:flex;flex-direction:column;align-items:center;min-width:0;max-width:100%} .st-node .pf-level b{font-size:var(--t-md);font-weight:800;line-height:1.1;color:var(--ink-strong);white-space:nowrap}
+.st-node .pf-level small{font-size:1.25rem;font-weight:900;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums;white-space:nowrap} .st-node .pf-level small i{font-style:normal;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);margin-left:.25rem}      /* the record is the node's big number, its streak the small print */
+.st-tag{display:inline-flex;align-items:center;height:1.5rem;padding:0 .75rem;border-radius:var(--r-pill);background:var(--sky-2);font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap}
+.st-tag.is-medal,.st-chip.is-gold{background:linear-gradient(180deg,#fff8d0,var(--gold-1));color:var(--warn-deep);box-shadow:inset 0 0 0 .0625rem rgba(201,127,8,.35)} .st-tag.is-next{background:var(--me-tint);color:var(--me-ink)}
+.st-node.is-won .st-disc{background:radial-gradient(circle at 50% 50%, var(--gold-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--gold-1), var(--gold-3), var(--gold-1), var(--gold-4), var(--gold-1), var(--gold-3), var(--gold-1));box-shadow:0 0 0 .1875rem var(--gold-2), 0 .1875rem .5rem rgba(120,80,0,.35)}
+.st-node.is-won .st-disc svg{fill:#fff7c9;stroke:var(--gold-4);stroke-width:2} .st-node.is-won .st-disc::after{animation-delay:1200ms} .st-node.is-won .pf-level b{color:var(--warn-deep)}
+.st-node.is-next .st-disc{border-color:var(--line);background:linear-gradient(180deg,#fff,var(--sky-2));animation:st-pulse var(--d-pulse) var(--ease-soft) infinite} .st-node.is-next .st-disc svg{stroke:var(--line-deep)} .st-node.is-next .pf-level b{color:var(--me-ink)}      /* the one loop on the page: the next boss breathes */
+.st-node.is-locked .pf-level b,.st-node.is-locked .pf-level small{color:var(--ink-soft)}
+.st-node .pf-next{margin-top:.125rem;white-space:nowrap} .st-node:first-child .pf-next{align-self:flex-start} .st-node:last-child .pf-next{align-self:flex-end}      /* the edge nodes keep the button inside the strip */
+/* the tile surface (the home tiles' gloss): the people strip and the three number tiles. White tiles with a gold chip, never gold tiles: gold keeps meaning "best" */
+.st-people,.st-tile{position:relative;isolation:isolate;width:100%;padding:.5rem .875rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 400ms backwards}
+.st-people::before,.st-tile::before{content:"";position:absolute;inset:.25rem .25rem auto;height:46%;border-radius:calc(var(--r-lg) - .375rem) calc(var(--r-lg) - .375rem) 50% 50% / calc(var(--r-lg) - .375rem) calc(var(--r-lg) - .375rem) 1rem 1rem;background:linear-gradient(180deg,#fff,rgba(255,255,255,.3));pointer-events:none;z-index:-1}
+.st-people{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"h h h" "wl bar chips";align-items:center;column-gap:var(--s-4);row-gap:.25rem} .st-people .caps{grid-area:h}
+.st-wl{grid-area:wl;margin:0;display:flex;align-items:baseline;gap:.5rem;line-height:1;font-variant-numeric:tabular-nums} .st-wl b{font-size:2.25rem;font-weight:900;animation:num-pop 500ms var(--ease-bounce) 800ms both} .st-wl .is-me{color:var(--me-ink)} .st-wl .is-them{color:var(--them-ink)}
+.st-wl i{width:1rem;height:.375rem;border-radius:var(--r-pill);background:var(--ink-faint)} .st-wl small{font-size:var(--t-xs);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.st-bar{grid-area:bar;position:relative;display:flex;height:.875rem;margin-bottom:1.25rem;border-radius:var(--r-pill);background:var(--sky-3);box-shadow:inset 0 .0625rem .1875rem rgba(40,80,110,.18)}
+.st-bar i{height:100%;border-radius:inherit;width:var(--w,0%);background:linear-gradient(180deg,#8fdcf7,var(--me) 50%,var(--me-deep));transform:scaleX(0);transform-origin:0 50%;animation:bar-fill 700ms var(--ease-out) 900ms forwards} .st-bar i + i{flex:1;width:auto;background:linear-gradient(180deg,#ffc98a,var(--them) 50%,var(--them-deep));transform-origin:100% 50%}
+.st-bar.is-empty i{display:none}      /* no match yet: the empty track and the hint under it, no orange "they won it all" */
+.st-bar-l,.st-bar-r,.st-hint{position:absolute;top:100%;margin-top:.125rem;font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap} .st-bar-l,.st-hint{left:0;color:var(--me-ink)} .st-bar-r{right:0} .st-bar-r b{color:var(--ink-strong)}      /* the hint sits in "60% won"'s slot at its size: the same air under the bar either way */
+.st-chips{grid-area:chips;margin:0;display:flex;flex-wrap:wrap;gap:.375rem} .st-chip{display:inline-flex;align-items:center;gap:.3rem;height:1.75rem;padding:0 .75rem;border-radius:var(--r-pill);background:var(--sky-2);font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap} .st-chip b{color:var(--ink-strong);font-variant-numeric:tabular-nums} .st-chip .st-flame{width:1rem;height:1rem}
+.st-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-3);width:100%} .st-tile{display:flex;flex-direction:column;gap:.125rem} .st-tile:nth-child(3){animation-delay:470ms} .st-tile:nth-child(4){animation-delay:540ms}
+.st-badge{position:absolute;top:.5rem;right:.625rem;width:2.25rem;height:2.25rem;border-radius:50%;display:grid;place-items:center;background:var(--me-tint);box-shadow:inset 0 0 0 .125rem #fff, var(--sh-1)} .st-badge svg{width:1.25rem;height:1.25rem;fill:none;stroke:var(--me-ink);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.st-num{margin:0;display:flex;align-items:baseline;gap:.125rem;line-height:1;font-variant-numeric:tabular-nums} .st-num b{font-size:2.25rem;font-weight:900;color:var(--me-ink);animation:num-pop 500ms var(--ease-bounce) 800ms both} .st-num small{font-size:var(--t-md);font-weight:800;color:var(--ink-soft);margin-left:.25rem}
+.st-cap{margin:0;display:flex;align-items:center;gap:.5rem;min-width:0;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)} .st-cap > span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .st-cap.is-hint{color:var(--me-ink)} .st-tile .st-chip{flex:none;height:1.5rem}      /* is-hint: the coaching line of an empty tile, in the player's blue, never grey */
+.st .pf-foot{justify-content:center;text-align:center}
+@keyframes st-rays{to{scale:1;opacity:.55}} @keyframes st-swing{from{opacity:0;transform:rotate(-6deg) translateY(-.75rem)}} @keyframes st-flicker{50%{transform:scale(1.15) rotate(5deg)}}
+@keyframes st-track{from{transform:scaleX(0)}} @keyframes st-track-v{from{transform:scaleY(0)}}
+@keyframes st-pulse{0%,100%{box-shadow:0 0 0 .1875rem rgba(52,190,237,.28), 0 0 1.25rem .125rem rgba(52,190,237,.5)}50%{transform:scale(1.06);box-shadow:0 0 0 .3125rem rgba(52,190,237,.35), 0 0 1.75rem .375rem rgba(52,190,237,.65)}}
+@media (prefers-reduced-motion:reduce){ .st *,.st *::before,.st *::after{animation:none!important} .st-rays{scale:1;opacity:.55} .st-bar i{transform:none} }
+/* a phone: one column. The hero stacks, the road climbs down the left, the tiles become rows */
+@media (max-width:760px){
+  .st{padding:var(--s-5) var(--s-4)!important} .pf-foot{justify-content:center;text-align:center} .pf-foot-btns{justify-content:center}
+  .st-hero{grid-template-columns:auto minmax(0,1fr);padding:var(--s-4) var(--s-3)} .st-crest{width:5.5rem;height:5.5rem} .st-crest .st-disc{width:5rem;height:5rem} .st-rank-name{font-size:var(--t-xl);white-space:normal} .st-streak{grid-column:1/-1;min-width:0} .st-ribbon{font-size:var(--t-md);padding:0 1.25rem}
+  .st-nodes{grid-template-columns:1fr;gap:.5rem} .st-nodes::before,.st-nodes::after{display:none}      /* the track is a segment per node, disc centre to disc centre: the nodes are not equal in height here (the next one holds the button), so one long bar would run past the last disc and a fraction of it would miss the discs */
+  .st-node:not(:last-child)::before,.st-node.is-won:has(+ .is-won)::after{content:"";position:absolute;left:1.75rem;top:1.75rem;width:.875rem;height:calc(100% + .5rem);margin-left:-.4375rem;border-radius:var(--r-pill);background:var(--sky-3);box-shadow:inset .125rem 0 .25rem rgba(120,170,200,.35)}
+  .st-node.is-won:has(+ .is-won)::after{background:linear-gradient(90deg,var(--gold-1),var(--gold-2) 50%,var(--gold-3));box-shadow:inset -.125rem 0 0 rgba(201,127,8,.4);transform-origin:50% 0;animation:st-track-v 700ms var(--ease-out) 300ms backwards}      /* the gold segment over the sky one, for a beaten pair */
+  .st-node{display:grid;grid-template-columns:3.5rem minmax(0,1fr);grid-template-rows:auto auto;column-gap:.75rem;row-gap:.125rem;align-items:start;justify-items:start;text-align:left;padding:0} .st-node .st-disc{grid-row:1/span 3} .st-node .pf-level{align-items:flex-start}
+  .st-tag,.st-node .pf-next{grid-column:2} .st-node:first-child .pf-next,.st-node:last-child .pf-next{align-self:auto;justify-self:start}
+  .st-people{grid-template-columns:1fr;grid-template-areas:"h" "wl" "bar" "chips"} .st-bar{margin-bottom:1.25rem}
+  .st-tiles{grid-template-columns:1fr} .st-tile{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto;grid-template-areas:"b l n" "b c n";column-gap:.75rem;align-items:center;min-height:4.5rem;padding:.5rem .875rem}
+  .st-badge{position:static;grid-area:b} .st-tile .caps{grid-area:l} .st-cap{grid-area:c} .st-num{grid-area:n;margin:0} .st-num b{font-size:2.25rem} .st-cap{flex-wrap:wrap;row-gap:.25rem}      /* a row keeps its gold chip (a best has to look won); it wraps under the caption when the row is too narrow for both */
+}
 
 /* the account cards (9.5, 9.7): one at a time, over everything (the result card too, which keeps its own buttons), on the lobby's frosted veil like .ask */
 .acct-layer{position:fixed;inset:0;z-index:calc(var(--z-toast) + 1);display:grid;place-items:center;padding:var(--edge);background:rgba(232,243,249,.72);overscroll-behavior:contain}

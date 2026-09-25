@@ -81,27 +81,64 @@ export function result(p) {                                 // the 'profile' mes
   show('result-save', !!(line || notice || nudge));      // no focus is taken: the rematch buttons keep it
 }
 
-// ---------- Your stats (9.4) ----------
-function row(dl, label, value, sub) { const d = mk('div', 'pf-row'); d.append(mk('dt', '', label)); const dd = mk('dd', '', value); if (sub) dd.append(mk('small', '', sub)); d.append(dd); dl.append(d); }
-function drawLadder(p) {
-  const ol = $('pf-rungs'); if (!ol) return; ol.textContent = ''; let next = null;
-  const rows = p && Array.isArray(p.matt) ? p.matt : [];
-  for (const lv of ORDER) {
-    const r = rows.find(x => x && x.level === lv) || {}, won = Number.isFinite(r.firstWinAt) && r.firstWinAt > 0, li = mk('li', 'pf-rung' + (won ? ' is-won' : ' is-locked'));
-    li.dataset.level = lv; if (!won && next == null) next = lv;
-    const who = mk('span', 'pf-level'); who.append(mk('b', '', `${LEVEL[lv]} Matt`), mk('small', '', `${num(r.wins)}-${num(r.losses)}` + (num(r.streak) ? ` · streak ${num(r.streak)}` : '') + (num(r.bestStreak) ? ` · best ${num(r.bestStreak)}` : '')));
-    const chip = mk('span', 'pf-chip' + (won ? ' is-medal' : ''), won ? `Beaten on ${day(r.firstWinAt)}` : 'Not beaten yet');
-    li.append(mk('i', 'pf-dot'), who, chip); ol.append(li);
-  }
-  const b = $('btn-pf-next'); if (b) { b.hidden = next == null; b.dataset.level = next == null ? '' : String(next); b.textContent = next == null ? '' : `Next: beat ${LEVEL[next]} Matt`; }
+// ---------- Your stats (9.4): the player card. drawRoad (the hero and the four boss nodes), drawPeople and drawTiles fill index.html's markup ----------
+const NS = 'http://www.w3.org/2000/svg', dayS = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(new Date(ms).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) }) : '';      // "Sep 19": the card's dates are chips, the long form is for sentences
+const ICON = {      // the boss discs: won = the result card's star, next = Matt's face, locked = a padlock. Constants only: nothing from the server goes through here
+  star: ['0 0 48 48', [['path', { d: 'M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z' }]]],
+  face: ['0 0 24 24', [['circle', { cx: 12, cy: 8, r: 5 }], ['path', { d: 'M4 21c1-4.5 4-7 8-7s7 2.5 8 7' }], ['path', { d: 'M9.5 8h.01M14.5 8h.01', 'stroke-width': 3 }]]],
+  lock: ['0 0 24 24', [['rect', { x: 5, y: 10.5, width: 14, height: 10, rx: 2.5 }], ['path', { d: 'M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2.5' }]]] };
+function svg(name) { const [box, parts] = ICON[name], s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', box); s.setAttribute('aria-hidden', 'true');
+  for (const [tag, at] of parts) { const e = document.createElementNS(NS, tag); for (const k of Object.keys(at)) e.setAttribute(k, at[k]); s.append(e); } return s; }
+const cls = (id, c, onOff) => { const el = $(id); if (el) el.classList.toggle(c, !!onOff); };
+const human = p => p && p.human && typeof p.human === 'object' ? p.human : {};
+function rungs(p) {                                         // the four Matt rows in difficulty order, and what the card makes of them
+  const rows = ORDER.map(lv => (p && Array.isArray(p.matt) ? p.matt : []).find(x => x && x.level === lv) || {}), won = rows.map(r => Number.isFinite(r.firstWinAt) && r.firstWinAt > 0);
+  return { rows, won, beaten: won.filter(Boolean).length, top: won.lastIndexOf(true), nextI: won.indexOf(false) };      // top: the hardest Matt beaten = the rank (-1: none); nextI: -1 once all four are
 }
-function drawSide(p) {
-  const hu = $('pf-human'), be = $('pf-bests'); if (!hu || !be) return; hu.textContent = be.textContent = '';
-  const H = p && p.human && typeof p.human === 'object' ? p.human : {}, B = p && p.bests && typeof p.bests === 'object' ? p.bests : {};
-  row(hu, 'Record', `${num(H.wins)}-${num(H.losses)}`); row(hu, 'Win streak', `${num(H.streak)}`, `best ${num(H.bestStreak)}`);
-  row(hu, 'Points', `${num(H.pointsWon)}-${num(H.pointsLost)}`); row(hu, 'Tournament titles', `${num(p && p.titles)}`);
-  const best = (k, f) => { const x = B[k] && typeof B[k] === 'object' ? B[k] : {}, v = Number.isFinite(x.v) && x.v > 0 ? x.v : 0; return v ? [f(v), day(x.at)] : ['None yet', '']; };
-  row(be, 'Longest rally', ...best('rally', v => `${Math.round(v)} hits`)); row(be, 'Fastest swing', ...best('speed', v => `${degs(v)}°/s`));      // no Hardest hit: a unitless number nobody can read
+function drawRoad(p) {
+  const { rows, won, beaten, top, nextI } = rungs(p), H = human(p), name = i => `${LEVEL[ORDER[i]]} Matt`;
+  // the hero: the crest and the rank name are the hardest Matt beaten (every rank is gold, the tier is the name and the stars); the ribbon is the hottest live streak against anyone
+  const crest = $('st-crest'); if (crest) crest.className = 'st-crest' + (top < 0 ? ' is-none' : beaten === 4 ? ' is-pro' : '');
+  text('st-rank', top < 0 ? 'Unranked' : `${LEVEL[ORDER[top]]} player`); cls('st-rank', 'is-none', top < 0);
+  text('st-rank-cap', top < 0 ? 'Beat Rookie Matt to start your road' : nextI < 0 ? 'All 4 Matts beaten' : nextI < top ? `${beaten} of 4 Matts beaten · beat ${name(nextI)} to fill the road` : `${beaten} of 4 Matts beaten · beat ${name(nextI)} for ${LEVEL[ORDER[nextI]]} player`);      // says what the next rank needs, so it never argues with the Next button. Every level is free to pick, so Pro can fall before Club: then the next Matt fills a gap, it is no promotion
+  const stars = $('st-stars'); if (stars) { stars.setAttribute('aria-label', `${beaten} of 4 stars`); [...stars.children].forEach((s, i) => s.classList.toggle('is-on', i < beaten)); }
+  let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
+  const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
+  if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one
+  text('st-streak-n', String(hot.n));
+  const cap = $('st-streak-cap'); if (cap) { cap.textContent = hot.n === 1 ? `vs ${hot.who} · win again to build it` : hot.n ? `vs ${hot.who} · best ` : 'Win one match to light the flame'; if (hot.n >= 2) cap.append(mk('b', '', String(best))); }
+  // the road: a node a Matt, the gold track to the last one beaten. The Next button is the SAME element every draw (its click handler is wired once): it moves into the next node
+  const ol = $('pf-rungs'), btn = $('btn-pf-next'); if (!ol) return; ol.textContent = ''; ol.style.setProperty('--p', String((nextI < 0 ? 3 : Math.max(0, nextI - 1)) / 3));      // gold up to the last node of the beaten run from Rookie: a Pro medal past a gap never gilds the locked track under Club
+  rows.forEach((r, i) => {
+    const lv = ORDER[i], state = won[i] ? 'won' : i === nextI ? 'next' : 'locked', li = mk('li', 'st-node is-' + state); li.dataset.level = lv;
+    const disc = mk('i', 'st-disc'); disc.append(svg(state === 'won' ? 'star' : state === 'next' ? 'face' : 'lock'));
+    const who = mk('span', 'pf-level'), rec = mk('small', '', `${num(r.wins)}-${num(r.losses)}`);      // the record leads (test/profile-ui.mjs reads it), the streak is its small print
+    if (num(r.streak)) rec.append(mk('i', '', `· streak ${num(r.streak)}`)); else if (num(r.bestStreak)) rec.append(mk('i', '', `· best ${num(r.bestStreak)}`));
+    who.append(mk('b', '', name(i)), rec);
+    const tag = mk('span', 'st-tag' + (state === 'won' ? ' is-medal' : state === 'next' ? ' is-next' : ''), state === 'won' ? `Beaten ${dayS(r.firstWinAt)}` : state === 'next' ? (top < 0 ? 'Start here' : 'Up next') : i === 3 ? 'The final boss' : `Beat ${LEVEL[ORDER[i - 1]]} first`);
+    li.append(disc, who, tag);
+    if (state === 'next' && btn) { btn.hidden = false; btn.dataset.level = String(lv); btn.textContent = `Next: beat ${LEVEL[lv]} Matt`; btn.classList.add('is-focus'); li.append(btn); }
+    ol.append(li);
+  });
+  if (btn && nextI < 0) { btn.hidden = true; btn.dataset.level = ''; btn.textContent = ''; btn.classList.remove('is-focus'); ol.after(btn); }      // all four beaten: parked, hidden, back under the list
+}
+function drawPeople(p) {                                    // W-L, the tug-of-war bar with its two labels, the streak chips; nothing played: the empty track and a coaching line
+  const H = human(p), w = num(H.wins), l = num(H.losses), played = w + l, pct = played ? Math.round(100 * w / played) : 0;
+  text('st-w', String(w)); text('st-l', String(l));
+  const bar = $('st-bar'); if (bar) { bar.style.setProperty('--w', pct + '%'); bar.classList.toggle('is-empty', !played); }
+  text('st-bar-l', `${pct}% won`); text('st-pts', `${num(H.pointsWon)}-${num(H.pointsLost)}`); show('st-bar-l', !!played); show('st-bar-r', !!played); show('st-people-hint', !played);
+  show('st-chips', !!played); text('st-hstreak', String(num(H.streak))); text('st-hbest', String(num(H.bestStreak))); cls('st-hchip', 'is-one', num(H.streak) >= 1);
+}
+function tile(id, v, cap, chip) {                           // one number tile: the number (blue even at 0), its unit only with a value, the caption (a coaching line in blue when there is nothing yet), the gold chip
+  const t = $(id); if (!t) return; const b = t.querySelector('.st-num b'), u = t.querySelector('.st-num small'), c = t.querySelector('.st-cap'), ch = t.querySelector('.st-chip');
+  if (b) b.textContent = String(v); if (u) u.hidden = !v || !u.textContent; if (c) { c.firstElementChild.textContent = cap; c.classList.toggle('is-hint', !v); } if (ch) { ch.hidden = !v; if (chip) ch.textContent = chip; }
+}
+function drawTiles(p) {
+  const B = p && p.bests && typeof p.bests === 'object' ? p.bests : {}, best = k => { const x = B[k] && typeof B[k] === 'object' ? B[k] : {}; return Number.isFinite(x.v) && x.v > 0 ? x : null; }, titles = num(p && p.titles);
+  tile('st-t-titles', titles, titles ? `Tournament win${titles === 1 ? '' : 's'}` : 'Win a tournament to lift a cup', titles > 1 ? `Champion ×${titles}` : 'Champion');
+  const r = best('rally'), s = best('speed');      // no Hardest hit: a unitless number nobody can read
+  tile('st-t-rally', r ? Math.round(r.v) : 0, r ? `Set on ${dayS(r.at)}` : 'Keep the ball in play');
+  tile('st-t-speed', s ? degs(s.v) : 0, s ? `Set on ${dayS(s.at)}` : 'Swing hard, it counts');
 }
 function drawHead(p) {
   const n = $('pf-name'), name = me.account && me.account.username, typed = (($('name-input') || {}).value || '').trim().slice(0, 12);      // the lobby's name field holds the cleaned display name
@@ -109,9 +146,9 @@ function drawHead(p) {
   text('pf-sub', !statsOn() ? 'Stats are off' : me.account ? 'Stats saved to your account' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
   show('pf-notice', !!(p && p.guest === true && statsOn() && !me.account));      // the one-time notice (9.3) for everyone, always here: a player who left or forfeited never gets the result card's copy
 }
-export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available)
-  drawHead(p); drawLadder(p || null); drawSide(p || null); drawAcct();
-  const msg = p === undefined ? 'Stats aren’t available right now. The game still works.' : p === null ? 'Play a match to start your record' : '';
+export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available). Guest or signed in changes only the header: every stat draws the same way
+  drawHead(p); drawRoad(p || null); drawPeople(p || null); drawTiles(p || null); drawAcct();
+  const msg = p === undefined ? 'Stats aren’t available right now. The game still works.' : '';      // nothing yet: no bar, the card's own lines say it (Start here, the people hint, the tile captions)
   text('pf-msg', msg); show('pf-msg', !!msg); // download and delete live on the privacy page (web/data-tools.js): the footer links there
 }
 export async function showProfile() {                      // the lobby view opened: draw what is known at once (empty), then the answer

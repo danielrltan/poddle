@@ -1864,3 +1864,32 @@ A pass over every screen the stats feature added, at desktop and phone size, jud
 - **Your stats header.** Signed in: the username with its badge and a pen icon beside it (pick or change the
   username), and a real Sign out button with an exit icon on the right, where the Google button sits for a guest.
   The old "Signed in · Change name · Sign out" text row is gone.
+
+## 103. Your stats is a player card: a rank crest, the Trophy Road, the people bar and three number tiles
+
+- **The view is a card, not a table.** A hero well on top: the crest (a gold medal with a star, a crown once all four
+  Matts are beaten, a dashed silver ? before the first win) with a one-shot halo, the rank name in the player's blue
+  ("Club player" = the hardest Matt beaten, in difficulty order Rookie, Club, Tour, Pro), four stars beside the Rank
+  label (on the caption's line they and the caption need two lines at 1280, and the card scrolls), and the streak ribbon: the hottest live streak against anyone, gold from two wins up, never for one. Then the
+  Trophy Road: the four Matts as nodes on a sky track, gold up to the last one beaten in a run from Rookie, a gold
+  star for a beaten one ("Beaten Sep 19"), Matt's face pulsing on the next one with the Next button inside that node,
+  a padlock on the rest ("Beat Club first", "The final boss"). The W-L record is each node's big number, its streak
+  the small print. Under it, Against people: W-L, a blue-orange tug-of-war bar ("60% won" / "Points 50-41") and the
+  Streak / Best chips; and three tiles: Titles, Longest rally, Fastest swing, each with its date and a gold chip.
+  Hardest hit is gone from the page (a unitless number). Empty: a coaching line per block ("Start here", "Play a
+  person to start your record", "Win a tournament to lift a cup", "Keep the ball in play", "Swing hard, it counts")
+  and no "Play a match to start your record" bar over them; the bar stays for "Stats aren't available right now".
+- **Out-of-order wins.** Every level is free to pick, so Pro can fall before Club. The rank is still the hardest Matt
+  beaten, the Next button still points at the easiest one not beaten, and the caption then says "beat Club Matt to
+  fill the road" (no promotion promised); the gold track never runs past a gap.
+- **Motion** is the deal-in only: the crest drops, the halo grows once, the ribbon swings in, the track fills, the
+  stars and numbers pop, the nodes and tiles stagger in; the next node's pulse is the one loop. Reduced motion turns
+  all of it off. On a phone the hero stacks, the road runs down the left in one column (its track a segment per
+  node, disc to disc) and the tiles become rows that keep their gold chips.
+- **Sizes are chosen for 1280×800 without a scroll** (the lobby's head and foot leave the panel about 42rem): the
+  crest is the biggest thing on the card, the halo fades out inside the well.
+- Header, footer, ids and the data mapping are unchanged (docs/ACCOUNTS.md 9.4 rewritten to the card). No new data
+  flow, storage key or third party: the legal pages need no change.
+- test/profile-ui.mjs reads the new markup, adds the out-of-order case (Rookie + Pro beaten), clicks the Next button
+  (a private create, then bot level 3 against the fake game) and screenshots the empty state at both sizes too
+  (test/ui-shots/accounts/stats-empty-*.png).

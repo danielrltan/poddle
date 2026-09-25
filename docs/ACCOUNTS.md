@@ -1096,20 +1096,34 @@ builder at :383 and `backTo()` :377-378 are NOT changed.
 - New view `<div class="panel panel-mid lobby-view" id="lobby-profile" data-view="profile" data-fit hidden>`.
   Register in ui.js :535-538: `VIEW_TITLE.profile = 'Your stats'`, `VIEW_DEPTH.profile = 1`, add to `NO_NAME`,
   and a `firstFocus`. main.js `ui.onLobby` (:658-662): `profile()` → `profile.fetchProfile()` → `ui.drawProfile(p)`.
-- Contents, top to bottom:
-  1. Header row: registered username with badge, or "Guest" + "Stats saved on this device until {date}" (from
-     `expiresAt`). Signed-in only when enabled: "Sign in with Google" (`.btn`) or "Signed in · Change name · Sign out".
-  2. Matt ladder: three rungs, Rookie, Club, Pro (Tour is the tournaments' Matt and is not a rung; Q2). Under the
-     ladder, only when `tourMatt` is not null, one quiet line "Tournament Matt: W-L". Each rung: level name, W-L, current streak,
-     a medal chip when `firstWinAt` is set ("Beaten on {date}") or a locked chip "Not beaten yet". The easiest level
-     not yet beaten gets a "Next: beat {Level} Matt" call-to-action button that goes straight to Play a bot at that
-     level (`request({type:'create',public:false})` with `botWant` set, as the bot view does).
-  3. Against people: W-L, current and best streak, points won/lost, tournament titles.
-  4. Personal bests: longest rally, hardest hit, fastest swing, each with its date.
-  5. A one-line note: "Only you can see this page."
-  6. Footer (`.set-foot` style): "Download my data" (`.btn-quiet`) and "Delete my data" (`.btn-danger`).
-- Empty state (no profile yet): "Play a match to start your record" + the three rungs all locked.
-- DB unavailable / request failed: "Stats aren’t available right now. The game still works."
+- Contents, top to bottom (the player card, `.st-*` in ui.css, drawn by profile.js `drawRoad` / `drawPeople` / `drawTiles`):
+  1. Header row: registered username with badge and a pen (`#btn-pf-rename`), or "Guest" + "Stats saved on this
+     device until {date}" (from `expiresAt`) and the one-time notice. Signed-in only when enabled: the "Sign in with
+     Google" CTA (`#btn-pf-signin`) or a Sign out button (`#btn-pf-signout`) on the right.
+  2. Hero well: the crest (a gold medal disc with a star; a crown once all four Matts are beaten; a dashed silver `?`
+     before the first win), the "Rank" label with four stars beside it (one lit per Matt beaten), the rank name in
+     the player's blue ("{Level} player" = the HARDEST Matt beaten, in difficulty order Rookie, Club, Tour, Pro;
+     "Unranked" before the first), a one-line caption: "{n} of 4 Matts beaten · beat {Next} Matt for {Next} player", or "… to fill the road" when a harder Matt
+     fell before an easier one (every level is free to pick), or "All 4 Matts beaten"; and the streak ribbon: the
+     hottest live streak against anyone, gold from two wins up, "vs {who} · best {n}" under it.
+  3. Trophy Road: four nodes, Rookie, Club, Tour, Pro (the Tour Matt IS a rung: every level counts, Q2), joined by a
+     sky track whose gold fill runs over the beaten run from Rookie (never past a gap). Each node: a disc (gold star =
+     beaten, Matt's face pulsing = up next, a padlock = locked), the level name, W-L with the streak or best as small
+     print, and a tag: "Beaten {Mon d}", "Up next" ("Start here" before the first win), "Beat {Level} first", "The
+     final boss". The Next button (`#btn-pf-next`, "Next: beat {Level} Matt", `data-level`) sits inside the up-next
+     node and goes straight to Play a bot at that level (`request({type:'create',public:false})` with `botWant` set,
+     as the bot view does); it is hidden once all four are beaten.
+  4. Against people: W-L, a tug-of-war bar ("{pct}% won" / "Points {w}-{l}"), Streak and Best chips. Nothing played
+     yet: an empty track with "Play a person to start your record".
+  5. Three tiles: Titles ("Tournament win(s)", a gold Champion chip), Longest rally ("{n} hits"), Fastest swing
+     ("{n} °/s", `degs()` rounded to 10), each with "Set on {Mon d}" and a Personal best chip; no Hardest hit
+     (unitless). Empty: a blue 0 and a coaching caption ("Win a tournament to lift a cup", "Keep the ball in play",
+     "Swing hard, it counts").
+  6. Footer line: "Only you can see this page. Download or delete your data" (links to the privacy page, 9.7).
+  On a phone (≤760px) the hero stacks, the road runs down the left as one column and the tiles become rows.
+- Empty state (no profile yet): the `?` crest, Unranked, Rookie up next with the Next button, the hints above; no
+  `#pf-msg` bar (the card's own lines say it).
+- DB unavailable / request failed: `#pf-msg` "Stats aren’t available right now. The game still works."
 
 ### 9.5 Sign-in card and username claim
 - `#signin-card` (`.panel.panel-sm`, role dialog, `aria-modal`, Escape closes). Text: "Sign in to keep your stats on
