@@ -85,7 +85,7 @@ export function result(p) {                                 // the 'profile' mes
 const NS = 'http://www.w3.org/2000/svg', dayS = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(new Date(ms).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) }) : '';      // "Sep 19": the card's dates are chips, the long form is for sentences
 const ICON = {      // the boss discs: won = the result card's star, next = Matt's face, locked = a padlock. Constants only: nothing from the server goes through here
   star: ['0 0 48 48', [['path', { d: 'M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z' }]]],
-  face: ['0 0 24 24', [['circle', { cx: 12, cy: 8, r: 5 }], ['path', { d: 'M4 21c1-4.5 4-7 8-7s7 2.5 8 7' }], ['path', { d: 'M9.5 8h.01M14.5 8h.01', 'stroke-width': 3 }]]],
+  face: ['0 0 24 24', [['circle', { cx: 12, cy: 8.25, r: 4.25 }], ['path', { d: 'M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z' }], ['path', { d: 'M10.25 8.5v.75M13.75 8.5v.75', 'stroke-width': 2.5 }], ['path', { d: 'M10.5 17.25h3', 'stroke-width': 2.5 }]]],      // Matt: the Play a bot tile's head and shoulders (index.html #btn-bot), scaled 96 -> 24
   lock: ['0 0 24 24', [['rect', { x: 5, y: 10.5, width: 14, height: 10, rx: 2.5 }], ['path', { d: 'M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2.5' }]]] };
 function svg(name) { const [box, parts] = ICON[name], s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', box); s.setAttribute('aria-hidden', 'true');
   for (const [tag, at] of parts) { const e = document.createElementNS(NS, tag); for (const k of Object.keys(at)) e.setAttribute(k, at[k]); s.append(e); } return s; }
@@ -101,7 +101,6 @@ function drawRoad(p) {
   const crest = $('st-crest'); if (crest) crest.className = 'st-crest' + (top < 0 ? ' is-none' : beaten === 4 ? ' is-pro' : '');
   text('st-rank', top < 0 ? 'Unranked' : `${LEVEL[ORDER[top]]} player`); cls('st-rank', 'is-none', top < 0);
   text('st-rank-cap', top < 0 ? 'Beat Rookie Matt to start your road' : nextI < 0 ? 'All 4 Matts beaten' : nextI < top ? `${beaten} of 4 Matts beaten · beat ${name(nextI)} to fill the road` : `${beaten} of 4 Matts beaten · beat ${name(nextI)} for ${LEVEL[ORDER[nextI]]} player`);      // says what the next rank needs, so it never argues with the Next button. Every level is free to pick, so Pro can fall before Club: then the next Matt fills a gap, it is no promotion
-  const stars = $('st-stars'); if (stars) { stars.setAttribute('aria-label', `${beaten} of 4 stars`); [...stars.children].forEach((s, i) => s.classList.toggle('is-on', i < beaten)); }
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
   if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one

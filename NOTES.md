@@ -1896,3 +1896,13 @@ A pass over every screen the stats feature added, at desktop and phone size, jud
 
 ## 104. No GAME! stamp on the result card
 The owner found the "GAME!" / "CHAMPION!" stamp from section 97 cheesy and asked for something more neutral. The stamp element (#result-slam) and the screen shake that came with it are gone. In their place, one soft band of light crosses the card from left to right as it lands (#result-flash, 900 ms, starting at 260 ms). It can't be clicked, and reduced motion hides it. The medal and rays, crown and claps, count-up, stats and jingles are unchanged. The ui-next checks now assert that no stamp exists.
+
+## 105. Your stats has no footer line
+
+"Only you can see this page. Download or delete your data" is gone from the panel: the owner's call, and the privacy
+page already says both (statistics are shown only to you, section 4; the Your data box, section 9). Privacy 4 no
+longer points at Your stats for downloading or deleting.
+Also: the rank stars are gone (nobody could say what four stars meant; the caption "2 of 4 Matts beaten" says it), Matt's
+disc and the Trophy Road heading use the Play a bot tile's head (the previous face read as an egg with a crown), and
+the tiles' icons are a pickleball paddle with a ball (Longest rally) and a speed gauge (Fastest swing): the old ones
+looked like a badminton racket and a leaf.

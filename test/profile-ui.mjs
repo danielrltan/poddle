@@ -142,11 +142,11 @@ await pg.setViewport({ width: 1280, height: 720 }); await sleep(250);
 await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500);
 r = await ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.st-tag')?.textContent, l.className]),
   next: document.getElementById('btn-pf-next').textContent, nextIn: document.getElementById('btn-pf-next').closest('li')?.dataset.level, lvl: document.getElementById('btn-pf-next').dataset.level, bests: document.getElementById('pf-bests').textContent, human: document.getElementById('pf-human').textContent,
-  w: document.getElementById('st-w').textContent, l: document.getElementById('st-l').textContent, rank: document.getElementById('st-rank').textContent, streak: document.getElementById('st-streak').textContent.replace(/\s+/g, ' ').trim(), crest: document.getElementById('st-crest').className, stars: document.querySelectorAll('#st-stars .is-on').length }));
+  w: document.getElementById('st-w').textContent, l: document.getElementById('st-l').textContent, rank: document.getElementById('st-rank').textContent, streak: document.getElementById('st-streak').textContent.replace(/\s+/g, ' ').trim(), crest: document.getElementById('st-crest').className}));
 ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie Matt', 'Club Matt', 'Tour Matt', 'Pro Matt']), `Your stats: four rungs, Rookie, Club, Tour, Pro (${J(r.rungs.map(x => x[0]))})`);
 ok(/^Beaten /.test(r.rungs[0]?.[1]) && /^Beaten /.test(r.rungs[1]?.[1]) && r.rungs[2]?.[1] === 'Up next' && r.rungs[3]?.[1] === 'The final boss' && r.next === 'Next: beat Tour Matt' && r.nextIn === '3' && r.lvl === '3', `road tags: beaten, beaten, up next, the final boss; the Next button sits in the Tour node with data-level 3 (${J(r.rungs.map(x => x[1]))}, ${r.next} in level ${r.nextIn}, data-level ${r.lvl})`);
 ok(r.rungs[0][2].includes('is-won') && r.rungs[1][2].includes('is-won') && r.rungs[2][2].includes('is-next') && r.rungs[3][2].includes('is-locked'), `road nodes: won, won, next, locked (${J(r.rungs.map(x => x[2]))})`);
-ok(r.rank === 'Club player' && r.stars === 2 && r.crest === 'st-crest' && /^3 win streak vs Rookie Matt · best 3$/.test(r.streak), `hero: Club player, 2 stars, gold crest, the hottest streak is 3 vs Rookie Matt (${r.rank}, ${r.stars}, ${r.crest}, "${r.streak}")`);
+ok(r.rank === 'Club player' && r.crest === 'st-crest' && /^3 win streak vs Rookie Matt · best 3$/.test(r.streak), `hero: Club player, gold crest, the hottest streak is 3 vs Rookie Matt (${r.rank}, ${r.stars}, ${r.crest}, "${r.streak}")`);
 ok(r.bests.includes('14 hits') && r.bests.includes('540°/s') && !r.bests.includes('Hardest') && r.w === '3' && r.l === '2' && r.human.includes('60% won') && r.human.includes('50-41') && r.human.includes('Streak 1') && r.human.includes('Best 2'), `bests and the human record drawn (${r.bests.slice(0, 80)} | ${r.human.slice(0, 80)})`);
 ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your stats asks /api/stats with the device id in the body');
 { // the panel fits every window: inside the viewport's width, and no rung line or chip cut short with an ellipsis
@@ -202,16 +202,16 @@ await pg.close();
   await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
   const openStats = async () => { await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500); };
   const panel = () => ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, msg: document.getElementById('pf-msg').hidden ? '' : document.getElementById('pf-msg').textContent,
-    rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.pf-level small')?.textContent]), exp: !!document.querySelector('.pf-foot a[href^="/privacy.html#your-data"]') }));
+    rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.pf-level small')?.textContent]) }));
   await openStats(); let r = await panel();
   ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie Matt', 'Club Matt', 'Tour Matt', 'Pro Matt']) && /^3-0/.test(r.rungs[0][1]) && /^1-1/.test(r.rungs[1][1]) && /^0-2/.test(r.rungs[2][1]), `saved profile: four rungs in order with their records (${J(r.rungs)})`);
   { // out of order (every level is free to pick): Rookie and Pro beaten, Club not. The rank is the hardest beaten, the Next button and the caption point at the gap, and the gold track stops at Rookie
     const reopen = async () => { await ev(pg, () => window.__ui.lobbyView('home')); await sleep(200); await openStats(); };
     API.profile = { ...FIXTURE, matt: [rung(0, 'Rookie', 3, 0, 3, 3, day), rung(1, 'Club', 0, 1, 0, 0, null), rung(3, 'Tour', 0, 0, 0, 0, null), rung(2, 'Pro', 1, 0, 1, 1, day + 7200e3)] }; await reopen();
-    const o = await ev(pg, () => ({ rank: document.getElementById('st-rank').textContent, cap: document.getElementById('st-rank-cap').textContent, p: document.getElementById('pf-rungs').style.getPropertyValue('--p'), crest: document.getElementById('st-crest').className, stars: document.querySelectorAll('#st-stars .is-on').length,
+    const o = await ev(pg, () => ({ rank: document.getElementById('st-rank').textContent, cap: document.getElementById('st-rank-cap').textContent, p: document.getElementById('pf-rungs').style.getPropertyValue('--p'), crest: document.getElementById('st-crest').className,
       nodes: [...document.querySelectorAll('#pf-rungs > li')].map(l => l.className.replace('st-node ', '')), lvl: document.getElementById('btn-pf-next').dataset.level, nextIn: document.getElementById('btn-pf-next').closest('li')?.dataset.level }));
-    ok(o.rank === 'Pro player' && o.cap === '2 of 4 Matts beaten · beat Club Matt to fill the road' && o.p === '0' && o.crest === 'st-crest' && o.stars === 2 && J(o.nodes) === J(['is-won', 'is-next', 'is-locked', 'is-won']) && o.lvl === '1' && o.nextIn === '1',
-      `Rookie + Pro beaten: Pro player, 2 stars, no crown, the caption points at Club without promising a rank, --p 0, Next on Club (${J(o)})`);
+    ok(o.rank === 'Pro player' && o.cap === '2 of 4 Matts beaten · beat Club Matt to fill the road' && o.p === '0' && o.crest === 'st-crest' && J(o.nodes) === J(['is-won', 'is-next', 'is-locked', 'is-won']) && o.lvl === '1' && o.nextIn === '1',
+      `Rookie + Pro beaten: Pro player, no crown, the caption points at Club without promising a rank, --p 0, Next on Club (${J(o)})`);
     API.profile = FIXTURE; await reopen(); }
   for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-${w}x${h}.png`) }); }
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();
@@ -225,7 +225,7 @@ await pg.close();
   let file = ''; for (let k = 0; k < 30 && !file; k++) { await sleep(200); file = fs.readdirSync(DL).find(f => f.endsWith('.json')) || ''; }
   let parsed = null; try { parsed = JSON.parse(fs.readFileSync(path.join(DL, file), 'utf8')); } catch { parsed = null; }
   const ex = API.log.slice(n0).find(l => l[0] === 'POST' && l[1] === '/api/export');
-  ok(r.exp && !!ex && ex[2]?.dev === ID && file === 'poddle-data-2026-09-24.json' && parsed?.profile?.matt?.length === 4, `privacy page: Download a copy POSTs /api/export with the id (${J(ex && ex[2])}), downloaded "${file}", JSON with ${parsed?.profile?.matt?.length} rungs; Your stats links there (${r.exp})`);
+  ok(!!ex && ex[2]?.dev === ID && file === 'poddle-data-2026-09-24.json' && parsed?.profile?.matt?.length === 4, `privacy page: Download a copy POSTs /api/export with the id (${J(ex && ex[2])}), downloaded "${file}", JSON with ${parsed?.profile?.matt?.length} rungs`);
   // Delete my data: an inline confirm (Cancel focused), Delete: DELETE /api/account with the id and confirm, the id goes, the status says so
   await ev(pg, () => document.getElementById('btn-delete').click()); await sleep(300);
   r = await ev(pg, () => ({ card: !document.getElementById('data-confirm').hidden, focus: document.activeElement?.id || '' }));
