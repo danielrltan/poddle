@@ -57,7 +57,7 @@
   // Mock driver: forces each state through the real ui.js API. Nothing here is game logic.
   const $ = id => document.getElementById(id), qs = new URLSearchParams(location.search), screen = qs.get('screen') || 'title';
   const SCREENS = ['title', 'lobby', 'lobby-first', 'lobby-bot', 'lobby-ask', 'lobby-courts', 'lobby-courts-full', 'lobby-courts-loading', 'lobby-courts-empty', 'lobby-courts-empty-full', 'lobby-courts-nomatch', 'lobby-courts-down', 'lobby-courts-err', 'lobby-courts-link', 'lobby-courts-many', 'connect', 'calibrate1', 'calibrate2', 'calibrate-error', 'calibrate-settle', 'calibrate-done', 'hud', 'hud-countdown', 'hud-callout', 'hud-point-you', 'hud-point-enemy', 'hud-arrivals', 'serve-prompt', 'hud-airpod-lost', 'hud-stats',
-    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'server-down', 'game-full', 'hud-ask', 'hud-ask-settings', 'match-ask', 'watch-ask',
+    'settings', 'settings-paused', 'settings-stats', 'settings-watch', 'hud-paused', 'hold', 'watch', 'watch-split', 'watch-pov', 'watch-point', 'match-win', 'match-voted', 'match-asked', 'match-left', 'match-lose', 'match-forfeit', 'match-watch', 'match-legacy', 'match-nostats', 'server-down', 'game-full', 'hud-ask', 'hud-ask-settings', 'match-ask', 'watch-ask',
     'tourney-courts', 'tourney-host-empty', 'tourney-host-3', 'tourney-host-ready', 'tourney-host-16', 'tourney-guest', 'tourney-warmfull', 'tourney-banner', 'tourney-banner-host', 'tourney-card', 'tourney-intro', 'tourney-bracket', 'tourney-win', 'tourney-out', 'tourney-champion', 'tourney-champion-watch', 'tourney-ended', 'tourney-match', 'tourney-match-settings', 'tourney-match-qq'];
   // extra params: &bg=court|grass (flat ground under the HUD) · &name=<player name> · &opp=<opponent> (try a hostile one) · &idle=1 · &freeze=1
   if (qs.get('freeze') === '1') document.documentElement.classList.add('freeze');
@@ -154,13 +154,14 @@
       'hold': () => { hud(); ui.setServe(null); ui.hold(opp, 12); },
       'watch': () => watch(), 'watch-split': () => watch('split'), 'watch-pov': () => watch('pov', opp),
       'watch-point': () => { watch(); ui.pointBanner(null, opp, 1); },
-      'match-win': () => result({ won: true, me: 11, them: 8 }, { mine: null, theirs: null, left: 20 }),
+      'match-win': () => result({ won: true, me: 11, them: 8, stats: { rally: 14, smashes: 3, run: 5 } }, { mine: null, theirs: null, left: 20 }),
       'match-voted': () => result({ won: true, me: 11, them: 8 }, { mine: true, theirs: null, left: 14 }),
       'match-asked': () => result({ won: false, me: 9, them: 11 }, { mine: null, theirs: true, left: 17 }),
       'match-left': () => result({ won: true, me: 11, them: 8 }, { mine: true, theirs: false, left: 9 }),
-      'match-lose': () => result({ won: false, me: 9, them: 11 }, { left: 20 }),
+      'match-lose': () => result({ won: false, me: 9, them: 11, stats: { rally: 7, smashes: 0, run: 4 } }, { left: 20 }),
       'match-forfeit': () => result({ won: true, me: 6, them: 4, forfeit: true }, { left: 20 }),
-      'match-watch': () => { watch(); ui.matchResult({ won: false, me: 9, them: 11, nameMe: me, nameThem: opp, role: 'spectator' }); ui.rematch({ left: 16 }); },
+      'match-watch': () => { watch(); ui.matchResult({ won: false, me: 9, them: 11, nameMe: me, nameThem: opp, role: 'spectator', stats: { rally: 12, smashes: 4, run: 3 } }); ui.rematch({ left: 16 }); },
+      'match-nostats': () => result({ won: true, me: 11, them: 8, stats: null }, { mine: null, theirs: null, left: 20 }),      // main.js did not see every point: no stats row
       'match-legacy': () => { hud(11, 8, 0); ui.setServe(null); ui.matchResult(true, 11, 8, opp); },                           // the old positional call: no vote
       'server-down': () => { hud(); ui.setStatus({ game: 'bad' }); ui.setServerAddress('ws://localhost:8080'); ui.showOverlay('server-down'); },
       'game-full': () => { hud(); ui.showOverlay('game-full'); },
@@ -180,8 +181,8 @@
       'tourney-card': () => { warm(tsnap(+qs.get('n') || 5, { you: { id: 1, host: true, warm: 'on' } })); ui.setPaused(true); ui.tourCard(true); },
       'tourney-intro': () => { hud(0, 0, 0); ui.tourVs({ round: 2, name: qs.get('final') ? 'Final' : 'Quarterfinal', n: 2, of: qs.get('final') ? 1 : 4, vs: qs.get('bot') ? { name: 'Matt', bot: true } : { name: 'Kim', bot: false }, target: qs.get('final') ? 11 : 7, final: !!qs.get('final'), at: 4, side: 0 }); },
       'tourney-bracket': () => tourLobby(bracketSnap(+qs.get('n') === 16 ? 16 : 5, qs.get('you') || 'through', qs.get('next') === '1'), 'bracket'),
-      'tourney-win': () => { hud(7, 4, 0); ui.setServe(null); ui.matchResult({ won: true, me: 7, them: 4, nameThem: 'Kim', tour: { round: 'Quarterfinal', next: 'Semifinal', final: false, gap: 6 } }); },
-      'tourney-out': () => { hud(4, 7, 0); ui.setServe(null); ui.matchResult({ won: false, me: 4, them: 7, nameThem: 'Kim', tour: { round: 'Quarterfinal', next: 'Semifinal', final: false, gap: 6 } }); },
+      'tourney-win': () => { hud(7, 4, 0); ui.setServe(null); ui.matchResult({ won: true, me: 7, them: 4, nameThem: 'Kim', stats: { rally: 10, smashes: 2, run: 4 }, tour: { round: 'Quarterfinal', next: 'Semifinal', final: false, gap: 6 } }); },
+      'tourney-out': () => { hud(4, 7, 0); ui.setServe(null); ui.matchResult({ won: false, me: 4, them: 7, nameThem: 'Kim', stats: { rally: 8, smashes: 1, run: 3 }, tour: { round: 'Quarterfinal', next: 'Semifinal', final: false, gap: 6 } }); },
       'tourney-champion': () => { hud(11, 9, 0); ui.setServe(null); ui.champion(CHAMP, 1); },
       'tourney-champion-watch': () => { hud(11, 9, 0); ui.setServe(null); ui.champion(qs.get('matt') ? { ...CHAMP, id: null, name: 'Matt', bot: true } : CHAMP, 5); },
       'tourney-ended': () => { lobby(); ui.tourEnded(qs.get('why') || 'restart'); },

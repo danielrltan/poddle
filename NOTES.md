@@ -1751,3 +1751,14 @@ bet that flew a drive and settled as a lob no longer burns the lob's white trail
 - "I just want Poddle" in the tab, not "Poddle | Pickleball You Swing With Your Phone". The home page's <title> is now
   `Poddle`; seo.test checks for exactly that. og:title and the meta description still describe the game for share cards
   and search results. The other pages (How to play, paddle, privacy, terms, 404) keep their own titles.
+
+## 97. The result card is a moment: GAME!, a medal with rays, crown and claps, match stats, a jingle
+The win/lose card was a static panel. It now plays a short Smash / Wii Sports style sequence, and the title, score and buttons are all readable by about 1.2 s, because no-vote rooms and tournaments close the card after about 6 s:
+- A "GAME!" stamp slams in (blue for a win, grey for a loss, gold in a tournament) and is gone by about 380 ms, before the title pops.
+- The medal lands with rays behind it: gold for a win, silver for a loss.
+- The winner's chip gets a crown that bobs. The loser's chip claps (Smash's loser applauds).
+- The scores count up visually. `#tally-sc-*` text holds the final numbers from the first frame.
+- Stat pills show the match's longest rally, smashes and best point run, and the best one is starred. main.js counts them in memory from 'hit', 'launch' and 'point'. Nothing is saved or sent. The stats are left out after a forfeit, a reconnect or revive, a late spectator, or any gap where the counted points don't add up to the score.
+- Sound: `scene.jingle(kind)` plays a synthesised fanfare. There is a win fanfare, a warm consolation for a loss, a neutral one for spectators, a forfeit one, and a champion one. Each new jingle cuts the one still ringing, which matters when the champion card follows the final's result straight away. It goes through the normal mute and output-sink path.
+- Spectators get one confetti burst in the winner's colours.
+- Reduced motion shows the finished card with no animation.

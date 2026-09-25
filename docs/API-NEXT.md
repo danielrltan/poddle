@@ -52,7 +52,7 @@ coast.test.mjs, badwifi.mjs and smooth.mjs must still run.
 
 Full list after this work:
 `setCourt(c) setSide(side) setViewer(v) setView(name, side) getView() setMenu(on) startAttract() stopAttract()
-setFrozen(on) updatePaddle(side, d) updateBall(p, v, live, tMs, spin, m) hideBall() onEvent(m) unlockAudio()
+setFrozen(on) updatePaddle(side, d) updateBall(p, v, live, tMs, spin, m) hideBall() onEvent(m) unlockAudio() jingle(kind)
 render(nowMs) resize() _dbg`
 
 ### 2.1 Modes, and which one wins
@@ -272,6 +272,8 @@ enough that a live rally is visible behind it. While open: `body.dataset.setting
 - `matchResult(o)` with `o = { won, me, them, nameMe = 'You', nameThem, forfeit = false, role = 'player', vote = true }`
   (`me` / `them` = the two scores, left and right). The old positional call `matchResult(won, me, them, name)` still
   works (test/e2e.mjs uses it) and means `{ role:'player', vote:false }`.
+  Optional `o.stats = { rally, smashes, run }` (counted by MAIN in memory, only when every point was seen from 0-0; else
+  null): pills under the tally. Hidden for a forfeit, the positional call and `champion()`.
   Title `#result-title`: player won -> "You win!"; player lost -> `"<nameThem> wins"`; spectator -> `"<winner's name> wins"`
   (`won` = the left side won). Medal gold for a player's win and for spectators, silver for a player's loss.
   `p#result-note`: when `forfeit` -> `"<loser's name> left"`, else empty.
@@ -336,7 +338,7 @@ while `!live()` (mid-calibration) is kept and shown on entering play, unless `re
 | `serve {by, wait}` | seated | rally 0; `ui.setServe`; `live()` + my serve + `wait` -> "Your serve!"; `scene.onEvent` |
 | `hit` `swung` `bounce` `launch` `whiff` | seated | stats + rally as today; `scene.onEvent` |
 | `point {winner, final}` | seated | not `final` and `live()`: player -> `ui.pointBanner(winner === me, nameOf(winner))` + confetti when mine; spectator -> `ui.pointBanner(null, nameOf(winner), winner)`; `scene.onEvent` |
-| `matchover {winner, score, forfeit, rematchBy}` | seated; drawn when `live()` | `ui.setServe(null)`; `ui.hold(null)`; `ui.settings(false)`; `ui.matchResult({...})` then `ui.rematch({ mine:null, theirs:null, left: rematchBy, name })`; confetti for a player's win. Legacy page: `vote:false` |
+| `matchover {winner, score, forfeit, rematchBy}` | seated; drawn when `live()` | `ui.setServe(null)`; `ui.hold(null)`; `ui.settings(false)`; `ui.matchResult({...})` then `ui.rematch({ mine:null, theirs:null, left: rematchBy, name })`; confetti for a player's win. `scene.jingle('win'|'lose'|'forfeit'|'watch')`; a spectator gets one 60-piece burst in the winner's colours. Legacy page: `vote:false` |
 | `rematch {votes, left}` | seated | `ui.rematch({ mine: votes[me], theirs: votes[1 - me], left, name: nameOf(1 - me) })`; spectator: `{ left }` only |
 | `rematchon` | seated | `ui.showOverlay(null)`; rally 0; scores follow in `state` |
 | `hold {side, left}` | seated | `holding = true`; `scene.setFrozen(true)`; `live()` -> `ui.hold(nameOf(side), left)` |

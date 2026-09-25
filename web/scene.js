@@ -1029,12 +1029,18 @@ export function createScene(containerEl) {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
     o.connect(g); g.connect(dst); o.start(t); o.stop(t + decay + 0.02);
   }
-  function noise(dst, f0, f1, f2, Q, gain, dur, attack) {
-    const t = ac.currentTime, src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+  function noise(dst, f0, f1, f2, Q, gain, dur, attack, at = 0) {      // at: seconds from now, so a jingle can place its crash on the stamp's impact
+    const t = ac.currentTime + at, src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
     src.buffer = noiseBuf; src.loop = true; bp.type = 'bandpass'; bp.Q.value = Q;
     bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.45); bp.frequency.exponentialRampToValueAtTime(f2, t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(bp); bp.connect(g); g.connect(dst); src.start(t, rndFx() * 0.5); src.stop(t + dur + 0.02);
+  }
+  let jingleBus = null;
+  function jingleOut() {                                  // each jingle has its own gain; a new one cuts the old (a won final is followed at once by the champion card)
+    const now = ac.currentTime;
+    if (jingleBus) { const g = jingleBus.gain, old = jingleBus; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + 0.06); setTimeout(() => { try { old.disconnect(); } catch { /* already gone */ } }, 400); }
+    jingleBus = ac.createGain(); jingleBus.gain.value = 1; jingleBus.connect(out(0)); return jingleBus;      // out(0) -> master: mute and the chosen speaker apply
   }
   const sfx = {
     pock(n, x) {                                          // hollow plastic: pitched body + low cavity + bright click
@@ -1048,6 +1054,21 @@ export function createScene(containerEl) {
     chime(win) {
       if (!ac) return; const d = out(0), ns = win ? [783.99, 1174.66] : [587.33, 440];
       ns.forEach((f, i) => { tone(d, 'sine', f, f, 0.01, 0.3, 0.7, i * 0.17); tone(d, 'triangle', f * 2, f * 2, 0.01, 0.07, 0.4, i * 0.17); });
+    },
+    // The result card's sting (ui.css data-beat): win/watch = thump + crash on the GAME! stamp's impact (114 ms), a G-C-E pickup, a top G and a
+    // C major chord; champ adds a sparkle and a second crash; forfeit is the pickup alone (nobody was beaten); lose sighs A-G down onto a warm
+    // C major, never minor and never silence. Chord voices stay <= .12 so the DynamicsCompressor on master does not pump.
+    jingle(kind) {
+      if (!ac) return; const d = jingleOut();
+      const n = (f, at, dur, g, type = 'triangle') => { tone(d, type, f, f, 0.01, g, dur, at); tone(d, 'sine', 2 * f, 2 * f, 0.01, g * 0.25, dur * 0.6, at); };      // a note: its body + a soft octave on top
+      const pickup = g => { n(392, 0.14, 0.16, g); n(523.25, 0.23, 0.16, g); n(659.25, 0.32, 0.16, g); };
+      if (kind === 'forfeit') { pickup(0.12); n(783.99, 0.44, 0.16, 0.12); return; }
+      if (kind === 'lose') { tone(d, 'sine', 130.81, 130.81, 0.01, 0.10, 1.6, 0.44); n(440, 0.44, 0.4, 0.12); n(392, 0.60, 0.4, 0.12);
+        for (const f of [329.63, 392, 523.25]) tone(d, 'sine', f, f, 0.02, 0.10, 1.3, 0.80); return; }
+      tone(d, 'sine', 120, 50, 0.12, 0.4, 0.3, 0.11); noise(d, 7000, 5200, 3800, 0.6, 0.12, 0.7, 0.002, 0.11);      // win / watch / champ
+      pickup(0.16); n(783.99, 0.44, 0.6, 0.2); tone(d, 'square', 783.99, 783.99, 0.01, 0.06, 0.5, 0.44);
+      for (const f of [523.25, 659.25, 783.99, 1046.5]) n(f, 0.62, 1.0, 0.12);
+      if (kind === 'champ') { [[1318.5, 0.95], [1568, 1.02], [2093, 1.09]].forEach(([f, at]) => tone(d, 'sine', f, f, 0.01, 0.08, 0.5, at)); noise(d, 7000, 5200, 3800, 0.6, 0.10, 0.7, 0.002, 0.95); }
     },
   };
 
@@ -1110,7 +1131,7 @@ export function createScene(containerEl) {
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }
-      sfx.chime(spectator || m.winner === localSide);      // a spectator is on nobody's side: every point gets the winner's chime
+      if (!m.final) sfx.chime(spectator || m.winner === localSide);      // a spectator is on nobody's side: every point gets the winner's chime. The match point's sound is the result card's jingle (main.js showOver)
     } else if (m.type === 'whiff' && !spectator) { const me = pads[localSide]; if (ac) noise(out(panOf(me.pos.x)), 900, 500, 260, 1.0, 0.1, 0.22, 0.04); }
   }
 
@@ -1273,6 +1294,7 @@ export function createScene(containerEl) {
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize,
+    jingle(kind) { if (['win', 'lose', 'watch', 'forfeit', 'champ'].includes(kind)) sfx.jingle(kind); },      // the result card's sting: main.js showOver / showChamp only
     // Sound. setSink takes a deviceId ('' = the system default) and resolves false when that device is gone, so the panel
     // can fall back instead of naming a speaker nothing is coming out of.
     // devices() is empty until the page holds a media grant: Chrome blanks BOTH the id and the label of every audio output

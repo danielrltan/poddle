@@ -117,6 +117,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 /* veil: sits over the live court for result / error cards */
 /* no backdrop blur here or on any overlay: it is a full-screen two-pass filter re-run on every WebGL frame. The one exception is .glass (title + lobby), where nothing is being played */
 .veil{background:var(--tex-scan), linear-gradient(180deg,rgba(255,255,255,.92),rgba(226,240,248,.88));align-items:center;justify-content:center;z-index:var(--z-veil)}
+#screen-match.is-active{transition:opacity 100ms var(--ease-soft), visibility 0s}      /* in fast: the GAME! impact (114 ms) lands on a solid card, not a half-faded one. It still leaves at --d-med */
 .veil.is-result{background:repeating-linear-gradient(135deg, rgba(52,190,237,.075) 0 14px, transparent 14px 32px), linear-gradient(180deg,#fff,var(--sky-2))}          /* a results ground, fully opaque */
 
 /* ==========================================================================================================
@@ -383,12 +384,46 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
   background:linear-gradient(180deg,#fff 0%,#fbfdfe 45%,#e9f2f7 100%);box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
 .result-card h2{margin:0 0 var(--s-4);font-size:4.25rem;font-weight:900;line-height:1.1;color:var(--me-ink);letter-spacing:.01em}
 .result-card.is-lose h2{color:var(--ink-strong);font-size:3.5rem}
+.result-card.is-watch.is-them-won h2{color:var(--them-ink)}      /* a spectator: the title in the winner's colour, like the stamp and the crown */
 .tally{display:flex;align-items:center;justify-content:center;gap:var(--s-4);padding:var(--s-4) var(--s-5);margin:0 auto var(--s-5);border-radius:var(--r-lg)}
 .tally-side{display:flex;flex-direction:column;align-items:center;gap:.375rem;min-width:8rem}
 .tally-side b{font-size:var(--t-md);font-weight:800;color:var(--ink);white-space:nowrap}
 .tally-num{font-size:6rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--me-ink);min-width:7rem}
 .tally-num.is-them{color:var(--them-ink)} .tally-dash{flex:none;width:1.5rem;height:.375rem;border-radius:var(--r-pill);background:var(--ink-faint)}
 .tally-side.is-winner .chip{box-shadow:0 0 0 .1875rem var(--gold-2), 0 .125rem .5rem rgba(120,80,0,.35)}
+/* the GAME! beat (ui.js matchResult sets #screen-match[data-beat] = win | lose | forfeit | watch | champ): a white flash and a stamp over the card, both gone by 380 ms and never in the way of a click */
+.result-flash{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 45%,#fff 0 30%,rgba(255,255,255,0) 75%)}
+.result-slam{position:absolute;inset:0;margin:auto;height:fit-content;z-index:3;pointer-events:none;opacity:0;text-align:center;
+  font-size:min(11rem,17vw);font-weight:900;font-style:italic;line-height:1;letter-spacing:.02em;color:var(--me);
+  -webkit-text-stroke:.25rem #fff;paint-order:stroke fill;text-shadow:0 .5rem 0 var(--me-deep)}      /* the winner's colour: blue, orange (.is-them) or the champion's gold */
+.result-slam.is-them{color:var(--them);text-shadow:0 .5rem 0 var(--them-deep)}
+.result-slam.is-gold{font-size:min(8rem,11vw);color:var(--gold-2);text-shadow:0 .5rem 0 #8a5200}
+.result-slam:empty{display:none}      /* a forfeit win: nothing was played out to stamp */
+/* the count-up: a CSS counter drawn over the real number, whose glyphs stay transparent until it lands (the same digits, so no jump). textContent is final from the first frame */
+@property --n{syntax:'<integer>';inherits:false;initial-value:0}
+.tally-num{position:relative}
+.tally-num::before{content:counter(n);counter-reset:n var(--n);position:absolute;inset:0;text-align:center;color:var(--me-ink);opacity:0;pointer-events:none}
+.tally-num.is-them::before{color:var(--them-ink)}
+/* the winner's chip wears a crown; the other chip claps for them (Smash's loser applauds). Beside the chip, not in it: .chip clips */
+.tally-side{position:relative}
+.tally-crown{position:absolute;top:-1.5rem;left:50%;width:2.6rem;height:1.95rem;margin-left:-1.3rem;rotate:-10deg;display:none;fill:var(--gold-2);stroke:var(--gold-4);stroke-width:1.4;stroke-linejoin:round;filter:drop-shadow(0 .125rem .125rem rgba(120,80,0,.35))}
+.tally-side.is-winner .tally-crown{display:block}
+.tally-clap{position:absolute;top:-.6rem;left:calc(50% + 1.6rem);width:2.9rem;height:2.8rem;overflow:visible;display:none;fill:var(--silver-3);stroke:#fff;stroke-width:1.4;stroke-linejoin:round;filter:drop-shadow(0 .125rem .125rem rgba(40,70,90,.3))}      /* two mitten hands, palms toward each other */
+.tally-clap .clap-line{fill:none;stroke:rgba(40,70,90,.35);stroke-width:1.1;stroke-linecap:round}
+.tally-clap .clap-fx{fill:none;stroke:var(--silver-4);stroke-width:1.8;stroke-linecap:round;opacity:0}      /* the little impact lines on each clap */
+.tally-side:not(.is-winner) .tally-clap{display:block}
+.result-card.is-lose .tally-clap{fill:var(--gold-2);stroke:#fff}  .result-card.is-lose .tally-clap .clap-fx{stroke:var(--gold-4)}  .result-card.is-lose .tally-clap .clap-line{stroke:rgba(138,82,0,.4)}      /* my own clap: warm, a good-game moment rather than a grey one */
+.result-card.is-forfeit .tally-clap{display:none}                              /* nobody left to clap */
+.tally-clap .clap-l,.tally-clap .clap-r{transform-box:fill-box;transform-origin:50% 100%} .tally-clap .clap-l{rotate:-16deg} .tally-clap .clap-r{rotate:16deg}      /* at rest the palms are apart; a clap swings them together about the wrist */
+/* this match's stats (main.js counts them; hidden when it did not see every point): pills, the best one starred */
+.result-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:.75rem;list-style:none;margin:-.5rem auto var(--s-4);padding:0}
+.result-card.has-stats{padding-top:7rem}      /* the row's height comes out of the room above the title, so the card grows less */
+.stat{position:relative;display:inline-flex;align-items:center;gap:.5rem;height:2.5rem;padding:0 1rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--line-faint);box-shadow:var(--sh-1);overflow:hidden}
+.stat b{font-size:1.5rem;font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums}
+.stat span{font-size:var(--t-md);font-weight:700;color:var(--ink-soft)}
+.stat.is-best{background:linear-gradient(180deg,#fffdf3,#fff4c9);border-color:var(--gold-2)}
+.stat.is-best::before{content:"\2605";color:var(--gold-3);font-size:1.1rem}      /* a star glyph, not an asset */
+.stat.is-best::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);transform:translateX(-150%) skewX(-20deg)}      /* the shine, clipped by the pill */
 /* under the tally: Rematch / Leave, what the other player chose, and the seconds left (a bar that drains + a bare number). Spectators and rooms with no vote get the note alone. */
 #result-note{min-height:0;margin:calc(var(--s-3) * -1) 0 var(--s-4);font-size:var(--t-lg);font-weight:700;color:var(--ink-soft)} #result-note:empty{display:none}
 .rematch{display:flex;flex-direction:column;align-items:center;gap:.75rem}
@@ -416,6 +451,12 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
 .medal.is-silver .medal-disc{background:radial-gradient(circle at 50% 50%, var(--silver-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--silver-1), var(--silver-3), var(--silver-1), var(--silver-4), var(--silver-1), var(--silver-3), var(--silver-1));
   box-shadow:0 .25rem .75rem rgba(40,70,90,.30), inset 0 0 0 .0625rem rgba(70,100,120,.35)}
 .medal.is-silver .medal-disc svg{fill:#fff;stroke:var(--silver-4)}
+/* rays behind the disc (its centre is 3.5rem above the medal's bottom); the radial mask keeps them off the title */
+.medal-rays{position:absolute;left:50%;bottom:3.5rem;width:18rem;height:18rem;margin:0 0 -9rem -9rem;z-index:-1;border-radius:50%;pointer-events:none;
+  background:repeating-conic-gradient(rgba(255,211,74,.55) 0 7deg,transparent 7deg 20deg);
+  -webkit-mask:radial-gradient(circle,#000 20%,transparent 58%);mask:radial-gradient(circle,#000 20%,transparent 58%);scale:0}
+[data-beat="lose"] .medal-rays{background:repeating-conic-gradient(rgba(150,190,215,.45) 0 7deg,transparent 7deg 20deg);opacity:.7}      /* silver and slow: the loser still gets a warm moment */
+[data-beat="champ"] .medal-rays{width:24rem;height:24rem;margin:0 0 -12rem -12rem}
 
 /* notice card (server down, game full): an icon well on the left, words on the right */
 .notice{display:flex;align-items:center;gap:var(--s-6);text-align:left;width:min(46rem,92vw)}
@@ -462,6 +503,9 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
   .callout.go{animation:banner-hold var(--d-callout) linear both!important}
   .rematch-bar i{transition-duration:1s!important}                   /* a countdown is information, not decoration */
   .confetti{display:none}
+  .result-slam,.result-flash{display:none} .tally-num::before{display:none} .screen.is-active .tally-num{animation:none!important}      /* no stamp, flash or count: the card is there, numbers and all */
+  #screen-match .result-card{animation:panel-in var(--d-slow) var(--ease-out) both!important}      /* no shake */
+  .medal-rays{animation:none!important;scale:1} .tally-clap g{animation:none!important} .tally-clap .clap-fx{display:none} .stat.is-best::after{display:none}      /* rays still, hands still; the crown and pills land on their last frame */
 }
 @keyframes banner-hold{0%,85%{opacity:1;transform:none}100%{opacity:0;transform:none}}
 
@@ -1123,8 +1167,28 @@ button.set-row > span{transition:translate var(--d-fast) var(--ease-bounce)} but
 body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms var(--ease-bounce) backwards} body[data-role="spectator"] .ask-play.ov-bump:not([hidden]){animation:ov-pill-in 380ms var(--ease-bounce) backwards, ov-bump 360ms var(--ease-bounce)}      /* Ask to play pops in; each change of state bumps it */
 /* match result: the medal lands, then the title, then the two scores; the winner's token bounces */
 .screen.is-active .result-card h2{animation:ov-title-pop 560ms var(--ease-bounce) 380ms both}
-.screen.is-active .tally-num{animation:ov-title-pop 520ms var(--ease-bounce) 560ms both} .screen.is-active .tally-num.is-them{animation-delay:640ms}
+.screen.is-active .tally-num{animation:ov-title-pop 520ms var(--ease-bounce) 560ms both, ov-ink 1040ms linear}      /* pop, and the real glyphs stay clear until the counter over them lands */
+.screen.is-active .tally-num.is-them{animation:ov-title-pop 520ms var(--ease-bounce) 640ms both, ov-ink 1040ms linear}
+.screen.is-active .tally-num::before{animation:ov-count 440ms var(--ease-out) 600ms both}      /* both counters roll together, so the loser never looks ahead mid-count; only the pops are staggered */
 .screen.is-active .tally-side.is-winner .chip{animation:ov-winner-bob 1600ms var(--ease-soft) 1100ms infinite}
+/* the impact (win / watch / champion only; a loss gets the soft stamp and no flash or shake) */
+#screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-card{animation:panel-in var(--d-slow) var(--ease-out) both, ov-shake 240ms linear 120ms both}
+#screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-flash{animation:ov-flash 280ms linear both}
+#screen-match.is-active .result-slam.go{animation:ov-slam 380ms linear both}
+#screen-match.is-active[data-beat="lose"] .result-slam.go{animation:ov-slam-soft 380ms var(--ease-out) both}
+/* rays open as the medal lands, then turn: slow for a loss, fast for the champion */
+.screen.is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 14s linear 940ms infinite}
+[data-beat="lose"].is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 28s linear 940ms infinite}
+[data-beat="champ"].is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 8s linear 940ms infinite}
+/* the crown drops, then rides the winner's bob; the other side claps five times */
+.screen.is-active .tally-side.is-winner .tally-crown{animation:crown-drop 460ms var(--ease-bounce) 900ms both, ov-winner-bob 1600ms var(--ease-soft) 1360ms infinite}
+.screen.is-active .tally-side:not(.is-winner) .tally-clap{animation:ov-title-pop 300ms var(--ease-bounce) 980ms both}
+.screen.is-active .tally-side:not(.is-winner) .clap-l{animation:clap-l 280ms var(--ease-soft) 1000ms 5 both}
+.screen.is-active .tally-side:not(.is-winner) .clap-r{animation:clap-r 280ms var(--ease-soft) 1000ms 5 both}
+.screen.is-active .tally-side:not(.is-winner) .clap-fx{transform-box:fill-box;transform-origin:50% 100%;animation:clap-fx 280ms linear 1000ms 5 both}
+/* the stats pop last; the best one shines once */
+.screen.is-active .stat{animation:ov-title-pop 360ms var(--ease-bounce) calc(1100ms + var(--i,0) * 80ms) both}
+.screen.is-active .stat.is-best::after{animation:stat-shine 700ms var(--ease-soft) 1600ms 1}
 #rematch-note.ov-note{animation:ov-note-in 360ms var(--ease-out)}      /* 'Sam wants a rematch' slides up into place */
 .rematch-count:not([hidden]){animation:panel-in var(--d-med) var(--ease-out) both} #rematch-left.ov-pop{animation:num-pop 360ms var(--ease-bounce)}      /* the count rises in; each second hops */
 .screen.is-active .notice-icon svg{animation:ov-float 2400ms var(--ease-soft) 600ms infinite}      /* server down / game full: the icon floats while it waits */
@@ -1140,6 +1204,19 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 @keyframes ov-blink{50%{scale:1 .15}}
 @keyframes ov-title-pop{from{opacity:0;scale:.6}}
 @keyframes ov-winner-bob{0%,100%{translate:0 0}50%{translate:0 -.375rem}}
+@keyframes ov-flash{0%{opacity:.95}100%{opacity:0}}
+@keyframes ov-slam{0%{opacity:0;scale:2.4}30%{opacity:1;scale:.92}42%{scale:1}62%{opacity:1;scale:1}100%{opacity:0;scale:1.3}}
+@keyframes ov-slam-soft{0%{opacity:0;scale:1.6}42%{opacity:1;scale:1}63%{opacity:1;scale:1}100%{opacity:0;scale:1}}
+@keyframes ov-shake{0%{translate:0 0}20%{translate:.5rem .25rem}40%{translate:-.4rem -.2rem}60%{translate:.25rem .1rem}80%{translate:-.1rem 0}100%{translate:0 0}}      /* translate only: panel-in owns transform */
+@keyframes ov-rays-in{0%{scale:0}70%{scale:1.15}100%{scale:1}}
+@keyframes ov-spin{to{rotate:360deg}}
+@keyframes ov-ink{0%,100%{color:transparent}}
+@keyframes ov-count{from{--n:0;opacity:1}99.9%{opacity:1}to{--n:var(--to);opacity:0}}
+@keyframes crown-drop{0%{opacity:0;translate:0 -2.5rem;rotate:-35deg}60%{opacity:1;translate:0 .2rem;rotate:4deg}100%{opacity:1;translate:0 0;rotate:-10deg}}
+@keyframes clap-l{0%,100%{rotate:-16deg}50%{rotate:3deg}}
+@keyframes clap-r{0%,100%{rotate:16deg}50%{rotate:-3deg}}
+@keyframes clap-fx{0%,40%{opacity:0;scale:.6}55%{opacity:1;scale:1}85%,100%{opacity:0;scale:1.15}}
+@keyframes stat-shine{to{transform:translateX(350%) skewX(-20deg)}}
 @keyframes ov-note-in{from{opacity:0;translate:0 .375rem}}
 @keyframes ov-float{0%,100%{translate:0 0}50%{translate:0 -.25rem}}
 @media (max-width:700px){      /* last, so it wins: the root is at its 10px floor here, and nothing on Courts or the ask card goes under 12 px */
@@ -1285,6 +1362,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .medal.is-champion::before,.medal.is-champion::after{background:linear-gradient(90deg,var(--gold-4) 0 22%,#fff 22% 34%,var(--gold-3) 34% 66%,#fff 66% 78%,var(--gold-4) 78%)}
 .medal.is-champion .medal-trophy{width:4rem;height:4rem}
 .result-card.is-champion .tally,.result-card.is-champion #rematch-note{display:none}
+.result-card.is-champion .result-stats{display:none}      /* a safety net: champion() hides the row too */
 .medal-trophy{display:none} .medal.is-champion .medal-star{display:none} .medal.is-champion .medal-trophy{display:block;fill:#fff7c9;stroke:var(--gold-4);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
 .medal.is-champion{scale:1.35}
 .road{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;list-style:none;margin:0 auto var(--s-5);padding:0}
@@ -1316,6 +1394,8 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
   .tour-view .caps,.tour-card .caps{font-size:max(var(--t-xs),11px)} .badge-tour{font-size:max(var(--t-xs),12px)}      /* the name over the code boxes, and the one thing that tells a tournament row from a court */
   .court-list li[data-kind="tour"]::after{display:none}      /* the readable badge needs the room: a tournament row (never a Watch) takes the empty Watch slot too */
   .vs-round{font-size:max(var(--t-md),13px)} .vs-target{font-size:max(var(--t-lg),15px)} .rematch-count,.tally-side b{font-size:max(var(--t-md),13px)}      /* the VS card's round line, 'Bracket in 6', the result card's names */
+  .stat b{font-size:max(1.4rem,14px)} .stat span{font-size:max(var(--t-md),13px)}      /* the stats pills: nothing under 13 px */
+  .tally-crown{width:2.1rem;height:1.6rem;margin-left:-1.05rem} .tally-clap{left:calc(50% + 1.5rem)}      /* the chip is smaller here */
   .notices{top:auto;bottom:calc(var(--edge) + 5.25rem);translate:none} .notice{font-size:max(var(--t-sm),12px);height:auto;min-height:max(2.25rem,28px);max-width:calc(100vw - 2 * var(--edge))} body:has(.ask-card.is-on) .notices{opacity:0}      /* portrait: half way down is the net and the far service box, where the ball is: the cards sit above the key hints instead */
 }
 @media (max-width:480px){

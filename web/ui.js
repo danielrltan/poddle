@@ -104,7 +104,8 @@ export function confetti(colors, n = 46) {
 // The old positional call (won, me, them, name) still works and means a room with no vote: the next game starts by itself.
 let resultRole = 'player', voted = false, votedYes = false, noCount = false, countT = 0, countLeft = 0, countTotal = 0;
 export function matchResult(o, me, them, name) {
-  if (o === null || typeof o !== 'object') o = { won: !!o, me, them, nameThem: name, vote: false };
+  const legacy = o === null || typeof o !== 'object';                                   // the old positional call: it never carries stats
+  if (legacy) o = { won: !!o, me, them, nameThem: name, vote: false };
   const T = o.tour && typeof o.tour === 'object' ? o.tour : null;      // a tournament match (docs/COURTS-TOURNEY.md 4.6 item 8): { round, next, gap }. No vote, one button: See bracket
   const won = !!o.won, watching = o.role === 'spectator', nameMe = String(o.nameMe || 'You'), nameThem = String(o.nameThem || 'Opponent'), lost = !watching && !won, vote = !watching && o.vote !== false && !T;
   $('result').classList.toggle('is-lose', lost); $('result').classList.remove('is-champion'); show('result-road', false); show('champ-acts', false); show('tour-res', !!T);
@@ -119,9 +120,22 @@ export function matchResult(o, me, them, name) {
   for (const id of ['btn-rematch', 'btn-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
   setText($('rematch-note'), T ? '' : watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
   if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final!') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
+  const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
+  $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
+  { const s = $('result-slam'); s.textContent = o.forfeit ? '' : 'GAME!'; s.classList.remove('is-gold'); s.classList.toggle('is-them', watching ? !won : lost); if (s.textContent) restart(s, 'go'); }      // the stamp takes the winner's colour; gone by 380 ms, before the title pops
+  $('tally-sc-me').style.setProperty('--to', o.me | 0); $('tally-sc-them').style.setProperty('--to', o.them | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame
+  resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
   if (T) { if (T.gap > 0) rematch({ left: T.gap }); setTimeout(() => { if (slots.overlay === 'match') $('btn-see-bracket')?.focus({ preventScroll: true, focusVisible: true }); }, 60); }
   if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60);
+}
+// The stats pills under the tally ({ rally, smashes, run } from main.js, counted on this client). A stat under its floor stays out; the one furthest over its norm is starred.
+function resultStats(S, card) {
+  const ul = $('result-stats'); if (!ul) return; ul.textContent = '';
+  const rows = !S ? [] : [['Longest rally', S.rally | 0, 4, 8], ['Smashes', S.smashes | 0, 1, 2], ['Best run', S.run | 0, 3, 4]].filter(r => r[1] >= r[2]);      // [label, n, min, norm]: a 2-hit rally or no smash is nothing to show off
+  let best = null; for (const r of rows) if (!best || r[1] / r[3] > best[1] / best[3]) best = r;      // ties go to the first row
+  rows.forEach((r, k) => { const li = mk('li', 'stat' + (r === best ? ' is-best' : '')); li.append(mk('b', '', String(r[1])), mk('span', '', r[0])); li.style.setProperty('--i', k); ul.append(li); });      // textContent only
+  show('result-stats', rows.length > 0); card.classList.toggle('has-stats', rows.length > 0);
 }
 function stopCount() { clearInterval(countT); countT = 0; }
 let countWord = '';      // a tournament match: 'Bracket in 6' (the vote's own count is a bare number beside its buttons)
@@ -971,6 +985,8 @@ function brPick(k) { brTab = k; drawBracket(); $('br-tabs').querySelector('[aria
 export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
+  $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won'); resultStats(null, card);      // the final's own card is replaced at once: its stats and beat go with it
+  { const s = $('result-slam'); s.textContent = 'CHAMPION!'; s.classList.remove('is-them'); s.classList.add('is-gold'); restart(s, 'go'); }
   setText($('result-title'), me ? 'You’re the champion!' : `${name} is the champion!`); setText($('result-note'), me ? 'The road to the title' : `${name}’s road to the title`);
   const road = $('result-road'); road.textContent = '';
   for (const st of Array.isArray(c.path) ? c.path : []) { const li = mk('li', 'road-step'), sc = Array.isArray(st.score) ? st.score : [0, 0], vs = st.bot ? 'Matt' : tnm(st.vs) || 'Player';
