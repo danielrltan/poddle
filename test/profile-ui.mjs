@@ -147,7 +147,7 @@ r = await ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden
   next: document.getElementById('btn-pf-next').textContent, bests: document.getElementById('pf-bests').textContent, human: document.getElementById('pf-human').textContent }));
 ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie Matt', 'Club Matt', 'Tour Matt', 'Pro Matt']), `Your stats: four rungs, Rookie, Club, Tour, Pro (${J(r.rungs.map(x => x[0]))})`);
 ok(/^Beaten on/.test(r.rungs[0]?.[1]) && /^Beaten on/.test(r.rungs[1]?.[1]) && r.rungs[2]?.[1] === 'Not beaten yet' && r.rungs[3]?.[1] === 'Not beaten yet' && r.next === 'Next: beat Tour Matt', `chips: beaten / not beaten yet, next is Tour (${J(r.rungs.map(x => x[1]))}, ${r.next})`);
-ok(r.bests.includes('14') && r.bests.includes('22') && r.human.includes('3-2'), `bests and the human record drawn (${r.bests.slice(0, 80)} | ${r.human.slice(0, 60)})`);
+ok(r.bests.includes('14 hits') && r.bests.includes('540°/s') && !r.bests.includes('Hardest') && r.human.includes('3-2'), `bests and the human record drawn (${r.bests.slice(0, 80)} | ${r.human.slice(0, 60)})`);
 ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your stats asks /api/stats with the device id in the body');
 { // the panel fits every window: inside the viewport's width, and no rung line or chip cut short with an ellipsis
   const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);

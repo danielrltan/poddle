@@ -1489,7 +1489,9 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 /* the result card's line (9.3): what this match did to my record. Quiet, under the tally; it never takes focus */
 .result-save{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:calc(-1 * var(--s-3)) auto var(--s-4);max-width:36rem;text-align:center}
 .result-save p{margin:0}
-#result-save-text{font-size:var(--t-md);font-weight:800;color:var(--me-ink)}
+#result-save-text{font-size:var(--t-md);font-weight:800;color:var(--ink-strong)}      /* a headline, not a link: the blue read as one */
+#result-save-text.is-first{display:inline-flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:.25rem 1rem;border-radius:var(--r-pill);background:linear-gradient(180deg,#fffdf3,#fff4c9);border:.125rem solid var(--gold-2);box-shadow:var(--sh-1);color:var(--warn-deep)}      /* a first win: the gold pill the match-stat chips and the ladder's medal chip use */
+#result-save-text.is-first::before{content:"\2605";color:var(--gold-3);font-size:1.1rem}
 .result-notice{font-size:var(--t-sm);font-weight:600;line-height:1.45;color:var(--ink)} .result-notice .foot-link{font-size:inherit}
 .result-save .btn{margin-top:.125rem}
 
@@ -1555,5 +1557,5 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 #set-account .btn{height:max(2.25rem,44px);padding:0 1rem;flex:none}
 
 /* the home notice (9.9), under the safety one: the same card, a little quieter */
-.news h3{font-size:var(--t-md)} .news p{font-size:var(--t-sm)} .news .safety-icon{width:3.5rem;height:3.5rem}
+.news h3{font-size:var(--t-md)} .news p{font-size:var(--t-sm)} .news .safety-icon{width:3.5rem;height:3.5rem} .news .foot-link,.acct-links .foot-link,.acct-check .foot-link{font-size:inherit}      /* inline links keep the paragraph's size (the footer's 14px floor made them the biggest thing on a phone) */
 .name-row #btn-name-change{flex:none;height:max(2.5rem,44px);padding:0 1.125rem}

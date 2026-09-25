@@ -173,7 +173,7 @@
   <section class="set-group" id="grp-you" aria-label="You"><div class="set-list">
     <div class="set-row" id="set-name"><span><label for="set-name-input">Name</label></span><span class="set-name-end"><input class="field" id="set-name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"><button class="btn btn-sm is-tall" id="btn-set-name-change" hidden>Change</button></span></div>
     <!-- player stats (docs/ACCOUNTS.md 9.6): hidden until web/profile.js knows this page's server keeps them -->
-    <button class="set-row set-switch" id="tog-save-stats" role="switch" aria-checked="true" hidden><span>Save my stats on this device</span><i></i></button>
+    <button class="set-row set-switch" id="tog-save-stats" role="switch" aria-checked="true" hidden><span>Save my stats</span><i></i></button>
     <p class="set-confirm" id="stats-off-ask" hidden><span>Also delete the stats saved so far?</span><button class="btn btn-sm btn-danger" id="btn-stats-del">Delete</button><button class="btn btn-sm" id="btn-stats-keep">Keep</button></p>
     <p class="set-hint" id="stats-hint" role="status" hidden></p>
     <div class="set-row" id="set-account" hidden><span id="set-account-name">Signed in</span><button class="btn btn-sm" id="btn-set-signout">Sign out</button></div>
@@ -227,7 +227,7 @@
   <div class="panel panel-sm acct-card" id="signin-card" role="dialog" aria-modal="true" aria-labelledby="signin-title" tabindex="-1" hidden>
     <div class="acct-body" id="signin-main">
       <h2 id="signin-title">Sign in</h2>
-      <p>Sign in to keep your stats on any device and claim a username. Your stats from this browser come with you. Google sends us your name, e-mail and picture with the sign-in; we keep only an ID from Google and throw the rest away.</p>
+      <p>Keep your stats on any device and pick a username. Your stats from this browser come with you. Google sends us your name, e-mail and picture; we keep only an ID and throw the rest away.</p>
       <p class="acct-links"><a class="foot-link" href="/privacy.html#sharing" target="_blank" rel="noopener">Privacy Policy</a><a class="foot-link" href="/terms.html" target="_blank" rel="noopener">Terms of Use</a></p>
       <label class="acct-check"><input type="checkbox" id="signin-age"><span>I am 13 or older. If I am under 18, my parent or guardian has agreed to the Terms of Use and the Privacy Policy.</span></label>
       <div class="signin-google" id="signin-google"><p class="t-note" id="signin-hint">Tick the box to continue</p><div class="signin-btn" id="signin-btn" hidden></div></div>
@@ -272,7 +272,7 @@
       <svg class="safety-icon" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="33" fill="#eaf6fc" stroke="#a9e0f6" stroke-width="2.5"/><g class="art-line" style="stroke-width:3.6"><path d="M22 52V40M36 52V26M50 52V34"/></g><path class="art-accent" d="m29 20 5 5 9-9" style="stroke-width:3.4"/></svg>
       <div>
         <h3>New: your stats are saved</h3>
-        <p>Beat Matt at every level and track your best rally. Stats are saved with a random identifier in this browser, and you can turn this off in Settings. <a class="foot-link" href="/privacy.html#storage" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a> updated September 25, 2026.</p>
+        <p>Beat Matt at every level and keep your best rally. Saved in this browser; turn it off in Settings. <a class="foot-link" href="/privacy.html#storage" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a> updated September 25, 2026.</p>
       </div>
     </div>
   </div>

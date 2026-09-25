@@ -60,8 +60,8 @@ export async function fetchProfile() {                      // -> the Profile of
 
 // ---------- after a match: one line on the result card (9.3) ----------
 const WHY = { not_counted: 'This match doesn’t count toward your record', self: 'Matches against yourself don’t count', restart: 'Matches brought back after an update don’t count', too_short: 'Too short to count' };
-const BEST = { rally: v => `longest rally ${v}`, hit: v => `hardest hit ${v}`, speed: v => `fastest swing ${degs(v)}°/s` };
-let overTour = false;
+const BEST = { rally: v => `longest rally ${v}`, speed: v => `fastest swing ${degs(v)}°/s` };      // hit (power) is kept and exported but never shown: it is a unitless internal number
+let overTour = false, nudged = false;      // nudged: the sign-in nudge shows once a visit, and on every first win
 export function matchover(tour) { overTour = !!tour; show('result-save', false); }      // a new result: last match's line goes (result() fills it again for this one). tour: a tournament's card (the line, no nudge)
 export function result(p) {                                 // the 'profile' message (8.3), right after matchover, to my seat only
   if (!on || !p || typeof p !== 'object') return; const tour = overTour;
@@ -75,7 +75,8 @@ export function result(p) {                                 // the 'profile' mes
     else if (p.ranked === false) { const w = why.find(x => WHY[x]); if (w) line = WHY[w]; }
     else if (why.includes('level')) line = 'Counted at the easiest level you played';      // R13: a level changed mid-match
   }
-  const notice = p.created === true && statsOn(), nudge = p.nudge === true && !tour && me.enabled && !me.account;      // a win only (the server decides), never for a signed-in player
+  const notice = p.created === true && statsOn(), nudge = p.nudge === true && !tour && me.enabled && !me.account && (p.first === true || !nudged);      // a win only (the server decides), never for a signed-in player; not after every win
+  if (nudge) nudged = true; { const el = $('result-save-text'); if (el) el.classList.toggle('is-first', p.first === true && !!line); }
   text('result-save-text', line); show('result-save-text', !!line); show('result-notice', notice); show('btn-save-signin', nudge);
   show('result-save', !!(line || notice || nudge));      // no focus is taken: the rematch buttons keep it
 }
@@ -100,11 +101,12 @@ function drawSide(p) {
   row(hu, 'Record', `${num(H.wins)}-${num(H.losses)}`); row(hu, 'Win streak', `${num(H.streak)}`, `best ${num(H.bestStreak)}`);
   row(hu, 'Points', `${num(H.pointsWon)}-${num(H.pointsLost)}`); row(hu, 'Tournament titles', `${num(p && p.titles)}`);
   const best = (k, f) => { const x = B[k] && typeof B[k] === 'object' ? B[k] : {}, v = Number.isFinite(x.v) && x.v > 0 ? x.v : 0; return v ? [f(v), day(x.at)] : ['None yet', '']; };
-  row(be, 'Longest rally', ...best('rally', v => `${Math.round(v)}`)); row(be, 'Hardest hit', ...best('hit', v => `${Math.round(v)}`)); row(be, 'Fastest swing', ...best('speed', v => `${degs(v)}°/s`));
+  row(be, 'Longest rally', ...best('rally', v => `${Math.round(v)} hits`)); row(be, 'Fastest swing', ...best('speed', v => `${degs(v)}°/s`));      // no Hardest hit: a unitless number nobody can read
 }
 function drawHead(p) {
-  const n = $('pf-name'), name = me.account && me.account.username; if (n) { n.textContent = name || (me.account ? 'Signed in' : 'Guest'); h.badge(n, !!name); }
-  text('pf-sub', !statsOn() ? 'Stats are off on this device' : me.account ? 'Stats saved to your account' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
+  const n = $('pf-name'), name = me.account && me.account.username, typed = (($('name-input') || {}).value || '').trim().slice(0, 12);      // the lobby's name field holds the cleaned display name
+  if (n) { n.textContent = name || typed || (me.account ? 'Signed in' : 'Guest'); h.badge(n, !!name); }
+  text('pf-sub', !statsOn() ? 'Stats are off' : me.account ? 'Stats saved to your account' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
   show('pf-notice', !!(p && p.guest === true && statsOn() && !me.account));      // the one-time notice (9.3) for everyone, always here: a player who left or forfeited never gets the result card's copy
 }
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available)

@@ -1817,3 +1817,22 @@ The win/lose card was a static panel. It now plays a short Smash / Wii Sports st
   rule is overridden so it is not drawn as a stroke). The Your stats button is now a call to action: "Sign in with
   Google" over "Save your stats and keep them on every device!". Nothing new is loaded: the G is inline SVG, and Google's
   own script still loads only after the age box is ticked.
+
+## 100. Stats, looked at again: fewer words, one hierarchy, no unitless numbers
+
+A pass over every screen the stats feature added, at desktop and phone size, judged against the rest of the game.
+- **The result card tells one story.** The record line ("First win against Tour Matt!") was small link-blue text under
+  the match-stat chips and read as a link. A first win is now the same gold pill as the chips and the ladder's medal
+  chip; every other line is plain ink. The sign-in nudge showed after EVERY win for a guest: now once a visit, and on
+  every first win.
+- **No "Hardest hit".** Its number is the game's internal power scale (a smash is ~27): nobody can read "22". It is
+  still stored and exported (the privacy page's list is unchanged); it is just not shown. Longest rally says "hits".
+- **Your stats greets you by name.** The header said "Guest" while the lobby said Daniel: it now shows the typed name
+  (or the username), with "Stats saved on this device" under it.
+- **"Save my stats"** (was "... on this device"): since 98's review fix the switch also stops recording to an account.
+- **Links the size of their sentence.** `.foot-link` has a 14px floor for the footer; inside the home notice and the
+  sign-in card it made the Privacy Policy link the biggest thing on a phone. Those inherit now.
+- **Shorter copy** on the home notice and the sign-in card. The home notice stays: the privacy page promises one for
+  important changes (remove it around late November 2026).
+- Kept on purpose: the fourth home tile (a page among actions, as on a console menu), Google's G in the Settings row
+  (the only colour icon there; it is what the owner asked for), and the age box unticked on every open.
