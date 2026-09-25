@@ -1915,3 +1915,14 @@ server sends, which only that account can carry) gets an orange DEV pill beside 
 orange (`.is-dev`), on the scoreboard, the result card, the court list, tournament chips, the bracket, the VS card
 and Your stats. The claim card no longer promises a badge; the changelog and CLAUDE.md follow.
 The ladder's heading is "Matt difficulties beaten" (was "Trophy Road · beat Matt": trophies belong to a rank system, not to Matt).
+
+## 107. Rank is a trophy tier; the Matt row has no track
+
+- **Trophies and tiers.** The rank used to be the hardest Matt beaten, which the Matt row already says. Now trophies are
+  counted from the stored record (nothing new is kept): 10 a counted win against people, a first-win bounty per Matt
+  (Rookie 25, Club 50, Tour 75, Pro 100) and 50 a tournament title. Tiers: Bronze 0, Silver 50, Gold 150, Platinum 300,
+  Diamond 600, Legend 1000. The crest wears the tier's metal (the top tier a crown), the rank row shows the count with a
+  cup and "145 to Platinum", and a bar fills across the current tier. Everyone starts Bronze: no "Unranked" and no "?".
+  Bot wins beyond the first do not earn trophies (they are uncapped and scriptable, docs/ACCOUNTS.md 5.2).
+- **No track under the Matt row** (the owner: a bar is not a difficulty). The four discs stand on their own; the gold
+  medals, the pulsing next one and the padlocks say the state. Phone: the same, in a column.

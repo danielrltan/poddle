@@ -5,7 +5,8 @@
 // Every string from the server or the player goes in as textContent. Nothing here logs an id, a name or a token.
 const $ = id => document.getElementById(id);
 const DEV_KEY = 'poddle.device', ON_KEY = 'poddle.stats.on', GSI = 'https://accounts.google.com/gsi/client';
-const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];      // wire level -> name; the ladder in difficulty order (Tour is 3 on the wire, between Club and Pro)
+const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];
+const TIERS = [['Bronze', 0], ['Silver', 50], ['Gold', 150], ['Platinum', 300], ['Diamond', 600], ['Legend', 1000]], FIRST_WIN = [25, 50, 75, 100];      // the rank tiers by trophies, and the first-win bounty per Matt in difficulty order (NOTES 107)      // wire level -> name; the ladder in difficulty order (Tour is 3 on the wire, between Club and Pro)
 const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^[0-9a-f]{32}$/;      // the server's own check (3.1): anything else is no device id
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } }, del(k) { try { localStorage.removeItem(k); } catch { /* same */ } } };
@@ -97,17 +98,21 @@ function rungs(p) {                                         // the four Matt row
 }
 function drawRoad(p) {
   const { rows, won, beaten, top, nextI } = rungs(p), H = human(p), name = i => `${LEVEL[ORDER[i]]} Matt`;
-  // the hero: the crest and the rank name are the hardest Matt beaten (every rank is gold, the tier is the name and the stars); the ribbon is the hottest live streak against anyone
-  const crest = $('st-crest'); if (crest) crest.className = 'st-crest' + (top < 0 ? ' is-none' : beaten === 4 ? ' is-pro' : '');
-  text('st-rank', top < 0 ? 'Unranked' : `${LEVEL[ORDER[top]]} player`); cls('st-rank', 'is-none', top < 0);
-  text('st-rank-cap', top < 0 ? 'Beat Rookie Matt to start your road' : nextI < 0 ? 'All 4 Matts beaten' : nextI < top ? `${beaten} of 4 Matts beaten · beat ${name(nextI)} to fill the road` : `${beaten} of 4 Matts beaten · beat ${name(nextI)} for ${LEVEL[ORDER[nextI]]} player`);      // says what the next rank needs, so it never argues with the Next button. Every level is free to pick, so Pro can fall before Club: then the next Matt fills a gap, it is no promotion
+  // the hero: trophies (10 a win against people, 25/50/75/100 for a first win over each Matt, 50 a tournament title: all derived
+  // from the stored record, nothing new is kept) place the player in a tier; the crest wears the tier's metal and the bar fills to the next
+  const T = 10 * num(H.wins) + won.reduce((a, w, i) => a + (w ? FIRST_WIN[i] : 0), 0) + 50 * num(p && p.titles);
+  let ti = 0; TIERS.forEach((t, i) => { if (T >= t[1]) ti = i; }); const cur = TIERS[ti], nxt = TIERS[ti + 1] || null;
+  const crest = $('st-crest'); if (crest) crest.className = 'st-crest is-' + cur[0].toLowerCase() + (nxt ? '' : ' is-top');
+  text('st-rank', cur[0]); text('st-trophies', String(T));
+  text('st-rank-cap', !T ? 'Win a match for your first trophies' : nxt ? `${T === 1 ? 'trophy' : 'trophies'} · ${nxt[1] - T} to ${nxt[0]}` : `${T === 1 ? 'trophy' : 'trophies'} · top tier`);
+  const bar = $('st-rank-bar'); if (bar) { const f = nxt ? (T - cur[1]) / (nxt[1] - cur[1]) : 1; bar.style.setProperty('--p', f.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(f * 100))); }
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
   if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one
   text('st-streak-n', String(hot.n));
   const cap = $('st-streak-cap'); if (cap) { cap.textContent = hot.n === 1 ? `vs ${hot.who} · win again to build it` : hot.n ? `vs ${hot.who} · best ` : 'Win one match to light the flame'; if (hot.n >= 2) cap.append(mk('b', '', String(best))); }
   // the road: a node a Matt, the gold track to the last one beaten. The Next button is the SAME element every draw (its click handler is wired once): it moves into the next node
-  const ol = $('pf-rungs'), btn = $('btn-pf-next'); if (!ol) return; ol.textContent = ''; ol.style.setProperty('--p', String((nextI < 0 ? 3 : Math.max(0, nextI - 1)) / 3));      // gold up to the last node of the beaten run from Rookie: a Pro medal past a gap never gilds the locked track under Club
+  const ol = $('pf-rungs'), btn = $('btn-pf-next'); if (!ol) return; ol.textContent = '';
   rows.forEach((r, i) => {
     const lv = ORDER[i], state = won[i] ? 'won' : i === nextI ? 'next' : 'locked', li = mk('li', 'st-node is-' + state); li.dataset.level = lv;
     const disc = mk('i', 'st-disc'); disc.append(svg(state === 'won' ? 'star' : state === 'next' ? 'face' : 'lock'));
