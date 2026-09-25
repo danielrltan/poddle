@@ -47,9 +47,18 @@ export const currentScreen = () => slots.menu;
 export const currentOverlay = () => slots.overlay;
 
 // ---------- scoreboard ----------
-export function setNames({ me, meSub, them, themSub } = {}) {
+export function setNames({ me, meSub, them, themSub, reg } = {}) {
   if (me != null) setText($('name-me'), me); if (meSub != null) setText($('sub-me'), meSub);
   if (them != null) setText($('name-them'), them); if (themSub != null) setText($('sub-them'), themSub);
+  if (reg !== undefined) { const r = Array.isArray(reg) ? reg : []; regBadge($('name-me'), r[0] === true); regBadge($('name-them'), r[1] === true); }      // [left, right]: a registered username (docs/ACCOUNTS.md 7.5). Left out = unchanged
+}
+// The registered-name badge: its own element BESIDE the name, never in the name's text, drawn as a pill with an SVG tick, so no
+// name a guest can type reproduces it (docs/ACCOUNTS.md 7.5). Made and removed here: a guest's seat has no .reg-badge at all.
+const BADGE_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.8 8.4 2.7 2.7 5.7-6"/></svg>';
+export function regBadge(nameEl, on) {
+  if (!nameEl) return; const next = nameEl.nextElementSibling, has = !!next && next.classList.contains('reg-badge');
+  if (on && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Registered player'); b.title = 'Registered player'; b.innerHTML = BADGE_SVG; nameEl.after(b); }
+  else if (!on && has) next.remove();
 }
 export function setScore(me, them) {
   for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); if (+v > 0) { const t = el.closest('.score-tab'); if (t) restart(t, 'ov-scored'); } } }      // the tab that scored gets a sweep of its colour (not the 0-0 reset)
@@ -114,6 +123,7 @@ export function matchResult(o, me, them, name) {
   setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : '');
   $('tally-sc-me').textContent = o.me ?? 0; $('tally-sc-them').textContent = o.them ?? 0; setText($('tally-name-me'), nameMe); setText($('tally-name-them'), nameThem);
   $('tally-me').classList.toggle('is-winner', won); $('tally-them').classList.toggle('is-winner', !won);
+  { const r = Array.isArray(o.reg) ? o.reg : []; regBadge($('tally-name-me'), r[0] === true); regBadge($('tally-name-them'), r[1] === true); }      // reg: [left, right], registered usernames (docs/ACCOUNTS.md 7.5)
   countWord = T ? 'Bracket in ' : '';
   resultRole = watching ? 'spectator' : 'player'; voted = votedYes = false; noCount = !!o.forfeit; stopCount();      // a forfeit leaves one thing to press (Leave): a bar ticking down beside it read as a rematch clock nobody could answer. The court still closes by itself countTotal = 0; votes = { mine: null, theirs: null, name: nameThem };
   show('rematch-btns', vote); show('rematch-count', false);
@@ -350,18 +360,26 @@ export function onRetry(fn) { $('btn-retry').addEventListener('click', fn); }
 // ---------- names ----------
 // One name, two fields (lobby and settings panel), kept in localStorage. The server cleans it again: this is only so the player sees what they will get.
 const NAME_KEY = 'poddle.name';
-const cleanName = t => { const n = [...String(t ?? '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (server/game.js cleanName): a name that draws as nothing is no name
+const BADGE_OUT = /[\u221a\u2122\u2610-\u2612\u2705\u2713\u2714\u{1f5f8}\u{1f5f9}\u{1f197}][\ufe0e\ufe0f]?/gu;      // badge look-alikes (docs/ACCOUNTS.md 7.3), as server/usernames.js stripBadges
+const cleanName = t => { const n = [...String(t ?? '').replace(BADGE_OUT, '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (server/game.js cleanName): a name that draws as nothing is no name
 let savedName = ''; try { savedName = cleanName(localStorage.getItem(NAME_KEY)); } catch { /* private window: ask every time */ }
 for (const id of ['name-input', 'set-name-input']) { const el = $(id); if (el) { el.value = savedName; el.addEventListener('focus', () => el.select()); } }      // like the code boxes: typing replaces what is there
-export const playerName = () => cleanName(($('name-input') || {}).value ?? savedName);
+let lockedName = '';                                       // a signed-in player's registered username (docs/ACCOUNTS.md 9.5): both fields show it, read-only, and it is the name
+export const playerName = () => lockedName || cleanName(($('name-input') || {}).value ?? savedName);
+export function lockName(name) {                           // name: the username, or null to give the fields back (the typed guest name, which was never overwritten)
+  lockedName = typeof name === 'string' ? name.slice(0, 12) : '';
+  for (const id of ['name-input', 'set-name-input']) { const el = $(id); if (el) { el.readOnly = !!lockedName; el.value = lockedName || savedName; } }
+  show('btn-name-change', !!lockedName); show('btn-set-name-change', !!lockedName); nameGate();
+}
 function keepName(from) {                                  // typing in one field shows in the other; an empty name is never stored
+  if (lockedName) return;
   const n = cleanName(from.value); for (const id of ['name-input', 'set-name-input']) { const el = $(id); if (el && el !== from) el.value = n; }
   if (n) { savedName = n; try { localStorage.setItem(NAME_KEY, n); } catch { /* fine */ } }
   nameGate();
 }
 function nameGate() {                                      // first visit: the choices are dimmed (and say so to a screen reader) until the name has a letter
   const need = !playerName(); $('screen-lobby')?.classList.toggle('needs-name', need); $('name-row')?.classList.remove('is-bad');
-  for (const t of document.querySelectorAll('#lobby-home .tile')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }
+  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile)')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats seats nobody: it needs no name
 }
 function needName() {                                      // a seat was asked for with no name: the field says so, nothing is sent
   if (playerName()) return false;
@@ -383,7 +401,7 @@ export function settings(open) {
   const el = $('settings'), btn = $('btn-menu'); if (!el) return false;
   if (open) tourCard(false);                                                         // one card at a time
   setOpen = open; el.hidden = !open; btn?.setAttribute('aria-expanded', String(open));
-  if (open) { document.body.dataset.settings = 'open'; fullSync(); placeSettings(); const n = $('set-name-input'); if (n) n.value = savedName; el.focus({ preventScroll: true }); }      // the card takes focus, not its name field: Esc and the game keys must still reach main.js
+  if (open) { document.body.dataset.settings = 'open'; fullSync(); placeSettings(); const n = $('set-name-input'); if (n) n.value = lockedName || savedName; el.focus({ preventScroll: true }); }      // the card takes focus, not its name field: Esc and the game keys must still reach main.js
   else { delete document.body.dataset.settings; if (el.contains(document.activeElement)) { if (btn && !slots.menu && !slots.overlay) btn.focus({ preventScroll: true }); else document.activeElement.blur(); } }
   const fn = open ? setH.open : setH.close; if (fn) fn();
   return setOpen;
@@ -435,9 +453,9 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('bot-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });
   on2('btn-recenter', 'click', e => { restart(e.currentTarget, 'ov-spin'); call('recenter'); }); on2('btn-leave-room', 'click', () => call('leave'));      // Recentre: the button spins its svg (restart() cannot replay an SVG itself: no offsetWidth)
   // name: saved on Enter / blur. Empty puts the old one back. Esc cancels the edit and hands focus back to the card (main.js owns what Esc does next)
-  const commit = el => { const n = cleanName(el.value); if (!n) { el.value = savedName; return; } const changed = n !== savedName; el.value = n; keepName(el); if (changed) call('name', n); };
+  const commit = el => { if (lockedName) { el.value = lockedName; return; } const n = cleanName(el.value); if (!n) { el.value = savedName; return; } const changed = n !== savedName; el.value = n; keepName(el); if (changed) call('name', n); };
   on2('set-name-input', 'blur', e => commit(e.currentTarget));
-  on2('set-name-input', 'keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget); $('settings').focus({ preventScroll: true }); } else if (e.key === 'Escape') { e.currentTarget.value = savedName; $('settings').focus({ preventScroll: true }); } });
+  on2('set-name-input', 'keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget); $('settings').focus({ preventScroll: true }); } else if (e.key === 'Escape') { e.currentTarget.value = lockedName || savedName; $('settings').focus({ preventScroll: true }); } });
   // Up / Down walk the card's controls (Tab works too)
   on2('settings', 'keydown', e => { const d = { ArrowDown: 1, ArrowUp: -1 }[e.key]; if (!d || document.activeElement?.tagName === 'SELECT') return;      // on the Output row the arrows are the list's own: Tab leaves it
     const nav = [...$('settings').querySelectorAll('button, input, select')].filter(b => !b.disabled && b.offsetParent), i = nav.indexOf(document.activeElement);      // select: Down from the row above still lands on it
@@ -546,14 +564,14 @@ on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'Ar
 // main.js owns the socket; this only draws and reports what was chosen. Handlers carry no name: main.js reads playerName().
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
 export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
-const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament' };
-const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
+const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats' };
+const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
 const VIEW_PARENT = { create: 'courts', share: 'courts', tour: 'courts', bracket: 'courts' };      // Back from these goes to Courts, not home (a tournament lives on: T brings it back)
-const NO_NAME = ['share', 'tour', 'bracket'];                                            // views with no name row above them
+const NO_NAME = ['share', 'tour', 'bracket', 'profile'];                                 // views with no name row above them
 export const viewParent = v => VIEW_PARENT[v] || null;
 const boxes = () => [...$('code-boxes').children];
 let view = 'home', roomsKey = '', on = {}, deep = null;                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
-export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied() }
+export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied(), profile() }
 export function lobbyView(name, { code, watch } = {}) {
   if (!name) return view;
   if (name === 'code') name = 'courts';                                                 // the old code view lives inside Courts now: old call sites still land
@@ -563,7 +581,7 @@ export function lobbyView(name, { code, watch } = {}) {
   sl.dataset.live = '1';
   for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view;
   { const t = $('lobby-title'), tt = view === 'bracket' && ts ? `Tournament ${ts.code}` : VIEW_TITLE[view]; if (t.textContent !== tt) { setText(t, tt); restart(t, 'swap'); } } codeError(''); show('name-row', !NO_NAME.includes(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
-  if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour();
+  if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour(); else if (view === 'profile' && was !== 'profile' && on.profile) on.profile();      // Your stats: main.js asks web/profile.js to fetch and draw it
   deep = null; for (const b of [$('btn-join'), $('btn-watch-code')]) b?.classList.remove('is-focus');
   if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
   nameGate();
@@ -578,9 +596,10 @@ function courtsFocus() {                                                        
   return matchMedia('(pointer: fine)').matches ? $('court-search') : $('court-seg').querySelector('[aria-checked="true"]');
 }
 const vis = el => !!el && !el.hidden && !!el.offsetParent;
+const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
-const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus() }[view] || $('btn-quick'));
+const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus() }[view] || $('btn-quick'));
 // The list scrolls when it is full, and macOS hides scrollbars until you already know to scroll. So the bar is ours: a
 // track and a thumb that are always drawn while there is more to see, sized from the list's own scroll numbers. Drag it or wheel.
 function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) return; const more = l.scrollHeight > l.clientHeight + 1; t.hidden = !more; if (!more) return;
@@ -601,14 +620,15 @@ let drawn = new Map(), drawnMode = '';      // the rows last drawn (code -> meta
 try { if (localStorage.getItem('poddle.courts') === 'full') filter = 'full'; } catch { /* private window */ }
 const kindOf = r => r.open !== false ? 'open' : r.ask ? 'ask' : 'full';
 const nm = (r, i) => Array.isArray(r.names) && typeof r.names[i] === 'string' && r.names[i] ? r.names[i].slice(0, 24) : '';
+const rg = (r, i) => Array.isArray(r.reg) && r.reg[i] === true;      // a registered username in seat i (docs/ACCOUNTS.md 7.5): the row draws the badge beside it
 const sc = r => `${Array.isArray(r.score) ? r.score[0] | 0 : 0}-${Array.isArray(r.score) ? r.score[1] | 0 : 0}`;
 function rowsOf() {                                                                      // every court as a row: { kind, code, who, meta, go, watch, label }
   const out = [];
   for (const t of list.tours) out.push({ kind: 'tour', code: t.code, who: `${String(t.host || 'Someone').slice(0, 24)}’s tournament`, meta: `${t.n | 0} of ${t.max | 0 || 16} joined`, go: 'Join' });
-  for (const r of list.rooms) { const k = kindOf(r), w = r.watchers | 0, human = nm(r, 0) && nm(r, 0) !== 'Matt' ? nm(r, 0) : nm(r, 1) && nm(r, 1) !== 'Matt' ? nm(r, 1) : '';
-    if (k === 'open') out.push({ kind: k, code: r.code, who: !r.players ? 'Empty' : `${human || 'A player'} is waiting`, meta: w > 0 ? `${w} watching` : '', go: 'Join', watch: r.players > 0 && r.watch > 0, w, players: r.players > 0 });      // players: a human is sitting there waiting
-    else if (k === 'ask') out.push({ kind: k, code: r.code, who: `${human || 'A player'} vs Matt`, meta: sc(r), go: 'Ask to play', watch: r.watch > 0, w });
-    else out.push({ kind: k, code: r.code, who: `${nm(r, 0) || 'Player 1'} vs ${nm(r, 1) || 'Player 2'}`, meta: (r.live === false ? 'Starting' : sc(r)) + (w > 0 ? ` · ${w} watching` : ''), go: r.watch > 0 ? 'Watch' : 'Stands full', full: !(r.watch > 0), w }); }
+  for (const r of list.rooms) { const k = kindOf(r), w = r.watchers | 0, hi = nm(r, 0) && nm(r, 0) !== 'Matt' ? 0 : nm(r, 1) && nm(r, 1) !== 'Matt' ? 1 : -1, human = hi < 0 ? '' : nm(r, hi), hr = hi >= 0 && rg(r, hi);
+    if (k === 'open') out.push({ kind: k, code: r.code, who: !r.players ? 'Empty' : `${human || 'A player'} is waiting`, segs: r.players ? [[human || 'A player', hr], ' is waiting'] : null, meta: w > 0 ? `${w} watching` : '', go: 'Join', watch: r.players > 0 && r.watch > 0, w, players: r.players > 0 });      // players: a human is sitting there waiting. segs: who, in pieces: [name, registered] | plain text
+    else if (k === 'ask') out.push({ kind: k, code: r.code, who: `${human || 'A player'} vs Matt`, segs: [[human || 'A player', hr], ' vs Matt'], meta: sc(r), go: 'Ask to play', watch: r.watch > 0, w });
+    else out.push({ kind: k, code: r.code, who: `${nm(r, 0) || 'Player 1'} vs ${nm(r, 1) || 'Player 2'}`, segs: [[nm(r, 0) || 'Player 1', rg(r, 0)], ' vs ', [nm(r, 1) || 'Player 2', rg(r, 1)]], meta: (r.live === false ? 'Starting' : sc(r)) + (w > 0 ? ` · ${w} watching` : ''), go: r.watch > 0 ? 'Watch' : 'Stands full', full: !(r.watch > 0), w }); }
   return out;
 }
 const tabOf = row => row.kind === 'full' ? 'full' : 'open';
@@ -637,7 +657,7 @@ function drawCourts() {
   const nn = st === 'loading' || st === 'down' ? () => '–' : n => String(n); for (const [id, v] of [['n-open', nn(s.open.length)], ['n-full', nn(s.full.length)]]) swapText($(id), v, view === 'courts' ? 'lob-pop' : '');      // the counts follow the search: a query shows which tab its matches are in. Loading or down: a dash, never a false 0
   const n = s.all.filter(r => r.kind !== 'full').length, sub = $('courts-n'); if (sub) { const t = `${n} open`, was = sub.textContent, off = !(seen && n); if (!off) setText(sub, t); sub.classList.toggle('is-off', off); if (!off && was && was !== t) restart(sub, 'pop'); }      // the home tile: never jumps
   for (const o of $('court-seg')?.children || []) { const yes = o.dataset.filter === filter; o.setAttribute('aria-checked', String(yes)); o.tabIndex = yes ? 0 : -1; }
-  const key = [st, filter, query, ...rows.map(r => [r.kind, r.code, r.who, r.meta, r.go, r.watch, r.full].join(':'))].join('|');
+  const key = [st, filter, query, ...rows.map(r => [r.kind, r.code, r.who, JSON.stringify(r.segs || null), r.meta, r.go, r.watch, r.full].join(':'))].join('|');
   if (key === roomsKey) return; roomsKey = key;                                          // the list arrives every second: only touch the DOM (and the focus) when something drawn changed
   const at = ul.contains(document.activeElement) ? document.activeElement : null, had = at && (at.dataset.watch || at.dataset.code), hadWatch = !!(at && at.dataset.watch),
     idx = at ? [...ul.querySelectorAll('.court-row')].indexOf(at.closest('li')?.firstElementChild) : -1;
@@ -647,7 +667,8 @@ function drawCourts() {
   if (st === 'loading' || st === 'down') for (let i = 0; i < 4; i++) { const li = mk('li', 'court is-skel'); li.append(mk('span', 'court-row is-skel')); li.setAttribute('aria-hidden', 'true'); ul.append(li); }      // skeletons: nothing in them is focusable
   rows.forEach((r, i) => { const li = mk('li', 'court'), b = mk('button', 'room-row court-row' + (r.kind === 'full' ? ' is-full' : ''));
     li.dataset.kind = r.kind; b.dataset.code = r.code; b.dataset.nav = ''; b.tabIndex = i ? -1 : 0; if (r.kind === 'full') b.dataset.act = 'watch'; if (r.full) b.setAttribute('aria-disabled', 'true');
-    const who = mk('span', 'court-who', r.who); if (r.kind === 'tour') who.prepend(mk('span', 'badge-tour', 'Tournament'));
+    const who = mk('span', 'court-who', r.segs ? '' : r.who); for (const g of r.segs || []) if (typeof g === 'string') who.append(g); else { const n = mk('span', 'court-name', g[0]); who.append(n); regBadge(n, g[1]); }      // a registered name gets its badge beside it, never in its text
+    if (r.kind === 'tour') who.prepend(mk('span', 'badge-tour', 'Tournament'));
     const meta = mk('span', 'court-meta', r.meta); b.append(mk('b', 'court-code', r.code), who, meta, mk('span', 'court-go', r.go));
     li.dataset.code = r.code; if (fresh || !drawn.has(r.code)) { li.classList.add('lob-in'); li.style.setProperty('--i', fresh ? Math.min(i, 7) : 0); } else if (r.meta && drawn.get(r.code) !== r.meta) meta.classList.add('lob-pop');      // a court that just opened rises in (a new tab, or the list after the skeletons, staggers); a score or watcher change pops. Classes only here: no layout reads
     b.setAttribute('aria-label', `Court ${r.code}. ${r.who}.${r.meta ? ' ' + r.meta + '.' : ''} ${r.go}${r.watch ? '. Right arrow to watch' : ''}`); if (r.watch) b.setAttribute('aria-keyshortcuts', 'ArrowRight'); li.append(b);      // Watch is off the Tab order: say how to reach it
@@ -736,6 +757,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('btn-tour', 'click', () => { if (ts && !ts.you?.viewer && ts.phase !== 'done') { tcall('open'); return; } if (!needName()) tcall('create'); });      // one press makes one (docs/COURTS-TOURNEY.md 4.6 item 1). Already in one: Your tournament
   on2('btn-watch-code', 'click', () => { const c = getCode(); if (c.length === 4 && !needName() && on.watch) on.watch(c); });
   on2('btn-bot', 'click', () => { if (!needName()) lobbyView('bot'); });
+  on2('btn-profile', 'click', () => lobbyView('profile'));      // no name needed: nobody is seated
   $('btn-create-go').addEventListener('click', () => { if (!needName() && on.create) on.create($('seg').querySelector('[aria-checked="true"]').dataset.public === '1'); });
   on2('bot-levels', 'click', e => { const b = e.target.closest('[data-level]'); if (b && !needName() && on.bot) on.bot(+b.dataset.level); });       // one click plays: no second confirm
   on2('lobby-bot', 'keydown', e => { let d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); const bs = [...$('bot-levels').children], i = bs.indexOf(document.activeElement);
@@ -858,10 +880,10 @@ function drawTour() {
 const chipSeen = new WeakMap();
 function names(ul, s, cap) {
   if (!ul) return; const ps = tPlayers(s), me = s.you && s.you.id, list = ps.length > cap ? ps.slice(0, cap - 1) : ps, more = ps.length - list.length;
-  const key = JSON.stringify([list.map(p => [p.id, p.name, p.host, p.on, p.id === me]), more]); if (ul.dataset.key === key) return; ul.dataset.key = key;
+  const key = JSON.stringify([list.map(p => [p.id, p.name, p.reg === true, p.host, p.on, p.id === me]), more]); if (ul.dataset.key === key) return; ul.dataset.key = key;
   const first = !chipSeen.has(ul), seen = chipSeen.get(ul) || new Set(); ul.textContent = '';
   for (const p of list) { const li = mk('li', 'tour-chip' + (p.on === false ? ' is-off' : '') + (p.id != null && p.id === me ? ' is-you' : '') + (!first && !seen.has(p.id) ? ' is-new' : ''));
-    li.append(mk('span', 'tour-chip-name', tnm(p.name) || 'Player'));
+    { const n = mk('span', 'tour-chip-name', tnm(p.name) || 'Player'); li.append(n); regBadge(n, p.reg === true); }      // a registered username: the badge beside it (docs/ACCOUNTS.md 7.5)
     if (p.on === false) li.append(mk('span', 'tour-tag is-off', 'Reconnecting')); else if (p.id != null && p.id === me) li.append(mk('span', 'tour-tag is-you', 'You')); else if (p.host) li.append(mk('span', 'tour-tag', 'Host'));
     ul.append(li); seen.add(p.id); }
   if (more > 0) ul.append(mk('li', 'tour-chip is-more', `+${more} more`));
@@ -931,7 +953,7 @@ export function tourVs(m) {
   if (!m || typeof m !== 'object') { if (slots.overlay === 'tour-vs') showOverlay(null); return; }
   const of = m.of | 0, name = tnm(m.name) || 'Next round', bot = !!(m.vs && m.vs.bot);
   setText($('vs-round'), of > 1 ? `${name} · Match ${m.n | 0} of ${of}` : name);
-  setText($('vs-them'), bot ? 'Matt' : tnm(m.vs && m.vs.name) || 'Opponent'); show('vs-them-tag', bot);
+  setText($('vs-them'), bot ? 'Matt' : tnm(m.vs && m.vs.name) || 'Opponent'); show('vs-them-tag', bot); regBadge($('vs-them'), !bot && !!m.vs && m.vs.reg === true);
   setText($('vs-target'), `First to ${m.target | 0 || (m.final ? 11 : 7)}, win by 2`);      // the round line above already says Final
   showOverlay('tour-vs'); restart($('vs-card'), 'go');
 }
@@ -959,7 +981,7 @@ function drawBracket() {
       for (const x of r.matches || []) { const drawn = x.a && (x.a.name || x.a.bot) || x.b && (x.b.name || x.b.bot), li = mk('li', 'br-match' + (mine(x) ? ' is-you' : '') + (x.live ? ' is-live' : '') + (x.w ? ' is-done' : '') + (drawn ? '' : ' is-tbd')); if (mine(x) && k === cur && !you.viewer && !you.out) li.tabIndex = -1;      // your own card takes the first focus (brFocus)
         for (const sd of ['a', 'b']) { const p = x[sd] || {}, won = x.w === sd, lost = !!x.w && !won, row = mk('div', 'br-p' + (won ? ' is-win' : '') + (lost ? ' is-lose' : '') + (id != null && p.id === id ? ' is-me' : ''));
           const nmEl = mk('span', 'br-name', drawn ? who(p) : 'To be decided'); if (drawn && x.forfeit && lost && !p.bot) nmEl.append(mk('span', 'br-left', ' (left)'));
-          row.append(nmEl); if (p.bot) row.append(mk('span', 'br-tag', 'Tour'));
+          row.append(nmEl); if (drawn && !p.bot) regBadge(nmEl, p.reg === true); if (p.bot) row.append(mk('span', 'br-tag', 'Tour'));      // a registered username: its badge beside the name (docs/ACCOUNTS.md 7.5)
           row.append(mk('b', 'br-sc', x.live || x.w ? String(Array.isArray(x.score) ? x.score[sd === 'a' ? 0 : 1] | 0 : 0) : '')); li.append(row); }
         if (x.live && typeof x.room === 'string') { const f = mk('div', 'br-live'), lv = mk('span', '', 'Live'), nw = x.watchers | 0; if (nw > 0) { lv.append(' · '); const e = mk('span', 'br-eye'); e.innerHTML = EYE_SVG; lv.append(e, String(nw)); } f.append(mk('i', 'br-dot'), lv);      // 'Live · (eye) 3': never cut to 'Live · 3 wat…' in a 13rem column; the Watch button's label says '3 watching'
           const w = mk('button', 'btn btn-sm is-tall br-watch'); w.innerHTML = EYE_SVG; w.append('Watch'); w.dataset.room = x.room; w.setAttribute('aria-label', `Watch ${who(x.a)} versus ${who(x.b)}${nw > 0 ? `, live, ${nw} watching` : ', live'}`); f.append(w); li.append(f); }

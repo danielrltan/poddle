@@ -606,7 +606,8 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 @media (hover:hover){ .tile:hover{transform:translateY(-.4375rem) scale(1.035);rotate:-.6deg;background-position:0 0,0 0;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 750ms var(--ease-soft)} .tile:nth-child(2):hover{rotate:.6deg} .tile:hover::after{opacity:.75} }      /* lifts, tips a touch and a light runs across it. Before :active, or the lift beats the press */
 .tile:active,.tile:nth-child(n):active{transform:scale(.96);rotate:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transition-duration:90ms}      /* the press goes in fast; the 260ms spring plays on release */
 .tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
-.tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
+.tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
+@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles:has(> .tile:nth-child(4):not([hidden])){display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
 @keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
 /* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks.
    Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
@@ -700,6 +701,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 @media (max-aspect-ratio: 1/1){
   .menu-glass .menu-body{padding:var(--s-4);justify-content:safe center;overflow-y:auto}
   .tiles{display:grid;grid-template-columns:repeat(3,1fr);width:min(56rem,100%);gap:var(--s-3)}             /* three tiles: still three across (60rem wide at the 10px floor) */
+  .tiles:has(> .tile:nth-child(4):not([hidden])){grid-template-columns:repeat(2,1fr);width:min(40rem,100%)}      /* four (Your stats shown): 2x2, never three and a lone fourth */
   .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
   .tile svg{width:5.5rem;height:5.5rem}
   .name-row .field{width:14rem}
@@ -766,6 +768,7 @@ button.set-row::before{content:"";position:absolute;inset:.0625rem 0 0;border-ra
 button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
 .set-action{color:var(--link)} .set-action svg{width:1.25rem;height:1.25rem;margin-right:.375rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}      /* Recentre camera: a row that does a thing, so it reads as a link, not a setting */
 .set-row .field{width:11.5rem;height:2.25rem;padding:0 .875rem;font-size:var(--t-md);border-width:.125rem}
+.set-name-end{display:flex;align-items:center;gap:.5rem;min-width:0} .set-name-end:has(> .btn:not([hidden])) .field{width:8.5rem;min-width:0}      /* a username: the read-only field and its Change button (docs/ACCOUNTS.md 9.5) */
 /* Output: the device list on the right. Device names get long ("Default - MacBook Pro Speakers"), so the select is capped and cuts rather than stretching the card */
 .set-pickdev select.field{width:11.5rem;max-width:56%;height:2.25rem;padding:0 .5rem 0 .625rem;font-size:var(--t-sm);font-weight:700;border-width:.125rem;text-overflow:ellipsis}
 .set-hint{margin:0;padding:.4375rem .875rem .5rem;font-size:var(--t-xs);font-weight:600;line-height:1.35;color:var(--ink-soft)}
@@ -1006,7 +1009,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   .courts-make{grid-template-columns:1fr 1fr} .tour-note{grid-column:1 / -1}
 }
 @media (max-width:480px){
-  .tiles{grid-template-columns:1fr;width:100%}
+  .tiles,.tiles:has(> .tile:nth-child(4):not([hidden])){grid-template-columns:1fr;width:100%}
   .tile{flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4)} .tile svg{width:4.5rem;height:4.5rem}
 }
 
@@ -1464,3 +1467,84 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
   .cam-points{flex-direction:row;align-items:stretch} .cam-points li{flex:1 1 0;flex-direction:column;gap:.5rem;padding:1rem 1.125rem}
 }
 @media (prefers-reduced-motion: reduce){ .screen.is-active .cam-steps-l,.screen.is-active .cam-steps-r{animation:none} }
+
+/* ==========================================================================================================
+   PLAYER STATS (docs/ACCOUNTS.md 9): Your stats in the lobby, the result card's line, the registered-name badge, the
+   sign-in / username / delete cards and Settings > You. web/profile.js draws all of it; every string goes in as text.
+   ========================================================================================================== */
+/* the badge of a registered username (7.5): its own element beside the name, an accent pill with a drawn tick. No glyph a guest could type */
+.reg-badge{flex:none;display:inline-grid;place-items:center;height:1.1em;min-width:1.55em;padding:0 .3em;margin-left:.35em;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--line),var(--line-deep));box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.45), 0 .0625rem .125rem rgba(20,60,90,.25);vertical-align:-.12em}
+.reg-badge svg{width:.8em;height:.8em;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.score-who:has(> .reg-badge){display:grid;grid-template-columns:minmax(0,max-content) auto;justify-content:start;align-items:center;column-gap:0} .score-who:has(> .reg-badge) small{grid-column:1 / -1}      /* the name and its badge on one line, the sub-label under both */
+.score-tab.is-them .score-who:has(> .reg-badge){justify-content:end}
+.tally-side:has(> .reg-badge){display:grid;grid-template-columns:auto auto;justify-content:center;justify-items:center;align-items:center;row-gap:.375rem} .tally-side:has(> .reg-badge) .chip{grid-column:1 / -1}
+.br-p:has(> .reg-badge) .br-name,.tour-chip:has(> .reg-badge) .tour-chip-name{flex:0 1 auto} .br-name + .reg-badge,.tour-chip-name + .reg-badge{margin:0 auto 0 0}      /* bracket and chips: the badge hugs the name, the tags and score stay at the end (the flex gap spaces it) */
+.court-who .reg-badge{display:inline-grid;margin-left:.25em} .vs-side > .reg-badge{margin:0}      /* the court list: inline in the nowrap line. The VS card: under the name, in its column */
+
+/* the result card's line (9.3): what this match did to my record. Quiet, under the tally; it never takes focus */
+.result-save{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:calc(-1 * var(--s-3)) auto var(--s-4);max-width:36rem;text-align:center}
+.result-save p{margin:0}
+#result-save-text{font-size:var(--t-md);font-weight:800;color:var(--me-ink)}
+.result-notice{font-size:var(--t-sm);font-weight:600;line-height:1.45;color:var(--ink)} .result-notice .foot-link{font-size:inherit}
+.result-save .btn{margin-top:.125rem}
+
+/* Your stats (9.4): the lobby view. Matt's ladder on the left, people and bests on the right; one column on a narrow window */
+.pf-view{gap:var(--s-4)!important;text-align:left}
+.pf-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3) var(--s-5);width:100%}
+.pf-who{margin:0;display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.pf-name-row{display:inline-flex;align-items:center;font-size:var(--t-xl);line-height:1.15}
+.pf-name-row b{font-weight:800;color:var(--ink-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-who small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .pf-who .pf-notice{font-weight:600;line-height:1.45} .pf-notice .foot-link{font-size:inherit}
+.pf-acct{display:flex;align-items:center;gap:var(--s-3)}
+.pf-signed{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem} .pf-signed > span{font-size:var(--t-sm);font-weight:800;color:var(--good-deep);margin-right:.25rem}
+.pf-msg{margin:0;width:100%;padding:.625rem 1rem;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-md);font-weight:700;color:var(--ink);text-align:center}
+.pf-cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:var(--s-5);width:100%}
+.pf-cols h2{margin:0 0 .5rem .25rem}
+.pf-side h2 + .pf-stats{margin-bottom:var(--s-4)} .pf-side .pf-stats:last-child{margin-bottom:0}
+.pf-rungs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.pf-rung{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.75rem;min-height:3.5rem;padding:.5rem .75rem .5rem .625rem;border-radius:var(--r-md);background:rgba(255,255,255,.78);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1), inset 0 0 0 .0625rem rgba(255,255,255,.9)}
+.pf-dot{position:relative;width:2rem;height:2rem;border-radius:50%;border:.1875rem solid #fff;background:var(--sky-3);box-shadow:0 .0625rem .25rem rgba(10,30,50,.25)}
+.pf-dot::after{content:"";position:absolute;left:50%;top:50%;width:.625rem;height:.1875rem;margin:-.09375rem 0 0 -.3125rem;border-radius:var(--r-pill);background:var(--ink-faint)}      /* locked: a flat dash */
+.pf-rung.is-won .pf-dot{background:radial-gradient(circle at 50% 50%, var(--gold-2) 0 56%, transparent 57%), conic-gradient(from 210deg, var(--gold-1), var(--gold-3), var(--gold-1), var(--gold-4), var(--gold-1))}
+.pf-rung.is-won .pf-dot::after{width:.6875rem;height:.375rem;margin:-.3125rem 0 0 -.34375rem;border-radius:0;background:none;border:solid var(--gold-4);border-width:0 0 .1875rem .1875rem;rotate:-45deg}      /* won: a gold disc with a tick */
+.pf-level{display:flex;flex-direction:column;min-width:0}
+.pf-level b{font-size:var(--t-md);font-weight:800;color:var(--ink-strong)}
+.pf-level small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}      /* wraps, never cut: a long record beside the 'Beaten on' chip. The view is panel-wide, not 9.4's panel-mid: at 50rem this line lost its streaks (test/profile-ui.mjs checks 9 window sizes) */
+.pf-chip{justify-self:end;padding:.25rem .625rem;border-radius:var(--r-pill);background:var(--sky-2);font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap}
+.pf-chip.is-medal{background:linear-gradient(180deg,#fff8d0,var(--gold-1));color:var(--warn-deep);box-shadow:inset 0 0 0 .0625rem rgba(201,127,8,.35)}
+.pf-next{margin-top:.75rem;width:100%}
+.pf-stats{margin:0;padding:.25rem 1rem}
+.pf-row{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;padding:.4375rem 0} .pf-row + .pf-row{box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
+.pf-row dt{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
+.pf-row dd{margin:0;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pf-row dd small{margin-left:.5rem;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
+.pf-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3);width:100%}
+.pf-foot-btns{display:flex;flex-wrap:wrap;gap:var(--s-3)}
+@media (max-width:760px){ .pf-cols{grid-template-columns:minmax(0,1fr)} .pf-view{padding:var(--s-5)!important} .pf-foot{justify-content:center;text-align:center} .pf-foot-btns{justify-content:center} }
+
+/* the account cards (9.5, 9.7): one at a time, over everything (the result card too, which keeps its own buttons), on the lobby's frosted veil like .ask */
+.acct-layer{position:fixed;inset:0;z-index:calc(var(--z-toast) + 1);display:grid;place-items:center;padding:var(--edge);background:rgba(232,243,249,.72);overscroll-behavior:contain}
+.acct-card{width:min(30rem,100%);max-height:calc(100dvh - 2 * var(--edge));overflow-y:auto;padding:var(--s-5);text-align:left;outline:0;box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
+.acct-body{display:flex;flex-direction:column;gap:var(--s-3)}
+.acct-body h2{margin:0;font-size:var(--t-lg);font-weight:800;line-height:1.2;color:var(--ink-strong)}
+.acct-body p{margin:0;font-size:var(--t-sm);line-height:1.5;color:var(--ink)}
+.acct-links{display:flex;flex-wrap:wrap;gap:var(--s-4)}
+.acct-check{display:flex;align-items:flex-start;gap:.75rem;min-height:44px;padding:.625rem .875rem;border-radius:var(--r-md);background:rgba(255,255,255,.78);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-sm);font-weight:700;line-height:1.45;color:var(--ink-strong);cursor:pointer}
+.acct-check input{flex:none;width:1.375rem;height:1.375rem;margin:.0625rem 0 0;accent-color:var(--line-deep);cursor:pointer}
+.acct-check:has(input:focus-visible){box-shadow:var(--glow)}
+.signin-google{display:grid;place-items:center;min-height:3.5rem}
+.signin-btn{display:flex;justify-content:center;min-height:44px}
+.acct-err{font-weight:700;color:var(--bad-deep)!important} .acct-err:empty{display:none}
+.acct-btns{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--s-3);margin-top:var(--s-2)!important}
+.acct-body .field{width:100%}
+
+/* Settings > You: the delete-or-keep question under the switch, a line of its own */
+.set-confirm{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:0;padding:.5rem .5rem .5rem .875rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-strong)} .set-confirm span{flex:1 1 100%}
+.set-confirm .btn{height:max(2.5rem,44px);padding:0 1.25rem}
+.set-list > .set-row + .set-confirm,.set-list > .set-row + .set-hint{box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
+#set-account span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+#set-account .btn{height:max(2.25rem,44px);padding:0 1rem;flex:none}
+
+/* the home notice (9.9), under the safety one: the same card, a little quieter */
+.news h3{font-size:var(--t-md)} .news p{font-size:var(--t-sm)} .news .safety-icon{width:3.5rem;height:3.5rem}
+.name-row #btn-name-change{flex:none;height:max(2.5rem,44px);padding:0 1.125rem}

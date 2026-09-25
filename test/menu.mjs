@@ -83,7 +83,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   // Play -> lobby
   await pg.click('#btn-start'); await sleep(700); s = await st(pg);
   ok(s.screen === 'lobby' && s.view === 'home' && s.title === 'Play' && s.focus === 'btn-quick', `${tag} Play -> lobby home, Quick play focused (${s.screen}/${s.view}/${s.focus})`);
-  const tiles = await pg.evaluate(() => [...document.querySelectorAll('#lobby-home .tile')].map(b => b.querySelector('b').textContent.trim())); ok(/^Quick play\|Courts\|Play a bot$/.test(tiles.join('|')) && !(await pg.$('#btn-code')), `${tag} the choices: ${tiles.join(' | ')} (no Enter code tile)`);
+  const tiles = await pg.evaluate(() => [...document.querySelectorAll('#lobby-home .tile:not([hidden])')].map(b => b.querySelector('b').textContent.trim())); ok(/^Quick play\|Courts\|Play a bot$/.test(tiles.join('|')) && !(await pg.$('#btn-code')), `${tag} the choices: ${tiles.join(' | ')} (no Enter code tile)`);
   ok(s.rooms.length === 2 && s.rooms[0].startsWith('KXQ7') && s.rooms[1].startsWith('M3PD') && s.online === '3 online', `${tag} room list from the server: ${s.rooms.join(' | ')}, "${s.online}"`);
   ok((await pg.evaluate(() => getComputedStyle(document.getElementById('glass')).visibility)) === 'visible', `${tag} glass stays under the lobby`);
   if (s.fs) await pg.evaluate(() => document.exitFullscreen()); await shot('2-lobby');

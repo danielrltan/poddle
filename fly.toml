@@ -20,3 +20,14 @@ primary_region = "yyz"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "256mb"
+
+# Player stats (docs/ACCOUNTS.md 11.1): a SQLite file on a volume made once by the operator with
+#   fly volumes create poddle_data --app poddle --region yyz --size 1 --snapshot-retention 5 --yes
+# The volume pins the machine to its host (deploy.sh keeps the machine that has it). 5-day snapshots: the privacy page promises it.
+[mounts]
+  source = "poddle_data"
+  destination = "/data"
+
+[env]
+  PODDLE_DB = "/data/poddle.db"      # server/db.js; never under web/ (db.open refuses that)
+  GOOGLE_CLIENT_ID = "722523597650-q0fitrq9nast0c2gh4gbdtt5keva6q0d.apps.googleusercontent.com"   # public (it is in every sign-in request); sign-in is off without it

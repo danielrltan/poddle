@@ -171,7 +171,14 @@
     <li class="is-wait" id="set-camera"><span class="light"></span><b>Camera</b><em id="set-camera-state">Waiting</em></li>
   </ul></div>
   <section class="set-group" id="grp-you" aria-label="You"><div class="set-list">
-    <label class="set-row" id="set-name"><span>Name</span><input class="field" id="set-name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"></label>
+    <div class="set-row" id="set-name"><span><label for="set-name-input">Name</label></span><span class="set-name-end"><input class="field" id="set-name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"><button class="btn btn-sm is-tall" id="btn-set-name-change" hidden>Change</button></span></div>
+    <!-- player stats (docs/ACCOUNTS.md 9.6): hidden until web/profile.js knows this page's server keeps them -->
+    <button class="set-row set-switch" id="tog-save-stats" role="switch" aria-checked="true" hidden><span>Save my stats on this device</span><i></i></button>
+    <p class="set-confirm" id="stats-off-ask" hidden><span>Also delete the stats saved so far?</span><button class="btn btn-sm btn-danger" id="btn-stats-del">Delete</button><button class="btn btn-sm" id="btn-stats-keep">Keep</button></p>
+    <p class="set-hint" id="stats-hint" role="status" hidden></p>
+    <div class="set-row" id="set-account" hidden><span id="set-account-name">Signed in</span><button class="btn btn-sm" id="btn-set-signout">Sign out</button></div>
+    <button class="set-row set-action" id="btn-set-signin" hidden><span>Sign in with Google</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.5-6 7-6s6.2 2 7 6"/></svg></button>
+    <button class="set-row set-action" id="btn-set-stats" hidden><span>Your stats</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-9"/></svg></button>
   </div></section>
   <section class="set-group" id="grp-paddle"><h3 class="set-label">Paddle</h3><div class="set-list">
     <div class="set-row set-pick set-wide" id="set-paddle" hidden><span class="vh">Paddle</span><span class="seg seg-sm" id="paddle-seg2" role="radiogroup" aria-label="Paddle"><button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone">Phone</button><button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod">AirPod</button></span></div>
@@ -214,6 +221,33 @@
   <div class="set-foot tc-foot"><p class="tour-why" id="tc-why"></p><button class="btn btn-sm is-tall" id="btn-tc-start" hidden>Start tournament</button><button class="btn btn-sm btn-danger" id="btn-tc-leave">Leave tournament</button></div>
 </div>
 
+<!-- ============================================== ACCOUNT CARDS (docs/ACCOUNTS.md 9.5, 9.7): over everything, one at a time. web/profile.js owns them ============================================== -->
+<!-- Nothing is requested from Google until the age box is ticked: only then does profile.js load https://accounts.google.com/gsi/client and draw Google's button in #signin-google -->
+<div class="acct-layer" id="acct-layer" hidden>
+  <div class="panel panel-sm acct-card" id="signin-card" role="dialog" aria-modal="true" aria-labelledby="signin-title" tabindex="-1" hidden>
+    <div class="acct-body" id="signin-main">
+      <h2 id="signin-title">Sign in</h2>
+      <p>Sign in to keep your stats on any device and claim a username. Your stats from this browser come with you. Google sends us your name, e-mail and picture with the sign-in; we keep only an ID from Google and throw the rest away.</p>
+      <p class="acct-links"><a class="foot-link" href="/privacy.html#sharing" target="_blank" rel="noopener">Privacy Policy</a><a class="foot-link" href="/terms.html" target="_blank" rel="noopener">Terms of Use</a></p>
+      <label class="acct-check"><input type="checkbox" id="signin-age"><span>I am 13 or older. If I am under 18, my parent or guardian has agreed to the Terms of Use and the Privacy Policy.</span></label>
+      <div class="signin-google" id="signin-google"><p class="t-note" id="signin-hint">Tick the box to continue</p><div class="signin-btn" id="signin-btn" hidden></div></div>
+      <p class="acct-err" id="signin-err" role="alert"></p>
+      <p class="acct-btns"><button class="btn btn-sm is-tall btn-quiet" id="btn-signin-close">Not now</button></p>
+    </div>
+    <form class="acct-body" id="name-claim" autocomplete="off" novalidate hidden>
+      <h2 id="claim-title">Pick a username</h2>
+      <p>3 to 12 letters, numbers or _. Other players see it with a badge.</p>
+      <input class="field" id="claim-input" maxlength="12" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" pattern="[A-Za-z0-9_]{3,12}" aria-describedby="claim-err" aria-label="Username">
+      <p class="acct-err" id="claim-err" role="alert"></p>
+      <p class="acct-btns"><button class="btn btn-sm is-tall" id="btn-claim" type="submit">Claim</button><button class="btn btn-sm is-tall btn-quiet" id="btn-claim-skip" type="button">Skip for now</button></p>
+    </form>
+  </div>
+  <div class="panel panel-sm acct-card" id="acct-confirm" role="alertdialog" aria-modal="true" aria-labelledby="acct-confirm-title" aria-describedby="acct-confirm-text" tabindex="-1" hidden>
+    <div class="acct-body"><h2 id="acct-confirm-title">Delete your data?</h2><p id="acct-confirm-text"></p>
+      <p class="acct-btns"><button class="btn btn-sm is-tall btn-danger" id="btn-confirm-yes">Delete</button><button class="btn btn-sm is-tall" id="btn-confirm-no">Cancel</button></p></div>
+  </div>
+</div>
+
 <!-- ============================================== TITLE ============================================== -->
 <section class="screen menu-glass" id="screen-title" data-screen="title" hidden>
   <div class="menu-body" style="gap:var(--s-6)">
@@ -233,6 +267,14 @@
         <p>Check behind you before you swing. Hold your paddle tight, it has no strap.</p>
       </div>
     </div>
+    <!-- docs/ACCOUNTS.md 9.9: shown by web/profile.js where stats are kept. Remove about 60 days after launch -->
+    <div class="panel panel-sm notice news" id="news" data-fit hidden>
+      <svg class="safety-icon" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="33" fill="#eaf6fc" stroke="#a9e0f6" stroke-width="2.5"/><g class="art-line" style="stroke-width:3.6"><path d="M22 52V40M36 52V26M50 52V34"/></g><path class="art-accent" d="m29 20 5 5 9-9" style="stroke-width:3.4"/></svg>
+      <div>
+        <h3>New: your stats are saved</h3>
+        <p>Beat Matt at every level and track your best rally. Stats are saved with a random identifier in this browser, and you can turn this off in Settings. <a class="foot-link" href="/privacy.html#storage" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a> updated September 25, 2026.</p>
+      </div>
+    </div>
   </div>
   <footer class="menu-foot menu-foot-note"><span>Any computer, any phone, nothing to install: scan a code and your phone is the paddle</span><span class="foot-links"><a class="foot-link" href="/how-to-play.html" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">How to play</a><a class="foot-link foot-legal" href="/privacy.html" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy</a><a class="foot-link foot-legal" href="/terms.html" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Terms</a></span></footer>
 </section>
@@ -250,7 +292,7 @@
     <!-- the tournament ended under you (ui.tourEnded): a notice, not a dialog. OK or any other view puts it away -->
     <div class="panel tour-ended" id="tour-ended" role="status" data-fit hidden><div class="notice-icon well"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8.5 20h7M10 17h4v3h-4Z"/></svg></div><div><h2 id="tour-ended-text"></h2><p class="ask-btns"><button class="btn is-tall" id="btn-tour-ended-ok">OK</button></p></div></div>
 
-    <div class="name-row" id="name-row" data-fit><label for="name-input">Name</label><input class="field" id="name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"></div>
+    <div class="name-row" id="name-row" data-fit><label for="name-input">Name</label><input class="field" id="name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"><button class="btn btn-sm is-tall" id="btn-name-change" hidden>Change</button></div>
 
     <div class="lobby-view lobby-home" id="lobby-home" data-view="home">
       <div class="tiles" data-fit>
@@ -263,6 +305,9 @@
         <button class="tile" id="btn-bot" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M20 82c2-19 13-27 28-27s26 8 28 27Z"/><circle cx="48" cy="33" r="17"/></g><g class="art-accent" style="stroke-width:5"><path d="M41 34v3M55 34v3"/></g><path class="art-accent" d="M42 69h12" style="stroke-width:6"/></svg>
           <b>Play a bot</b></button>
+        <button class="tile" id="btn-profile" data-nav hidden>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="14" y="52" width="18" height="28" rx="5"/><rect x="39" y="34" width="18" height="46" rx="5"/><rect x="64" y="44" width="18" height="36" rx="5"/></g><path class="art-accent" d="m43 17 5 5 9-10" style="stroke-width:5.5"/></svg>
+          <b>Your stats</b></button>
       </div>
     </div>
 
@@ -350,6 +395,32 @@
     <div class="panel panel-mid lobby-view" id="lobby-bot" data-view="bot" data-fit hidden>
       <h2 class="caps" id="bot-title">Select difficulty</h2>
       <div class="bot-levels" id="bot-levels" role="group" aria-labelledby="bot-title"><button class="btn btn-lg" id="btn-bot-0" data-level="0"><b>Rookie</b><small>Slow and forgiving</small></button><button class="btn btn-lg" id="btn-bot-1" data-level="1"><b>Club</b><small>A fair match</small></button><button class="btn btn-lg" id="btn-bot-3" data-level="3"><b>Tour</b><small>Tournament pace</small></button><button class="btn btn-lg" id="btn-bot-2" data-level="2"><b>Pro</b><small>Fast and accurate</small></button></div>
+    </div>
+
+    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player's own record, drawn by web/profile.js. Matt's four rungs on the left, people and bests on the right. The tile and this view show only where the server keeps stats -->
+    <div class="panel panel-wide lobby-view pf-view" id="lobby-profile" data-view="profile" data-fit hidden>
+      <div class="pf-head">
+        <p class="pf-who"><span class="pf-name-row"><b id="pf-name">Guest</b></span><small id="pf-sub">Stats saved on this device</small><small class="pf-notice" id="pf-notice" hidden>You can turn this off in Settings. <a class="foot-link" href="/privacy.html#storage" target="_blank" rel="noopener" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a></small></p>
+        <div class="pf-acct" id="pf-acct" hidden>
+          <button class="btn btn-sm is-tall" id="btn-pf-signin" hidden>Sign in with Google</button>
+          <p class="pf-signed" id="pf-signed" hidden><span>Signed in</span><button class="btn btn-sm is-tall btn-quiet" id="btn-pf-rename">Change name</button><button class="btn btn-sm is-tall btn-quiet" id="btn-pf-signout">Sign out</button></p>
+        </div>
+      </div>
+      <p class="pf-msg" id="pf-msg" role="status" hidden></p>
+      <div class="pf-cols">
+        <section class="pf-ladder" aria-labelledby="pf-ladder-h">
+          <h2 class="caps" id="pf-ladder-h">Beat Matt</h2>
+          <ol class="pf-rungs" id="pf-rungs"></ol>
+          <button class="btn btn-sm is-tall pf-next" id="btn-pf-next" hidden></button>
+        </section>
+        <section class="pf-side">
+          <h2 class="caps" id="pf-human-h">Against people</h2>
+          <dl class="pf-stats well" id="pf-human" aria-labelledby="pf-human-h"></dl>
+          <h2 class="caps" id="pf-bests-h">Personal bests</h2>
+          <dl class="pf-stats well" id="pf-bests" aria-labelledby="pf-bests-h"></dl>
+        </section>
+      </div>
+      <div class="pf-foot"><p class="t-note">Only you can see this page.</p><span class="pf-foot-btns"><button class="btn btn-sm is-tall btn-quiet" id="btn-pf-export">Download my data</button><button class="btn btn-sm is-tall btn-danger" id="btn-pf-delete">Delete my data</button></span></div>
     </div>
 
     <!-- a full court offers a place to watch. Opens over the lobby; the rest of the lobby is inert meanwhile -->
@@ -504,6 +575,10 @@
     </div>
     <ul class="result-stats" id="result-stats" aria-label="Match stats" hidden></ul>
     <ol class="road" id="result-road" aria-label="The road to the title" hidden></ol>
+    <!-- what this match did to the player's own stats (docs/ACCOUNTS.md 9.3): web/profile.js fills it from the 'profile' message. Never takes focus -->
+    <div class="result-save" id="result-save" role="status" hidden><p id="result-save-text"></p>
+      <p class="result-notice" id="result-notice" hidden>Your stats are saved on this device. You can turn this off in Settings. <a class="foot-link" href="/privacy.html#storage" target="_blank" rel="noopener" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a></p>
+      <button class="btn btn-sm is-tall" id="btn-save-signin" hidden>Sign in to keep this win</button></div>
     <div class="rematch" id="rematch">
       <div class="rematch-btns tour-res" id="tour-res" hidden><button class="btn" id="btn-see-bracket">See bracket</button></div>
       <div class="rematch-btns tour-res" id="champ-acts" hidden><button class="btn" id="btn-champ-back">Back to courts</button><button class="btn" id="btn-champ-bracket">See bracket</button></div>

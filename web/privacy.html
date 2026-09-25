@@ -7,6 +7,10 @@
   CDNs, SDKs, fonts, auth providers or vendored libraries that phone home (a MediaPipe upgrade: re-apply the "Poddle:" patch
   in web/vendor/mp/vision_bundle.js); accounts or sign-in (e.g. Google); chat, profiles, leaderboards, replays, payments,
   prizes; the age policy. Sections to check: Short version, For teens and parents, 2 (table + permissions), 3, 4, 5, 6, 7, 13.
+  Game statistics and Sign in with Google (docs/ACCOUNTS.md 10.1; both launch together) are described in: Summary, For
+  teens and parents, 2 (table, statistics paragraph, IP purpose, automated decision), 4 (statistics, usernames), 5 (poddle.device,
+  poddle.stats.on, the two __Host- cookies), 6 (Fly volume and snapshots, Google), 7 (retention = server/db.js sweep), 9, 10 (age
+  checkbox), 11, 13 (lawful bases), 15. docs/ropa.md is the matching record of processing: update it with this page.
   Important changes also need a notice on the home page.
 -->
 <html lang="en">
@@ -14,7 +18,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy Policy · Poddle</title>
-<meta name="description" content="What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.">
+<meta name="description" content="What Poddle collects, why, who sees it and how long it lasts. Optional Google sign-in, no advertising, no analytics. Your webcam video stays on your computer.">
 <link rel="canonical" href="https://poddleball.com/privacy.html">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#dfeef6">
@@ -25,7 +29,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Poddle">
 <meta property="og:title" content="Poddle Privacy Policy">
-<meta property="og:description" content="What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.">
+<meta property="og:description" content="What Poddle collects, why, who sees it and how long it lasts. Optional Google sign-in, no advertising, no analytics. Your webcam video stays on your computer.">
 <meta property="og:url" content="https://poddleball.com/privacy.html">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://poddleball.com/og.jpg?v=6">
@@ -37,7 +41,7 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Poddle Privacy Policy">
-<meta name="twitter:description" content="What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.">
+<meta name="twitter:description" content="What Poddle collects, why, who sees it and how long it lasts. Optional Google sign-in, no advertising, no analytics. Your webcam video stays on your computer.">
 <meta name="twitter:image" content="https://poddleball.com/og.jpg?v=6">
 <meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod!">
 
@@ -68,9 +72,9 @@
   "@id": "https://poddleball.com/privacy.html",
   "url": "https://poddleball.com/privacy.html",
   "name": "Poddle Privacy Policy",
-  "description": "What Poddle collects, why, who sees it and how long it lasts. No accounts, no cookies, no ads. Your webcam video stays on your computer.",
+  "description": "What Poddle collects, why, who sees it and how long it lasts. Optional Google sign-in, no advertising, no analytics. Your webcam video stays on your computer.",
   "inLanguage": "en",
-  "dateModified": "2026-09-24",
+  "dateModified": "2026-09-25",
   "isPartOf": { "@type": "WebSite", "name": "Poddle", "url": "https://poddleball.com/" }
 }
 </script>
@@ -87,18 +91,19 @@
 <main class="wrap">
   <section class="intro" aria-labelledby="title">
     <h1 id="title">Privacy Policy</h1>
-    <p class="updated">Last updated: September 24, 2026. Effective: September 24, 2026.</p>
+    <p class="updated">Last updated: September 25, 2026. Effective: September 25, 2026.</p>
     <p class="lead">Poddle is a free pickleball game that runs in your browser at poddleball.com. This Privacy Policy explains, in plain language, what information the game uses, why it is used, who can see it and how long it is kept. It also covers the Poddle Helper application for Mac. The rules for using Poddle are set out in our <a href="/terms.html">Terms of Use</a>.</p>
   </section>
 
   <section class="card summary" aria-labelledby="short">
     <h2 id="short">Summary</h2>
     <ul>
-      <li><strong>No accounts, cookies, advertising or analytics.</strong> We never sell your information or share it for advertising purposes.</li>
+      <li><strong>Signing in with Google is optional and is never required to play.</strong> We use sign-in cookies only if you choose to sign in. We do not use advertising or analytics, and we never sell your information or share it for advertising purposes.</li>
       <li><strong>Your webcam video remains on your computer.</strong> It is processed within your browser to determine approximately where you are standing. No video, images or face data are transmitted or saved. We do not identify anyone.</li>
       <li><strong>Your position and your paddle's motion are transmitted live</strong> to our game server and relayed to your opponent and anyone watching, so that the match can be played. They are not stored.</li>
       <li><strong>Your display name is publicly visible</strong> to other players and spectators. Please do not use your full real name.</li>
-      <li><strong>Our server holds your IP address and display name in memory only</strong>, in order to operate the game and prevent abuse. We maintain no database, and all of this information is erased when the server restarts.</li>
+      <li><strong>Our server keeps game statistics in a database in Canada</strong>, linked to a random identifier in your browser or, if you sign in, to your account. Your IP address and the display name you type are held in memory only, in order to operate the game, prevent abuse and check that matches are fair, and are never written to the database.</li>
+      <li><strong>Statistics are optional and private.</strong> They are shown only to you. You may turn them off in Settings, and you may download or delete them, and your account, at any time from Your stats.</li>
       <li>Questions or requests: <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</li>
     </ul>
   </section>
@@ -108,7 +113,8 @@
     <ol>
       <li><strong>Use a nickname rather than your real name.</strong> It is visible to strangers.</li>
       <li><strong>Camera video never leaves your computer.</strong> Only an approximate position is transmitted.</li>
-      <li><strong>There is no chat, profile or account.</strong> The game server discards your name when the match ends or the server restarts.</li>
+      <li><strong>There is no chat.</strong> Your statistics are private and are shown only to you. The game server discards the display name you type when the match ends or the server restarts.</li>
+      <li><strong>Signing in is optional.</strong> If you sign in, your username is saved and is shown to other players whenever you play, so do not use your real name in it. Players under 18 may sign in only with a parent's or guardian's permission.</li>
       <li><strong>Anyone with a court code can watch or take an empty seat</strong>, so please share codes only with friends. Do not display your phone's pairing code on a stream.</li>
       <li><strong>Under 18?</strong> Please ask a parent before playing or installing Poddle Helper.</li>
       <li>For questions or deletion requests, please contact <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</li>
@@ -144,24 +150,30 @@
 
   <section class="card" aria-labelledby="collect">
     <h2 id="collect">2. Information we use and why</h2>
-    <p>Poddle does not require registration. We do not ask for your email address, age, location, phone number or payment details. The table below sets out all of the information the game uses.</p>
+    <p>Poddle does not require registration. Signing in with Google is optional and is never required to play. We do not ask for your email address, date of birth, location, phone number or payment details, and we do not keep the email address, name or picture that Google sends when you sign in (see <a href="#sharing">Third-party recipients</a>). The table below sets out all of the information the game uses.</p>
     <div class="tbl">
       <table>
         <thead><tr><th scope="col">Information</th><th scope="col">Purpose</th></tr></thead>
         <tbody>
           <tr><td><strong>Display name</strong> that you enter (up to 12 characters)</td><td>To show who is playing: in the court list, on the scoreboard, in tournaments, and when you watch, request to play or send an emote.</td></tr>
-          <tr><td><strong>IP address</strong></td><td>To limit the number of courts that a single IP address may have open at once (up to 4), to allow one open tournament per IP address, and to limit how often someone may request to take a seat. This prevents spam and abuse and keeps the game running for everyone.</td></tr>
+          <tr><td><strong>IP address</strong></td><td>To limit the number of courts that a single IP address may have open at once (up to 4), to allow one open tournament per IP address, and to limit how often someone may request to take a seat. This prevents spam and abuse and keeps the game running for everyone. To decide whether a match counts toward statistics: at the end of a match, the server compares the two players' IP addresses (for IPv6 addresses, the network portion only) in memory. For up to 24 hours, the server also keeps in memory a scrambled form of the network address (a keyed one-way hash that is replaced every day), linked to recent match outcomes and to the random identifiers seen with it, so that it can recognise the same computer from one match to the next. The IP address itself is never written to our database; only the outcome of the comparison is recorded. We also use the scrambled form to limit how often statistics, sign-in and data requests may be made.</td></tr>
           <tr><td><strong>Your position on screen</strong>, derived from the webcam (only if you permit camera access)</td><td>To move your player when you step from side to side. Only a few numerical values are transmitted (see <a href="#webcam">Your webcam</a>).</td></tr>
           <tr><td><strong>Paddle motion</strong> from your phone or AirPod: the direction in which it points, how quickly it rotates and moves, and a timestamp</td><td>To swing your paddle. Phone motion is relayed live from your phone to your game tab only.</td></tr>
           <tr><td><strong>Game information</strong>: court and tournament codes, whether a court is listed, seats, score, swings, bot level, emotes you select, pause and rematch choices, and connection speed checks</td><td>To operate the match and display it to the players and spectators on that court.</td></tr>
           <tr><td><strong>Random tab ID</strong> (10 characters) and <strong>phone pairing code</strong></td><td>To reconnect you to your court if the connection drops, and to link your phone to the correct browser tab. They are random and are not associated with your identity.</td></tr>
+          <tr><td>A <strong>random device identifier</strong> created by your browser the first time you take a seat to play while statistics are switched on. Our server stores only a one-way hash of it, which remains linked to your statistics.</td><td>To save your statistics without an account, and to recognise when both players in a match are using the same browser.</td></tr>
+          <tr><td><strong>Match results and statistics</strong>: the result and score, how the match ended, its length, the Matt level played, rally lengths, your hardest hit and fastest swing as reported by your device, winning streaks, tournament titles, and the time each match ended</td><td>To show you your statistics and personal bests.</td></tr>
+          <tr><td>A <strong>record of each match</strong> from the last 30 days: the two players' statistics records (never their names), the score, how the match ended, its length, whether it counted toward statistics and, if it did not, the reason (for example, that both players appeared to be on the same network). No record is kept when you leave a match against Matt (it counts toward your statistics only), and at most 100 records a day are kept for each player (a match against another player beyond that is saved as played but does not count toward wins and losses)</td><td>To detect results that should not count, such as matches played against oneself, repeated matches between the same players and arranged wins, and to show you your recent matches.</td></tr>
+          <tr><td>If you sign in: your <strong>Google account identifier</strong> (a code that Google assigns to your account), the date your account was created, your <strong>username</strong> and the date it was last changed</td><td>To sign you in, to keep your statistics across devices and to display your username.</td></tr>
+          <tr><td>If you sign in: <strong>sign-in session records</strong>: a one-way hash of your sign-in cookie, when it was created, when it expires and when it was last used (at most 10 sessions per account)</td><td>To keep you signed in and to allow you to sign out.</td></tr>
           <tr><td><strong>Basic connection details</strong> received by any website: IP address, browser type and requested web address</td><td>To deliver the pages. Our hosting provider, Fly.io, processes this information (see <a href="#sharing">Third-party recipients</a>).</td></tr>
         </tbody>
       </table>
     </div>
-    <p>We use your IP address only to keep a free game online without spam, flooding or attacks. We do not use it to determine your location or your identity.</p>
-    <p>A display name is required to take a seat or watch, and your IP address is necessary for any website to reach you. Without them, you cannot play online. All other information, such as camera and motion data, is optional or used only while you play.</p>
-    <p>In the background, the game's connection to our server includes your display name, tab ID, court code and score, so that you can be returned to your court after a reconnection. The link in your browser's address bar contains only the court code.</p>
+    <p>Statistics are optional. You may turn off Save my stats on this device in Settings. When it is off, the game does not create a device identifier and saves no statistics, even while you are signed in, from the match under way onward, and you can still play every mode. When you turn it off without being signed in, you are offered the choice to delete the statistics already saved; if you keep them, they are deleted automatically 90 days after your last recorded match (7 days if only one match was recorded). Statistics already saved to an account stay with the account until you delete them or the account is deleted.</p>
+    <p>We use your IP address only for the purposes described in the table above: to keep a free game online without spam, flooding or attacks, to limit how often statistics, sign-in and data requests may be made, and to prevent players from counting matches played against themselves. We do not use it to determine your location or your identity, and we never write it to our database.</p>
+    <p>A display name is required to take a seat or watch, and your IP address is necessary for any website to reach you. Without them, you cannot play online. All other information, such as camera and motion data, statistics and signing in, is optional or used only while you play.</p>
+    <p>In the background, the game's connection to our server includes your display name, tab ID, court code and score, so that you can be returned to your court after a reconnection. The link in your browser's address bar contains only the court code. Neither the device identifier nor any sign-in information is ever included in that connection address.</p>
 
     <h3>Device permissions the game may request</h3>
     <ul>
@@ -174,7 +186,7 @@
     <p>You may decline any of these permissions, or disable them later in your browser or phone settings. Without the camera, the game moves your player automatically (Auto). Without phone motion or an AirPod, you may still watch matches.</p>
 
     <h3>What we do not do</h3>
-    <p>We do not sell personal information, share it for advertising purposes, build profiles or make automated decisions about you. We do not use your information to train artificial intelligence. We do not run advertisements, analytics tools, tracking pixels or social media plug-ins on Poddle.</p>
+    <p>We do not sell personal information, share it for advertising purposes, or build advertising or marketing profiles. The only automated decision that Poddle makes is whether a match counts toward statistics, which is decided by fixed fair-play rules and affects nothing other than your own statistics. It never prevents you from playing, and no one reviews it unless you ask us to. If you believe that a result was wrongly excluded, you may contact us. We do not use your information to train artificial intelligence. We do not run advertisements, analytics tools, tracking pixels or social media plug-ins on Poddle.</p>
   </section>
 
   <section class="card" aria-labelledby="webcam">
@@ -200,13 +212,15 @@
       <li><strong>Unlisted courts</strong> (created with a code): these do not appear in the list, but anyone who has the 4-character code or link can take an empty seat or watch. Because codes are short, a code should be treated like a room number, not a password.</li>
       <li><strong>Tournaments:</strong> the host's name is listed while players join. Anyone with the tournament code can see all players' names and the bracket.</li>
       <li><strong>On a court:</strong> players and spectators can see the players' names, scores, movements and swings. Players can also see the name of each spectator who begins watching or requests to play, and everyone on the court can see the name of any spectator who sends an emote.</li>
+      <li><strong>Statistics:</strong> your statistics, including your record against Matt and your personal bests, are shown only to you. We do not publish leaderboards. If a match does not count because both players appear to be using the same network or the same browser, both players are told that the match did not count.</li>
+      <li><strong>Usernames:</strong> if you sign in and choose a username, it replaces your display name whenever you play. It is shown with a registered-player mark to opponents and spectators, in the public court list and in tournament brackets. Because a username stays the same from match to match, other players can recognise you each time you play. Do not include your real name or any other personal information in it. Your statistics remain private.</li>
     </ul>
     <p>Poddle has no chat feature. Emotes are limited to a fixed set of 7 emoji.</p>
   </section>
 
   <section class="card" aria-labelledby="storage">
     <h2 id="storage">5. Browser storage and cookies</h2>
-    <p><strong>Poddle does not use cookies.</strong> It saves a small number of settings in your browser's own storage, on your device, so that the game remembers your choices. We cannot read this storage from our server. It affects only how the game works for you.</p>
+    <p><strong>Poddle uses a cookie only if you sign in.</strong> It also saves a small number of settings in your browser's own storage, on your device, so that the game remembers your choices. We cannot read that storage from our server; the game sends the device identifier to our server only to save your statistics, to let you download or delete them, and for the fair-play checks. The sign-in cookies are sent by your browser to our server and cannot be read by the page's scripts.</p>
     <div class="tbl">
       <table>
         <thead><tr><th scope="col">Name</th><th scope="col">Contents</th><th scope="col">Duration</th></tr></thead>
@@ -217,35 +231,47 @@
           <tr><td><code>poddle.view</code></td><td>Your preferred camera view when watching</td><td>Until you clear it</td></tr>
           <tr><td><code>poddle.airpod</code></td><td>Whether you play with an AirPod or a phone</td><td>Until you clear it</td></tr>
           <tr><td><code>poddle.courts</code></td><td>Your court list filter (open or full courts)</td><td>Until you clear it</td></tr>
+          <tr><td><code>poddle.device</code></td><td>A random identifier used to save your statistics on our server without an account. It is created the first time you take a seat to play, and it is replaced with a new one when you sign out, delete your data or turn statistics off and on again.</td><td>Until you clear it, sign out, turn statistics off or delete your data</td></tr>
+          <tr><td><code>poddle.stats.on</code></td><td>Whether you have chosen to save your statistics</td><td>Until you clear it</td></tr>
           <tr><td><code>cid</code></td><td>A random tab ID, which allows you to rejoin your court after a dropped connection</td><td>Until you close the tab</td></tr>
           <tr><td><code>pad</code></td><td>Your phone pairing code for this tab</td><td>Until you close the tab</td></tr>
+          <tr><td><code>__Host-poddle_s</code> (cookie, only if you sign in)</td><td>Keeps you signed in. It contains a random value that our server matches to your account, and it cannot be read by the page's scripts.</td><td>180 days, or until you sign out or delete your account</td></tr>
+          <tr><td><code>__Host-poddle_n</code> (cookie, only if you begin to sign in)</td><td>A one-time random value that protects the sign-in process from misuse. The server keeps a one-way hash of each value it issues, in memory only, so that each value can be used only once</td><td>10 minutes, and removed when sign-in completes</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Each item is used to provide a feature you have requested, so no consent banner is required. To remove them, use your browser's "clear site data" option for poddleball.com. If we ever introduce analytics, advertising or any non-essential storage, we will ask for your consent first and update this policy.</p>
+    <p>Each item is used to provide a feature that you have requested or that you may switch off. The sign-in cookies are strictly necessary for the account that you ask for, and are set only when you choose to sign in. The device identifier is used only to save your own statistics and for fair-play checks within Poddle. It is never used for advertising or analytics and is never shared. You may switch it off at any time in Settings, under Save my stats on this device. To remove these items, use your browser's "clear site data" option for poddleball.com. If we ever introduce analytics, advertising or any non-essential storage, we will ask for your consent first and update this policy.</p>
+    <p>When you choose to sign in, Google may set or read its own cookies in its sign-in window, and your browser may use its built-in sign-in feature for websites (FedCM), under Google's Privacy Policy. Poddle cannot read those cookies.</p>
   </section>
 
   <section class="card" aria-labelledby="sharing">
     <h2 id="sharing">6. Third-party recipients</h2>
     <p>In addition to other players (see <a href="#public">Information visible to other players</a>), the following companies are involved:</p>
     <ul>
-      <li><strong>Fly.io, Inc.</strong> (United States) hosts the game server in its Toronto, Canada region and acts as our service provider. Its network receives your IP address and the web addresses you request, which, for the game connection, include your display name, tab ID and court code. It also stores the game's activity logs (see <a href="#retention">Data retention</a>).</li>
+      <li><strong>Fly.io, Inc.</strong> (United States) hosts the game server in its Toronto, Canada region and acts as our service provider. Its network receives your IP address and the web addresses you request, which, for the game connection, include your display name, tab ID and court code. It also stores the game's activity logs (see <a href="#retention">Data retention</a>). It also stores our statistics database on a storage volume in its Toronto region, together with daily snapshots of that volume, which may be stored elsewhere in Canada or the United States.</li>
       <li><strong>Cloudflare, Inc.</strong> (United States) forwards email sent to hello@danielrltan.com to our mailbox, acting as our service provider. Through its cdnjs service, it also provides a backup copy of the three.js graphics library, which is used only if our own copy fails to load. In that event, Cloudflare receives your IP address and browser details.</li>
+      <li><strong>Google LLC</strong> (United States) provides the optional Sign in with Google feature. Nothing is loaded from Google until you open the sign-in card and confirm that you meet the age conditions. Your browser then loads Google's sign-in software and communicates directly with Google. Google receives your IP address, your browser details and the fact that you are signing in to Poddle, and it may set or read its own cookies, or use your browser's FedCM sign-in feature, in its sign-in window. Google then sends us a signed sign-in token. Because Google always includes them, that token contains your Google account identifier, your email address, your name and your profile picture. We verify the token, keep only the account identifier, and discard everything else immediately, without storing or logging it. Google handles your information under its own Privacy Policy. Deleting your Poddle account does not remove Poddle from the list of connected services in your Google Account; you may remove it there at any time.</li>
       <li><strong>Our email provider</strong> stores the messages you send us, acting as our service provider.</li>
       <li><strong>GitHub, Inc.</strong> (United States) hosts the source code for Poddle Helper. You connect to GitHub only if you click a GitHub link.</li>
       <li><strong>Apple</strong> and the manufacturer of your phone or computer display the permission prompts and provide motion sensor readings on your own device. Poddle sends nothing to them.</li>
     </ul>
     <p>All other fonts, images, 3D graphics, game code and the MediaPipe files are served from poddleball.com itself.</p>
-    <p>We may also disclose information where required by law, for example in response to a valid court order, or to protect the safety of individuals. Because we keep very little information, there is usually little to disclose.</p>
+    <p>We may also disclose information where required by law, for example in response to a valid court order, or to protect the safety of individuals. Because we keep little information, and none of it names you, there is usually little to disclose.</p>
   </section>
 
   <section class="card" aria-labelledby="retention">
     <h2 id="retention">7. Data retention</h2>
     <ul>
-      <li><strong>Display names, IP addresses, court and tournament details:</strong> held in the game server's memory for as long as your court, tournament or anti-spam cooldown lasts, and at the latest until the server restarts. The server writes none of this information to disk. The server restarts when we update the game, or when it goes to sleep because no one is connected. If you are in the middle of a match during a restart, your own tab sends back your court code, display name and score so that the match can continue.</li>
+      <li><strong>Display names that you type, IP addresses, court and tournament details:</strong> held in the game server's memory for as long as your court, tournament or anti-spam cooldown lasts, and at the latest until the server restarts. The server writes none of this information to disk. A scrambled form of the network address is kept in memory for up to 24 hours for fair-play checks, as described in <a href="#collect">Information we use and why</a>. The server restarts when we update the game, or when it goes to sleep because no one is connected. If you are in the middle of a match during a restart, your own tab sends back your court code, display name and score so that the match can continue.</li>
       <li><strong>Motion, position and swing data:</strong> relayed live and not stored.</li>
       <li><strong>Webcam video:</strong> never leaves your computer and is never saved.</li>
-      <li><strong>Activity logs:</strong> the server writes brief activity entries, such as "court joined" or "tournament started: 4 players", with court codes. Our logs do not include display names, IP addresses or tab IDs. Fly.io's own network and platform logs may record IP addresses and web addresses. We do not export, copy or archive any of these logs. Fly.io retains them for approximately 7 days, after which they are deleted automatically.</li>
+      <li><strong>Activity logs:</strong> the server writes brief activity entries, such as "court joined" or "tournament started: 4 players", with court codes. Our logs do not include display names, IP addresses or tab IDs. Fly.io's own network and platform logs may record IP addresses and web addresses. We do not export, copy or archive any of these logs. Fly.io retains them for approximately 7 days, after which they are deleted automatically. Log entries about matches record the court code, the side that won, the score, the kind of match (including the Matt level) and whether it counted, never who played.</li>
+      <li><strong>Statistics saved without an account:</strong> deleted automatically 90 days after the last match recorded for them, or 7 days after it if only one match was ever recorded. If you clear your browser storage, you can no longer view or delete those statistics yourself, and they are deleted automatically on the same schedule.</li>
+      <li><strong>Accounts:</strong> kept until you delete your account. An account that has not signed in or recorded a match for 24 months is deleted automatically, together with its statistics.</li>
+      <li><strong>Sign-in sessions:</strong> deleted when you sign out, 180 days after you signed in, or when you delete your account.</li>
+      <li><strong>Match records:</strong> deleted 30 days after the match, or sooner, oldest first, if our database approaches its size limit. If either player deletes their data sooner, that player's link to the record is removed at once.</li>
+      <li><strong>Former usernames:</strong> after a username is changed, or an account is deleted, a simplified form of the former username, which is not linked to any account, is kept for 30 days after a change or 90 days after a deletion, so that no one else can immediately take it to impersonate the former holder.</li>
+      <li><strong>Backups:</strong> our hosting provider takes a snapshot of the database storage each day, and each snapshot is kept for 5 days. Information that you delete is removed from the live database immediately and is removed from all backups within 5 days. Any copy of the database that we make for maintenance is deleted within 5 days. We do not keep any other copies of the database. Expired information is removed by an automatic clean-up that runs when the server starts and every 24 hours.</li>
       <li><strong>Browser storage:</strong> remains on your device until you clear it or, in the case of the tab ID and pairing code, until you close the tab.</li>
       <li><strong>Emails you send us:</strong> kept until your request has been resolved, and then deleted within 12 months.</li>
     </ul>
@@ -254,7 +280,7 @@
   <section class="card" aria-labelledby="transfers">
     <h2 id="transfers">8. Where information is processed</h2>
     <p>Poddle is operated from Ontario, Canada, and the game server runs in Toronto, Canada. By using Poddle, you understand that your information is handled in Canada.</p>
-    <p>Our hosting provider Fly.io, Cloudflare and our email provider are US companies or may use servers outside Canada, and may process information in the United States or elsewhere. <strong>Information handled by them may be accessed by courts, law enforcement and national security authorities in those countries</strong> under their laws. For individuals in the EU, EEA and UK, the safeguards on which we rely are described in <a href="#laws">Jurisdiction-specific information</a>.</p>
+    <p>Our hosting provider Fly.io, Cloudflare, Google (only if you sign in) and our email provider are US companies or may use servers outside Canada, and may process information in the United States or elsewhere. <strong>Information handled by them may be accessed by courts, law enforcement and national security authorities in those countries</strong> under their laws. For individuals in the EU, EEA and UK, the safeguards on which we rely are described in <a href="#laws">Jurisdiction-specific information</a>.</p>
   </section>
 
   <section class="card" aria-labelledby="rights">
@@ -267,8 +293,8 @@
       <li>object to, or request that we limit, our use of it, including uses based on our legitimate interests;</li>
       <li>withdraw any permission you have given, such as camera access, at any time. This does not affect anything done before the withdrawal.</li>
     </ul>
-    <p>To exercise any of these rights, please email <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>. We will respond within 30 days. We may need to ask you a question to confirm that the request genuinely comes from you, for example which court code or display name you used. Because we have no accounts and keep very little information, we will often hold nothing that we can link to you. In that case, we will inform you.</p>
-    <p>You may also take action yourself immediately: change your display name before each game, clear your browser storage, disable camera, motion or microphone access in your browser or phone settings, or decline camera access when your browser requests it.</p>
+    <p>To exercise any of these rights, please email <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>. We will respond within 30 days. We may need to ask you a question to confirm that the request genuinely comes from you, for example which court code or display name you used. You may also exercise the most common rights yourself, immediately, in the game. Open Your stats and choose Download my data to receive a copy of your statistics and recent matches in a machine-readable file (JSON), or Delete my data to delete your statistics (and, if you are signed in, your account, username and sign-in sessions) from our live database at once. To protect your statistics, we can act on a request sent by email only if you can show that the statistics are yours, for example by making the request while signed in or from the browser that holds them. Statistics saved without an account are linked only to a random identifier in your browser. If that identifier has been cleared, we cannot find those statistics, and they are deleted automatically after 90 days. If your username contains personal information and you wish to change or remove it sooner than the 30-day limit on changes allows, please contact us.</p>
+    <p>You may also take action yourself immediately: change your display name before each game, turn off Save my stats on this device in Settings, sign out, clear your browser storage, disable camera, motion or microphone access in your browser or phone settings, or decline camera access when your browser requests it.</p>
     <p><strong>Complaints.</strong> Please contact us first, and we will endeavour to resolve the matter. You may also lodge a complaint with a privacy regulator: the <a href="https://www.priv.gc.ca/">Office of the Privacy Commissioner of Canada</a>, the Commission d'accès à l'information du Québec if you are in Quebec, the data protection authority where you live in the EU or EEA, or the Information Commissioner's Office in the UK.</p>
   </section>
 
@@ -276,11 +302,12 @@
     <h2 id="children">10. Children and teens</h2>
     <p>Poddle is intended for people <strong>13 years of age and older</strong>. If you are under 18, you must have your parent's or guardian's permission to play. If you live in Quebec and are under 14, a parent or guardian must consent to the information handling described in this policy before you play. We recommend that an adult be nearby while anyone under 18 plays, both for safety and because display names are publicly visible. See <a href="#family">For teens and parents</a>.</p>
     <p>We do not knowingly collect personal information from children under 13. If we learn that we have done so, we will delete that information. If you are a parent and believe that your child under 13 has used Poddle, please email <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</p>
+    <p>An account may be created only by a person who is 13 or older, and a person under 18 may create one only with the permission of a parent or guardian. Poddle does not ask for a date of birth. Before signing in, you are asked to tick a box to confirm that you meet these conditions, and Google's sign-in is not loaded until you do. If we learn that an account belongs to a child under 13, we will delete the account and its statistics. A parent or guardian may ask us to delete a child's account or statistics by writing to <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</p>
   </section>
 
   <section class="card" aria-labelledby="security">
     <h2 id="security">11. Security</h2>
-    <p>We protect information by keeping as little of it as possible. The website and the game connection use encrypted connections (HTTPS). Game data is held in memory rather than in a database. Webcam video never leaves your device. Phone motion data is validated and relayed only to the single tab that paired with that phone.</p>
+    <p>We protect information by keeping as little of it as possible. The website and the game connection use encrypted connections (HTTPS). Live game data is held in memory. Our database holds no email addresses, no IP addresses and no display names typed by guests. Device identifiers and sign-in cookies are stored only as one-way hashes, which cannot be converted back into the original values, although they remain linked to your statistics. The sign-in cookie cannot be read by the page's scripts and is sent only over encrypted connections to poddleball.com. Information that is deleted is overwritten in the database file, not merely marked as deleted. Webcam video never leaves your device. Phone motion data is validated and relayed only to the single tab that paired with that phone.</p>
     <p>No system is perfectly secure. If a breach of security involving personal information creates a real risk of significant harm, we will notify the privacy regulators as required by law (within 72 hours where the GDPR applies), including the Office of the Privacy Commissioner of Canada. Because we hold no contact details for players, we will also post a notice on the Poddle home page. We will keep a record of every breach.</p>
   </section>
 
@@ -299,7 +326,7 @@
   <section class="card" aria-labelledby="laws">
     <h2 id="laws">13. Jurisdiction-specific information</h2>
     <h3>Canada</h3>
-    <p>Daniel Tan is the individual accountable for your personal information, and we handle it in accordance with the Personal Information Protection and Electronic Documents Act (PIPEDA). In Quebec, Daniel Tan is the person in charge of the protection of personal information, and we collect only the information the game requires. This policy is intentionally written in plain language.</p>
+    <p>Daniel Tan is the individual accountable for your personal information, and we handle it in accordance with the Personal Information Protection and Electronic Documents Act (PIPEDA). In Quebec, Daniel Tan is the person in charge of the protection of personal information, and we collect only the information the game requires. This policy is intentionally written in plain language. By saving statistics or signing in, you consent to the handling described in this policy. You may withdraw that consent at any time by turning statistics off in Settings, by signing out or by deleting your data or your account.</p>
     <h3>European Union, EEA and UK</h3>
     <p>Daniel Tan is the "controller" of your personal data under the General Data Protection Regulation (GDPR and UK GDPR). Our legal bases for processing are as follows:</p>
     <div class="tbl">
@@ -308,14 +335,17 @@
         <tbody>
           <tr><td>Display name, webcam position, paddle motion, game information, tab ID and pairing code</td><td>Necessary to provide the game you requested (contract, Art. 6(1)(b))</td></tr>
           <tr><td>IP address for abuse limits, and basic connection details</td><td>Our legitimate interest in keeping a free service safe and operational (Art. 6(1)(f))</td></tr>
+          <tr><td>Game statistics, the random device identifier and recent match records</td><td>Our legitimate interest in giving players a record of their progress, which you may switch off at any time in Settings (Art. 6(1)(f))</td></tr>
+          <tr><td>Fair-play checks at the end of a match (comparison of IP addresses, device identifiers and accounts, and the reasons recorded when a match does not count)</td><td>Our legitimate interest in keeping statistics fair and preventing cheating (Art. 6(1)(f))</td></tr>
+          <tr><td>Google account identifier, username and sign-in sessions, if you sign in</td><td>Necessary to provide the account that you ask us to create (contract, Art. 6(1)(b))</td></tr>
           <tr><td>Emails you send us</td><td>Our legitimate interest in responding to you (Art. 6(1)(f)), or a legal obligation when you exercise a privacy right (Art. 6(1)(c))</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Canada has an adequacy decision from the European Commission (and a corresponding UK decision) for organisations subject to PIPEDA, and we handle your information in accordance with PIPEDA. Where Fly.io processes information outside Canada, we rely on Fly.io's data processing agreement, which incorporates the EU Standard Contractual Clauses (and the UK addendum). Cloudflare, Inc. participates in the EU-US Data Privacy Framework. A copy of the safeguards is available upon request.</p>
+    <p>Canada has an adequacy decision from the European Commission (and a corresponding UK decision) for organisations subject to PIPEDA, and we handle your information in accordance with PIPEDA. Where Fly.io processes information outside Canada, we rely on Fly.io's data processing agreement, which incorporates the EU Standard Contractual Clauses (and the UK addendum). Cloudflare, Inc. participates in the EU-US Data Privacy Framework. Google LLC participates in the EU-US Data Privacy Framework. When you choose to sign in, your browser communicates with Google directly. A copy of the safeguards is available upon request.</p>
     <p>We have not appointed a representative in the EU or UK, because Poddle's processing is occasional, small in scale and low risk. You may contact us directly at <a href="mailto:hello@danielrltan.com">hello@danielrltan.com</a>.</p>
     <h3>United States, including California</h3>
-    <p>We do not sell or share personal information, as those terms are defined in the California Consumer Privacy Act, and we have not done so in the past 12 months. We do not use personal information for targeted advertising. You may review your information and request that we correct it, as described in <a href="#rights">Your rights and choices</a>. We do not discriminate against anyone for exercising their privacy rights.</p>
+    <p>We do not sell or share personal information, as those terms are defined in the California Consumer Privacy Act, and we have not done so in the past 12 months. The categories of personal information we collect are identifiers (a random device identifier and, if you sign in, a Google account identifier and a username), internet activity (your IP address, used only as described in this policy) and game statistics. We do not use personal information for targeted advertising. You may review your information and request that we correct it, as described in <a href="#rights">Your rights and choices</a>. We do not discriminate against anyone for exercising their privacy rights.</p>
     <h3>Biometric laws</h3>
     <p>Poddle does not identify anyone. It does not create, collect, receive, store or share any face template, faceprint, scan of face geometry or other biometric identifier. Webcam video is processed only on your own device and only to determine your approximate position. The face and body points detected in each frame exist only momentarily in your browser's memory, are not stored and are not used to recognise anyone.</p>
   </section>
@@ -328,7 +358,7 @@
   <section class="card" aria-labelledby="changes">
     <h2 id="changes">15. Changes to this policy</h2>
     <p>We will update this policy when Poddle changes how it handles information. The "Last updated" date at the top of this page will change accordingly. For important changes, we will also post a notice on the Poddle home page before or when the change takes effect. If a change requires your consent, we will request it. Previous versions are available upon request.</p>
-    <p>If we add sign-in (for example, with a Google account), we will update this policy before that feature launches to set out exactly what we receive from the sign-in provider, how long we keep it and how you can delete your account. Signing in will remain optional where possible.</p>
+    <p>Game statistics and Sign in with Google were added on September 25, 2026. This policy sets out what we receive from Google, how long we keep it and how you can delete your account. Signing in is optional and is never required to play.</p>
   </section>
 
   <section class="card" aria-labelledby="contact">

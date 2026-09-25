@@ -9,11 +9,11 @@
 set -e
 cd "$(dirname "$0")"
 if [ "$1" != "--now" ]; then
-  for t in revive.test.mjs rooms.test.mjs seo.test.mjs; do printf "%-18s " "$t"; node "test/$t" 2>&1 | tail -1 | grep -E "PASS" || { echo "FAILED: not deploying"; exit 1; }; done
+  for t in revive.test.mjs rooms.test.mjs seo.test.mjs accounts-unit.test.mjs stats.test.mjs auth.test.mjs; do printf "%-22s " "$t"; node "test/$t" 2>&1 | tail -1 | grep -E "PASS" || { echo "FAILED: not deploying"; exit 1; }; done
 fi
 echo "online right now: $(curl -sf -m 5 https://poddleball.com/status.json | grep "^{" || echo unknown)"
 fly deploy --ha=false 2>&1 | grep -E "Visit|rror|✖" || true
-extra=$(fly machines list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s||"[]");const keep=m.find(x=>x.region==="yyz")||m[0];console.log(m.filter(x=>x!==keep).map(x=>x.id).join(" "))})')
+extra=$(fly machines list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s||"[]");const keep=m.find(x=>(x.config?.mounts||[]).length)||m.find(x=>x.region==="yyz")||m[0];console.log(m.filter(x=>x!==keep).map(x=>x.id).join(" "))})')
 for id in $extra; do echo "removing extra machine $id (courts cannot span machines)"; fly machine destroy "$id" --force; done
 echo "machines: $(fly machines list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).map(x=>x.region+":"+x.state).join(", ")))')"
 curl -s -o /dev/null -m 10 -w "https://poddleball.com -> %{http_code}\n" https://poddleball.com/

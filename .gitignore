@@ -7,3 +7,6 @@ data/live2.jsonl
 test/ui-shots/*.png
 test/ui-shots/scenery/
 test/ui-shots/*/
+*.db
+*.db-wal
+*.db-shm

@@ -4,6 +4,7 @@ import { createScene, shownN } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
 import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
+import * as profile from './profile.js';        // player stats (docs/ACCOUNTS.md 9): the device id, the hello, /api, sign-in. Its DOM is its own
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
@@ -35,6 +36,7 @@ else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoi
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
 const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get cam() { return body ? { ready: body.ready, error: body.error, errorName: body.errorName, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, get camView() { return phase === 'camera' ? camView : ''; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
+let regs = [false, false];                     // a registered username in that seat (docs/ACCOUNTS.md 7.5): the badge beside the name, never text
 let side = 0, role = 'player', names = [null, null], state = null, players = 0, calibrating = true;      // role: 'player' | 'spectator' (docs/SPECTATE.md). names: the server's truth, null = empty seat
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
@@ -48,7 +50,8 @@ const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverl
 const seated = () => !LOBBY || !!room, live = () => phase === 'play' || phase === 'watch', spec = () => role === 'spectator';
 if (qs.get('uitest') === '1') { window.__ui = ui; window.__scene = scene; }      // test hooks: test/e2e.mjs forces UI states for screenshots, test/menu.mjs reads the scene's mode
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } } };
-const cleanName = t => { const n = [...String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
+const BADGE_OUT = /[\u221a\u2122\u2610-\u2612\u2705\u2713\u2714\u{1f5f8}\u{1f5f9}\u{1f197}][\ufe0e\ufe0f]?/gu;      // text imitations of the registered badge (docs/ACCOUNTS.md 7.3): √ ™ ☐☑☒ ✅ ✓ ✔ 🗸 🗹 🆗 and a selector after one. The badge itself is an element
+const cleanName = t => { const n = [...String(t == null ? '' : t).replace(BADGE_OUT, '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
 const myName = () => cleanName(ui.playerName()) || cleanName(ls.get('poddle.name'));      // the lobby field; what was kept last time when the field is not there
 const nameOf = i => names[i] || (state && state.paddles[i] && state.paddles[i].bot ? 'Matt' : i ? 'Player 2' : 'Player 1');
 const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, reach, sound, sink, sinkName }
@@ -131,17 +134,18 @@ const msNew = () => ({ sum: 0, rally: 0, smash: [0, 0], run: [0, 0], best: [0, 0
 const msCommit = i => { if (ms && ms.kind[i] === 'smash') ms.smash[i]++; if (ms) ms.kind[i] = null; };      // a shot counts once, with its final kind (a bet's kind can still be re-aimed by 'launch')
 const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'B adds a bot', meSub: '' });      // the far side of the scoreboard with nobody on it. In a room the bot walks in by itself
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
-const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].slice(0, 24) : null);      // untrusted text: ui.js writes it with textContent only
+const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].replace(BADGE_OUT, '').slice(0, 24) || null : null);      // untrusted text: ui.js writes it with textContent only
+const cleanRegs = a => [0, 1].map(i => Array.isArray(a) && a[i] === true);      // only a literal true draws a badge (an old server sends none)
 // Who is on the scoreboard. A player reads 'You' on the left and the other seat on the right; a spectator reads side 0 on the
 // left (blue) and side 1 on the right (orange), names in both, never 'You'. Matt's second line is his level.
 function drawNames() {
   const pd = state ? state.paddles : [], sub = i => !pd[i] ? '' : pd[i].bot ? botLevel : STATUS_WORD[pd[i].status] || (pd[i].wait ? 'Calibrating' : '');      // the same word as the tag over their character (wait: a server from before 'status')
   ui.setBot(!spec() && tourKind !== 'match' && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour)
-  if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1) }); return; }
+  if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1), reg: [!!pd[0] && regs[0], !!pd[1] && regs[1]] }); return; }
   const o = pd[1 - side];
-  if (!o) ui.setNames({ me: 'You', ...alone() });
-  else if (o.bot) ui.setNames({ me: 'You', meSub: '', them: nameOf(1 - side), themSub: botLevel });
-  else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side') });
+  if (!o) ui.setNames({ me: 'You', ...alone(), reg: [false, false] });
+  else if (o.bot) ui.setNames({ me: 'You', meSub: '', them: nameOf(1 - side), themSub: botLevel, reg: [false, false] });
+  else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [false, regs[1 - side]] });      // 'You' is not a name: no badge on it
 }
 const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' };
 function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDim(); }
@@ -152,10 +156,11 @@ function showOver() {                              // the result card. A matchov
   const T = m.tour && typeof m.tour === 'object' ? { round: String(m.tour.round || '').slice(0, 24), next: m.tour.next ? String(m.tour.next).slice(0, 24) : null, final: !!m.tour.final, gap: Math.max(0, Math.round((+m.tour.gap || 0) - (performance.now() - overAt) / 1000)) } : null;      // a tournament match: no vote, back to the bracket after gap s
   const L = spec() ? 0 : side, won = m.winner === L, sc = Array.isArray(m.score) ? m.score : [0, 0], vote = LOBBY && m.type === 'matchover' && !T;      // the left slot: me, or side 0 for a spectator. Legacy room / old server: it restarts by itself
   ui.setServe(null); ui.hold(null); ui.settings(false);
+  const rg = Array.isArray(m.reg) ? m.reg.map(x => x === true) : [false, false];      // as it was when it ended, like its names
   const W = m.winner === 1 ? 1 : 0, n = (sc[0] | 0) + (sc[1] | 0);
   const mstats = ms && !m.forfeit && ms.sum === n ? (spec() ? { rally: ms.rally, smashes: ms.smash[0] + ms.smash[1], run: ms.best[W] }      // a spectator: both sides' smashes, the winner's best run
     : { rally: ms.rally, smashes: ms.smash[L], run: ms.best[L] }) : null; ms = null;      // every point seen from 0-0, or none at all (showOver runs once per matchover: it takes `over`)
-  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, stats: mstats });
+  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [spec() && rg[0], rg[1 - L]], stats: mstats });
   scene.jingle(spec() ? (m.forfeit ? 'forfeit' : 'watch') : m.forfeit ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
   const left = Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000));      // less what was spent behind a set-up screen
   if (vote) ui.rematch(spec() ? { left } : { mine: null, theirs: null, left, name: nameOf(1 - L) });
@@ -217,6 +222,16 @@ function setBody(on) { showBody = !!on; scene.setSelfBody(showBody); savePrefs()
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
 function recenter() { model.recenter(); if (body) body.center(); say('Recentred'); }
 function leave() { if (!LOBBY || !room) return; game.send({ type: 'leave' }); toLobby(); }
+// The socket opens again so the server hears who this is now (docs/ACCOUNTS.md 6.2, 9.6, 9.7): signed in or out, stats switched, data
+// deleted. It keeps the device of a socket's first hello and reads the cookie at the upgrade, so a new socket is the only way. Never
+// in the middle of a match or on its result card (a drop there is a hold, a forfeit or 'No rematch' for the other player): then it
+// waits for the court to be left, or for the rematch to begin (rematchon, before its first ball: nothing of it is recorded yet).
+let redialWait = false;
+const midMatch = () => !!room && !spec() && (struck || over != null || ui.currentOverlay() === 'match' || !!(state && state.score && state.score[0] + state.score[1] > 0));
+function redial() { if (midMatch()) { redialWait = true; return; } redialWait = false; game.drop(); }
+function redialDue() { if (redialWait) { redialWait = false; game.drop(); } }
+function openStats() { if (room) { say('Leave the court to see your stats', null, 2400); return; } ui.settings(false); if (phase === 'title') play(); if (phase === 'lobby') ui.lobbyView('profile'); }      // Settings > You > Your stats
+function playBot(level) { if (pending) return; botWant = [0, 1, 2, 3].includes(level) ? level : 1; request({ type: 'create', public: false }); }      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
 // Opening the panel pauses a match against Matt (or an empty court); against a human it is only a card over a live rally.
 const vsHuman = () => { const o = state && state.paddles[1 - side]; return !!o && !o.bot; };
 const forfeits = () => LOBBY && !spec() && ui.currentOverlay() !== 'match' && (tourKind === 'match' || vsHuman() && !holding && (struck || !!state && state.score[0] + state.score[1] > 0));      // a tournament match: leaving is a forfeit from the first moment, against Matt too      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
@@ -282,7 +297,7 @@ function enterWatch() { phase = 'watch'; openCourt(); }      // a spectator: no 
 let pendT = 0;
 function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
 function request(m) {                               // one lobby request at a time, each carrying the player's name. Not connected right now: it goes out when the socket opens
-  if (pending) return; const n = myName(); m.name = sentName = n; if (n) ls.set('poddle.name', n);
+  if (pending) return; const n = myName(); m.name = sentName = n; if (n && !profile.username()) ls.set('poddle.name', n);
   pending = m; ui.lobbyBusy(true); game.send(m);
   pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // an old server never answers: do not leave the lobby dimmed for good
 }
@@ -347,14 +362,14 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
-  clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
+  clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
   tourKind = null; tourMoving = false; ui.tourCourt(null); syncSettings();
-  if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // in a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
+  redialDue(); if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // redialDue: off the court, the socket may open again (stats switched, signed in or out). In a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
   padPhase();
 }
 function back() {                                  // Back button / Esc, wherever it is
@@ -500,12 +515,12 @@ function onSample(sample, from) {
         // (0.5-0.7 at the bet), not a wrist. The settled report keeps the roll alone.
         const fade = r => { const k = Math.max(0, Math.min(1, (r - 0.45) / 0.3)); return 1 - k * k * (3 - 2 * k); }, rl = Math.abs(e.roll || 0);
         const g = 1 - fade(e.final === false && e.pend && e.twist != null ? Math.min(rl, Math.abs(e.twist)) : rl), lob = e.lob * (1 - g);
-        game.send({ type: 'swing', power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final });      // final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
-        unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob: (e.lobRaw != null ? e.lobRaw : e.lob) * fade(rl), chop: e.chop, age: e.age, slice };   // standing in for a settled report, the lob is the path as it was, not the look-ahead
+        game.send({ type: 'swing', power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final, pk: e.raw || 0, src: src === 'phone' ? 'phone' : 'airpod' });      // pk, src: stats only (docs/ACCOUNTS.md 4.5), the UNGAINED peak rad/s (motion.js sw.peak) and which paddle made it. final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
+        unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob: (e.lobRaw != null ? e.lobRaw : e.lob) * fade(rl), chop: e.chop, age: e.age, slice, pk: e.raw || 0, src: src === 'phone' ? 'phone' : 'airpod' };   // standing in for a settled report, the lob is the path as it was, not the look-ahead
         if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);
-      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
+      if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, pk: e.raw || unsettled.pk, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
   }
 }
 
@@ -554,7 +569,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
   if (m.type === 'welcome') {
-    ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); holding = false;
+    ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); holding = false;
+    if (LOBBY && room && !spec()) profile.seated();              // a seat of my own: the device id is made now if there is none, and its hello goes at once (docs/ACCOUNTS.md 3.1)
     if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(spec() ? null : side);
     if (spec()) setView(VIEWS.includes(ls.get('poddle.view')) ? ls.get('poddle.view') : 'broadcast', false);
@@ -567,7 +583,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'names') {
-    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
+    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }
@@ -600,9 +616,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
   if (m.type === 'left') { ui.countdown(0); const who = lastOpp || nameOf(1 - side); clearFar(); ui.setServe(null); if (live() && !spec()) say(`${who} left`, null, 2200); return; }      // only before a match has started now; mid-match it is a hold or a forfeit
-  if (m.type === 'match' || m.type === 'matchover') { ui.countdown(0); struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false; if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
+  if (m.type === 'match' || m.type === 'matchover') { ui.countdown(0); struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false; profile.matchover(!!m.tour); if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
+  if (m.type === 'profile') { if (!spec()) profile.result(m); return; }      // what this match did to my own stats: a line on the result card (docs/ACCOUNTS.md 9.3), to my seat only
   if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
-  if (m.type === 'rematchon') { over = null; struck = false; ms = null; if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
+  if (m.type === 'rematchon') { over = null; struck = false; ms = null; redialDue(); if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
   if (m.type === 'hold') { holding = true; scene.setFrozen(true); setPaused(false); if (live()) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // their wifi dropped: the seat is held, the ball waits where it is
   if (m.type === 'holdoff') { holding = false; ui.hold(null); return; }                     // frozen follows the next 'state'
   if (m.type === 'paused') { if (m.refused) ui.setSettings({ canPause: false }); else { setPaused(!!m.on); scene.setFrozen(!!m.on || holding); } return; }
@@ -629,7 +646,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     else { const won = m.winner === side; ui.pointBanner(won, nameOf(m.winner === 1 ? 1 : 0)); if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); } }      // "Your point!" / "<name> scores", nothing else
   if (m.type === 'launch' && m.by === side && m.n != null && !spec()) { if (m.kind) myKind = m.kind; clearTimeout(myBet); myBet = null; padFx('tint', shownN(+m.n || 0, myKind)); }      // my hit re-aimed on the settled swing: the phone's glow takes that power's colour
   if (SCENE_EVENTS.includes(m.type)) scene.onEvent(m);           // anything else: ignored, no throw
-}, () => { if (pending && !room) game.send(pending);       // the request made while the socket was down
+}, () => { const hi = profile.opened(); if (hi) game.send(hi);      // FIRST on every socket: the device id (docs/ACCOUNTS.md 9.2), never in the URL
+  if (pending && !room) game.send(pending);       // the request made while the socket was down
   if (tourOn()) { clearTimeout(tourHang); tourHang = setTimeout(() => { if (tourOn()) endTour('restart'); }, 5000); } });      // a tournament socket back: no room, tour or tourend in 5 s = the server restarted under it (docs/COURTS-TOURNEY.md 4.5)
 
 // ---------- link quality ----------
@@ -676,8 +694,14 @@ addEventListener('pointerdown', () => { unlock(); play(); });
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
-  bot: level => { if (pending) return; botWant = [0, 1, 2, 3].includes(level) ? level : 1; request({ type: 'create', public: false }); },      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
-  start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600) });
+  bot: playBot,
+  start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
+  profile: () => profile.showProfile() });      // Your stats: web/profile.js fetches and draws it
+// Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
+// Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
+profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
+  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats,
+  bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 // open(): the device list is re-read every time the card opens, because headphones come and go.
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
 ui.onSettings({
@@ -698,6 +722,7 @@ function esc() { if (ui.championShowing()) { tourCourts(); return; } if (ui.curr
   if (ui.asking()) ui.askWatch(null); else if (live() && !ui.currentScreen()) { if (!ui.currentOverlay()) ui.settings(!ui.settings()); } else back(); }      // in play and while watching Esc is the hamburger
 addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Tab'].includes(e.key)) return;   // browser shortcuts are not ours
+  if (profile.cardOpen()) { if (e.key === 'Escape') profile.closeCard(); return; }      // a sign-in or delete card is up (its own keys stop at the card): no game key behind it
   unlock();
   const k = e.key.toLowerCase();
   if (e.target.tagName === 'INPUT') { if (k === 'escape') esc(); return; }      // typing a room code or a name: F, C, B, M are letters there

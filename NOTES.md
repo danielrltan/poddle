@@ -1762,3 +1762,47 @@ The win/lose card was a static panel. It now plays a short Smash / Wii Sports st
 - Sound: `scene.jingle(kind)` plays a synthesised fanfare. There is a win fanfare, a warm consolation for a loss, a neutral one for spectators, a forfeit one, and a champion one. Each new jingle cuts the one still ringing, which matters when the champion card follows the final's result straight away. It goes through the normal mute and output-sink path.
 - Spectators get one confetti burst in the winner's colours.
 - Reduced motion shows the finished card with no animation.
+
+## 98. Your stats: a private record of every match, the Matt ladder, fair-play checks and optional Google sign-in
+- Spec: docs/ACCOUNTS.md (the OPERATOR CORRECTION at its top wins: four Matt rungs). Server: server/db.js (`node:sqlite`,
+  no new dependency, file `PODDLE_DB=/data/poddle.db` on the Fly volume `poddle_data`), stats.js (per-match accumulator,
+  one transaction at match end), abuse.js (the rules, pure), api.js (`/api/me`, `/api/stats`, sign-in, sign-out,
+  username, export, delete), auth.js (Google ID token checked with `node:crypto`; sessions; Origin allowlist), usernames.js
+  + words.js, hooks in game.js. Client: web/profile.js, the result-card line, Your stats, Settings > You. Sign-in never
+  gates play: with the database missing, broken or full, the game plays exactly as before.
+- What is kept: matches played, human W/L, streaks, points, tournament titles, best rally, hardest hit and fastest swing
+  (with dates), and the Matt ladder: Rookie, Club, Tour, Pro (wire levels 0, 1, 3, 2; `matt` is a four-entry array in
+  that order), each with W/L, first win date, current streak and best streak. Every Tour-level result (Play a bot at
+  Tour, tournament matches and warm-ups against Matt) lands on the Tour rung; there is no separate Tournament Matt line.
+- Identity: guests hang off `poddle.device` (random, made at the first seat with Save my stats on, never on load, never in
+  a URL; the server keeps only its SHA-256). Signing in merges that guest record into the account. Accounts keep the
+  Google `sub` only: the token's email, name and picture are discarded, never stored or logged. Session cookie
+  `__Host-poddle_s` (HttpOnly, 180 days, at most 10 per account; the database holds its hash), nonce `__Host-poddle_n`
+  (10 min). An age checkbox (13+, under 18 with a parent's permission) comes before Google's script is even loaded.
+- Fair play (abuse.js, rules R0-R18): a result counts ("ranked") unless the two seats look like one person (same
+  computer by IP or /64 widened by a 24 h in-memory link map, same device, account or tab), the match was revived, too
+  fast, idle, an early forfeit or a leader's hand-over, the pair or the winner hit a daily cap, the loser is a feeder,
+  a one-way farm or brand new, or a paddle teleported. Unranked matches still count as played; both players are told
+  when a match did not count. The IP is compared in memory and never written; keyed hashes (key replaced daily) live
+  at most 24 h. Swing bests are client-reported, capped and personal-only. Stats are private: no leaderboards.
+- Retention (db.sweep at boot and every 24 h, 500-row batches): guests 90 days after the last recorded match (7 if only
+  one), accounts after 24 months with no sign-in and no match, match log 30 days (R11b looks back 30 days and the export
+  lists recent matches), sessions at expiry, sign-out or deletion, name holds 30 days (rename) / 90 (deleted account).
+  `secure_delete` plus a WAL checkpoint after deletes. Fly snapshots kept 5 days (`--snapshot-retention 5`); an
+  `admin.js backup` goes to /tmp and any copy taken off the volume is deleted within 5 days. Export (JSON) and delete are
+  self-serve in Your stats.
+- Infra: fly.toml `[mounts]` + `PODDLE_DB`; the operator creates the volume once (command in fly.toml); deploy.sh keeps
+  the machine that owns the volume and runs accounts-unit, stats and auth tests. Dockerfile pins node:24.11-alpine and
+  silences node:sqlite's one ExperimentalWarning. `*.db`, `*.db-wal`, `*.db-shm` are git- and docker-ignored.
+  test/auth.test.mjs runs offline: its production server gets test/no-network.cjs preloaded, which refuses non-loopback
+  fetches and logs the URL, so the test proves production goes to Google's real key set and never trusts GOOGLE_JWKS_FILE.
+- Open before deploy: Q1 (the 14.3 client-address probe) not run; Q6 (snapshot retention and location) not confirmed with
+  Fly, so the privacy page uses the spec's "Canada or the United States"; Q5 (EU/UK/Quebec opt-in) and Q18 (EU/UK
+  representative) await counsel, so privacy 13 keeps its current representative sentence. Stats and sign-in launch
+  together: set `GOOGLE_CLIENT_ID` in fly.toml in the same deploy, or the pages describe a sign-in that is not there.
+- Privacy and Terms updated with it (spec 10.1 and 10.2, statistics and sign-in text together): accounts, the two
+  cookies and `poddle.device` / `poddle.stats.on` in section 5, Google as a recipient (token contents discarded, its own
+  cookies and FedCM, deleting here does not disconnect there), usernames shown to others, the automated counted/not
+  counted decision, retention as implemented, 13+ and the age checkbox, lawful bases; Terms gains 5 "Statistics,
+  accounts and usernames" (later sections renumbered; survival clause 3, 9 and 11 to 16). "Last updated", dateModified
+  and sitemap lastmod 2026-09-24. CLAUDE.md "Current data flows" and the new docs/ropa.md (record of processing) match.

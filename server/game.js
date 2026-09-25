@@ -3,6 +3,9 @@
 // docs/SPECTATE.md + docs/API-NEXT.md 4: spectators, names, match end -> rematch vote -> closed, a dropped seat held then forfeited, pause.
 const { WebSocketServer } = require('ws');
 const http = require('http'), fs = require('fs'), path = require('path');
+const db = require('./db'), stats = require('./stats'), auth = require('./auth'), api = require('./api'), abuse = require('./abuse'), usernames = require('./usernames');   // player stats (docs/ACCOUNTS.md): none does anything when loaded
+const safeName = (n, fb) => (n && !usernames.impersonates(n) ? n : fb);   // a guest name that passes as Matt or staff is shown as `fb` wherever others see it (docs/ACCOUNTS.md 7.3)
+const HOSTED = !!process.env.FLY_APP_NAME;                        // on Fly: the client address header, the production Origin allowlist, secure cookies, HSTS
 
 // The same port also serves web/ over plain HTTP, so a hosted copy (fly.io) is one process behind one address:
 // the page loads from https://<app>/ and its game socket is wss://<app>/. Locally nothing changes.
@@ -21,6 +24,10 @@ function notFound(req, res) {                                                   
 const SITE = 'poddleball.com', OLD_HOSTS = new Set(['poddle.fly.dev', 'www.poddleball.com']);      // the site's one name, and the names that forward to it
 const httpServer = http.createServer((req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options', 'DENY'); res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");   // docs/ACCOUNTS.md 11.5: never framed; a full CSP is a later question
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');   // not same-origin: that breaks Google's sign-in popup
+  if (HOSTED) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  if (String(req.url).startsWith('/api/')) return void api.handle(req, res).catch(() => {});   // before the 405 and the old-host 301: the API answers its own methods, and wrong_host (never a redirect: the cookie is poddleball.com's)
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD', 'Content-Length': 0 }); return res.end(); }   // a WebSocket upgrade never comes through here
   const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
   if (OLD_HOSTS.has(host)) { res.writeHead(301, { Location: 'https://' + SITE + req.url, 'Cache-Control': 'public, max-age=3600', 'Content-Length': 0 }); return res.end(); }   // one address for people, crawlers and share cards. Sockets still connect on any host: an open tab from the old address keeps playing
@@ -50,6 +57,10 @@ const httpServer = http.createServer((req, res) => {
   });
 });
 const wss = new WebSocketServer({ server: httpServer, maxPayload: 4096 });   // our biggest message is a few hundred bytes; a huge one is an attack (deep nesting overflows the stack) and closes that socket
+try {                                                            // docs/ACCOUNTS.md 11.3: the stats database before the first socket; a failure is one log line and the game plays as before
+  db.open(process.env.PODDLE_DB || ':memory:'); db.sweep(Date.now()); setInterval(() => { try { db.sweep(Date.now()); } catch { /* next day */ } }, 24 * 3600e3).unref();
+} catch { /* db logs its own code */ }
+api.init({ env: process.env }); stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients });
 httpServer.listen(+process.env.PORT || 8080);
 
 const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
@@ -165,12 +176,12 @@ let clock = 0;                            // sim clock of the process. A room st
 // Nor characters that draw as nothing (Hangul fillers, the braille blank, soft hyphen, tags: a name of those was a blank on every scoreboard), nor more than 2 stacked marks on a letter. What is left must have something to see in it.
 const NAME_OUT = /[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}\ud800-\udfff<>]/gu;
 const cleanName = v => { if (typeof v !== 'string') return '';
-  const n = [...v.slice(0, 64).replace(NAME_OUT, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim();
+  const n = [...usernames.stripBadges(v.slice(0, 64)).replace(NAME_OUT, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim();
   return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };
 const secsTo = ms => Math.max(0, Math.ceil((ms - Date.now()) / 1000));
 // Every message leaves through here. A socket that has stopped reading (BUF_MAX queued) is let go instead of fed: whoever it was reconnects by cid if they are still there.
 const askCool = new Map();                                     // key -> wall ms before which it may not ask again. Keys: 'c:' + cid (or the socket itself with no cid), so a reload does not reset it, AND 'a:' + address, which a client cannot rotate (a new cid, or none, got round the cid alone)
-const askKeys = ws => [ws.cid ? 'c:' + ws.cid : ws, ...(loopback(ws.addr) ? [] : ['a:' + ws.addr])];   // loopback: every test, and this machine's own tabs, share one address
+const askKeys = ws => [ws.cid ? 'c:' + ws.cid : ws, ...(loopback(ws) ? [] : ['a:' + ws.addr])];   // loopback: every test, and this machine's own tabs, share one address
 const coolLeft = ws => Math.max(0, ...askKeys(ws).map(k => { const t = askCool.get(k); return t ? secsTo(t) : 0; }));
 function coolSet(ws) { const ms = Date.now(); for (const [k, t] of askCool) if (t <= ms) askCool.delete(k); for (const k of askKeys(ws)) askCool.set(k, ms + ASK_COOL_S * 1000); }   // past entries pruned on every set: a few hundred at most, and a closed cid-less socket is not kept
 function put(ws, s) { if (!ws || ws.readyState !== 1) return; if (ws.bufferedAmount > BUF_MAX) return ws.terminate(); ws.send(s); }
@@ -289,14 +300,16 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   let server = 0, serveAt = Infinity, tick = 0;     // who serves next; when (sim time); steps taken
   let counting = null;                              // the count into a new match: { until (sim time), said (the last whole second told) }
   let asking = null, askN = 0, askRest = 0, promo = null;   // asking: { id, ws, name, until } the ONE pending request to take Matt's seat. askRest: wall ms before the next may start. promo: { side, until, level } a seat just given to a spectator
+  let match = null;                                 // player stats (docs/ACCOUNTS.md 4.1): this match's accumulator, built by startMatch, recorded once at its end. Never in LOCAL
 
   function send(pl, msg) { put(pl.ws, JSON.stringify(msg)); }
   function broadcast(msg, skip) { const s = JSON.stringify(msg); for (const pl of players) if (pl.ws !== skip) put(pl.ws, s); for (const ws of spectators) put(ws, s); }
   const bySide = side => players.find(p => p.side === side);
   // the server owns the names: a human's clean one, Matt for the bot (at every level), null for an empty seat
-  const names = () => [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? 'Matt' : p.name) : null; });
+  const names = () => [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? 'Matt' : p.reg ? p.name : usernames.guestShown(p.name, sd)) : null; });   // a guest who passes as Matt or staff shows as Player 1/2 (7.3)
+  const regs = () => [0, 1].map(sd => { const p = bySide(sd); return !!(p && !p.bot && p.reg); });   // a registered username sits in that seat (docs/ACCOUNTS.md 7.5): the client draws the badge, never text
   let namesSent = '';
-  function tellNames(skip) { const n = names(), s = JSON.stringify(n); if (s !== namesSent) { namesSent = s; broadcast({ type: 'names', names: n }, skip); } }   // whenever a seat changes hands (skip: whoever just read them in their welcome)
+  function tellNames(skip) { const n = names(), g = regs(), s = JSON.stringify([n, g]); if (s !== namesSent) { namesSent = s; broadcast({ type: 'names', names: n, reg: g }, skip); } }   // whenever a seat changes hands (skip: whoever just read them in their welcome)
 
   function launch(side, n, dir, lob, hit, slice, blk, curl = 0) {     // curl: only strike() passes 1 (see solve)
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
@@ -304,6 +317,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (!started && pub) lobbyChanged();                          // the first strike turns a Matt court from Join to Ask to play in the list (sent on its timer, after this)
     ball.v = sol.v; ball.spin = sol.spin; ball.kick = sol.kick; ball.curl = sol.curl; ball.lastHit = side; ball.lofted = lofted(lob) > 0.5; ball.bounces = 0; ball.aim = null; hLen = 0; started = true;
     ball.land = sol.land;                                         // where it comes down: a re-aim that cannot move it says so again
+    stats.launched(match);                                        // every struck ball: the rally length, and the match's first strike (docs/ACCOUNTS.md 4.4)
     planFootwork(1 - side);
     if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
     broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, c: sol.curl });
@@ -387,6 +401,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     const s = sgn(by), pl = bySide(by);
     for (const p of players) { p.swing = p.lunge = p.servePending = p.hit = null; p.blockRun = 0; }   // a fresh point: nothing left to correct, and the held-paddle box is forgiving again
     ball.live = true; ball.bounces = 0; ball.spin = 0; ball.curl = 0;          // the last rally's slice must not ride on the hanging ball (clients drew its spin streaks on the serve)
+    stats.rallyReset(match);
     if (SWING_SERVE && pl) {                                     // the ball floats in front of the server until they swing at it
       ball.serving = by; ball.lastHit = 1 - by;
       ball.hang = serveSpot(pl); ball.hv = [0, 0, 0]; ball.drag = [false, false, false]; hangBall(0);
@@ -439,6 +454,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     // a block may be corrected too now (its own window: see fixBlock). floor: a serve's correction keeps the serve floor
     pl.swing = null; pl.hit = { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind, blk: push ? { w, spd } : null, near: w, spd, held: !!sw.held };
     pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
+    if (!pl.bot && stats.contact(match, pl, sw)) pl.hit.statted = true;   // a human contact; a SETTLED real swing may set a hit/speed best (docs/ACCOUNTS.md 4.5)
     launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind, bet: bet ? 1 : undefined }, sw.slice, blk, sw.floor || bet ? 0 : 1);      // bet: the client shows it cool until the settled swing (or its absence) says what it was
   }
   // The settled report for a shot that was struck on the near-net curve: put it where that power belongs on the same curve.
@@ -455,26 +471,41 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     score[0] = score[1] = 0; if (revived) { score[0] = revived[0]; score[1] = revived[1]; revived = null; } else resumed = false;      // a court brought back after a restart carries its score (and stays under way); any later match is a new one
     server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
     counting = READY_S > 0 ? { until: Infinity, said: -1 } : null;   // armed: it starts counting once the room is whole and both seats are ready (countdown())
+    if (!LEGACY) { stats.drop(match); match = stats.newMatch({ revived: !!room.reviveTaint, rank: theBot() ? BOT_ORDER.indexOf(botLevel) : null, seats: [bySide(0), bySide(1)] }); room.reviveTaint = false; }   // a court revive() rebuilt: its first match is unranked (R2), a rematch is clean
     if (pub) lobbyChanged();
   }
+  // Player stats (docs/ACCOUNTS.md 4.2): the one place a match is recorded, once (match.done). winner null: left or dropped against Matt.
+  // A stats or database error never leaves here: this runs inside sim() on the 60 Hz interval, and a throw there ends every room.
+  function record(winner, ending) {
+    if (LEGACY || !match || match.done || !match.t0 && (winner == null || match.seats.some(x => x && x.bot))) return null;   // G1c: before the first strike nothing is recorded; against Matt not even a forfeit (a tournament's never-ready or dropped seat at 0-0)
+    try {
+      const bot = match.seats.some(x => x && x.bot), kind = MATCH ? (bot ? 'tourbot' : 'tour') : bot ? 'bot' : 'human';
+      const r = stats.onEnd(match, { now: Date.now(), kind, winner, ending, score: [...score] }); if (!r) return null;
+      if (r.logged) console.log(`[${code}] match recorded: ${bot ? kind + ' ' + BOTS[r.level].name : kind} ${r.ranked ? 'ranked' : 'unranked'}`);   // the court code and whether it counted: no identity, no reasons
+      if (opts.tour) r.rankedWin.forEach((w, i) => { const cid = w && match.seats[i].pl.cid, mem = cid && [...opts.tour.members.values()].find(x => x.cid === cid); if (mem) mem.rankedWins = (mem.rankedWins || 0) + 1; });   // before onResult: the final's win counts toward the title (4.3)
+      r.seats = match.seats; return r;
+    } catch (e) { console.error('stats: ' + (e && typeof e.code === 'string' ? e.code : 'error')); return null; }
+  }
+  function tellProfiles(r) { if (r) r.msgs.forEach((msg, i) => { const pl = msg && r.seats[i] && r.seats[i].pl; if (pl && pl.ws && pl.ws.room === room) send(pl, msg); }); }   // to each human seat still on the court, right after its matchover, never broadcast (8.3). A leaver is in the lobby by now: their profile shows it next time
 
   // ---------- match end, rematch vote, closing (docs/SPECTATE.md). A finished match no longer restarts by itself ----------
-  const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, rematchBy: secsTo(over.until), names: over.names, tour: MATCH ? { ...opts.info, gap: secsTo(over.until) } : undefined });   // names: as they were when it ended (a forfeit has emptied a seat by now). tour: a tournament match: no vote, back to the bracket in gap s
+  const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, rematchBy: secsTo(over.until), names: over.names, reg: over.reg, tour: MATCH ? { ...opts.info, gap: secsTo(over.until) } : undefined });   // names: as they were when it ended (a forfeit has emptied a seat by now). tour: a tournament match: no vote, back to the bracket in gap s
   const voteMsg = () => ({ type: 'rematch', votes: over.votes, left: secsTo(over.until) });
   function endMatch(winner, forfeit, nm) {
+    const rec = record(winner, forfeit ? 'forfeit' : 'won');     // rows A-F: a win, a forfeit, a stall, a tournament result
     ball.live = false; ball.serving = null; serveAt = Infinity; counting = null; for (const pl of players) pl.swing = pl.servePending = null;
     askEnd('gone');                                              // a result card is no time to swap seats
     if (MATCH) {                                                 // a tournament match: no vote, the bracket hears it once, the room closes after TOUR_GAP_S
       if (hold) { hold = null; broadcast({ type: 'holdoff' }); }
-      over = { winner, forfeit, names: nm || names(), until: Date.now() + TOUR_GAP_S * 1000, votes: [true, true], tour: true };
-      broadcast(overMsg()); console.log(`[${code}] tournament match over: side ${winner} ${score.join('-')}${forfeit ? ' (forfeit)' : ''}`);
+      over = { winner, forfeit, names: nm || names(), reg: regs(), until: Date.now() + TOUR_GAP_S * 1000, votes: [true, true], tour: true };
+      broadcast(overMsg()); tellProfiles(rec); console.log(`[${code}] tournament match over: side ${winner} ${score.join('-')}${forfeit ? ' (forfeit)' : ''}`);
       if (!reported) { reported = true; opts.onResult(winner, [...score], !!forfeit); }
       return;
     }
-    over = { winner, forfeit, names: nm || names(), until: Date.now() + (LEGACY ? 5 : REMATCH_S) * 1000,
+    over = { winner, forfeit, names: nm || names(), reg: regs(), until: Date.now() + (LEGACY ? 5 : REMATCH_S) * 1000,
       votes: [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? true : null) : false; }) };      // Matt always wants another; a seat that was forfeited cannot
     if (LEGACY) newMatchAt = now + 5;                            // LOCAL: a new match after 5 s whatever anyone says (test/e2e.mjs lives there)
-    broadcast(overMsg());
+    broadcast(overMsg()); tellProfiles(rec);
     if (!LEGACY && over.votes.some(v => v != null)) broadcast(voteMsg());
     if (pub) lobbyChanged();
   }
@@ -491,7 +522,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     const out = [...players.filter(p => p.ws).map(p => p.ws), ...spectators];
     console.log(`[${code}] court closed: ${reason} (${out.length} sent to the lobby, score ${score.join('-')})`);      // fly logs: "why did my court die" has an answer
     askEnd('gone', false); promo = null;
-    room.dead = true; players.length = 0; spectators.clear(); over = hold = paused = slow = null;
+    room.dead = true; players.length = 0; spectators.clear(); over = hold = paused = slow = null; stats.drop(match); match = null;   // closed mid-match: nothing is recorded (G4)
     if (rooms.get(code) === room) rooms.delete(code);
     for (const ws of out) { ws.room = ws.pl = null; ws.spec = false; tell(ws, { type: 'closed', reason }); if (ws.readyState === 1) enterLobby(ws); }
     console.log(`[${code}] room closed (${reason})`); lobbyChanged();
@@ -510,7 +541,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     console.log(`[${code}] side ${me.side} dropped: seat held ${HOLD_S} s`);
   }
   function forfeitHeld() {                                        // not back in time: the one who stayed wins
-    if (humans().length === 1) { const me = bySide(hold.side); hold = null; broadcast({ type: 'holdoff' }); return leave(me); }   // a bot court held for its spectators: nobody else was playing, so the court empties as if they had left (closed empty)
+    if (humans().length === 1) { const me = bySide(hold.side); if (!MATCH && theBot() && !over) tellProfiles(record(null, 'dropped')); hold = null; broadcast({ type: 'holdoff' }); return leave(me); }   // C': an abandon, never a loss (before leave(), which would call it one)   // a bot court held for its spectators: nobody else was playing, so the court empties as if they had left (closed empty)
     const sd = hold.side, nm = names(), i = players.findIndex(p => p.side === sd);
     hold = null; if (i >= 0) players.splice(i, 1);
     broadcast({ type: 'holdoff' }); endMatch(1 - sd, true, nm);
@@ -558,6 +589,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
 
   function point(winner, why) {
+    stats.pointEnd(match);                                       // the rally's length, before the score moves (docs/ACCOUNTS.md 4.4)
     score[winner]++; ball.live = false;
     const loser = bySide(1 - winner);
     if (loser && loser.swing && ball.lastHit === winner) send(loser, { type: 'whiff', why: whyMissed(loser.swing, inZone(loser)) });
@@ -631,7 +663,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
     if (Number.isInteger(level)) botLevel = clamp(level, 0, BOTS.length - 1);
     else if (theBot()) botLevel = BOT_ORDER[(BOT_ORDER.indexOf(botLevel) + 1) % BOT_ORDER.length];   // B walks the display order: Club -> Tour -> Pro -> Rookie
-    if (!theBot()) addBot(); else broadcast(botInfo());
+    if (!theBot()) addBot(); else { stats.level(match, BOT_ORDER.indexOf(botLevel)); broadcast(botInfo()); }   // after the first strike a match is recorded at the easiest level used (docs/ACCOUNTS.md 4.6)
   }
 
   // Auto-footwork for humans: run to where the ball will be, drift home between shots. Foot speed is finite,
@@ -668,7 +700,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // What a socket hears on sitting down, as a player or (side null) to watch: welcome + botinfo as always, then whatever
   // is going on that it missed (a pause, a held seat, a finished match being voted on).
   function greet(ws, side) {
-    tell(ws, { type: 'welcome', side, role: side == null ? 'spectator' : 'player', court: COURT, names: names() });
+    tell(ws, { type: 'welcome', side, role: side == null ? 'spectator' : 'player', court: COURT, names: names(), reg: regs() });
     tell(ws, botInfo());
     if (paused) tell(ws, { type: 'paused', on: true, by: paused.by });
     if (hold) tell(ws, { type: 'hold', side: hold.side, left: secsTo(hold.until) });
@@ -676,6 +708,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (side != null && asking && humans()[0] && humans()[0].ws === ws) tell(ws, { type: 'askplay', id: asking.id, name: asking.name, left: secsTo(asking.until) });   // the player reloaded mid-request: the card comes back with the time left
     if (side == null && coolLeft(ws) > 0) tell(ws, { type: 'askstate', s: 'wait', left: coolLeft(ws) });   // a spectator back after a reload: the button is right at once
   }
+  function identify(pl, ws) { try { stats.identify(match, pl, ws); } catch { /* stats never stop a seat */ } }   // join, retake, a hello on a seated socket
+  function optOut(pl, ws) { try { stats.optOut(match, pl, ws); } catch { /* stats never stop a seat */ } }   // Save my stats switched off on a seated socket: the match under way records nothing for this seat
   // Seat a socket (the lobby layer has checked there is a seat).
   function join(ws) {
     if (paused) resume();                                        // a second human: an online game cannot pause
@@ -684,7 +718,9 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     botJoinAt = Infinity;
     const want = opts.sideOf ? opts.sideOf(ws.cid) : ws.wantSide, side = (want === 0 || want === 1) && !players.some(p => p.side === want) ? want : players.length && players[0].side === 0 ? 1 : 0;   // wantSide: a court brought back after a restart seats people where they were
     const me = newPlayer(ws, side); me.cid = ws.cid; me.name = ws.name || (side ? 'Player 2' : 'Player 1');
+    if (ws.acct && ws.acct.username) { me.reg = true; me.name = ws.acct.username; }   // signed in with a username: that is the name on court (docs/ACCOUNTS.md 7.5)
     players.push(me); ws.room = room; ws.pl = me; ws.spec = false;
+    identify(me, ws); if (match) stats.seatFill(match, side, me);  // player stats: the seat's identity (docs/ACCOUNTS.md 3.2)
     if (humans().length === 1) room.waitAt = Date.now();
     greet(ws, side);
     console.log(`[${code}] player joined as side ${side} (${players.length} connected)`);
@@ -696,6 +732,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   function retake(pl, ws) {
     if (pl.ws) pl.ws.room = pl.ws.pl = null;
     pl.ws = ws; ws.room = room; ws.pl = pl; ws.spec = false; pl.ready = pl.cal = false;   // ready: the serve waits for their first paddle message again (a reloaded page is calibrating)
+    identify(pl, ws);                                            // compared with the seat's frozen identity, never replacing it (docs/ACCOUNTS.md 3.2)
     const back = hold && hold.side === pl.side; if (back) hold = null;
     greet(ws, pl.side);
     if (back) {                                                  // the point is replayed: same server, score kept
@@ -707,12 +744,12 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   function watch(ws) {
     spectators.add(ws); ws.room = room; ws.pl = null; ws.spec = true; greet(ws, null); if (pub) lobbyChanged(); if (opts.tour) opts.tour.dirty = true;   // the bracket counts watchers
     if (ws.cid && seen.has(ws.cid)) return; if (ws.cid) seen.add(ws.cid);
-    const s = JSON.stringify({ type: 'watcher', name: ws.name || '' }); for (const pl of players) if (pl.ws) put(pl.ws, s);   // the players get a small 'Sam is watching' in the top-right corner
+    const s = JSON.stringify({ type: 'watcher', name: safeName(ws.name, '') }); for (const pl of players) if (pl.ws) put(pl.ws, s);   // the players get a small 'Sam is watching' in the top-right corner
   }
   function emote(ws, e) {                                         // a spectator's reaction: everyone in the room sees it pop in from the side, with the sender's name
     if (!spectators.has(ws) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
     const ms = Date.now(); if (ms - (ws.emoteAt || 0) < EMOTE_GAP) return; ws.emoteAt = ms;
-    broadcast({ type: 'emote', e, name: ws.name || '' });
+    broadcast({ type: 'emote', e, name: safeName(ws.name, '') });
   }
   // ---------- asking to play (docs/SPECTATE.md Asking to play): a spectator watching one human play Matt asks for Matt's seat. ONE request per court,
   // it lives ASK_S, the player answers Y/N, silence is a no; a requester waits ASK_COOL_S from the END of their request, the court rests ASK_GAP_S between two ----------
@@ -728,7 +765,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     const cl = coolLeft(ws); if (cl > 0) return askSay(ws, 'wait', cl);
     if (asking) return askSay(ws, 'wait', secsTo(asking.until) + Math.ceil(ASK_GAP_S), { busy: true });   // someone else asked: no cooldown charged
     if (Date.now() < askRest) return askSay(ws, 'wait', secsTo(askRest), { busy: true });
-    asking = { id: ++askN, ws, name: ws.name || 'Someone', until: Date.now() + ASK_S * 1000 };
+    asking = { id: ++askN, ws, name: safeName(ws.name, 'Someone'), until: Date.now() + ASK_S * 1000 };
     const h = humans()[0]; if (h.ws) send(h, { type: 'askplay', id: asking.id, name: asking.name, left: ASK_S });
     askSay(ws, 'sent', ASK_S); console.log(`[${code}] a spectator asked to play`);
   }
@@ -746,6 +783,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     const w = asking.ws, lv = botLevel; asking = null; askRest = Date.now() + ASK_GAP_S * 1000;
     if (!spectators.has(w) || w.readyState !== 1) return send(me, { type: 'askoff', id, why: 'gone' });
     if (!askable()) { send(me, { type: 'askoff', id, why: 'gone' }); return askSay(w, 'gone', 0); }
+    if (match && match.t0 && !over) { record(null, 'dropped'); stats.drop(match); }   // G3: the player gave Matt's seat away after the first strike: an abandon (no W/L, the streak ends), or a second tab of their own could erase a losing match. No profile line: no result card came before it
     spectators.delete(w); askSay(w, 'yes'); tell(w, { type: 'room', code, public: pub, role: 'player', promoted: true });
     join(w);                                                     // resumes a pause, Matt goes, w sits in his seat, a new match from 0-0, names: the player's usual 'Sam joined to play'
     promo = { side: w.pl.side, until: Date.now() + PROMO_S * 1000, level: lv }; send(me, { type: 'askoff', id, why: 'yes' });
@@ -756,7 +794,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     players.splice(players.indexOf(p), 1); spectators.add(ws); ws.pl = null; ws.spec = true;   // no 'left', no score: that match never started
     tell(ws, { type: 'room', code, public: pub, role: 'spectator', demoted: true }); greet(ws, null);
     botLevel = lv; addBot(); resumed = true;                     // Matt back at the level he had, and the match counts as under way at once: the player already said who may take Matt's seat, so a joiner in the gap before the next strike is watch + ask, not a seat (addBot's startMatch left started false)
-    const h = humans()[0]; if (h) send(h, { type: 'promoff', name: nm });
+    const h = humans()[0]; if (h) send(h, { type: 'promoff', name: p.reg ? nm : safeName(nm, 'Someone') });
     console.log(`[${code}] the new player was not ready in ${PROMO_S} s: Matt is back`); if (pub) lobbyChanged();
   }
   function unwatch(ws) { if (spectators.delete(ws)) { ws.room = null; ws.spec = false; if (asking && asking.ws === ws) askEnd('gone', true, true); if (pub) lobbyChanged(); if (opts.tour) opts.tour.dirty = true; } }   // the requester walked off: charged, so leaving and coming back is no way round the cooldown
@@ -786,6 +824,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
         return endMatch(1 - me.side, true, nm);                   // 'leave': forfeit at once
       }
     }
+    if (theBot() && !over) tellProfiles(record(null, dropped ? 'dropped' : 'left'));   // G1a/G1b: quitting Matt after the first strike is a loss; a dropped socket an abandon (docs/ACCOUNTS.md 4.2)
+    stats.drop(match); match = null;                             // somebody left: that match is over, recorded or not
     if (asking) askEnd('gone', false);                           // the one who was asked is going: the requester hears it (or, with nobody left, 'closed empty' below)
     if (promo && me.side !== promo.side) promo = null;           // the one who let them in went: the seat is theirs now, a court of one is never handed back to Matt
     players.splice(i, 1);
@@ -821,10 +861,11 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (final) serveDecide(me, me.servePending);
   }
 
+  function swingStat(me, n, pk, src) { const a = stats.accOf(match, me); if (a) stats.swingBest(a, n, pk, src); }
   function onMessage(me, m) {
     if (m.type === 'pause') return pause(me, m.on);
     if (m.type === 'rematch') return vote(me, m.yes);
-    if (m.type === 'name') { me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel
+    if (m.type === 'name') { if (!me.reg) me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel. A registered seat keeps its username
     if (m.type === 'bot') return botRequest(me, m.level);
     if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. Booleans only
     if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
@@ -838,6 +879,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (!me.auto) me.x = clamp(num(m.x, me.x), -X_LIMIT, X_LIMIT);
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
+      if (match && !me.auto) stats.sample(match, me, me.x, me.y, ball.live);   // paddle plausibility: 2+ teleports in a row while the ball is live (docs/ACCOUNTS.md 4.8)
     } else if (m.type === 'swing') {
       let pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
       // No overhead bonus any more (NOTES 82): it lifted any downward stroke past n 0.55 by 0.2 to a smash, however slowly it came
@@ -846,24 +888,28 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       // A bet never smashes: 38 of 140 recorded swings were FIRST called at smash pace, 14 settled there, 12 settled as taps, and the label, ring, flash, shake and flame went out on the bet.
       const final = m.final !== false; if (!final) pw = Math.min(pw, SMASH);
       const dir = clamp(num(m.dir, 0), -1, 1), lob = clamp(num(m.lob, 0), 0, 1), slice = clamp(num(m.slice, 0), -1, 1);   // signed spin, 0 when the client sends none
+      const sure = m.final === true, pk = Number.isFinite(m.pk) ? m.pk : null, src = m.src === 'airpod' || m.src === 'phone' ? m.src : null;   // stats only (docs/ACCOUNTS.md 4.5): a MISSING final plays as settled but never records; pk the ungained peak rad/s
       if (!m.fix) { me.swPrev = me.swAt; me.pvPow = me.swPow; me.pvDir = me.swDir; me.swAt = now; }        // EVERY swing, twitches too: what came just before tells a serve's stroke from its wind-up
       me.swPow = num(m.power, 6); me.swDir = dir;                // its latest report: settled by the time the next swing asks
       if (ball.live && ball.serving === me.side) {                // my serve: a real swing that meets the ball, gently measured (NOTES 40)
         const sp = Math.max(me.swPow, num(m.raw, 0) * clamp((num(m.rom, 0) - SERVE_ROM[0]) / (SERVE_ROM[1] - SERVE_ROM[0]), 0, 1)), through = num(m.off, 0) >= SERVE_BACK.off && num(m.back, 0) >= SERVE_BACK.back;
-        return serveSwing(me, !!m.fix, clamp(sp, 0, 60), { n: Math.max(pw, SERVE_FLOOR), dir, lob, slice, floor: SERVE_FLOOR }, final, through);
+        return serveSwing(me, !!m.fix, clamp(sp, 0, 60), { n: Math.max(pw, SERVE_FLOOR), dir, lob, slice, floor: SERVE_FLOOR, sure, pk, src }, final, through);
       }
       if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
+        const betN = me.hit ? me.hit.n : null; let ran = false;   // stats: the power the bet struck at, before a re-aim moves it
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
-        if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice, final });              // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power)
+        if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice, final, sure, pk, src });   // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power)
         // A shot struck on the near-net curve: only the SETTLED report may move it along that curve, never another bet.
         // Struck near the net: the ball is already away at the swing's own power, and only a SETTLED report may bend it.
         // Its gate is the near one (PUSH.gate): from up there the ball passes the rally gate of 1 m before any report lands.
-        else if (me.hit && me.hit.near > 0 && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) fixBlock(me, pw, dir, lob, slice);
+        else if (me.hit && me.hit.near > 0 && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) { fixBlock(me, pw, dir, lob, slice); ran = true; }
         else if (me.hit && !me.hit.near && final && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
           && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
           const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
           Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined, undefined, me.hit.floor ? 0 : 1);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
+          ran = true;
         }
+        if (sure && !me.swing && stats.fixRecords(me.hit, betN, pw, ran, now, Math.max(FIX_WINDOW, PUSH.fix))) { swingStat(me, pw, pk, src); me.hit.statted = true; }   // a settled report that speaks for the contact (docs/ACCOUNTS.md 4.5)
         return;
       }
       me.blockRun = 0;                                             // a swing, however small: the held-paddle box is forgiving again
@@ -872,12 +918,13 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (me.hit && me.hit.blk && me.hit.held && now - me.hit.at < PUSH.late && ball.live && ball.lastHit === me.side) {
         me.hit.held = false; me.hit.at = now;
         if (final) fixBlock(me, pw, dir, lob, slice);
+        if (sure && stats.fixRecords(me.hit, null, pw, true, now, 0)) { swingStat(me, pw, pk, src); me.hit.statted = true; }
         return;
       }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
         from: now - clamp((num(m.age, 0) + clamp(num(m.net, 0), 0, 250)) / 1000, 0, LAG_MAX),   // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness), and `net` = the round trip: the player saw the ball half a trip ago and the swing took the other half to get here
         n: pw,                                                     // power 6 = a tap, 18-23 = a relaxed stroke (a drive), 27.3+ = a smash (only with speed)
-        dir, lob, slice, final, why: null, best: Infinity };   // final: an early report is a bet, and near the net it strikes soft until it settles
+        dir, lob, slice, final, sure, pk, src, why: null, best: Infinity };   // final: an early report is a bet, and near the net it strikes soft until it settles. sure/pk/src: stats
       broadcast({ type: 'swung', side: me.side });
       tryHit(me);                                                // ball already there: struck NOW, not on the next tick
     }
@@ -1006,13 +1053,13 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   const underway = () => !LEGACY && !opts.tour && mattSeat() && (started || resumed) && !over;   // one human playing Matt, a ball already struck: taking that seat needs their OK. Before the first strike (share screen, calibrating, the 3-2-1) a joiner just sits down, as always
   const askable = () => !LEGACY && !opts.tour && mattSeat() && !over && !hold && !promo;   // a spectator may ask (paused is fine: the card shows over the settings panel)
   const canWatch = () => spectators.size < SPEC_CAP;
-  const info = () => ({ code, players: humans().length, open: free() && !underway(), ask: underway() && canWatch(), bot: !!theBot(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over, names: names() });   // open: a join seats you. ask: a join puts you in the stands and asks the player
+  const info = () => ({ code, players: humans().length, open: free() && !underway(), ask: underway() && canWatch(), bot: !!theBot(), watch: SPEC_CAP - spectators.size, watchers: spectators.size, score: [...score], live: started && !over, names: names(), reg: regs() });   // open: a join seats you. ask: a join puts you in the stands and asks the player
   const force = sd => { if (over || room.dead) return; if (hold) { hold = null; broadcast({ type: 'holdoff' }); }   // the bracket settles it (a no-show, a member who left the tournament): a forfeit win for side sd
     endMatch(sd, true, names().map((n, k) => n || (opts.label || [])[k] || null)); if (!humans().some(p => p.ws)) close('round'); };
   const drawnFree = cid => MATCH && !over && !room.dead && !!opts.sideOf && (sd => sd != null && !bySide(sd))(opts.sideOf(cid));   // a drawn member's own seat is empty: they sit down even while the other side's seat is held (free() says no then)
   const seatedSides = () => [0, 1].map(sd => !!bySide(sd));    // a seat is taken (Matt, a human, or a human's held seat)
   const unready = () => (started || over ? [] : [0, 1].filter(sd => { const p = bySide(sd); return p && !p.bot && !ready(p); }));   // seated but never got a paddle ready, before the first ball
-  const room = { code, pub, kind: opts.kind || null, only: opts.only || null, force, drawnFree, seatedSides, unready, revive: (sc, matt) => { revived = sc; resumed = !!matt && sc[0] + sc[1] > 0; }, mattBack: (pl, lv) => { if (humans().length !== 1 || theBot() || humans()[0] !== pl) return; if (revived && revived[0] + revived[1] > 0) resumed = true; botRequest(pl, lv); }, join, leave, retake, heldBy, watch, unwatch, emote, ask, underway, askable, canWatch, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
+  const room = { code, pub, kind: opts.kind || null, only: opts.only || null, force, drawnFree, seatedSides, unready, revive: (sc, matt) => { revived = sc; resumed = !!matt && sc[0] + sc[1] > 0; }, mattBack: (pl, lv) => { if (humans().length !== 1 || theBot() || humans()[0] !== pl) return; if (revived && revived[0] + revived[1] > 0) resumed = true; botRequest(pl, lv); }, join, leave, retake, identify, optOut, heldBy, watch, unwatch, emote, ask, underway, askable, canWatch, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
   return room;
 }
 
@@ -1059,9 +1106,9 @@ function seat(ws, r) {
   if (ws.viaLobby) tell(ws, { type: 'room', code: r.code, public: r.pub, role: 'player', ...r.tag });   // tag: { tour, kind } on a tournament's court
   r.join(ws); lobbyChanged(); return true;
 }
-const loopback = a => !a || a === '::1' || a.endsWith('127.0.0.1');   // this machine (its own player, every test): no address limit. Hosted, every socket carries fly-client-ip
+const loopback = ws => auth.isLoopbackPeer(ws.addr, ws.addrFromPeer);   // this machine (its own player, every test with no address header): no address limit. An EXACT match on the TCP peer, never a header value (docs/ACCOUNTS.md 3.5): a forged fly-client-ip of 127.0.0.1 is limited like any other
 function create(ws, pub) {
-  let mine = 0; if (!loopback(ws.addr)) for (const r of rooms.values()) if (r.by === ws.addr) mine++;
+  let mine = 0; if (!loopback(ws)) for (const r of rooms.values()) if (r.by === ws.addr) mine++;
   if (rooms.size + tourKeep() >= ROOM_CAP || mine >= ADDR_ROOMS) return tell(ws, { type: 'joinfail', reason: 'busy' });   // tourKeep: courts a tournament's next round is owed
   const code = newCode(), r = createRoom(code, pub); r.by = ws.addr; rooms.set(code, r); seat(ws, r);
 }
@@ -1085,6 +1132,7 @@ function revive(ws, q) {
   const code = String(q.get('room') || '').trim().toUpperCase(), watch = q.get('watch') === '1';
   if (q.get('tour') || Date.now() - BOOT > REVIVE_S * 1000 || code.length !== 4 || [...code].some(c => !CODE_CHARS.includes(c)) || tourneys.has(code) || rooms.size + tourKeep() >= ROOM_CAP) return false;   // nothing of a tournament is ever revived
   const r = createRoom(code, q.get('pub') === '1'); r.by = ws.addr; rooms.set(code, r);
+  r.reviveTaint = true;                                            // score, side, bot and pub are the client's word: its first match counts for nothing (docs/ACCOUNTS.md R2)
   const m = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('score') || ''), a = m ? +m[1] : 0, b = m ? +m[2] : 0;
   const lv = q.get('bot'), matt = lv != null && lv !== '' && !watch;   // they were playing Matt (at this level)
   if (m && !(WIN_AT > 0 && Math.max(a, b) >= WIN_AT && Math.abs(a - b) >= WIN_BY)) r.revive([a, b], matt);      // a finished score is not brought back: start level. A Matt match with points on the board is under way at once: a stranger may not sit in Matt's seat while the host recalibrates (they watch and ask)
@@ -1124,8 +1172,11 @@ const tourOf = code => (typeof code === 'string' ? tourneys.get(code.trim().toUp
 const tmember = ws => (ws.tour && ws.tm != null ? ws.tour.members.get(ws.tm) || null : null);
 const byCid = (t, cid) => (cid ? [...t.members.values()].find(m => m.cid === cid) : null) || null;
 const isMatt = e => typeof e === 'string';                     // an entrant: a member id (a number), or 'M1', 'M2'... a Tour Matt
-const eName = (t, e) => (isMatt(e) ? 'Matt' : (t.members.get(e) || { name: '?' }).name);
-const tourHostName = t => (t.members.get(t.host) || { name: '' }).name;
+const mName = m => (!m ? '?' : m.reg ? m.name : safeName(m.name, 'Player ' + m.id));   // a member's name as the bracket shows it; a username is never replaced
+const eName = (t, e) => (isMatt(e) ? 'Matt' : mName(t.members.get(e)));
+const eReg = (t, e) => !isMatt(e) && !!(t.members.get(e) || {}).reg;   // a member signed in with a username
+const memberAcct = (m, ws) => { m.reg = !!(ws.acct && ws.acct.username); if (m.reg) m.name = ws.acct.username; };   // a username is the member's name, as on a seat (docs/ACCOUNTS.md 7.5)
+const tourHostName = t => { const h = t.members.get(t.host); return h ? mName(h) : ''; };
 const roundName = (len, i) => (len === 1 ? 'Final' : len === 2 ? 'Semifinal' : len === 4 ? 'Quarterfinal' : 'Round ' + (i + 1));
 const tourActive = ws => { const m = tmember(ws); return !!m && !m.out && ws.tour.phase !== 'done'; };   // still in one: signed up, or not knocked out yet
 const tourDirty = t => { t.dirty = true; };                    // flushed by tourTick, at most 4 a second
@@ -1138,14 +1189,14 @@ function tourKeep() {                                          // courts owed to
 
 // the snapshot (docs/COURTS-TOURNEY.md 4.3): built once, `you` stitched in per socket. Never a cid: a cid is a seat credential
 function tourBase(t) {
-  const side = e => (e == null ? { id: null, name: null, bot: false } : { id: isMatt(e) ? null : e, name: eName(t, e), bot: isMatt(e) });
+  const side = e => (e == null ? { id: null, name: null, bot: false, reg: false } : { id: isMatt(e) ? null : e, name: eName(t, e), bot: isMatt(e), reg: eReg(t, e) });   // reg: a registered username (the client's badge, docs/ACCOUNTS.md 7.5)
   const rounds = t.rounds.map(r => ({ name: r.name, target: r.target, matches: r.matches.map(x => { const live = !!(x.r && !x.r.dead && !x.w);
     return { n: x.n, a: side(x.a), b: side(x.b), room: live ? x.r.code : null, score: live ? x.r.info().score : [...x.score], live, w: x.w, forfeit: x.forfeit, watchers: x.r && !x.r.dead ? x.r.info().watchers : 0 }; }) }));
   if (t.phase === 'play') for (let alive = t.rounds.at(-1).matches.length, i = t.rounds.length; alive > 1; i++) {   // the rest of the bracket, To be decided: its shape is known
     const len = Math.ceil(alive / 2); rounds.push({ name: roundName(len, i), target: len === 1 ? TOUR_FINAL : TOUR_WIN, matches: Array.from({ length: len }, (_, k) => ({ n: k + 1, a: side(null), b: side(null), room: null, score: [0, 0], live: false, w: null, forfeit: false, watchers: 0 })) });
     alive = len; }
   return { type: 'tour', code: t.code, phase: t.phase, min: TOUR_MIN, max: TOUR_MAX, n: t.members.size, host: tourHostName(t), win: TOUR_WIN, final: TOUR_FINAL,
-    players: [...t.members.values()].map(m => ({ id: m.id, name: m.name, host: m.id === t.host, out: m.out, left: m.left, on: m.on })),
+    players: [...t.members.values()].map(m => ({ id: m.id, name: mName(m), reg: !!m.reg, host: m.id === t.host, out: m.out, left: m.left, on: m.on })),
     rounds, next: t.next ? { what: t.next.what, in: secsTo(t.next.at) } : null, champ: t.champ };
 }
 function tourYou(t, ws) { const m = tmember(ws);
@@ -1158,14 +1209,14 @@ function tourFlush(t) {
 }
 
 function tourAdd(t, ws) {                                      // a new member, joined last
-  const id = ++t.seq, m = { id, cid: ws.cid, name: ws.name || 'Player ' + id, ws, on: true, out: false, left: false, goneAt: 0, warm: null, warmFull: false, joined: Date.now() };
-  t.members.set(id, m); t.viewers.delete(ws); ws.tour = t; ws.tm = id; t.touched = Date.now(); tourDirty(t); return m;
+  const id = ++t.seq, m = { id, cid: ws.cid, name: ws.name || 'Player ' + id, ws, on: true, out: false, left: false, goneAt: 0, warm: null, warmFull: false, joined: Date.now() }; memberAcct(m, ws);
+  t.members.set(id, m); t.viewers.delete(ws); ws.tour = t; ws.tm = id; t.touched = Date.now(); stats.member(m, ws); tourDirty(t); return m;   // stats: the member's identity, frozen like a seat's (docs/ACCOUNTS.md 4.3)
 }
 function tourBind(t, m, ws) {                                  // a member on a new socket (a reload, a reconnect): the old one no longer speaks for them
   if (ws.tour && ws.tour !== t) tourLeave(ws, false);
   if (m.ws && m.ws !== ws && m.ws.tour === t) { m.ws.tour = null; m.ws.tm = null; }
-  m.ws = ws; m.on = true; m.goneAt = 0; if (t.phase === 'reg' && ws.name) m.name = ws.name;
-  t.viewers.delete(ws); ws.tour = t; ws.tm = m.id; tourDirty(t);
+  m.ws = ws; m.on = true; m.goneAt = 0; if (t.phase === 'reg') { if (ws.name) m.name = ws.name; memberAcct(m, ws); }   // the name (and badge) freeze when the bracket is drawn
+  t.viewers.delete(ws); ws.tour = t; ws.tm = m.id; stats.member(m, ws); tourDirty(t);
 }
 function tourHost(t) {                                         // the host went: the crown passes to the earliest-joined member still here
   const h = t.members.get(t.host); if (h && !h.left) return;
@@ -1176,7 +1227,7 @@ function tourCreate(ws) {
   if (!ws.cid) return tell(ws, { type: 'joinfail', reason: 'nocid' });
   if (ws.tour && tourActive(ws)) return sendTour(ws.tour, ws);   // already in one: show it (a double press makes one)
   if (ws.tour) tourLeave(ws, false);
-  let mine = false, standing = 0; for (const t of tourneys.values()) if (t.phase !== 'done') { standing++; if (!loopback(ws.addr) && t.by === ws.addr) mine = true; }   // a finished one (its champion still showing) holds no courts and blocks nobody
+  let mine = false, standing = 0; for (const t of tourneys.values()) if (t.phase !== 'done') { standing++; if (!loopback(ws) && t.by === ws.addr) mine = true; }   // a finished one (its champion still showing) holds no courts and blocks nobody
   if (standing >= TOUR_CAP || mine || rooms.size + tourKeep() >= ROOM_CAP) return tell(ws, { type: 'joinfail', reason: 'busy' });
   const t = { code: newCode(), phase: 'reg', by: ws.addr, made: Date.now(), touched: Date.now(), host: 1, seq: 0, mseq: 0, members: new Map(), viewers: new Set(),
     rounds: [], champ: null, next: null, arriveAt: 0, readyBy: 0, doneAt: 0, dirty: false, sentAt: 0, dead: false };
@@ -1236,7 +1287,7 @@ function tourRound(t, ents) {                                  // the next round
       onResult: (w, sc, f) => tourResult(t, x, w, sc, f), onClose: (why, seated) => { if (!t.dead && !x.w) tourResult(t, x, seated[0] && !seated[1] ? 0 : seated[1] && !seated[0] ? 1 : 0, x.score, true); } });   // every exit of a match reaches the bracket once
     x.r.by = null; x.r.noTtl = true; x.r.tag = { tour: t.code, kind: 'match' }; rooms.set(code, x.r);
     for (const [mm, other, sd] of [[ma, b, 0], [mb, a, 1]]) if (mm && mm.ws && mm.ws.tour === t)
-      tell(mm.ws, { type: 'tmove', round: idx + 1, name, n: k + 1, of: pairs.length, vs: { name: eName(t, other), bot: isMatt(other) }, target, final: last, at: TOUR_VS_S, side: sd });   // the VS card; the room follows in `at` s
+      tell(mm.ws, { type: 'tmove', round: idx + 1, name, n: k + 1, of: pairs.length, vs: { name: eName(t, other), bot: isMatt(other), reg: eReg(t, other) }, target, final: last, at: TOUR_VS_S, side: sd });   // the VS card; the room follows in `at` s
   });
   console.log(`[${t.code}] ${name}: ${pairs.length} match${pairs.length === 1 ? '' : 'es'}`);      // counts, never display names: the privacy page promises our logs hold no names (web/privacy.html, CLAUDE.md)
   t.next = round.matches.some(x => !x.w) ? { at: Date.now() + TOUR_VS_S * 1000, what: 'seat' } : null; t.arriveAt = t.readyBy = 0;
@@ -1259,6 +1310,7 @@ function tourChamp(t, e) {
   const path = []; for (const r of t.rounds) { const x = r.matches.find(o => o.a === e && o.w === 'a' || o.b === e && o.w === 'b'); if (!x) continue;
     const mine = x.a === e, vs = mine ? x.b : x.a; path.push({ round: r.name, vs: eName(t, vs), bot: isMatt(vs), score: mine ? [...x.score] : [x.score[1], x.score[0]], forfeit: x.forfeit }); }
   t.champ = { id: isMatt(e) ? null : e, name: eName(t, e), bot: isMatt(e), path }; t.phase = 'done'; t.doneAt = Date.now(); t.next = null;
+  if (!isMatt(e)) try { stats.title(t.members.values(), t.members.get(e), Date.now()); } catch { /* a title is never worth a crash */ }   // only with 3+ distinct people and a ranked win (R16)
   console.log(`[${t.code}] champion: ${t.champ.bot ? 'Matt' : 'a player'}`); tourFlush(t);
 }
 function tourSeat(t, ws) {                                     // a member to their match: out of wherever they are (the stands, a court), into the drawn seat
@@ -1377,11 +1429,31 @@ function padGone(ws) {
   if (ws.padCode && padHosts.get(ws.padCode) === ws) { padHosts.delete(ws.padCode); const p = pads.get(ws.padCode); if (p) tell(p, { type: 'padhost', on: false }); }
 }
 
+// The browser's device id (docs/ACCOUNTS.md 3.1-3.2): a bearer secret for its guest profile, so only its SHA-256 is kept, on the socket.
+// Once per socket, never from a phone pad or a page with a bad Origin. A signed-in socket keeps its account (identOf prefers it). The owner
+// is looked up only at match end, so a socket that never finishes a match writes nothing. Never throws, never logs anything of it.
+function helloMsg(ws, m) {
+  if (ws.helloSeen || ws.pad || ws.originBad) return; ws.helloSeen = true;
+  const h = auth.deviceHash(m.dev); if (!h) return;              // malformed: no device id
+  ws.devHash = h; stats.seen(ws);
+  if (ws.pl && ws.room && ws.room.identify) ws.room.identify(ws.pl, ws);   // already seated (back=1 / room= in the URL, or the lazy id arriving just after welcome)
+  const mem = tmember(ws); if (mem) stats.member(mem, ws);
+}
+// Save my stats switched off (docs/ACCOUNTS.md 9.6): the client says so first on every socket while it is off, and at once on the current
+// one when it is turned off mid-match. From then on this socket is anonymous for stats, signed in or not (stats.identOf); the account stays
+// on the socket for its name and badge. Sticky for the socket: turning stats on again opens a new one.
+function noStats(ws) {
+  if (ws.pad || ws.statsOff) return; ws.statsOff = true; ws.helloSeen = true; ws.devHash = null;   // a later hello is ignored
+  if (ws.pl && ws.room && ws.room.optOut) ws.room.optOut(ws.pl, ws);
+  const mem = tmember(ws); if (mem) stats.optOut(null, null, ws, mem);
+}
 wss.on('connection', (ws, req) => {
   ws.on('error', () => {});                                    // a bad frame must not take the process down
   ws.alive = true; ws.on('pong', () => { ws.alive = true; });
   const hdr = req && req.headers || {};                        // hosted: every socket comes from the proxy, the real address is in a header
-  ws.addr = hdr['fly-client-ip'] || ws._socket && ws._socket.remoteAddress;
+  const ca = auth.clientAddr(req); ws.addr = ca.addr; ws.addrFromPeer = ca.fromPeer; ws.computer = abuse.computerKey(ws.addr);   // docs/ACCOUNTS.md 3.5: hosted, a header that is not a public address is the one shared key 'bad'
+  if (hdr.origin != null) { if (auth.originAllowed(hdr.origin, hdr.host, { hosted: HOSTED, scheme: HOSTED ? 'https' : 'http' })) ws.originOk = true; else ws.originBad = true; }   // 3.4: never rejected. A bad Origin plays as an anonymous guest (no cookie, no hello); no Origin = not a browser (no cookie)
+  if (ws.originOk && req.url && !/[?&]padfor=/.test(req.url)) { try { const raw = auth.readSession(hdr.cookie), s = raw && db.session.lookup(raw, Date.now()); if (s) { ws.acct = s; ws.tokenHash = s.tokenHash; } } catch { /* a guest */ } }
   let q; try { q = new URL(req.url, 'http://x').searchParams; } catch { q = new URLSearchParams(); }
   ws.cid = q.get('cid') || null; ws.room = ws.pl = null; ws.spec = false; ws.viaLobby = q.get('lobby') === '1';
   ws.name = cleanName(q.get('name'));                          // names a seat taken by URL (room=CODE); otherwise it rides on the seat request
@@ -1392,6 +1464,8 @@ wss.on('connection', (ws, req) => {
     if (++ws.msgN > MSG_DROP) { if (ws.msgN > MSG_KILL) ws.terminate(); return; }
     const m = JSON.parse(raw);
     if (!m || typeof m !== 'object') return;
+    if (m.type === 'hello') return helloMsg(ws, m);              // player stats: the device id, first thing on the socket (docs/ACCOUNTS.md 3.2)
+    if (m.type === 'nostats') return noStats(ws);                // ...or that stats are off in this browser (9.6)
     if (ws.pad && m.type !== 'ping') return padMessage(ws, m);
     if (m.type === 'ping') return tell(ws, { type: 'pong', c: Number.isFinite(m.c) ? m.c : 0, t: ws.room ? ws.room.time() : clock });   // the client times the round trip itself (in the lobby too). c is echoed only as a number
     if (m.type === 'net') return void (ws.every = num(m.hz, 60) <= 30 ? 2 : 1);   // a struggling link asks for half the state packets; it is the link's, so it follows the socket from room to room
@@ -1448,6 +1522,6 @@ console.log('game server on port ' + (+process.env.PORT || 8080));
 let going = false;
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (going) return; going = true;
   for (const ws of wss.clients) { try { if (ws.readyState === 1) ws.send('{"type":"restart"}'); } catch { /* it is leaving anyway */ } }
-  setTimeout(() => process.exit(0), 50); });                      // the frames are handed to the kernel within a tick and it sends them after we are gone; any longer and a test that restarts on the same port finds it taken
+  setTimeout(() => { try { db.close(); } catch { /* going anyway */ } process.exit(0); }, 50); });   // the stats database first (its writes are synchronous: every result that finished is on disk). The frames are handed to the kernel within a tick and it sends them after we are gone; any longer and a test that restarts on the same port finds it taken
 
 module.exports = { COURT, ZONE, BOUNCE, SLICE, CURVE, G, R, PASSED, solve, shotKind, bounceV, gOf, flat, smooth };   // test/server.test.mjs sweeps solve() directly
