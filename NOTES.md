@@ -1906,3 +1906,12 @@ Also: the rank stars are gone (nobody could say what four stars meant; the capti
 disc and the Trophy Road heading use the Play a bot tile's head (the previous face read as an egg with a crown), and
 the tiles' icons are a pickleball paddle with a ball (Longest rally) and a speed gauge (Fastest swing): the old ones
 looked like a badminton racket and a leaf.
+
+## 106. The check badge is gone; the developer's username wears a DEV pill and orange
+
+The blue tick beside every registered username said nothing a player cared about (the owner: "feels useless"). Now
+nothing marks a registered name, except the developer's: the username Dan (ui.js DEV_NAMES, matched on the name the
+server sends, which only that account can carry) gets an orange DEV pill beside it and the name itself in the pill's
+orange (`.is-dev`), on the scoreboard, the result card, the court list, tournament chips, the bracket, the VS card
+and Your stats. The claim card no longer promises a badge; the changelog and CLAUDE.md follow.
+The ladder's heading is "Matt difficulties beaten" (was "Trophy Road · beat Matt": trophies belong to a rank system, not to Matt).

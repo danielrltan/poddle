@@ -54,11 +54,12 @@ export function setNames({ me, meSub, them, themSub, reg } = {}) {
 }
 // The registered-name badge: its own element BESIDE the name, never in the name's text, drawn as a pill with an SVG tick, so no
 // name a guest can type reproduces it (docs/ACCOUNTS.md 7.5). Made and removed here: a guest's seat has no .reg-badge at all.
-const BADGE_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.8 8.4 2.7 2.7 5.7-6"/></svg>';
-export function regBadge(nameEl, on) {
-  if (!nameEl) return; const next = nameEl.nextElementSibling, has = !!next && next.classList.contains('reg-badge');
-  if (on && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Registered player'); b.title = 'Registered player'; b.innerHTML = BADGE_SVG; nameEl.after(b); }
-  else if (!on && has) next.remove();
+const DEV_NAMES = new Set(['dan']);      // usernames that carry the DEV badge and show in orange (unique and confusable-folded on the server, so only the owner's account has them)
+export function regBadge(nameEl, on) {                   // on: a registered username sits there. Only the developer's gets a mark: a DEV pill beside the name, and the name in orange (NOTES 106)
+  if (!nameEl) return; const dev = !!on && DEV_NAMES.has((nameEl.textContent || '').trim().toLowerCase()), next = nameEl.nextElementSibling, has = !!next && next.classList.contains('reg-badge');
+  nameEl.classList.toggle('is-dev', dev);
+  if (dev && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Developer'); b.title = 'Developer'; b.textContent = 'DEV'; nameEl.after(b); }
+  else if (!dev && has) next.remove();
 }
 export function setScore(me, them) {
   for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); if (+v > 0) { const t = el.closest('.score-tab'); if (t) restart(t, 'ov-scored'); } } }      // the tab that scored gets a sweep of its colour (not the 0-0 reset)

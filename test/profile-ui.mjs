@@ -104,19 +104,25 @@ push({ type: 'names', names: ['Daniel', 'Ann✓'], reg: [false, false] }); await
 r = await ev(pg, () => ({ them: document.getElementById('name-them').textContent, badges: document.querySelectorAll('.reg-badge').length }));
 ok(!r.them.includes('✓') && r.them.startsWith('Ann') && r.badges === 0, `guest "Ann✓": shown as "${r.them}", ${r.badges} .reg-badge`);
 push({ type: 'names', names: ['Daniel', 'Bobby'], reg: [false, true] }); await sleep(400);
-r = await ev(pg, () => { const n = document.getElementById('name-them'), b = n.nextElementSibling; return { text: n.textContent, badge: !!b && b.classList.contains('reg-badge'), inName: !!n.querySelector('.reg-badge'), all: document.querySelectorAll('.reg-badge').length }; });
-ok(r.text === 'Bobby' && r.badge && !r.inName && r.all === 1, `registered seat: a .reg-badge beside the name, not in its text ("${r.text}", ${J(r)})`);
+r = await ev(pg, () => ({ text: document.getElementById('name-them').textContent, all: document.querySelectorAll('.reg-badge').length, dev: document.getElementById('name-them').classList.contains('is-dev') }));
+ok(r.text === 'Bobby' && r.all === 0 && !r.dev, `a registered seat gets no mark on its own ("${r.text}", ${J(r)})`);
+push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, true] }); await sleep(400);      // the developer's username (ui.js DEV_NAMES): a DEV pill beside the name, the name in orange
+r = await ev(pg, () => { const n = document.getElementById('name-them'), b = n.nextElementSibling; return { text: n.textContent, badge: !!b && b.classList.contains('reg-badge') && b.textContent === 'DEV', inName: !!n.querySelector('.reg-badge'), all: document.querySelectorAll('.reg-badge').length, dev: n.classList.contains('is-dev'), color: getComputedStyle(n).color }; });
+ok(r.text === 'Dan' && r.badge && !r.inName && r.all === 1 && r.dev, `the developer's seat: a DEV pill beside the name, not in its text, the name in orange ("${r.text}", ${J(r)})`);
+push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, false] }); await sleep(300);      // a guest typing Dan: nothing (the server would show Player 2 for look-alikes of staff anyway)
+ok(await ev(pg, () => document.querySelectorAll('.reg-badge').length === 0 && !document.getElementById('name-them').classList.contains('is-dev')), 'a guest named Dan gets no pill and no orange');
+push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, true] }); await sleep(300);
 // the court list, the tournament chips and the bracket draw it too, from the server's reg fields (room info reg:[a,b], tour players/sides reg:bool)
 r = await ev(pg, () => { const ui = window.__ui, q = (s, sel) => { const e = document.querySelector(s); return e ? e.querySelectorAll(sel).length : -1; };
-  ui.lobbyRooms([{ code: 'RRRR', players: 1, open: true, watch: 5, watchers: 0, score: [0, 0], live: false, names: ['Bobby', null], reg: [true, false] }, { code: 'GGGG', players: 1, open: true, watch: 5, watchers: 0, score: [0, 0], live: false, names: ['Gus', null], reg: [false, false] }], 3, []);
+  ui.lobbyRooms([{ code: 'RRRR', players: 1, open: true, watch: 5, watchers: 0, score: [0, 0], live: false, names: ['Dan', null], reg: [true, false] }, { code: 'GGGG', players: 1, open: true, watch: 5, watchers: 0, score: [0, 0], live: false, names: ['Gus', null], reg: [false, false] }], 3, []);
   const side = (id, name, reg) => ({ id, name, bot: false, reg });
   ui.setTour({ code: 'TTTT', phase: 'play', min: 4, max: 16, n: 2, win: 7, final: 11, host: 'Daniel', you: { id: 1, host: true, out: false, viewer: false, warm: 'off' },
-    players: [{ id: 1, name: 'Daniel', reg: false, host: true, on: true }, { id: 2, name: 'Bobby', reg: true, on: true }],
-    rounds: [{ name: 'Final', target: 11, matches: [{ n: 1, a: side(1, 'Daniel', false), b: side(2, 'Bobby', true), room: null, score: [0, 0], live: false, w: null, forfeit: false, watchers: 0 }] }], next: null, champ: null });
-  const o = { courts: q('#room-list', '.reg-badge'), courtText: [...document.querySelectorAll('#room-list .court-who')].map(e => e.textContent), chips: q('#tour-names', '.reg-badge'), bracket: q('#bracket', '.reg-badge'),
+    players: [{ id: 1, name: 'Daniel', reg: false, host: true, on: true }, { id: 2, name: 'Dan', reg: true, on: true }],
+    rounds: [{ name: 'Final', target: 11, matches: [{ n: 1, a: side(1, 'Daniel', false), b: side(2, 'Dan', true), room: null, score: [0, 0], live: false, w: null, forfeit: false, watchers: 0 }] }], next: null, champ: null });
+  const o = { courts: q('#room-list', '.reg-badge'), courtText: [...document.querySelectorAll('#room-list .court-who')].map(e => { const c = e.cloneNode(true); c.querySelectorAll('.reg-badge').forEach(x => x.remove()); return c.textContent; }), chips: q('#tour-names', '.reg-badge'), bracket: q('#bracket', '.reg-badge'),
     brNext: document.querySelector('#bracket .br-name + .reg-badge') ? document.querySelector('#bracket .br-name + .reg-badge').previousElementSibling.textContent : '' };
   ui.setTour(null); ui.lobbyRooms([], 2, []); return o; });
-ok(r.courts === 1 && r.chips === 1 && r.bracket === 1 && r.brNext === 'Bobby' && r.courtText.some(t => t === 'Bobby is waiting'), `court list, chips, bracket: one .reg-badge each, beside the registered name only (${J(r)})`);
+ok(r.courts === 1 && r.chips === 1 && r.bracket === 1 && r.brNext === 'Dan' && r.courtText.some(t => t === 'Dan is waiting'), `court list, chips, bracket: one .reg-badge each, beside the developer's name only (${J(r)})`);
 // a username locks both name fields; Settings > You gets its own Change (9.5), gone again for a guest
 r = await ev(pg, () => { const ui = window.__ui, g = id => document.getElementById(id); ui.lockName('Bobby'); const on = { ro: g('set-name-input').readOnly, btn: !g('btn-set-name-change').hidden, lobbyBtn: !g('btn-name-change').hidden };
   ui.lockName(null); return { on, off: { ro: g('set-name-input').readOnly, btn: !g('btn-set-name-change').hidden } }; });

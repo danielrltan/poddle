@@ -37,8 +37,9 @@ Important changes also need a notice on the home page. Open questions for the op
   cap; at most LOG_CAP_DAY=100 rows per owner a day; no row for leaving Matt), sessions at expiry, name holds 30 d
   (rename) / 90 d (deleted account). Fly volume snapshots daily, kept 5 d; admin backups in /tmp, gone within 5 d.
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
-  tournament host and player names, bracket; listed courts in the court list. Registered usernames with a badge
-  (replace the display name) to opponents, spectators, court list, brackets. Stats are private to their owner (no
+  tournament host and player names, bracket; listed courts in the court list. Registered usernames
+  (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a DEV pill
+  and in orange. Stats are private to their owner (no
   leaderboards); both players are told when a match did not count.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,

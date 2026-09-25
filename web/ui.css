@@ -1468,8 +1468,8 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
    sign-in / username / delete cards and Settings > You. web/profile.js draws all of it; every string goes in as text.
    ========================================================================================================== */
 /* the badge of a registered username (7.5): its own element beside the name, an accent pill with a drawn tick. No glyph a guest could type */
-.reg-badge{flex:none;display:inline-grid;place-items:center;height:1.1em;min-width:1.55em;padding:0 .3em;margin-left:.35em;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--line),var(--line-deep));box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.45), 0 .0625rem .125rem rgba(20,60,90,.25);vertical-align:-.12em}
-.reg-badge svg{width:.8em;height:.8em;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.reg-badge{flex:none;display:inline-grid;place-items:center;height:1.15em;padding:0 .4em;margin-left:.35em;border-radius:var(--r-pill);background:linear-gradient(180deg,#ffc95c,var(--warn-lamp));box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.5), 0 .0625rem .125rem rgba(120,60,0,.25);color:#fff;font-size:.55em;font-weight:900;letter-spacing:.08em;line-height:1;text-shadow:0 .0625em 0 rgba(0,0,0,.15);vertical-align:-.1em}      /* the DEV pill (ui.js regBadge): the developer's username only */
+.is-dev,.is-dev b{color:var(--warn-lamp)!important}      /* the developer's name, in the pill's orange, wherever it shows */
 .score-who:has(> .reg-badge){display:grid;grid-template-columns:minmax(0,max-content) auto;justify-content:start;align-items:center;column-gap:0} .score-who:has(> .reg-badge) small{grid-column:1 / -1}      /* the name and its badge on one line, the sub-label under both */
 .score-tab.is-them .score-who:has(> .reg-badge){justify-content:end}
 .tally-side:has(> .reg-badge){display:grid;grid-template-columns:auto auto;justify-content:center;justify-items:center;align-items:center;row-gap:.375rem} .tally-side:has(> .reg-badge) .chip{grid-column:1 / -1}
