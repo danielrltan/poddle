@@ -1806,3 +1806,14 @@ The win/lose card was a static panel. It now plays a short Smash / Wii Sports st
   counted decision, retention as implemented, 13+ and the age checkbox, lawful bases; Terms gains 5 "Statistics,
   accounts and usernames" (later sections renumbered; survival clause 3, 9 and 11 to 16). "Last updated", dateModified
   and sitemap lastmod 2026-09-24. CLAUDE.md "Current data flows" and the new docs/ropa.md (record of processing) match.
+
+## 99. The Your stats tile plays like the others, and signing in shows Google's G
+
+- **Tile icon.** Quick play, Courts and Play a bot each animate their icon on hover (a loop) and on keyboard focus (once);
+  Your stats sat still. Its three bars now dip and spring up left to right from the floor (`ic-bar`, 110 ms apart) and the
+  tick above them pops as the last bar lands (`ic-tick`), on the same 1.6 s beat. A dimmed tile stays still as before.
+- **Google's G.** The three sign-in buttons (Your stats, Settings > You, the result card's "Sign in to keep this win")
+  carry Google's four-colour G (`.g-logo`, colours unchanged per Google's branding rules; the Settings row's outline-icon
+  rule is overridden so it is not drawn as a stroke). The Your stats button is now a call to action: "Sign in with
+  Google" over "Save your stats and keep them on every device!". Nothing new is loaded: the G is inline SVG, and Google's
+  own script still loads only after the age box is ticked.

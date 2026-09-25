@@ -609,25 +609,30 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
 @media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles:has(> .tile:nth-child(4):not([hidden])){display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
 @keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
-/* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks.
+/* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks, Your stats' bars spring up and its tick pops.
    Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
    The hover block comes after the focus one: both match a focused tile under the mouse, and the loop must win */
 .tile svg *{transform-box:view-box}
 #btn-quick .art-accent-fill{transform-origin:53px 48px} #btn-quick .art-fill{transform-origin:48px 48px}
 #btn-courts circle,#btn-courts .art-accent{transform-origin:63px 59px}      /* lens and handle move as one */
 #btn-bot .art-fill circle,#btn-bot g.art-accent{transform-origin:48px 50px}      /* head and eyes tilt on the neck */
+#btn-profile rect:nth-child(1){transform-origin:23px 80px} #btn-profile rect:nth-child(2){transform-origin:48px 80px} #btn-profile rect:nth-child(3){transform-origin:73px 80px} #btn-profile .art-accent{transform-origin:50px 17px}      /* each bar grows from the floor; the tick pops on the spot */
 #btn-quick:focus-visible .art-accent-fill{animation:ic-play 1400ms var(--ease-soft) 1} #btn-quick:focus-visible .art-fill{animation:ic-ring 1400ms var(--ease-soft) 1}
 #btn-courts:focus-visible circle,#btn-courts:focus-visible .art-accent{animation:ic-scan 1800ms var(--ease-soft) 1}
 #btn-bot:focus-visible .art-fill circle{animation:ic-tilt 1800ms var(--ease-soft) 1} #btn-bot:focus-visible g.art-accent{animation:ic-blink 1800ms var(--ease-soft) 1}
+#btn-profile:focus-visible rect{animation:ic-bar 1600ms var(--ease-soft) 1} #btn-profile:focus-visible rect:nth-child(2){animation-delay:110ms} #btn-profile:focus-visible rect:nth-child(3){animation-delay:220ms} #btn-profile:focus-visible .art-accent{animation:ic-tick 1600ms var(--ease-soft) 1}
 @media (hover:hover){
   #btn-quick:hover .art-accent-fill{animation:ic-play 1400ms var(--ease-soft) infinite} #btn-quick:hover .art-fill{animation:ic-ring 1400ms var(--ease-soft) infinite}
   #btn-courts:hover circle,#btn-courts:hover .art-accent{animation:ic-scan 1800ms var(--ease-soft) infinite}
   #btn-bot:hover .art-fill circle{animation:ic-tilt 1800ms var(--ease-soft) infinite} #btn-bot:hover g.art-accent{animation:ic-blink 1800ms var(--ease-soft) infinite}
+  #btn-profile:hover rect{animation:ic-bar 1600ms var(--ease-soft) infinite} #btn-profile:hover rect:nth-child(2){animation-delay:110ms} #btn-profile:hover rect:nth-child(3){animation-delay:220ms} #btn-profile:hover .art-accent{animation:ic-tick 1600ms var(--ease-soft) infinite}
 }
 #screen-lobby.needs-name .tile svg *,#screen-lobby.is-down .tile svg *{animation:none}      /* a dimmed tile stays still (last: it ties the hover rules) */
 @keyframes ic-play{0%,45%,100%{transform:none}15%{transform:translateX(7px) scale(1.14,.88)}28%{transform:translateX(-2px) scale(.96,1.05)}38%{transform:translateX(2px)}}
 @keyframes ic-ring{0%,45%,100%{transform:none}15%{transform:scale(1.06)}30%{transform:scale(.98)}}
 @keyframes ic-scan{0%,100%{transform:none}22%{transform:translate(-14px,-8px) rotate(-14deg)}48%{transform:translate(-26px,-22px) rotate(10deg)}72%{transform:translate(-8px,-4px) rotate(-6deg)}}
+@keyframes ic-bar{0%,48%,100%{transform:none}12%{transform:scaleY(.6)}26%{transform:scaleY(1.14)}36%{transform:scaleY(.96)}}      /* Your stats: the bars dip and spring up left to right, */
+@keyframes ic-tick{0%,40%,100%{transform:none}50%{transform:scale(1.4) rotate(-10deg)}60%{transform:scale(.88) rotate(4deg)}70%{transform:scale(1.05)}}      /* then the tick pops as the last one lands */
 @keyframes ic-tilt{0%,100%{transform:none}22%{transform:rotate(-11deg)}50%{transform:rotate(8deg)}72%{transform:rotate(-3deg)}}
 @keyframes ic-blink{0%,100%{transform:rotate(0) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}22%{transform:rotate(-11deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}50%{transform:rotate(8deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}56%{transform:rotate(7deg) translate(0,-14.5px) scale(1,.1) translate(0,14.5px)}62%{transform:rotate(6deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}72%{transform:rotate(-3deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}}      /* the eyes follow the head's tilt and squash about their own middle (y 35.5, 14.5 above the neck): a blink */
 
@@ -1496,6 +1501,10 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .pf-name-row b{font-weight:800;color:var(--ink-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf-who small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .pf-who .pf-notice{font-weight:600;line-height:1.45} .pf-notice .foot-link{font-size:inherit}
 .pf-acct{display:flex;align-items:center;gap:var(--s-3)}
+.g-logo{flex:none;width:1.25em;height:1.25em} .g-logo *{stroke:none} .g-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em}      /* Google's own four-colour G (its branding rules: unchanged colours, on white), never tinted by the button */
+.set-action svg.g-logo{fill:initial;stroke:none;width:1.25rem;height:1.25rem}      /* the Settings row's icon rule would draw it as an outline */
+.pf-signin{height:auto;min-height:3.75rem;padding:.5rem 1.25rem .5rem 1rem;gap:.75rem;text-align:left} .pf-signin .g-logo{width:1.75rem;height:1.75rem}
+.pf-signin span{display:flex;flex-direction:column;line-height:1.2} .pf-signin b{font-weight:800} .pf-signin small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}      /* the call to action under the name of the button */
 .pf-signed{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem} .pf-signed > span{font-size:var(--t-sm);font-weight:800;color:var(--good-deep);margin-right:.25rem}
 .pf-msg{margin:0;width:100%;padding:.625rem 1rem;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-md);font-weight:700;color:var(--ink);text-align:center}
 .pf-cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:var(--s-5);width:100%}
