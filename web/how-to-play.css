@@ -111,3 +111,9 @@ kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.43
 @keyframes ball-spin{50%{translate:0 -.2em;rotate:200deg}100%{rotate:360deg}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;animation-delay:0ms!important;transition-duration:1ms!important}}      /* as ui.css: nothing on this page is information */
 @media print{ body{background:#fff} .card,.hero,.btn{box-shadow:none} }
+
+/* the privacy page's Your data box (web/data-tools.js): download or delete what this browser holds */
+.data-tools{margin:1.25rem 0 0;padding:1rem 1.25rem 1.125rem;border-radius:1rem;background:rgba(255,255,255,.7);border:.125rem solid rgba(255,255,255,.95)}
+.data-tools h3{margin:0 0 .375rem} .data-tools p{margin:.5rem 0 0}
+.data-btns{display:inline-flex;flex-wrap:wrap;gap:.75rem;margin-top:.75rem} .data-confirm{font-weight:700} .data-confirm .data-btns{display:flex;margin-top:.625rem}
+.data-status{font-weight:700;color:var(--ink-strong)} .data-status:empty{display:none}

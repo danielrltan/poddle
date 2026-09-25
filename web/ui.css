@@ -1500,7 +1500,9 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .pf-view{gap:var(--s-4)!important;text-align:left}
 .pf-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3) var(--s-5);width:100%}
 .pf-who{margin:0;display:flex;flex-direction:column;gap:.125rem;min-width:0}
-.pf-name-row{display:inline-flex;align-items:center;font-size:var(--t-xl);line-height:1.15}
+.pf-name-row{display:inline-flex;align-items:center;gap:.5rem;font-size:var(--t-xl);line-height:1.15}
+.pf-edit{width:2.25rem;height:2.25rem;box-shadow:var(--sh-1), var(--inner-hi)} .pf-edit svg{width:1.125rem;height:1.125rem;stroke-width:2.5;stroke-linejoin:round}      /* the pen beside a signed-in name: pick or change the username */
+.pf-signout{gap:.5rem} .pf-signout svg{width:1.125rem;height:1.125rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .pf-name-row b{font-weight:800;color:var(--ink-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf-who small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .pf-who .pf-notice{font-weight:600;line-height:1.45} .pf-notice .foot-link{font-size:inherit}
 .pf-acct{display:flex;align-items:center;gap:var(--s-3)}
@@ -1508,7 +1510,6 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .set-action svg.g-logo{fill:initial;stroke:none;width:1.25rem;height:1.25rem}      /* the Settings row's icon rule would draw it as an outline */
 .pf-signin{height:auto;min-height:3.75rem;padding:.5rem 1.25rem .5rem 1rem;gap:.75rem;text-align:left} .pf-signin .g-logo{width:1.75rem;height:1.75rem}
 .pf-signin span{display:flex;flex-direction:column;line-height:1.2} .pf-signin b{font-weight:800} .pf-signin small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}      /* the call to action under the name of the button */
-.pf-signed{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem} .pf-signed > span{font-size:var(--t-sm);font-weight:800;color:var(--good-deep);margin-right:.25rem}
 .pf-msg{margin:0;width:100%;padding:.625rem 1rem;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-md);font-weight:700;color:var(--ink);text-align:center}
 .pf-cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:var(--s-5);width:100%}
 .pf-cols h2{margin:0 0 .5rem .25rem}
@@ -1530,20 +1531,18 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .pf-row dt{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
 .pf-row dd{margin:0;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
 .pf-row dd small{margin-left:.5rem;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
-.pf-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3);width:100%}
+.pf-foot .foot-link{font-size:inherit} .pf-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-3);width:100%}
 .pf-foot-btns{display:flex;flex-wrap:wrap;gap:var(--s-3)}
 @media (max-width:760px){ .pf-cols{grid-template-columns:minmax(0,1fr)} .pf-view{padding:var(--s-5)!important} .pf-foot{justify-content:center;text-align:center} .pf-foot-btns{justify-content:center} }
 
 /* the account cards (9.5, 9.7): one at a time, over everything (the result card too, which keeps its own buttons), on the lobby's frosted veil like .ask */
 .acct-layer{position:fixed;inset:0;z-index:calc(var(--z-toast) + 1);display:grid;place-items:center;padding:var(--edge);background:rgba(232,243,249,.72);overscroll-behavior:contain}
-.acct-card{width:min(30rem,100%);max-height:calc(100dvh - 2 * var(--edge));overflow-y:auto;padding:var(--s-5);text-align:left;outline:0;box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
+.acct-card{position:relative;width:min(30rem,100%);max-height:calc(100dvh - 2 * var(--edge));overflow-y:auto;padding:var(--s-5);text-align:left;outline:0;box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
 .acct-body{display:flex;flex-direction:column;gap:var(--s-3)}
 .acct-body h2{margin:0;font-size:var(--t-lg);font-weight:800;line-height:1.2;color:var(--ink-strong)}
 .acct-body p{margin:0;font-size:var(--t-sm);line-height:1.5;color:var(--ink)}
-.acct-links{display:flex;flex-wrap:wrap;gap:var(--s-4)}
-.acct-check{display:flex;align-items:flex-start;gap:.75rem;min-height:44px;padding:.625rem .875rem;border-radius:var(--r-md);background:rgba(255,255,255,.78);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-sm);font-weight:700;line-height:1.45;color:var(--ink-strong);cursor:pointer}
-.acct-check input{flex:none;width:1.375rem;height:1.375rem;margin:.0625rem 0 0;accent-color:var(--line-deep);cursor:pointer}
-.acct-check:has(input:focus-visible){box-shadow:var(--glow)}
+.acct-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3)} .acct-close{width:2.5rem;height:2.5rem;box-shadow:var(--sh-1), var(--inner-hi)} .acct-close svg{width:1.125rem;height:1.125rem}      /* the one way out, where every dialog has it */
+.acct-fine{font-size:var(--t-xs)!important;line-height:1.45;color:var(--ink-soft)!important} .acct-fine .foot-link{font-size:inherit;font-weight:800}      /* the footer's own line, in the footer's own size */
 .signin-google{display:grid;place-items:center;min-height:3.5rem}
 .signin-btn{display:flex;justify-content:center;min-height:44px}
 .acct-err{font-weight:700;color:var(--bad-deep)!important} .acct-err:empty{display:none}
@@ -1558,5 +1557,4 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 #set-account .btn{height:max(2.25rem,44px);padding:0 1rem;flex:none}
 
 /* the home notice (9.9), under the safety one: the same card, a little quieter */
-.acct-links .foot-link,.acct-check .foot-link{font-size:inherit}      /* inline links keep the paragraph's size (the footer's 14px floor made them the biggest thing on a phone) */
 .name-row #btn-name-change{flex:none;height:max(2.5rem,44px);padding:0 1.125rem}

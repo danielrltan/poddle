@@ -16,8 +16,8 @@ const day = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateStrin
 const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/s rounded to 10 (Q7): 27.4 rad/s = 1570°/s
 const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 
-let nonceP = null;      // one sign-in nonce per card: re-ticking the box reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
-let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, ageGen = 0, gsi = null, lastFocus = null;      // saved: the server has a guest profile for this device (true / false / null = not asked)
+let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
+let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null;      // saved: the server has a guest profile for this device (true / false / null = not asked)
 let me = { enabled: false, clientId: null, account: null, db: false };      // GET /api/me: sign-in on or off, the Google client id, who is signed in
 
 // ---------- the device id (3.1): made at the first seat, never at load. A bearer secret for the guest profile: never in a URL or a log ----------
@@ -112,7 +112,7 @@ function drawHead(p) {
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available)
   drawHead(p); drawLadder(p || null); drawSide(p || null); drawAcct();
   const msg = p === undefined ? 'Stats aren’t available right now. The game still works.' : p === null ? 'Play a match to start your record' : '';
-  text('pf-msg', msg); show('pf-msg', !!msg); show('btn-pf-export', on && (!!p || !!me.account)); show('btn-pf-delete', on && (!!p || !!me.account || !!deviceId()));
+  text('pf-msg', msg); show('pf-msg', !!msg); // download and delete live on the privacy page (web/data-tools.js): the footer links there
 }
 export async function showProfile() {                      // the lobby view opened: draw what is known at once (empty), then the answer
   const g = ++viewGen; drawProfile(on ? null : undefined); if (!on) return;
@@ -129,17 +129,17 @@ function openCard(id) {
   setTimeout(() => { if (!c.hidden) (c.querySelector('[data-first]:not([hidden])') || c).focus({ preventScroll: true }); }, 30);
 }
 export function closeCard() {
-  const l = $('acct-layer'); if (!l || l.hidden) return; l.hidden = true; ageGen++;
+  const l = $('acct-layer'); if (!l || l.hidden) return; l.hidden = true; loadGen++;
   const f = lastFocus; lastFocus = null; if (f && f.isConnected && f.offsetParent) f.focus({ preventScroll: true });      // back where the player was (the result card's own buttons keep theirs)
 }
 const err = (id, t) => text(id, t || '');
 export function signIn() {                                  // our own button (the nudge, Your stats, Settings) opens the card: NOTHING goes to Google yet
   if (!on || !me.enabled || me.account) return;
-  const box = $('signin-age'); if (box) box.checked = false; nonceP = null;      // unticked every time (6.5); a fresh nonce for this card
-  show('signin-main', true); show('name-claim', false); show('signin-btn', false); show('signin-hint', true); text('signin-hint', 'Tick the box to continue'); err('signin-err');
-  openCard('signin-card');
+  nonceP = null;                                            // a fresh nonce for this card
+  show('signin-main', true); show('name-claim', false); show('signin-btn', false); show('signin-hint', true); text('signin-hint', 'Loading Google sign-in'); err('signin-err');
+  openCard('signin-card'); loadGoogle();                    // opening the card is the player's act: Google's script and button come now
 }
-function loadGis() {                                        // Google's script, injected once, only after the age box is ticked. A failure lets a later tick try again
+function loadGis() {                                        // Google's script, injected once, only after the player opens the card. A failure lets a later open try again
   if (window.google && window.google.accounts && window.google.accounts.id) return Promise.resolve();
   if (gsi) return gsi;
   gsi = new Promise((res, rej) => { const s = document.createElement('script'); s.src = GSI; s.async = true;
@@ -148,30 +148,28 @@ function loadGis() {                                        // Google's script, 
     s.onerror = () => { clearTimeout(t); s.remove(); rej(new Error('blocked')); }; document.head.append(s); });
   gsi.catch(() => { gsi = null; }); return gsi;
 }
-async function ageTicked() {                                // 6.2 steps 2-3: the nonce and Google's script, in parallel, then Google's own button
-  const box = $('signin-age'), g = ++ageGen; err('signin-err');
-  if (!box || !box.checked) { show('signin-btn', false); show('signin-hint', true); text('signin-hint', 'Tick the box to continue'); return; }      // unticking hides Google's button again
-  text('signin-hint', 'Loading Google sign-in');
+async function loadGoogle() {                               // 6.2 steps 2-3: the nonce and Google's script, in parallel, then Google's own button in the card
+  const g = ++loadGen; err('signin-err'); show('signin-google', true); show('signin-btn', false); show('signin-hint', true); text('signin-hint', 'Loading Google sign-in');
   try {
     if (!nonceP) { const p = nonceP = api('/api/signin/nonce'); p.then(n => { if (!n.ok && nonceP === p) nonceP = null; }, () => { if (nonceP === p) nonceP = null; }); }
-    const [n] = await Promise.all([nonceP, loadGis()]); if (g !== ageGen || !box.checked) return;
+    const [n] = await Promise.all([nonceP, loadGis()]); if (g !== loadGen) return;      // the card was closed meanwhile
     if (!n.ok || !n.j || typeof n.j.nonce !== 'string') throw new Error('nonce');
     const id = window.google.accounts.id, el = $('signin-btn');
     id.initialize({ client_id: me.clientId, nonce: n.j.nonce, callback: onCredential, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true, context: 'signin', itp_support: true, use_fedcm_for_button: true });      // One Tap (prompt()) is never called
     el.replaceChildren(); id.renderButton(el, { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', logo_alignment: 'left' });
     show('signin-hint', false); show('signin-btn', true);
-  } catch { if (g === ageGen) { show('signin-hint', false); err('signin-err', 'Google sign-in could not load. You can keep playing as a guest.'); } }
+  } catch { if (g === loadGen) { show('signin-google', false); err('signin-err', 'Google sign-in could not load. You can keep playing as a guest.'); } }      // the button's room goes with it: no gap over the message
 }
 async function onCredential(resp) {                        // Google's popup answered: the ID token goes to our server once, and is dropped
   const credential = resp && typeof resp.credential === 'string' ? resp.credential : ''; if (!credential) return;
   err('signin-err');
   let r; try { r = await api('/api/signin', 'POST', { credential, ...devBody() }); } catch { r = { ok: false, status: 0 }; }
   nonceP = null;                                            // single use: the server cleared it with this answer
-  if (!r.ok || !r.j) { const box = $('signin-age'); if (box) box.checked = false; show('signin-btn', false); show('signin-hint', true);
-    err('signin-err', r.status === 403 ? 'That sign-in timed out. Tick the box to try again.' : r.status === 503 ? 'Sign-in isn’t available right now. You can keep playing as a guest.' : 'Couldn’t sign you in. Tick the box to try again.'); return; }      // the nonce is single use: a new tick asks for a new one
+  if (!r.ok || !r.j) { const msg = r.status === 403 ? 'That sign-in timed out. Try again.' : r.status === 503 ? 'Sign-in isn’t available right now. You can keep playing as a guest.' : 'Couldn’t sign you in. Try again.';
+    if (r.status === 503) { show('signin-btn', false); show('signin-hint', false); err('signin-err', msg); } else loadGoogle().then(() => err('signin-err', msg)); return; }      // the nonce is single use: Google's button comes back with a new one
   me.account = acct(r.j.account) || { username: null, renameAt: null }; saved = null; drawAcct(); h.redial();      // the socket opens again (after the match) so its upgrade carries the cookie
   if (h.view() === 'profile') showProfile();
-  if (!me.account.username) claimCard(); else { closeCard(); h.toast(`Signed in as ${me.account.username}`, 2400); }
+  if (!me.account.username) claimCard(); else { closeCard(); h.toast(`Signed in as ${me.account.username}`, 2400); }      // no username yet: pick one now (Skip for now is there)
 }
 export async function signOut() {                           // only the server's 204 clears the HttpOnly cookie: anything else leaves the player signed in, and says so
   if (!on) return;
@@ -215,7 +213,8 @@ export async function claimName(name) {                    // -> true when the s
 // ---------- who is signed in, everywhere it shows. Everything signed-in-only stays hidden unless /api/me said sign-in is on (9) ----------
 function drawAcct() {
   const en = on && me.enabled, a = en ? me.account : null, name = a && a.username;
-  show('btn-pf-signin', en && !a); show('pf-signed', !!a); show('btn-pf-rename', !!a); show('pf-acct', en);
+  show('btn-pf-signin', en && !a); show('btn-pf-signout', !!a); show('btn-pf-rename', !!a); show('pf-acct', en);
+  { const b = $('btn-pf-rename'); if (b) { const t = name ? 'Change username' : 'Pick a username'; b.setAttribute('aria-label', t); b.title = t; } }      // the pen beside the name
   show('btn-set-signin', en && !a); show('set-account', !!a); text('set-account-name', name ? `Signed in as ${name}` : 'Signed in');
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
@@ -243,14 +242,6 @@ async function statsOff(del) {                              // del: Delete (the 
 }
 
 // ---------- Download my data, Delete my data (9.7) ----------
-export async function exportData() {
-  if (!on) return false;
-  let r; try { r = await fetch('/api/export', { method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(devBody()) }); } catch { r = null; }
-  if (!r || !r.ok) { h.toast(r && r.status === 404 ? 'Nothing saved yet' : r && r.status === 429 ? 'Too many downloads. Try again later.' : 'Couldn’t download your data right now', 2600); return false; }
-  const blob = await r.blob(), cd = r.headers.get('Content-Disposition') || '', m = /filename="(poddle-data-[0-9-]{10}\.json)"/.exec(cd);      // only a name of our own shape is used
-  const url = URL.createObjectURL(blob), a = mk('a'); a.href = url; a.download = m ? m[1] : 'poddle-data.json'; a.hidden = true; document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000); return true;
-}
 async function deleteNow() {                                // -> null when the request failed; else { any: something was deleted, out: signed in here but the session had ended, so the account was NOT deleted }
   const had = !!me.account;
   let r; try { r = await api('/api/account', 'DELETE', { ...devBody(), confirm: 'delete' }); } catch { r = { ok: false, status: 0 }; }
@@ -259,18 +250,6 @@ async function deleteNow() {                                // -> null when the 
   me.account = null; forgetDevice(); saved = false; drawAcct(); h.redial();      // a fresh id at the next seat; the socket opens again after the match without the old cookie
   const out = had && d.account !== true; if (out) loadMe();      // signed out in another tab, expired or evicted: ask again who is signed in
   return { any: d.account === true || d.device === true, out };
-}
-export function deleteData() {                              // the confirm card: Cancel is focused
-  if (!on) return;
-  const a = !!me.account;
-  text('acct-confirm-text', `This deletes your stats${a ? ', your username and your sign-in' : ''} from Poddle right away. Our backups are deleted within 5 days.${a ? ' Your old username stays reserved for 90 days so nobody can pretend to be you.' : ''} It can’t be undone.`);
-  openCard('acct-confirm'); setTimeout(() => { const n = $('btn-confirm-no'); if (n && !n.closest('[hidden]')) n.focus({ preventScroll: true }); }, 40);
-}
-async function confirmDelete() {
-  const y = $('btn-confirm-yes'); if (y) y.disabled = true;
-  const res = await deleteNow(); if (y) y.disabled = false; closeCard();
-  h.toast(!res ? 'Couldn’t delete right now. Try again.' : res.out ? 'You’re signed out. Sign in again to delete your account data.' : res.any ? 'Your data is deleted' : 'Nothing was saved to delete', 2600);
-  if (res && h.view() === 'profile') showProfile();
 }
 
 // ---------- wiring: main.js calls init() once, while it loads (before the first socket opens) ----------
@@ -289,12 +268,11 @@ function wire() {
   for (const id of ['btn-pf-signin', 'btn-set-signin', 'btn-save-signin']) click(id, () => signIn());
   for (const id of ['btn-pf-signout', 'btn-set-signout']) click(id, () => signOut());
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
-  click('btn-set-stats', () => h.stats()); click('btn-pf-export', () => exportData()); click('btn-pf-delete', () => deleteData());
+  click('btn-set-stats', () => h.stats());
   click('btn-pf-next', e => { const lv = +e.currentTarget.dataset.level; if (ORDER.includes(lv)) h.bot(lv); });
   click('tog-save-stats', () => statsToggle()); click('btn-stats-del', () => statsOff(true)); click('btn-stats-keep', () => statsOff(false));
-  click('btn-confirm-yes', () => confirmDelete()); click('btn-confirm-no', () => closeCard()); click('btn-signin-close', () => closeCard());
+  click('btn-signin-close', () => closeCard());
   click('btn-claim-skip', () => closeCard());
-  const age = $('signin-age'); if (age) age.addEventListener('change', () => ageTicked());
   const f = $('name-claim'); if (f) f.addEventListener('submit', e => { e.preventDefault(); claimName(($('claim-input') || {}).value); });
   const ci = $('claim-input'); if (ci) ci.addEventListener('input', () => err('claim-err', nameProblem(ci.value)));      // live, as the rules of 7.1
   const l = $('acct-layer'); if (!l) return;

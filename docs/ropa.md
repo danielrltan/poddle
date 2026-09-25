@@ -60,7 +60,7 @@ Last reviewed: 2026-09-24 (full launch: statistics and Sign in with Google toget
   name and picture (Google always includes them); never stored or logged.
 - Data in the browser: cookies `__Host-poddle_s` (session, HttpOnly, Secure, 180 days) and `__Host-poddle_n` (nonce,
   10 minutes; the server keeps a SHA-256 of each nonce it issued, in memory only, for the same 10 minutes, so each is
-  used once). An age confirmation checkbox (13+, under 18 with a parent's permission) precedes loading Google's script.
+  used once). The sign-in card states the age condition (13+, under 18 with a parent's permission); Google's script loads only when that card is opened.
 - Basis: contract (Art. 6(1)(b)): the account the player asks for. Fair-play checks on accounts: legitimate interests.
 - Recipients: Google LLC (United States; EU-US Data Privacy Framework) learns the player signed in to Poddle and sets
   or reads its own cookies / FedCM in its sign-in window; the username (with a registered-player badge) is shown to

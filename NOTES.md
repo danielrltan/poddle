@@ -1847,3 +1847,20 @@ A pass over every screen the stats feature added, at desktop and phone size, jud
   web/changelog.html (a dated, player-facing changelog on the help page's stylesheet; `/changelog` redirects like
   `/how-to-play`; in the sitemap). Changes to how Poddle handles information go there on the day they take effect,
   with a link to the updated page. NOTES 100 said the notice stays: superseded.
+
+## 102. Sign-in is one card, your data lives on the privacy page, and the stats header has real controls
+
+- **Sign-in card.** Title, one line, Google's button, one line of fine print (the footer's own "By signing in you
+  agree to the Terms and Privacy Policy. Under 18? Ask a parent first."), and an × in the title row. The age
+  checkbox is gone: the card states the condition and signing in confirms it (privacy 8, terms 4 reworded, no dates
+  bumped: the pages are already dated today). Google's script loads when the card opens, still never on page load.
+  A failed load hides the button's room instead of leaving a gap. The username pick after sign-in stays (Skip for now
+  is there).
+- **Download and delete moved to the privacy page** (web/privacy.html "Your data, from this browser", web/data-tools.js,
+  a classic script on the same origin: the device id from localStorage and the session cookie are both at hand). Your
+  stats keeps one line, "Only you can see this page. Download or delete your data", linking there. The game's confirm
+  card is gone; the privacy page has an inline confirm with Cancel focused. Terms 12 says where deletion lives now.
+  Settings' "Also delete the stats saved so far?" on switching stats off is unchanged.
+- **Your stats header.** Signed in: the username with its badge and a pen icon beside it (pick or change the
+  username), and a real Sign out button with an exit icon on the right, where the Google button sits for a guest.
+  The old "Signed in · Change name · Sign out" text row is gone.

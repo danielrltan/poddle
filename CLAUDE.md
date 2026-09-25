@@ -47,7 +47,7 @@ Important changes also need a notice on the home page. Open questions for the op
   (session, HttpOnly, 180 d), `__Host-poddle_n` (sign-in nonce, 10 min).
 - Third parties: Fly.io (host, logs ~7 days, the database volume + 5-day snapshots), Cloudflare (cdnjs three.js
   fallback; email forwarding for hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click),
-  Google (Sign in with Google: its script loads only after the player opens sign-in and ticks the age box; its ID
+  Google (Sign in with Google: its script loads only after the player opens the sign-in card; its ID
   token carries email/name/picture, which the server discards, keeping only `sub`; Google sets its own cookies / FedCM
   in its window). No analytics, no ads.
 - Poddle Helper (Mac, MIT, ~/poddle-helper): AirPod motion over localhost only; accepts poddleball.com,

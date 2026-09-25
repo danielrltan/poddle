@@ -30,7 +30,8 @@ const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o)
 const web = http.createServer((q, r) => {
   if (q.url.startsWith('/api/')) { let body = ''; q.on('data', c => { body += c; }); q.on('end', () => apiAnswer(q, body, r)); return; }
   let f = path.join(root, decodeURIComponent(q.url.split('?')[0])); if (!f.startsWith(root)) { r.writeHead(403); return r.end(); } if (f.endsWith('/')) f += 'index.html';
-  fs.readFile(f, (e, d) => { r.writeHead(e ? 404 : 200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(e ? '' : d); }); }).listen(W, '127.0.0.1');
+  const serve = (g, next) => fs.readFile(g, (e, d) => { if (e && next) return next(); r.writeHead(e ? 404 : 200, { 'content-type': MIME[path.extname(g)] || 'application/octet-stream' }); r.end(e ? '' : d); });
+  serve(f, () => serve(path.join(root, 'web', decodeURIComponent(q.url.split('?')[0])), null)); }).listen(W, '127.0.0.1');      // a page under /web/ asks for /site.webmanifest, /how-to-play.css, /data-tools.js at the root, as the real server serves them
 
 // ---------- the fake game: a lobby list, Quick play seats you at side 0. socks[] keeps every socket's URL and frames ----------
 const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 }, LIST = { type: 'lobby', online: 2, rooms: [] }, socks = [];
@@ -177,11 +178,9 @@ ok(!google.length, `sign-in on, load: nothing requested from Google (${google})`
 await ev(pg, () => window.__ui.settings(true)); await sleep(500);
 ok(await ev(pg, () => !document.getElementById('btn-set-signin').hidden), 'sign-in on: Settings has the Sign in with Google row');
 await ev(pg, () => document.getElementById('btn-set-signin').click()); await sleep(900);
-r = await ev(pg, () => ({ card: !document.getElementById('acct-layer').hidden && !document.getElementById('signin-card').hidden, age: document.getElementById('signin-age').checked }));
-ok(r.card && !r.age && !google.length, `the sign-in card opens with the age box unticked, and still nothing from Google (${J(r)}, ${google})`);
-await pg.click('#signin-age'); await sleep(2000);
-r = await ev(pg, () => document.getElementById('signin-err').textContent);
-ok(google.some(u => u.startsWith('https://accounts.google.com/gsi/client')) && /could not load/.test(r), `ticked: gsi/client requested (${google[0]}), aborted -> "${r}"`);
+await sleep(1500);
+r = await ev(pg, () => ({ card: !document.getElementById('acct-layer').hidden && !document.getElementById('signin-card').hidden, err: document.getElementById('signin-err').textContent, age: !!document.getElementById('signin-age') }));
+ok(r.card && !r.age && google.some(u => u.startsWith('https://accounts.google.com/gsi/client')) && /could not load/.test(r.err), `the sign-in card opens (no age box) and only then is gsi/client requested (${google[0]}), aborted -> "${r.err}"`);
 // the nudge shows only with sign-in on, for a guest, after a win outside a tournament
 await ev(pg, () => document.getElementById('btn-signin-close').click()); await sleep(300); await ev(pg, () => window.__ui.settings(false)); await sleep(200);
 await pg.click('#btn-start').catch(() => {}); await sleep(800); await pg.click('#btn-quick').catch(() => {}); await sleep(1400);
@@ -199,25 +198,27 @@ await pg.close();
   await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
   const openStats = async () => { await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500); };
   const panel = () => ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, msg: document.getElementById('pf-msg').hidden ? '' : document.getElementById('pf-msg').textContent,
-    rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.pf-level small')?.textContent]), exp: !document.getElementById('btn-pf-export').hidden }));
+    rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('.pf-level b')?.textContent, l.querySelector('.pf-level small')?.textContent]), exp: !!document.querySelector('.pf-foot a[href^="/privacy.html#your-data"]') }));
   await openStats(); let r = await panel();
   ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie Matt', 'Club Matt', 'Tour Matt', 'Pro Matt']) && /^3-0/.test(r.rungs[0][1]) && /^1-1/.test(r.rungs[1][1]) && /^0-2/.test(r.rungs[2][1]), `saved profile: four rungs in order with their records (${J(r.rungs)})`);
   for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-${w}x${h}.png`) }); }
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();
-  // Download my data: POST /api/export with the id, and a poddle-data-<day>.json file that parses back to the profile
-  const n0 = API.log.length; await ev(pg, () => document.getElementById('btn-pf-export').click());
+  // Download and delete live on the privacy page (web/data-tools.js), same origin as the game: the device id comes from localStorage
+  const PRIV = `http://127.0.0.1:${W}/web/privacy.html#your-data`; await pg.goto(PRIV); await sleep(900);
+  const n0 = API.log.length; await ev(pg, () => document.getElementById('btn-export').click());
   let file = ''; for (let k = 0; k < 30 && !file; k++) { await sleep(200); file = fs.readdirSync(DL).find(f => f.endsWith('.json')) || ''; }
   let parsed = null; try { parsed = JSON.parse(fs.readFileSync(path.join(DL, file), 'utf8')); } catch { parsed = null; }
   const ex = API.log.slice(n0).find(l => l[0] === 'POST' && l[1] === '/api/export');
-  ok(r.exp && !!ex && ex[2]?.dev === ID && file === 'poddle-data-2026-09-24.json' && parsed?.profile?.matt?.length === 4, `export: POST /api/export with the id (${J(ex && ex[2])}), downloaded "${file}", JSON with ${parsed?.profile?.matt?.length} rungs`);
-  // Delete my data from Your stats: the confirm card (Cancel focused), Delete: DELETE /api/account with the id, the id goes, the panel shows no record
-  await ev(pg, () => document.getElementById('btn-pf-delete').click()); await sleep(300);
-  r = await ev(pg, () => ({ card: !document.getElementById('acct-confirm').closest('[hidden]'), focus: document.activeElement?.id || '' }));
-  ok(r.card && r.focus === 'btn-confirm-no', `Delete my data: the confirm card, Cancel focused (${J(r)})`);
-  const n1 = API.log.length; await ev(pg, () => document.getElementById('btn-confirm-yes').click()); await sleep(1800);
-  const del = API.log.slice(n1).find(l => l[0] === 'DELETE' && l[1] === '/api/account'); r = await panel();
-  ok(!!del && del[2]?.dev === ID && del[2]?.confirm === 'delete' && await dev(pg) === null, `delete: DELETE /api/account with the id and confirm (${J(del && del[2])}), poddle.device gone (${await dev(pg)})`);
-  ok(r.view && r.msg === 'Play a match to start your record' && !r.exp && r.rungs.every(x => /^0-0/.test(x[1] || '')), `delete: Your stats is empty again ("${r.msg}", export ${r.exp}, ${J(r.rungs.map(x => x[1]))})`);
+  ok(r.exp && !!ex && ex[2]?.dev === ID && file === 'poddle-data-2026-09-24.json' && parsed?.profile?.matt?.length === 4, `privacy page: Download a copy POSTs /api/export with the id (${J(ex && ex[2])}), downloaded "${file}", JSON with ${parsed?.profile?.matt?.length} rungs; Your stats links there (${r.exp})`);
+  // Delete my data: an inline confirm (Cancel focused), Delete: DELETE /api/account with the id and confirm, the id goes, the status says so
+  await ev(pg, () => document.getElementById('btn-delete').click()); await sleep(300);
+  r = await ev(pg, () => ({ card: !document.getElementById('data-confirm').hidden, focus: document.activeElement?.id || '' }));
+  ok(r.card && r.focus === 'btn-delete-no', `Delete my data: the confirm line, Cancel focused (${J(r)})`);
+  const n1 = API.log.length; await ev(pg, () => document.getElementById('btn-delete-yes').click()); await sleep(1500);
+  const del = API.log.slice(n1).find(l => l[0] === 'DELETE' && l[1] === '/api/account'); const st = await ev(pg, () => document.getElementById('data-status').textContent);
+  ok(!!del && del[2]?.dev === ID && del[2]?.confirm === 'delete' && await dev(pg) === null && /have been deleted/.test(st), `delete: DELETE /api/account with the id and confirm (${J(del && del[2])}), poddle.device gone (${await dev(pg)}), "${st}"`);
+  await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900); await openStats(); r = await panel();
+  ok(r.view && r.msg === 'Play a match to start your record' && r.rungs.every(x => /^0-0/.test(x[1] || '')), `delete: Your stats is empty again ("${r.msg}", ${J(r.rungs.map(x => x[1]))})`);
   // the result card with its stats line, forced on screen (the fake game never plays a point), at both sizes
   await ev(pg, () => window.__ui.lobbyView('home')); await sleep(400); const s0 = last(); await pg.click('#btn-quick').catch(() => {}); await sleep(400);
   if (last() === s0 && !s0.frames.some(f => f.type === 'quick')) { await pg.keyboard.press('Enter'); await sleep(300); await pg.keyboard.press('Enter'); } await sleep(1200);
@@ -243,11 +244,10 @@ await pg.close();
   let r = await ev(pg, () => ({ signed: !document.getElementById('set-account').hidden, toast: document.getElementById('toast').textContent }));
   ok(r.signed && /Couldn’t sign you out/.test(r.toast), `sign-out answered 500: still signed in, and told so (${J(r)})`);
   await ev(pg, () => window.__ui.settings(false)); await sleep(300);
-  await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500);
-  await ev(pg, () => document.getElementById('btn-pf-delete').click()); await sleep(300);
-  await ev(pg, () => document.getElementById('btn-confirm-yes').click()); await sleep(900);
-  r = await ev(pg, () => document.getElementById('toast').textContent);
-  ok(/signed out/.test(r) && !/deleted/.test(r), `delete with a session that had ended: deleted.account false -> "${r}", not "Your data is deleted"`);
+  await pg.goto(`http://127.0.0.1:${W}/web/privacy.html#your-data`); await sleep(900);
+  await ev(pg, () => document.getElementById('btn-delete').click()); await sleep(200); await ev(pg, () => document.getElementById('btn-delete-yes').click()); await sleep(900);
+  r = await ev(pg, () => document.getElementById('data-status').textContent);
+  ok(/sign in to Poddle first/.test(r) && !/account and your statistics/.test(r), `delete with a session that had ended: deleted.account false -> "${r}", never the account deleted`);
   API.acct = null; API.stale = false; API.signoutFail = false; await pg.close(); }
 
 const uniq = [...new Set(errs.map(e => e.split('\n')[0].slice(0, 220)))];
