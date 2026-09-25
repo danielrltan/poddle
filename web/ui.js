@@ -132,7 +132,6 @@ export function matchResult(o, me, them, name) {
   if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final!') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
-  { const s = $('result-slam'); s.textContent = o.forfeit ? '' : 'GAME!'; s.classList.remove('is-gold'); s.classList.toggle('is-them', watching ? !won : lost); if (s.textContent) restart(s, 'go'); }      // the stamp takes the winner's colour; gone by 380 ms, before the title pops
   $('tally-sc-me').style.setProperty('--to', o.me | 0); $('tally-sc-them').style.setProperty('--to', o.them | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
@@ -1008,7 +1007,6 @@ export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
   $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won'); resultStats(null, card);      // the final's own card is replaced at once: its stats and beat go with it
-  { const s = $('result-slam'); s.textContent = 'CHAMPION!'; s.classList.remove('is-them'); s.classList.add('is-gold'); restart(s, 'go'); }
   setText($('result-title'), me ? 'You’re the champion!' : `${name} is the champion!`); setText($('result-note'), me ? 'The road to the title' : `${name}’s road to the title`);
   const road = $('result-road'); road.textContent = '';
   for (const st of Array.isArray(c.path) ? c.path : []) { const li = mk('li', 'road-step'), sc = Array.isArray(st.score) ? st.score : [0, 0], vs = st.bot ? 'Matt' : tnm(st.vs) || 'Player';
