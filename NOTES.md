@@ -1836,3 +1836,14 @@ A pass over every screen the stats feature added, at desktop and phone size, jud
   important changes (remove it around late November 2026).
 - Kept on purpose: the fourth home tile (a page among actions, as on a console menu), Google's G in the Settings row
   (the only colour icon there; it is what the owner asked for), and the age box unticked on every open.
+
+## 101. The name row stays put, and What's new is a page, not a card
+
+- **Name row.** The lobby body centred the name row and the view together, so the row rode up and down with each
+  panel's height: y 98 on Play, 118 on Courts, 239 on Create court, 265 on Play a bot (1280x800). The body now starts
+  at the top and a panel centres in the space under the row, so the row sits at one spot on every view that has it.
+- **No more home notice.** The owner's call: the title screen is back to one card. The privacy page's promise of "a
+  notice on the Poddle home page" for important changes is kept by a **What's new** link in the title footer to
+  web/changelog.html (a dated, player-facing changelog on the help page's stylesheet; `/changelog` redirects like
+  `/how-to-play`; in the sitemap). Changes to how Poddle handles information go there on the day they take effect,
+  with a link to the updated page. NOTES 100 said the notice stays: superseded.

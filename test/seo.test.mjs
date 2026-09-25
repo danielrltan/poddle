@@ -16,7 +16,7 @@ try {
   console.log('status, type, cache');
   const NOCACHE = 'no-cache', WEEK = 'public, max-age=604800';
   for (const [p, type, cache, file] of [['/', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/index.html', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/robots.txt', 'text/plain; charset=utf-8', NOCACHE, 'robots.txt'],
-    ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'],
+    ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'], ['/changelog.html', 'text/html; charset=utf-8', NOCACHE, 'changelog.html'],
     ['/privacy.html', 'text/html; charset=utf-8', NOCACHE, 'privacy.html'], ['/terms.html', 'text/html; charset=utf-8', NOCACHE, 'terms.html'], ['/vendor/mp/LICENSE.txt', 'text/plain; charset=utf-8', null, 'vendor/mp/LICENSE.txt'],
     ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=6', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
     ['/apple-touch-icon.png', 'image/png', WEEK, 'apple-touch-icon.png'], ['/icon-192.png', 'image/png', WEEK, 'icon-192.png'], ['/icon-512.png', 'image/png', WEEK, 'icon-512.png'],
@@ -114,7 +114,7 @@ try {
     const xml = (await req('/sitemap.xml')).body.toString(), locs = [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map(m => m[1]), mods = [...xml.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)].map(m => m[1]);
     const opens = (xml.match(/<(?![?\/!])[^>]*[^\/]>/g) || []).length, closes = (xml.match(/<\/[^>]+>/g) || []).length;
     ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>') && /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/.test(xml) && xml.trim().endsWith('</urlset>') && opens === closes && !/&(?!amp;|lt;|gt;|quot;|apos;)/.test(xml), `sitemap.xml is well formed (${opens} tags open, ${closes} close)`);
-    ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
+    ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/changelog.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
     ok(mods.length === locs.length && mods.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d)) && Date.parse(d) <= Date.now() + 864e5), `lastmod is a W3C date, not in the future: ${mods}`);
     for (const l of locs) { const p = new URL(l).pathname, r = await req(p); ok(r.status === 200 && /text\/html/.test(r.h['content-type']), `${p} from the sitemap: ${r.status}`);
       if (r.status === 200) { const c = [...r.body.toString().matchAll(/<link rel="canonical" href="([^"]*)"/g)].map(m => m[1]); ok(c.length === 1 && c[0] === l, `its canonical is itself: ${c}`); } } }

@@ -56,11 +56,11 @@ const seen = (pg, id) => ev(pg, i => { const e = document.getElementById(i); if 
 
 // ---------- A. ui-mock: the markup without any of the stats elements. ui.js must not care (they are optional) ----------
 { const pg = await page('mock'); await pg.goto(`http://127.0.0.1:${W}/test/ui-mock.html?screen=lobby`); await pg.waitForFunction(() => document.title.startsWith('ready'), { timeout: 15000 }).catch(() => {});
-  const r = await ev(pg, () => { const ids = ['btn-profile', 'lobby-profile', 'result-save', 'signin-card', 'tog-save-stats', 'news'], ui = window.__ui; let threw = '';
+  const r = await ev(pg, () => { const ids = ['btn-profile', 'lobby-profile', 'result-save', 'signin-card', 'tog-save-stats'], ui = window.__ui; let threw = '';
     for (const id of ids) document.getElementById(id)?.remove();
     try { ui.showScreen('lobby'); ui.setNames({ me: 'You', them: 'Bob', reg: [false, true] }); ui.settings(true); ui.settings(false); ui.showScreen('title'); } catch (e) { threw = e.message; }
     return { left: ids.filter(i => document.getElementById(i)), threw, ui: typeof ui }; });
-  ok(r.ui === 'object' && !r.left.length && !r.threw, `ui-mock: no #btn-profile/#lobby-profile/#result-save/#signin-card/#tog-save-stats/#news and ui.js still runs (${r.threw || 'no throw'})`);
+  ok(r.ui === 'object' && !r.left.length && !r.threw, `ui-mock: no #btn-profile/#lobby-profile/#result-save/#signin-card/#tog-save-stats and ui.js still runs (${r.threw || 'no throw'})`);
   await pg.close(); }
 
 // ---------- B. sign-in OFF: first load, lobby, first seat, the result card, names ----------
@@ -72,10 +72,6 @@ ok(r.screen === 'title' && r.dev === null, `load: title screen, no poddle.device
 ok(!google.length, `load: nothing requested from Google (${google})`);
 r = []; for (const id of ['btn-set-signin', 'btn-pf-signin', 'btn-save-signin', 'signin-card', 'acct-layer']) if (await seen(pg, id)) r.push(id);
 ok(!r.length, `sign-in off: no sign-in control visible (${r})`);
-{ // the home notice's Privacy link: a press on it never reaches the game's own pointerdown/Enter handlers
-  const s = await ev(pg, () => { const a = document.querySelector('#news a[href^="/privacy.html"]'); if (!a) return 'no link'; let got = 0; const f = () => { got++; }; document.addEventListener('pointerdown', f); document.addEventListener('keydown', f);
-    a.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.removeEventListener('pointerdown', f); document.removeEventListener('keydown', f); return got; });
-  ok(s === 0, `#news Privacy link stops pointerdown and Enter from reaching the page (${s})`); }
 await pg.click('#btn-start'); await sleep(900);
 r = await ev(pg, () => ({ screen: document.body.dataset.screen, dev: localStorage.getItem('poddle.device') }));
 ok(r.screen === 'lobby' && r.dev === null, `lobby: still no poddle.device (${r.screen}, ${r.dev})`);

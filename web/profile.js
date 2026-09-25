@@ -221,7 +221,6 @@ function drawAcct() {
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
   show('tog-save-stats', on); show('btn-set-stats', on); show('btn-profile', on);
   const t = $('tog-save-stats'); if (t) t.setAttribute('aria-checked', String(statsOn()));
-  show('news', on && me.db);                                // the home notice (9.9) says stats are saved: only where they are
 }
 
 // ---------- Settings > You: Save my stats on this device (9.6). Its own key, '0' or '1' ----------

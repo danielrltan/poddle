@@ -555,6 +555,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .lobby-down{animation:hm-hang 420ms var(--ease-bounce) backwards} @keyframes hm-hang{from{opacity:0;transform:translateY(-1.25rem) scale(.9)}}      /* hangs down from the header */
 
 /* views: one at a time */
+#screen-lobby .menu-body{justify-content:flex-start} #screen-lobby .lobby-view:not(.lobby-home){margin:auto 0}      /* the name row sits at the same spot on every view (it used to ride up and down with each panel's height); a panel centres in the space under it */
 #screen-lobby .lobby-view{animation:hm-view-in 380ms var(--ease-out) backwards}      /* backwards, not both: nothing is held afterwards, so the busy dim below works */
 #screen-lobby[data-dir="fwd"] .lobby-view{animation-name:hm-view-fwd} #screen-lobby[data-dir="back"] .lobby-view{animation-name:hm-view-back}      /* deeper views come in from the right, Back brings the last one in from the left (ui.js lobbyView) */
 #screen-lobby #lobby-home{animation:hm-fade var(--d-med) var(--ease-soft) backwards}      /* the home view's tiles deal themselves in: the container only fades */
@@ -1557,5 +1558,5 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 #set-account .btn{height:max(2.25rem,44px);padding:0 1rem;flex:none}
 
 /* the home notice (9.9), under the safety one: the same card, a little quieter */
-.news h3{font-size:var(--t-md)} .news p{font-size:var(--t-sm)} .news .safety-icon{width:3.5rem;height:3.5rem} .news .foot-link,.acct-links .foot-link,.acct-check .foot-link{font-size:inherit}      /* inline links keep the paragraph's size (the footer's 14px floor made them the biggest thing on a phone) */
+.acct-links .foot-link,.acct-check .foot-link{font-size:inherit}      /* inline links keep the paragraph's size (the footer's 14px floor made them the biggest thing on a phone) */
 .name-row #btn-name-change{flex:none;height:max(2.5rem,44px);padding:0 1.125rem}
