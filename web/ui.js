@@ -571,7 +571,7 @@ const NO_NAME = ['share', 'tour', 'bracket', 'profile'];                        
 export const viewParent = v => VIEW_PARENT[v] || null;
 const boxes = () => [...$('code-boxes').children];
 let view = 'home', roomsKey = '', on = {}, deep = null;                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
-export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied(), profile() }
+export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied(), profile(), view(name) }
 export function lobbyView(name, { code, watch } = {}) {
   if (!name) return view;
   if (name === 'code') name = 'courts';                                                 // the old code view lives inside Courts now: old call sites still land
@@ -586,6 +586,7 @@ export function lobbyView(name, { code, watch } = {}) {
   if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
   nameGate();
   const v = view; setTimeout(() => focusView(v), 60);    // after the key that brought us here is up: a held Enter must not press it
+  on.view?.(view);      // main.js puts the view in the address bar (/courts, /stats...), so a reload comes back to it
 }
 function focusView(v, n = 0) { if (slots.menu !== 'lobby' || asking() || view !== v) return; const el = firstFocus(); el.focus({ preventScroll: true, focusVisible: true }); if (v === 'bracket') brReveal(el); if (document.activeElement !== el && n < 4) setTimeout(() => focusView(v, n + 1), 100); }      // a screen still fading in (its visibility turns on a frame later under reduced motion) refuses focus: try again
 // where focus lands on a view. No name yet (the first visit): the name field, and nothing else can be chosen until it has a letter

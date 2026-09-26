@@ -9,7 +9,8 @@ import puppeteer from 'puppeteer-core';
 import { makeSynth, CALIBRATE, SESSION_LOOP } from './fake-bridge.mjs';
 const P0 = +process.env.MENU_PORT || 8330, W = P0, G = P0 + 1, DEAD = P0 + 2, POD = P0 + 3, ONLY = (process.env.ONLY || 'ab').toLowerCase(), root = new URL('..', import.meta.url).pathname, sleep = ms => new Promise(r => setTimeout(r, ms));
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const web = http.createServer((q, r) => { let f = path.join(root, 'web', decodeURIComponent(q.url.split('?')[0])); if (f.endsWith('/')) f += 'index.html';
+const MENU_PATHS = ['/play', '/courts', '/create', '/bot', '/stats'];      // the menu views' addresses are index.html, as server/game.js serves them: a reload stays on its view
+const web = http.createServer((q, r) => { let u = decodeURIComponent(q.url.split('?')[0]); if (MENU_PATHS.includes(u)) u = '/'; let f = path.join(root, 'web', u); if (f.endsWith('/')) f += 'index.html';
   fs.readFile(f, (e, d) => { r.writeHead(e ? 404 : 200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(e ? '' : d); }); }).listen(W);
 
 // ---- the fake: a lobby with two listed rooms. WXYZ and KXQ7 exist, FVVV is full, FWWW is full but can be watched, anything else is not found. MUTE=1 answers nothing (an old server).

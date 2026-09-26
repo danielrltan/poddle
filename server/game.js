@@ -14,7 +14,8 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
-const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/changelog': '/changelog.html', '/changelog/': '/changelog.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html' };            // clean URLs: a fixed map, no extension guessing
+const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
+const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/changelog': '/changelog.html', '/changelog/': '/changelog.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats' };            // clean URLs: a fixed map, no extension guessing
 let PAGE_404 = null; try { PAGE_404 = fs.readFileSync(path.join(WEB, '404.html')); } catch { /* no page: plain words */ }
 function notFound(req, res) {                                                                           // a miss is a real 404 (never a soft 200) and never indexed
   const body = PAGE_404 || Buffer.from('not found');
@@ -39,6 +40,7 @@ const httpServer = http.createServer((req, res) => {
     const body = JSON.stringify({ courts: rooms.size, tours: tourneys.size, playing: pl, watching: sp, online: wss.clients.size - pads.size, phones: pads.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
   if (rel === '/404.html') return notFound(req, res);
+  if (MENU_PATHS.has(rel)) rel = '/index.html';
   const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
   if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }      // no climbing out of web/
   fs.stat(file, (err, st) => {

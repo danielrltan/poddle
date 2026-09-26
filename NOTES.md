@@ -1926,3 +1926,24 @@ The ladder's heading is "Matt difficulties beaten" (was "Trophy Road · beat Mat
   Bot wins beyond the first do not earn trophies (they are uncapped and scriptable, docs/ACCOUNTS.md 5.2).
 - **No track under the Matt row** (the owner: a bar is not a difficulty). The four discs stand on their own; the gold
   medals, the pulsing next one and the padlocks say the state. Phone: the same, in a column.
+
+## 108. Menu views have addresses: a reload stays where you were
+Refreshing on Your stats, or any other lobby view, used to drop you back on the title screen. Each view now has its own path:
+- /play: the Play home
+- /courts: Courts. The Your court, Tournament and bracket views also show /courts.
+- /create: Create court
+- /bot: Play a bot
+- /stats: Your stats
+
+server/game.js serves index.html for these paths (MENU_PATHS), and redirects each one's trailing-slash form to it with a 301.
+
+main.js route() keeps the address bar in step using replaceState, so the browser's Back button behaves exactly as before:
+- It runs only after boot has restored the view. Otherwise the title screen would wipe /stats first.
+- It only ever swaps '/' or one of these paths, so a copy served from /web/index.html (the tests) keeps its path.
+- A seated court goes back to '/' with its ?court=CODE, and the invite always links the root.
+
+On load, a menu path with no ?court= skips the title and opens that view.
+
+test/menu.mjs's static server knows the same paths, because it reloads the page after the lobby has set /play.
+
+The stats page's "Against people" heading now reads "Online multiplayer", as the owner asked.

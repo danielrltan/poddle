@@ -276,7 +276,7 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 
 // ---------- screens: title -> connect -> calibrate -> play ----------
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
-function screen(name) { ui.showScreen(name); scene.setMenu(!!name); }      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
+function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); }      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
 function openCourt() { screen(null); if (over) showOver(); padPhase(); }
 function startCal() { if (undo) undo.kept = false; calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(true); padPhase(); }
 function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal: on }); }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
@@ -301,8 +301,14 @@ function request(m) {                               // one lobby request at a ti
   pending = m; ui.lobbyBusy(true); game.send(m);
   pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // an old server never answers: do not leave the lobby dimmed for good
 }
-function setUrl(code, watch) { const u = new URL(location.href), q = u.searchParams; q.delete('room'); if (code) q.set('court', code); else q.delete('court'); if (code && watch) q.set('watch', '1'); else q.delete('watch'); history.replaceState(null, '', u); }   // the address bar is the invite, and a reload comes back to the same room, in the same role
-const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}${location.pathname}?court=${code}`;      // a localhost link is no use to a friend
+// the menu's address (NOTES 108): each lobby view has a path the server answers with this same page, so a reload lands back on it instead of the title.
+// replaceState only: the browser's Back button still leaves the site as before. A court keeps '/' with its ?court=CODE (the invite).
+const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile' };
+let routing = false;      // off until the reload's view is back (the boot's title screen must not wipe /stats first)
+function route() { if (!LOBBY || !routing) return; const p = room ? '/' : ui.currentScreen() === 'lobby' ? VIEW_PATH[ui.lobbyView()] || '/play' : ui.currentScreen() === 'title' ? '/' : null;
+  if (p && p !== location.pathname && (location.pathname === '/' || PATH_VIEW[location.pathname])) history.replaceState(null, '', p + location.search + location.hash); }      // only ever swaps one of our own paths (a local copy served from /web/index.html keeps its path)
+function setUrl(code, watch) { const u = new URL(location.href), q = u.searchParams; q.delete('room'); if (code) q.set('court', code); else q.delete('court'); if (code && watch) q.set('watch', '1'); else q.delete('watch'); history.replaceState(null, '', u); route(); }   // the address bar is the invite, and a reload comes back to the same room, in the same role
+const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}/?court=${code}`;      // the root, never the menu path the address bar happens to show      // a localhost link is no use to a friend
 // ---------- asking to play (docs/SPECTATE.md Asking to play) ----------
 let askId = 0, askWho = '', askedFor = false, noBot = false;
 const CAN_PADDLE = CAN_PHONE || /Mac/.test(navigator.platform) && navigator.maxTouchPoints <= 1;      // this device can be a paddle (the inverse of the viewer-only note at the top): only then is there an Ask to play
@@ -696,12 +702,13 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: playBot,
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
-  profile: () => profile.showProfile() });      // Your stats: web/profile.js fetches and draws it
+  profile: () => profile.showProfile(), view: route });      // Your stats: web/profile.js fetches and draws it
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
 profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
   badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats,
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
+{ const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats...: straight back to that view (after profile.init: Your stats fetches through it)
 // open(): the device list is re-read every time the card opens, because headphones come and go.
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
 ui.onSettings({
