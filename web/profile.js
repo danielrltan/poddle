@@ -259,38 +259,16 @@ function drawAcct() {
   show('btn-set-signin', en && !a); show('set-account', !!a); text('set-account-name', name ? `Signed in as ${name}` : 'Signed in');
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
-  show('tog-save-stats', on); show('btn-set-stats', on); show('btn-profile', on);
-  const t = $('tog-save-stats'); if (t) t.setAttribute('aria-checked', String(statsOn()));
+  show('btn-profile', on);
 }
 
-// ---------- Settings > You: Save my stats on this device (9.6). Its own key, '0' or '1' ----------
-function statsNote(t) { text('stats-hint', t || ''); show('stats-hint', !!t); }
-async function statsToggle() {
+// ---------- Save my stats lives on the privacy page (web/data-tools.js, NOTES 108). This tab hears the key change through the storage event ----------
+function statsChanged() {
   if (!on) return;
-  if (!statsOn()) { ls.set(ON_KEY, '1'); drawAcct(); statsNote(''); show('stats-off-ask', false); h.redial(); return; }      // on again: a NEW id at the next seat (3.1), and the socket opens again after the match so that hello is its first
-  if (deviceId() && !me.account && saved !== false) { show('stats-off-ask', true); const k = $('btn-stats-keep'); if (k) k.focus({ preventScroll: true }); return; }      // something may be saved for this device (or the server could not say): ask first
-  statsOff(false);
-}
-async function statsOff(del) {                              // del: Delete (the request goes BEFORE the id is removed: the id is what proves the profile is this browser's)
-  show('stats-off-ask', false);
-  if (del) { const ok = await deleteNow(); if (!ok) { statsNote('Couldn’t delete right now. Stats are still on.'); return; } }
-  ls.set(ON_KEY, '0'); forgetDevice(); sockHello = true;      // no hello goes out on this socket any more, even at a seat
+  if (statsOn()) { drawAcct(); h.redial(); return; }        // on again: a NEW id at the next seat (3.1), and the socket opens again after the match so that hello is its first
+  forgetDevice(); sockHello = true;                        // no hello goes out on this socket any more, even at a seat
   h.send({ type: 'nostats' });                              // and the server stops recording this socket now, the match under way and a signed-in account included
-  const kept = del ? '' : me.account ? 'Stats already saved to your account stay there. ' : 'Saved stats are deleted automatically 90 days after your last recorded match (7 days if only one match was recorded). ';
-  drawAcct(); statsNote(kept + 'Stats are off. Matches aren’t recorded.');
-  h.redial();                                               // the server keeps the device of a socket's first hello: the next match is on a new socket
-  const t = $('tog-save-stats'); if (t) t.focus({ preventScroll: true });
-}
-
-// ---------- Download my data, Delete my data (9.7) ----------
-async function deleteNow() {                                // -> null when the request failed; else { any: something was deleted, out: signed in here but the session had ended, so the account was NOT deleted }
-  const had = !!me.account;
-  let r; try { r = await api('/api/account', 'DELETE', { ...devBody(), confirm: 'delete' }); } catch { r = { ok: false, status: 0 }; }
-  if (!r.ok) return null;
-  const d = r.j && r.j.deleted && typeof r.j.deleted === 'object' ? r.j.deleted : {};      // the server says what it deleted: a 200 alone is not a deletion
-  me.account = null; forgetDevice(); saved = false; drawAcct(); h.redial();      // a fresh id at the next seat; the socket opens again after the match without the old cookie
-  const out = had && d.account !== true; if (out) loadMe();      // signed out in another tab, expired or evicted: ask again who is signed in
-  return { any: d.account === true || d.device === true, out };
+  drawAcct(); h.redial();                                   // the server keeps the device of a socket's first hello: the next match is on a new socket
 }
 
 // ---------- wiring: main.js calls init() once, while it loads (before the first socket opens) ----------
@@ -309,9 +287,8 @@ function wire() {
   for (const id of ['btn-pf-signin', 'btn-set-signin', 'btn-save-signin']) click(id, () => signIn());
   for (const id of ['btn-pf-signout', 'btn-set-signout']) click(id, () => signOut());
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
-  click('btn-set-stats', () => h.stats());
   click('btn-pf-next', e => { const lv = +e.currentTarget.dataset.level; if (ORDER.includes(lv)) h.bot(lv); });
-  click('tog-save-stats', () => statsToggle()); click('btn-stats-del', () => statsOff(true)); click('btn-stats-keep', () => statsOff(false));
+  addEventListener('storage', e => { if (e.key === ON_KEY || e.key === null) statsChanged(); });      // the privacy page (another tab) flipped Save my stats, or the site's storage was cleared
   click('btn-signin-close', () => closeCard());
   click('btn-claim-skip', () => closeCard());
   const f = $('name-claim'); if (f) f.addEventListener('submit', e => { e.preventDefault(); claimName(($('claim-input') || {}).value); });

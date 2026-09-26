@@ -1947,3 +1947,14 @@ On load, a menu path with no ?court= skips the title and opens that view.
 test/menu.mjs's static server knows the same paths, because it reloads the page after the lobby has set /play.
 
 The stats page's "Against people" heading now reads "Online multiplayer", as the owner asked.
+
+## 109. Even padding on Your stats; Settings loses its stats rows
+
+- **Padding.** The card had .5rem on top and .25rem at the bottom against 1.5rem at the sides: the header sat on the rim
+  and the tiles on the border. Now var(--s-4) top and bottom, var(--s-6) at the sides, the section gap var(--s-2) (1.5rem top and bottom
+  with a .75rem gap put the tiles under the footer at 1280x800 once the header has its three lines).
+- **Settings.** "Save my stats" and "Your stats" are gone from the pause menu (the owner: not a thing for a pause menu).
+  Your stats is a home tile. The switch lives in the privacy page's Your data box (web/data-tools.js, same origin, same
+  key); an open game tab hears the change through the storage event and does what the switch did (nostats, drop the id,
+  redial). Turning it off no longer asks Delete or Keep: Delete my data is right there. The privacy page, terms, ROPA,
+  changelog and the two in-game notices now point at the privacy page.

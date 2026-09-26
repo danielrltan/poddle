@@ -44,7 +44,7 @@ Important changes also need a notice on the home page. Open questions for the op
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at first seat with stats on; rotated on sign-out, delete,
-  stats off/on), poddle.stats.on ('0': every socket says `nostats` first and nothing is recorded, signed in or not); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
+  stats off/on), poddle.stats.on ('0', set from the privacy page's Your data box: every socket says `nostats` first and nothing is recorded, signed in or not); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
   (session, HttpOnly, 180 d), `__Host-poddle_n` (sign-in nonce, 10 min).
 - Third parties: Fly.io (host, logs ~7 days, the database volume + 5-day snapshots), Cloudflare (cdnjs three.js
   fallback; email forwarding for hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click),

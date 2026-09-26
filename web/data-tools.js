@@ -25,6 +25,10 @@
       : d.device === true ? 'The statistics saved by this browser have been deleted. If you also have a Poddle account, sign in to Poddle first, then return here to delete it.'      // the session may have ended: the account is untouched until it is deleted while signed in
       : 'Nothing was saved for this browser. If you have an account, sign in to Poddle first, then return here.');
   }
+  const ON = 'poddle.stats.on', tog = $('tog-stats');      // Save my stats: the game reads this key at every seat, and an open game tab hears the change (profile.js, storage event)
+  const statsOn = () => { try { return localStorage.getItem(ON) !== '0'; } catch { return true; } };
+  if (tog) { tog.checked = statsOn(); tog.addEventListener('change', () => { try { localStorage.setItem(ON, tog.checked ? '1' : '0'); if (!tog.checked) localStorage.removeItem('poddle.device'); } catch { /* private window: nothing kept either way */ }
+    say(tog.checked ? 'Stats are on. Your next match starts a new record on this browser.' : 'Stats are off. Nothing is recorded from now on. Statistics saved so far expire on their own, or delete them now with Delete my data.'); }); }
   $('btn-export')?.addEventListener('click', download);
   $('btn-delete')?.addEventListener('click', () => { $('data-confirm').hidden = false; say(''); $('btn-delete-no')?.focus(); });      // Cancel is focused: a second press deletes nothing
   $('btn-delete-no')?.addEventListener('click', () => { $('data-confirm').hidden = true; });

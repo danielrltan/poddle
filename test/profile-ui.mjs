@@ -57,11 +57,11 @@ const seen = (pg, id) => ev(pg, i => { const e = document.getElementById(i); if 
 
 // ---------- A. ui-mock: the markup without any of the stats elements. ui.js must not care (they are optional) ----------
 { const pg = await page('mock'); await pg.goto(`http://127.0.0.1:${W}/test/ui-mock.html?screen=lobby`); await pg.waitForFunction(() => document.title.startsWith('ready'), { timeout: 15000 }).catch(() => {});
-  const r = await ev(pg, () => { const ids = ['btn-profile', 'lobby-profile', 'result-save', 'signin-card', 'tog-save-stats'], ui = window.__ui; let threw = '';
+  const r = await ev(pg, () => { const ids = ['btn-profile', 'lobby-profile', 'result-save', 'signin-card'], ui = window.__ui; let threw = '';
     for (const id of ids) document.getElementById(id)?.remove();
     try { ui.showScreen('lobby'); ui.setNames({ me: 'You', them: 'Bob', reg: [false, true] }); ui.settings(true); ui.settings(false); ui.showScreen('title'); } catch (e) { threw = e.message; }
     return { left: ids.filter(i => document.getElementById(i)), threw, ui: typeof ui }; });
-  ok(r.ui === 'object' && !r.left.length && !r.threw, `ui-mock: no #btn-profile/#lobby-profile/#result-save/#signin-card/#tog-save-stats and ui.js still runs (${r.threw || 'no throw'})`);
+  ok(r.ui === 'object' && !r.left.length && !r.threw, `ui-mock: no #btn-profile/#lobby-profile/#result-save/#signin-card and ui.js still runs (${r.threw || 'no throw'})`);
   await pg.close(); }
 
 // ---------- B. sign-in OFF: first load, lobby, first seat, the result card, names ----------
@@ -164,15 +164,15 @@ ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your s
   ok(!bad.length, `Your stats fits at ${SIZES.length} window sizes, nothing clipped${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
   await pg.setViewport({ width: 1280, height: 720 }); await sleep(250); }
 
-// ---------- Save my stats OFF with a saved profile: the choice, then Delete: DELETE /api/account carries the id, then the id is gone ----------
-await ev(pg, () => window.__ui.settings(true)); await sleep(500);
-await ev(pg, () => document.getElementById('tog-save-stats').click()); await sleep(400);
-r = await ev(pg, () => ({ ask: !document.getElementById('stats-off-ask').hidden, dev: localStorage.getItem('poddle.device') }));
-ok(r.ask && r.dev === id0, `stats off with a saved profile asks Delete or Keep first (ask ${r.ask}, id kept for now ${r.dev === id0})`);
-const n0 = API.log.length; await ev(pg, () => document.getElementById('btn-stats-del').click()); await sleep(900);
-{ const del = API.log.slice(n0).find(l => l[0] === 'DELETE' && l[1] === '/api/account'), d = await dev(pg), on = await ev(pg, () => localStorage.getItem('poddle.stats.on'));
-  ok(!!del && del[2] && del[2].dev === id0 && d === null && on === '0', `Delete: DELETE /api/account with the old id (${J(del && del[2])}), then no poddle.device (${d}), stats.on '${on}'`); }
-await ev(pg, () => window.__ui.settings(false)); await sleep(300);
+// ---------- Save my stats lives on the privacy page: Delete my data there carries the id, then the switch off drops the id and sets the key ----------
+{ const s = await ev(pg, () => ({ tog: !!document.getElementById('tog-save-stats'), row: !!document.getElementById('btn-set-stats') })); ok(!s.tog && !s.row, 'Settings has no Save my stats switch and no Your stats row'); }
+await pg.goto(`http://127.0.0.1:${W}/web/privacy.html#your-data`); await sleep(900);
+const n0 = API.log.length; await ev(pg, () => document.getElementById('btn-delete').click()); await sleep(200); await ev(pg, () => document.getElementById('btn-delete-yes').click()); await sleep(900);
+{ const del = API.log.slice(n0).find(l => l[0] === 'DELETE' && l[1] === '/api/account'), d = await dev(pg);
+  ok(!!del && del[2] && del[2].dev === id0 && d === null, `privacy page Delete: DELETE /api/account with the old id (${J(del && del[2])}), then no poddle.device (${d})`); }
+await ev(pg, () => { const t = document.getElementById('tog-stats'); t.checked = false; t.dispatchEvent(new Event('change')); }); await sleep(200);
+{ const on = await ev(pg, () => localStorage.getItem('poddle.stats.on')), st = await ev(pg, () => document.getElementById('data-status').textContent); ok(on === '0' && /Stats are off/.test(st), `the switch off: stats.on '${on}', "${st.slice(0, 40)}"`); }
+await pg.goto(URL0); await sleep(2200);
 { // stats off: a new seat makes no id and sends no hello, not even on a new socket
   await ev(pg, () => window.__ui.showScreen('title')); await sleep(200); await pg.click('#btn-start').catch(() => {}); await sleep(800); const n = socks.length; await pg.reload(); await sleep(2400); await pg.click('#btn-start').catch(() => {}); await sleep(800);
   await pg.click('#btn-quick').catch(() => {}); await sleep(1400); const f = socks.slice(n).flatMap(s => s.frames);

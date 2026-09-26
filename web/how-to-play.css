@@ -117,3 +117,4 @@ kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.43
 .data-tools h3{margin:0 0 .375rem} .data-tools p{margin:.5rem 0 0}
 .data-btns{display:inline-flex;flex-wrap:wrap;gap:.75rem;margin-top:.75rem} .data-confirm{font-weight:700} .data-confirm .data-btns{display:flex;margin-top:.625rem}
 .data-status{font-weight:700;color:var(--ink-strong)} .data-status:empty{display:none}
+.data-switch label{font-weight:800;color:var(--ink-strong);cursor:pointer} .data-switch input{width:1.25rem;height:1.25rem;vertical-align:-.2rem;margin-right:.25rem;accent-color:var(--line-deep)}

@@ -32,8 +32,8 @@ Last reviewed: 2026-09-24 (full launch: statistics and Sign in with Google toget
 - Data: SHA-256 of a random device id (`localStorage['poddle.device']`); owner rows (created, last match or sign-in);
   profile (matches played, W/L, streaks, points, tournament titles, best rally, hardest hit and fastest swing with
   dates); Matt ladder (four rungs Rookie, Club, Tour, Pro: W/L, abandons, streaks, first win date, best margin).
-- Basis: legitimate interests (Art. 6(1)(f)): giving players a record of their progress; switchable off in Settings
-  (Save my stats on this device; off, nothing is recorded, signed in or not), with self-serve download and deletion. Canada: consent by saving statistics,
+- Basis: legitimate interests (Art. 6(1)(f)): giving players a record of their progress; switchable off on the privacy page
+  (Save my stats; off, nothing is recorded, signed in or not), with self-serve download and deletion. Canada: consent by saving statistics,
   withdrawn by turning them off or deleting. Consent is not the GDPR basis (Art. 8 would need verified parental
   consent under 16).
 - Recipients: only the owner (stats are never shown to other players; no leaderboards); Fly.io.

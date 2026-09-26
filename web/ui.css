@@ -1502,7 +1502,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .pf-msg{margin:0;width:100%;padding:.625rem 1rem;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1);font-size:var(--t-md);font-weight:700;color:var(--ink);text-align:center}
 /* ---------- Your stats (9.4): the player card. st- = stats. Hero (crest | rank | streak), the Trophy Road, the people strip, three number tiles ---------- */
 /* the player's own colours: rank in --me-ink blue, the streak ribbon gold (orange is the opponent's), gold otherwise only where something was won */
-.st{gap:var(--s-2)!important;padding:var(--s-3) var(--s-6) var(--s-1)!important} .st .pf-msg{padding:.3125rem 1rem;font-size:var(--t-sm)}      /* the whole card has 41rem at 1280x800 (menu head + foot + the body padding): every size below is chosen to fit it without a scroll */
+.st{gap:var(--s-2)!important;padding:var(--s-4) var(--s-6)!important}      /* the same air on every side: the old .5rem top / .25rem bottom put the header on the rim and the tiles on the border */ .st .pf-msg{padding:.3125rem 1rem;font-size:var(--t-sm)}      /* the whole card has 41rem at 1280x800 (menu head + foot + the body padding): every size below is chosen to fit it without a scroll */
 .st .caps{margin:0;display:flex;align-items:center;gap:.4rem} .st .caps svg{width:1.25rem;height:1.25rem;fill:none;stroke:var(--line-deep);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .st-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--s-3) var(--s-5);width:100%;padding:.5rem 1rem}      /* the crest is the biggest thing on the card: bigger than any road medal */
 .st-crest{position:relative;isolation:isolate;width:6.25rem;height:6.25rem;display:grid;place-items:center;animation:medal-drop 900ms var(--ease-bounce) 120ms both}
@@ -1567,7 +1567,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 @media (prefers-reduced-motion:reduce){ .st *,.st *::before,.st *::after{animation:none!important} .st-rays{scale:1;opacity:.55} .st-bar i{transform:none} }
 /* a phone: one column. The hero stacks, the road climbs down the left, the tiles become rows */
 @media (max-width:760px){
-  .st{padding:var(--s-5) var(--s-4)!important}
+  .st{padding:var(--s-5) var(--s-4)!important;gap:var(--s-2)!important}
   .st-hero{grid-template-columns:auto minmax(0,1fr);padding:var(--s-4) var(--s-3)} .st-crest{width:5.5rem;height:5.5rem} .st-crest .st-disc{width:5rem;height:5rem} .st-rank-name{font-size:var(--t-xl);white-space:normal} .st-streak{grid-column:1/-1;min-width:0} .st-ribbon{font-size:var(--t-md);padding:0 1.25rem}
   .st-nodes{grid-template-columns:1fr;gap:.5rem}
   .st-node{display:grid;grid-template-columns:3.5rem minmax(0,1fr);grid-template-rows:auto auto;column-gap:.75rem;row-gap:.125rem;align-items:start;justify-items:start;text-align:left;padding:0} .st-node .st-disc{grid-row:1/span 3} .st-node .pf-level{align-items:flex-start}
@@ -1592,9 +1592,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .acct-body .field{width:100%}
 
 /* Settings > You: the delete-or-keep question under the switch, a line of its own */
-.set-confirm{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:0;padding:.5rem .5rem .5rem .875rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-strong)} .set-confirm span{flex:1 1 100%}
-.set-confirm .btn{height:max(2.5rem,44px);padding:0 1.25rem}
-.set-list > .set-row + .set-confirm,.set-list > .set-row + .set-hint{box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
+.set-list > .set-row + .set-hint{box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
 #set-account span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
 #set-account .btn{height:max(2.25rem,44px);padding:0 1rem;flex:none}
 
