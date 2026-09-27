@@ -20,6 +20,7 @@ const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
 let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null;      // saved: the server has a guest profile for this device (true / false / null = not asked)
 let me = { enabled: false, clientId: null, account: null, db: false };      // GET /api/me: sign-in on or off, the Google client id, who is signed in
+let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
 // ---------- the device id (3.1): made at the first seat, never at load. A bearer secret for the guest profile: never in a URL or a log ----------
 export const statsOn = () => ls.get(ON_KEY) !== '0';      // Save my stats on this device: ON unless turned off (Q5)
@@ -142,6 +143,18 @@ function drawTiles(p) {
   tile('st-t-rally', r ? Math.round(r.v) : 0, r ? `Set on ${dayS(r.at)}` : 'Keep the ball in play');
   tile('st-t-speed', s ? degs(s.v) : 0, s ? `Set on ${dayS(s.at)}` : 'Swing hard, it counts');
 }
+// the play row (docs/SHARE.md 3): profile.play's counters. An older server or the Ranked branch sends no play: the row stays hidden, nothing else changes
+const clock = s => s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m` : s ? '<1m' : '0m';      // time on court: "1h 20m", "12m"
+const fig = (id, v) => { const d = $(id) && $(id).querySelector('dd'); if (d && d.textContent !== v) d.textContent = v; };
+function drawPlay(p) {
+  const P = p && p.play && typeof p.play === 'object' ? p.play : null; if (!show('pf-play', !!P)) return;
+  const ch = num(P.chances), rt = Math.min(num(P.returns), ch), ok = ch >= 10, f = ok ? rt / ch : 0;      // under 10 chances a percentage says nothing: the coaching line instead
+  const ring = $('st-ring'); if (ring) { ring.style.setProperty('--p', f.toFixed(3)); ring.classList.toggle('is-zero', !f); }
+  text('st-ret-pct', ok ? `${Math.round(100 * f)}%` : ''); show('st-ret-pct', ok); text('st-ret-cap', ok ? `${rt.toLocaleString()} of ${ch.toLocaleString()} returned` : 'Return 10 balls to see it'); cls('st-ret', 'is-hint', !ok);
+  const pw = num(P.pointsWon), pl = num(P.pointsLost);      // every kind of match (h_points_* in human stay people-only)
+  fig('st-f-winners', num(P.winners).toLocaleString()); fig('st-f-aces', num(P.aces).toLocaleString()); fig('st-f-smashes', num(P.smashes).toLocaleString()); fig('st-f-hits', num(P.hits).toLocaleString());
+  fig('st-f-points', `${pw + pl ? Math.round(100 * pw / (pw + pl)) : 0}%`); fig('st-f-time', clock(num(P.secs)));
+}
 function drawHead(p) {
   const n = $('pf-name'), name = me.account && me.account.username, typed = (($('name-input') || {}).value || '').trim().slice(0, 12);      // the lobby's name field holds the cleaned display name
   if (n) { n.textContent = name || typed || (me.account ? 'Signed in' : 'Guest'); h.badge(n, !!name); }
@@ -149,7 +162,8 @@ function drawHead(p) {
   show('pf-notice', !!(p && p.guest === true && statsOn() && !me.account));      // the one-time notice (9.3) for everyone, always here: a player who left or forfeited never gets the result card's copy
 }
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available). Guest or signed in changes only the header: every stat draws the same way
-  drawHead(p); drawRoad(p || null); drawPeople(p || null); drawTiles(p || null); drawAcct();
+  shareable = !!p && typeof p === 'object' && 'share' in p; share = shareable ? shareOf(p.share) : null;      // fresh at every draw: the image's ?v= changes with the stats
+  drawHead(p); drawRoad(p || null); drawPeople(p || null); drawPlay(p || null); drawTiles(p || null); drawAcct();
   const msg = p === undefined ? 'Stats aren’t available right now. The game still works.' : '';      // nothing yet: no bar, the card's own lines say it (Start here, the people hint, the tile captions)
   text('pf-msg', msg); show('pf-msg', !!msg); // download and delete live on the privacy page (web/data-tools.js): the footer links there
 }
@@ -218,6 +232,68 @@ export async function signOut() {                           // only the server's
   if (h.view() === 'profile') showProfile();
 }
 
+// ---------- Share card (docs/SHARE.md 2-3): one public link per profile that unfurls as a picture. The click copies it, then the sheet opens ----------
+const WEB = /^https?:\/\/[^\s"'<>\\]{1,400}$/;      // what the server makes: https://poddleball.com/c/<slug> and its .png (http://<host> locally)
+const shareOf = x => x && typeof x === 'object' && typeof x.url === 'string' && WEB.test(x.url) && typeof x.image === 'string' && WEB.test(x.image) ? { url: x.url, image: x.image } : null;
+function clip(what) {                                       // -> a promise of true once the clipboard has it. Called INSIDE the click, before any await (Safari's rule)
+  const c = navigator.clipboard, wt = u => c && typeof c.writeText === 'function' ? c.writeText(u).then(() => true, () => false) : false;      // writeText: the fallback where ClipboardItem is missing or refused
+  try {
+    if (typeof what === 'string') return Promise.resolve(wt(what));
+    if (c && typeof c.write === 'function' && typeof ClipboardItem === 'function')      // the link is not known yet: hand Safari a promise of it now
+      return c.write([new ClipboardItem({ 'text/plain': what.then(u => new Blob([u], { type: 'text/plain' })) })]).then(() => true, () => what.then(wt, () => false));
+    return what.then(wt, () => false);
+  } catch { return Promise.resolve(what && typeof what.then === 'function' ? what.then(wt, () => false) : false); }
+}
+function makeLink() {                                       // POST /api/share once at a time -> a promise of the url (rejects: no link)
+  if (!shareP) { shareP = api('/api/share', 'POST', devBody()).then(r => { const s = r.ok && shareOf(r.j); if (!s) throw new Error(String(r.status)); share = s; return s.url; }); shareP.then(() => { shareP = null; }, () => { shareP = null; }); }
+  return shareP;
+}
+async function shareCard() {                                // Share card: copy first (synchronously when the link is known), then the sheet
+  if (!on || !shareable) return;
+  const b = $('btn-pf-share'); if (b && document.activeElement !== b) b.focus({ preventScroll: true });      // the sheet hands focus back here (Safari does not focus a clicked button)
+  let copied;
+  if (share) copied = clip(share.url);
+  else { const p = makeLink(); copied = clip(p);
+    try { await p; } catch { copied.catch(() => {}); h.toast('Couldn’t make a link. Try again.', 2400); return; } }
+  openShare(); copied.then(ok => { if (ok) { h.toast('Link copied', 1800); flashCopied(); } else pickUrl(); }, () => pickUrl());
+}
+let copiedT = 0;
+function flashCopied() { const b = $('btn-share-copy'); if (!b) return; b.textContent = 'Copied!'; b.classList.add('is-done'); clearTimeout(copiedT); copiedT = setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('is-done'); }, 1800); }
+function pickUrl() { const i = $('share-url'); if (i && !i.closest('[hidden]')) { i.focus({ preventScroll: true }); i.select(); } }      // no clipboard: the link is selected for the player to copy
+function openShare() {
+  if (!share) return; const s = share, i = $('share-url'), img = $('share-img'), fg = $('share-prev');
+  if (i) i.value = s.url;
+  if (img && fg && img.getAttribute('src') !== s.image) { fg.className = 'share-prev is-loading'; img.onload = () => { fg.className = 'share-prev'; }; img.onerror = () => { fg.className = 'share-prev is-broken'; }; img.src = s.image; }      // a skeleton until the picture lands
+  const a = me.enabled ? me.account : null, nm = a ? (a.username ? '' : 'Pick a username to put it on your card') : me.enabled ? 'Sign in to put your name on your card' : '';      // guests are "Poddle player" on the card: their display names are never stored
+  text('btn-share-name', nm); show('share-name', !!nm);
+  show('btn-share-native', typeof navigator.share === 'function'); show('share-stop', true); show('share-confirm', false);
+  { const b = $('btn-share-copy'); if (b) { clearTimeout(copiedT); b.textContent = 'Copy'; b.classList.remove('is-done'); } }
+  openCard('share-card');
+}
+async function downloadCard() {                             // the PNG as a file: poddle-card.png
+  if (!share) return; const u = share.image;
+  try { const r = await fetch(u, { credentials: 'same-origin' }); if (!r.ok) throw new Error(String(r.status)); const blob = await r.blob(), href = URL.createObjectURL(blob), a = mk('a');
+    a.href = href; a.download = 'poddle-card.png'; a.hidden = true; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(href), 4000);
+  } catch { h.toast('Couldn’t download the picture. Try again.', 2400); }
+}
+async function stopSharing() {                              // DELETE /api/share (204, idempotent): the link dies; Share card makes a new one next time
+  let r; try { r = await api('/api/share', 'DELETE', devBody()); } catch { r = { ok: false, status: 0 }; }
+  if (!r.ok) { h.toast('Couldn’t stop sharing. Try again.', 2400); return; }
+  share = null; closeCard(); h.toast('Sharing stopped. That link no longer works', 2600);
+}
+function wireShare() {
+  click('btn-pf-share', () => { shareCard(); });
+  click('btn-share-close', () => closeCard());
+  click('btn-share-copy', () => { if (share) clip(share.url).then(ok => { if (ok) { flashCopied(); h.toast('Link copied', 1800); } else pickUrl(); }); });
+  click('btn-share-dl', () => { downloadCard(); });
+  click('btn-share-native', () => { if (share && typeof navigator.share === 'function') navigator.share({ url: share.url, title: 'My Poddle card' }).catch(() => {}); });      // cancelled: nothing to say
+  click('btn-share-name', () => { if (me.account) claimCard(); else signIn(); });
+  click('btn-share-stop', () => { show('share-stop', false); show('share-confirm', true); const k = $('btn-share-stop-no'); if (k) k.focus({ preventScroll: true }); });      // an inline confirm, Keep it focused
+  click('btn-share-stop-no', () => { show('share-confirm', false); show('share-stop', true); const k = $('btn-share-stop'); if (k) k.focus({ preventScroll: true }); });
+  click('btn-share-stop-yes', () => { stopSharing(); });
+  const i = $('share-url'); if (i) i.addEventListener('focus', () => i.select());
+}
+
 // ---------- the username (7.1, 7.4, 9.5): the same card, its second face. Checked here as the server checks it, the server decides ----------
 const NAME_OK = /^[A-Za-z0-9_]{3,12}$/;
 function nameProblem(v) {                                   // -> words for the first rule it breaks, '' = fine to send
@@ -252,7 +328,7 @@ export async function claimName(name) {                    // -> true when the s
 // ---------- who is signed in, everywhere it shows. Everything signed-in-only stays hidden unless /api/me said sign-in is on (9) ----------
 function drawAcct() {
   const en = on && me.enabled, a = en ? me.account : null, name = a && a.username;
-  show('btn-pf-signin', en && !a); show('btn-pf-signout', !!a); show('btn-pf-rename', !!a); show('pf-acct', en);
+  show('btn-pf-signin', en && !a); show('btn-pf-signout', !!a); show('btn-pf-rename', !!a); show('btn-pf-share', on && shareable); show('pf-acct', en || (on && shareable));      // Share card shows with sign-in off too
   { const b = $('btn-pf-rename'); if (b) { const t = name ? 'Change username' : 'Pick a username'; b.setAttribute('aria-label', t); b.title = t; } }      // the pen beside the name
   show('btn-set-signin', en && !a); show('set-account', !!a); text('set-account-name', name ? `Signed in as ${name}` : 'Signed in');
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
@@ -286,7 +362,7 @@ function wire() {
   for (const id of ['btn-pf-signout', 'btn-set-signout']) click(id, () => signOut());
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
   addEventListener('storage', e => { if (e.key === ON_KEY || e.key === null) statsChanged(); });      // the privacy page (another tab) flipped Save my stats, or the site's storage was cleared
-  click('btn-signin-close', () => closeCard());
+  click('btn-signin-close', () => closeCard()); wireShare();
   click('btn-claim-skip', () => closeCard());
   const f = $('name-claim'); if (f) f.addEventListener('submit', e => { e.preventDefault(); claimName(($('claim-input') || {}).value); });
   const ci = $('claim-input'); if (ci) ci.addEventListener('input', () => err('claim-err', nameProblem(ci.value)));      // live, as the rules of 7.1
