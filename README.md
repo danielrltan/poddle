@@ -76,7 +76,7 @@ npm install && ./motion/build.sh
 node bridge/bridge.js
 ```
 
-Type your name once, press Play, then Quick play, Create court, Enter code, or Play a bot (Matt: Rookie, Club or Pro).
+Type your name once, press Play, then Quick play, Ranked (a queue: Matt warms you up until an opponent arrives, then a best of 3 for trophies and seven ranks), Courts (a code, a list, a tournament), Play a bot (Matt: Rookie, Club, Tour or Pro) or Your stats.
 Courts have a 4-character code and a link (`?court=CODE`) to share. Alone on a court? Matt walks in after 2.5 s. With two
 players the serve waits until both have calibrated. A full court can be watched (`?court=CODE&watch=1`, or Watch in the
 court list): broadcast, split screen, either player's view, or a free camera (keys 1 to 4). When a match ends both players

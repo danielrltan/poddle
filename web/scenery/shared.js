@@ -38,6 +38,24 @@ export const PAL = {
 };
 
 export const LIGHT = { sun: 3.35, hemi: 1.35, fogNear: 45, fogFar: 270 };   // court is <= 27 m from the eye: untouched by fog
+
+// The RANKED venue (scene.setVenue('stadium'), stadium.js): an evening arena, floodlit. Same sun VECTOR (scene.js's shadow frustum and
+// S.sunDir depend on it), recoloured to a cool floodlight white and dimmed; the hemisphere is the bowl's own bounce (blue-grey sky term,
+// near-black ground). Sky by elevation from a city-lit horizon to a navy zenith. Nothing here is yellow/white/orange behind the baselines:
+// the far stand fills the calm band, so seats and heads are mid-value and the LED strip is a thin light blue.
+export const PAL_STADIUM = {
+  night: true,
+  skyZenith: '#04071a', sky40: '#080f2c', sky12: '#101c40', sky4: '#1a2a50', horizon: '#26365a', fog: '#0b1222', glow: '#1c2a4a', star: '#d8e2ff',
+  sunLight: '#dfe8ff', hemiSky: '#55699a', hemiGround: '#151a26',
+  concourse: '#14181f', spill: '#2e3f5c',
+  stand: '#2c3443', standAlt: '#303948', parapet: '#3a4354', backWall: '#1c2230', roof: '#232a38', cornerBlock: '#1f2633',
+  seat: '#161c2a', seatAlt: '#171e2d', crowdBody: ['#1c2338', '#33202b', '#22262e', '#1a2b2b', '#261f32', '#1d2a38', '#2d241c'],
+  crowdHead: ['#6b6259', '#5a524c', '#5f5a68', '#786a5c', '#4e4842', '#66606c', '#574f48', '#736b64'],   // mid-dark: the far stand is the ball's backdrop
+  hoarding: '#0c1526', hoardingEdge: '#1b2740', led: '#8fd6ff', ledDim: '#2b6e9c',
+  mast: '#3b4352', lampFrame: '#20262f', lamp: '#f1f6ff', beam: '#7f9dff',
+};
+export const LIGHT_STADIUM = { sun: 1.75, hemi: 1.15, fogNear: 24, fogFar: 150 };   // faint: the far stand (32-40 m) takes 5-10 % of fog, the court none
+export const VENUES = { park: { pal: PAL, light: LIGHT }, stadium: { pal: PAL_STADIUM, light: LIGHT_STADIUM } };
 export const WORLD = { keepX: 9, keepZ: 14.6, tallX: 9, tallZ: 18, domeR: 440, farR: [250, 400], maxR: 420 };   // camera.far is 500
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), sstep = (a, b, v) => { v = clamp((v - a) / (b - a), 0, 1); return v * v * (3 - 2 * v); };
@@ -57,15 +75,15 @@ float sWind(vec2 p) { return uWind.z + uWind.w * sGust(p); }   // strength 0.3 (
 float sHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 `;
 
-export function makeShared(THREE, ctx) {
-  const Q = new URLSearchParams(typeof location !== 'undefined' ? location.search : ''), q = Q.get('q');
+export function makeShared(THREE, ctx, venue = 'park') {   // one shared context PER VENUE (index.js): its own palette, light, uniforms and texture count
+  const Q = new URLSearchParams(typeof location !== 'undefined' ? location.search : ''), q = Q.get('q'), V = VENUES[venue] || VENUES.park;
   const small = typeof window !== 'undefined' && (Math.min(window.innerWidth, window.innerHeight) < 500 || ((window.devicePixelRatio || 1) < 1.5 && (navigator.hardwareConcurrency || 8) <= 4) || (navigator.deviceMemory || 8) < 4);
   const quality = q === 'low' || q === 'high' ? q : small ? 'low' : 'high', low = quality === 'low';
   const uniforms = { uTime: { value: 0 }, uWind: { value: new THREE.Vector4(Math.cos(WIND.theta0), Math.sin(WIND.theta0), WIND.calm, WIND.gain) } };
   const scratch = { x: 0, z: 0, gust: 0, dx: 0, dz: 0 }, colors = new Map();
   const sd = ctx.sun.position.clone().sub(ctx.sun.target.position).normalize();
   const S = {
-    ctx, pal: PAL, light: LIGHT, world: WORLD, rng, hash, quality, low, uniforms, windGLSL: WIND_GLSL, windSpeed: WIND.speed, texBytes: 0,
+    ctx, venue, pal: V.pal, light: V.light, world: WORLD, rng, hash, quality, low, uniforms, windGLSL: WIND_GLSL, windSpeed: WIND.speed, texBytes: 0,
     pick: (high, lo) => (low ? lo : high),                                  // S.pick(87, 44): every count goes through this
     color: hex => { let c = colors.get(hex); if (!c) colors.set(hex, c = new THREE.Color(hex)); return c; },   // shared, sRGB-correct: do not mutate
     sunDir: sd, shadowPerM: { x: -sd.x / sd.y, z: -sd.z / sd.y },           // painted shadow of a point h metres up lands at (x + h*shadowPerM.x, z + h*shadowPerM.z)

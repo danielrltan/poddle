@@ -257,7 +257,7 @@ console.log('14. export and delete a guest profile');
 {
   const { d, addr } = F.win, r = await api(PORT, 'POST', '/api/export', { dev: d }, { addr }), x = r.json;
   ok(r.status === 200 && /^attachment; filename="poddle-data-\d{4}-\d{2}-\d{2}\.json"$/.test(r.headers['content-disposition'] || '') && r.headers['cache-control'] === 'no-store', 'POST /api/export {dev}: a JSON attachment, no-store');
-  ok(x && x.format === 'poddle-export-1' && x.kind === 'guest' && x.account === null && x.device && x.device.created && x.device.deletedAfter && x.profile && x.profile.matt.length === 4 && typeof x.notes === 'string', 'the 10.6 shape: format, kind guest, device dates, the profile, notes');
+  ok(x && x.format === 'poddle-export-2' && x.kind === 'guest' && x.account === null && x.device && x.device.created && x.device.deletedAfter && x.profile && x.profile.matt.length === 4 && typeof x.notes === 'string', 'the 10.6 shape: format, kind guest, device dates, the profile, notes');
   const m = x && x.matches[0];
   ok(x && x.matches.length === F.win.played && m.kind === 'bot' && m.mattLevel === 'Rookie' && ['win', 'loss'].includes(m.result) && m.score.length === 2 && m.ending === 'won' && typeof m.counted === 'boolean' && Array.isArray(m.reasons), 'matches from the requester\'s side: ' + JSON.stringify(m));
   ok(!r.body.includes(d) && !/[0-9a-f]{64}/.test(r.body), 'the export carries neither the device id nor its hash');
@@ -319,6 +319,25 @@ console.log('20. database growth: only completed matches create profiles, and ne
   const saved = done.filter(([, p]) => p && p.saved).length;
   ok(saved === 3 && done.length === 5 && (out.out.match(/match recorded/g) || []).length === 3, `5 completed matches from one address: exactly 3 new guests saved (${saved}), the rest saved:false`);
   bye(...quitters, ...done.map(x => x[0])); await stop(C);
+}
+
+console.log('21. Ranked (docs/RANKED.md): a series records mode ladder, kind human, the same log line; /api/stats carries the ladder block');
+{
+  const C = await up(P3, { ...BASE, PODDLE_DB: path.join(tmp, 'r.db'), RK_WIN: '1', WIN_BY: '1', RK_VS_S: '0.3', RK_GAME_GAP_S: '0.3', RK_DONE_S: '0.5', READY_S: '0', SWING_SERVE: '0' }), out = logs.at(-1);
+  const a = tab({ port: P3, addr: ip(), d: dev() }), b = tab({ port: P3, addr: ip(), d: dev() }); await a.open(); await b.open(); await until(() => a.n('lobby') && b.n('lobby'));
+  a.send({ type: 'rk', name: 'Ann' }); await until(() => a.room && a.room.kind === 'warm'); b.send({ type: 'rk', name: 'Ben' });
+  ok(await until(() => a.n('rkvs') && b.n('rkvs')) && await until(() => a.room && a.room.kind === 'match' && b.room && b.room.kind === 'match' && a.side != null && b.side != null), 'two queued players are pulled into one series room');
+  hit(a); still(b);
+  ok(await until(() => a.n('rkres') && b.n('rkres'), 60000), 'the series settles (rkres to both)');
+  const ra = a.last('rkres'), rb = b.last('rkres');
+  ok(ra.won && ra.delta === 33 && ra.trophies === 33 && ra.tier === 1 && ra.div === 1 && ra.counted && rb.delta === 0 && rb.floorHeld, `+33 / held at 0 (${JSON.stringify([ra, rb])})`);
+  ok(a.n('profile') === 2 && a.got('profile').every(p => p.kind === 'human' && p.ranked === true && p.saved), 'a profile message per game, kind human, counted');
+  ok((out.out.match(/match recorded: human ranked/g) || []).length === 2 && !/match recorded: tour/.test(out.out), 'the log line per game is unchanged: match recorded: human ranked (never tour)');
+  const pa = await profileOf(a.d, a.addr, P3), pb = await profileOf(b.d, b.addr, P3);
+  ok(pa && pa.human.wins === 2 && pa.ladder && pa.ladder.trophies === 33 && pa.ladder.wins === 1 && pa.ladder.tier === 1 && pa.ladder.div === 1 && pb.ladder.losses === 1 && pb.ladder.trophies === 0, `/api/stats: two human wins on the record and the ladder block (${JSON.stringify(pa.ladder)})`);
+  const ex = await exportOf(a.d, a.addr, P3);
+  ok(ex && ex.format === 'poddle-export-2' && ex.matches.length === 2 && ex.matches.every(m => m.mode === 'ladder' && m.kind === 'human' && m.trophyDelta === 33) && ex.profile.ladder.trophies === 33, 'the export: format 2, each game mode ladder with the trophy change');
+  bye(a, b); await stop(C);
 }
 
 console.log('16. logs');

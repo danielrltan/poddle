@@ -18,7 +18,7 @@ Important changes also need a notice on the home page. Open questions for the op
 
 ### Current data flows (diff new features against this)
 - Server (Fly.io, Toronto; memory): display name (12 chars), IP (4 courts per IP, 1 open tournament
-  per IP, ask-to-play cooldown), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
+  per IP, ask-to-play cooldown, 2 Ranked queue entries per computer and never paired within one computer group), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
   level, emotes, pause/rematch, position (~60 Hz, relayed), phone motion (relayed to the paired tab only). Reconnect URL
   carries name, cid, code, score, side, bot (revive()); never the device id or any sign-in value. Logs: activity lines
   with court codes and ranked/unranked, no names/IPs/cids/device ids/account ids/Google subs/tokens.
@@ -31,7 +31,9 @@ Important changes also need a notice on the home page. Open questions for the op
   accounts (Google `sub` only, username + confusable-folded key, created, renamed, merge count; NO email, name or
   picture from Google); sessions (SHA-256 of the cookie token, created, expires 180 d, last seen hourly; max 10);
   profile + bot_record (W/L, streaks, points, titles, best rally/hit/speed + dates, four Matt rungs: wire 0,1,3,2);
-  match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length).
+  match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length, and for
+  Ranked mode: mode 'ladder'|'casual', series id, the trophy change per side); ladder (per owner: trophies, rank tier and
+  division, best rank/division and when, Ranked wins/losses/streaks, Matt queue wins/losses, Matt trophies awarded today).
   No IPs, no guest display names, no emails. Retention (db.sweep at boot + every 24 h): guests 90 d after last
   recorded match (7 d if only one), accounts 24 months idle, match_log 30 d (sooner, oldest first, near the DB_MAX_MB
   cap; at most LOG_CAP_DAY=100 rows per owner a day; no row for leaving Matt), sessions at expiry, name holds 30 d
@@ -39,7 +41,8 @@ Important changes also need a notice on the home page. Open questions for the op
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
   (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a DEV pill
-  and in orange. Stats are private to their owner (no
+  and in orange. In Ranked courts the rank emblem (the rank's tier and division only, never trophies or record) beside a
+  name, to the opponent and spectators (VS card, scoreboard, result card). Stats are otherwise private to their owner (no
   leaderboards); both players are told when a match did not count.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,

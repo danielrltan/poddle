@@ -64,8 +64,8 @@ function seatAcc(pl) {
     identChanged: false, pendingAnon: false, gone: false, mv: { x: 0, y: 0, at: 0, fast: 0 }, teleport: false };
 }
 // newMatch({ revived, rank, seats: [pl|null, pl|null] }) -> the match object a room keeps in `match` (4.1)
-function newMatch({ revived = false, rank = null, seats = [null, null] } = {}) {
-  const m = { id: ++seq, done: false, t0: 0, revived: !!revived, rank, levelChanged: false, rally: 0, seats: [0, 1].map(i => seatAcc(seats[i] || null)) };
+function newMatch({ revived = false, rank = null, seats = [null, null], mode = 'casual', series = null } = {}) {   // mode 'ladder' + series: a Ranked game (docs/RANKED.md 4)
+  const m = { id: ++seq, done: false, t0: 0, revived: !!revived, rank, levelChanged: false, rally: 0, mode: mode === 'ladder' ? 'ladder' : 'casual', series: Number.isSafeInteger(series) && series > 0 ? series : null, seats: [0, 1].map(i => seatAcc(seats[i] || null)) };
   live.add(m); return m;
 }
 const drop = m => { if (m) live.delete(m); };                     // the room closed or a new match replaced it
@@ -182,17 +182,17 @@ function onEnd(m, e) {
   const history = {};
   if (human && winner != null && info[0] && info[1]) {
     const W = info[winner], Lo = info[1 - winner];
-    if (store && W.owner != null && Lo.owner != null) { history.pairRanked24h = store.recentPairs(W.owner, Lo.owner, now - DAY); history.oneWay30d = store.oneWay(W.owner, Lo.owner, now - 30 * DAY); }
+    if (store && W.owner != null && Lo.owner != null) { history.pairRanked24h = store.recentPairs(W.owner, Lo.owner, now - DAY, m.series); history.oneWay30d = store.oneWay(W.owner, Lo.owner, now - 30 * DAY, m.series); }   // R10 and R11b count OTHER series: the one this game belongs to is being played, not repeated (REVIEW FIX, RANKED.md 5.6)
     if (store && Lo.owner != null) history.loserHuman7d = store.recentLosses(Lo.owner, now - 7 * DAY);
     if (store && W.owner != null) history.winnerWins24h = store.recentWins(W.owner, now - DAY);
-    history.cpuPair24h = L.pair(W.keys, Lo.keys); history.cpuLoser24h = L.loser(Lo.keys);
+    history.cpuPair24h = L.pair(W.keys, Lo.keys, m.series); history.cpuLoser24h = L.loser(Lo.keys);
   }
   const v = abuse.judge(facts, history, cfg);
-  const rec = store ? store.recordMatch({ now, kind, level, winner, ending: e.ending, score, secs, ranked: v.ranked, flags: v.flags,
+  const rec = store ? store.recordMatch({ now, kind, level, winner, ending: e.ending, score, secs, ranked: v.ranked, flags: v.flags, mode: m.mode, series: m.series,
     seats: m.seats.map((s, i) => (!s || s.bot || info[i].owner == null ? null : { owner: info[i].owner, record: v.seats[i].record, bests: v.seats[i].bests,
       swingBad: !v.seats[i].swing, bestRally: s.bestRally, bestHit: s.bestHit, bestSpeed: s.bestSpeed })) }) : null;
   if (rec && rec.capped && human) { v.ranked = false; if (!v.flags.includes('daily_cap')) v.flags.push('daily_cap'); for (const x of v.seats) x.record = x.bests = x.swing = false; }   // past LOG_CAP_DAY: saved as played only (db.recordMatch), so it is not ranked either
-  if (human && winner != null && info[0] && info[1]) L.result(info[winner].keys, info[1 - winner].keys, v.ranked);   // after the transaction, ranked or not (5.4)
+  if (human && winner != null && info[0] && info[1]) L.result(info[winner].keys, info[1 - winner].keys, v.ranked, m.series);   // after the transaction, ranked or not (5.4); the series id so R10 counts series by computer too (RANKED.md 5.6)
   const msgs = m.seats.map((s, i) => {
     if (!s || s.bot) return null;
     const r = rec && rec.seats[i] && rec.seats[i].saved ? rec.seats[i] : null, won = winner === i && v.seats[i].record;
@@ -200,7 +200,8 @@ function onEnd(m, e) {
       first: !!(r && r.first), bests: r ? r.bests : [], streak: r ? r.streak : 0, guest: r ? !!r.guest : undefined,
       nudge: !!(r && signin && r.guest && won && (!human || v.ranked)), created: info[i].created || undefined };
   });
-  return { logged: !!(rec && rec.logged), ranked: v.ranked, level, msgs, rankedWin: [0, 1].map(i => human && winner === i && !!v.seats[i].record) };
+  return { logged: !!(rec && rec.logged), ranked: v.ranked, level, msgs, rankedWin: [0, 1].map(i => human && winner === i && !!v.seats[i].record),
+    owners: info.map(i => (i ? i.owner : null)), flags: [...v.flags], logId: rec && rec.logId != null ? rec.logId : null };   // the Ranked settlement (RANKED.md 5.5) re-resolves owners and reads the flags per game; logId names the Matt game's row for its trophy delta
 }
 
 // title(members, champ, now) -> true when the champion's owner got tour_titles + 1 (4.3, R16). members: the tournament's member objects
@@ -229,5 +230,5 @@ function forget({ tokenHash = null, accountId = null, devHash = null, deleted = 
   for (const m of live) for (const s of m.seats) if (s && !s.bot && hit(s.ident)) s.gone = true;
 }
 
-module.exports = { init, config, identOf, seen, seatAcc, newMatch, drop, accOf, seatFill, identify, member, optOut, launched, rallyReset, contact, pointEnd,
+module.exports = { init, config, linkMap, identOf, sameIdent, seen, seatAcc, newMatch, drop, accOf, seatFill, identify, member, optOut, launched, rallyReset, contact, pointEnd,
   swingBest, fixRecords, level, sample, onEnd, title, forget, SPEED_CAP, SPEED_BAD, _live: live };

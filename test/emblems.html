@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Rank emblems</title>
+<link rel="stylesheet" href="../web/ui.css">
+<style>
+  /* preview-only: a scrolling page at a fixed 16px root so .is-xs / .is-md / .is-xl are exactly 20 / 40 / 120 px */
+  html{font-size:16px!important} html,body{height:auto!important;overflow:auto!important}
+  body{padding:1.5rem 2.5rem 2rem;background:linear-gradient(180deg,#f7fbfd,#eaf3f8 45%,#dcebf3)}
+  h1{margin:0 0 .25rem;font-size:1.625rem;font-weight:700;color:var(--ink-strong)} .lead{margin:0 0 1rem;font-size:.875rem;color:var(--ink-soft)}
+  .ground{border-radius:var(--r-lg);padding:1rem 1.25rem;margin-bottom:1rem;display:flex;flex-direction:column;gap:.75rem}
+  .ground.is-light{background:linear-gradient(180deg,#fff,var(--sky-2));box-shadow:var(--sh-2),inset 0 0 0 2px var(--line-faint)}
+  .ground.is-navy{background:#0e2a4d;box-shadow:0 3px 0 rgba(0,0,0,.25),0 8px 16px rgba(0,0,0,.2);color:#eaf3f8}
+  .ground.is-navy .caps,.ground.is-navy .lbl{color:#8fb3d6}
+  .caps{font-size:.75rem;font-weight:800;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft)}
+  .line{display:flex;align-items:center;gap:1rem} .line.is-cards{gap:1.5rem;align-items:flex-start}
+  .lbl{width:4rem;font-size:.6875rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+  .name{display:inline-flex;align-items:center;gap:.375rem;font-size:1rem;font-weight:700;color:var(--ink-strong)} .ground.is-navy .name{color:#eaf3f8}
+  .name small{font-weight:500;color:var(--ink-faint)}
+  .card{display:flex;flex-direction:column;align-items:center;gap:.375rem;text-align:center} .card small{font-size:.6875rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)} .ground.is-navy .card small{color:#8fb3d6}
+</style>
+<h1>Rank emblems</h1>
+<p class="lead">web/emblems.js on the light ground and the stadium navy strip: 20 px (.is-xs), 40 px (.is-md), 120 px (.is-xl) plus emblemCard() at 80 px, a name line, Silver beside Platinum at 20 px, a swap and a hidden one.</p>
+<div id="grounds"></div>
+<script type="module">
+  import { RANKS, THRESHOLDS, rankOf, emblem, emblemEl, setEmblem, emblemCard, installSprite } from '../web/emblems.js';
+  const NAMES = ['Sam', 'Priya', 'Matt', 'Jonah', 'Elena', 'Kofi', 'Yuki'];
+  installSprite(); installSprite();      // twice on purpose: the sprite must be in the DOM once
+  const sprites = document.querySelectorAll('svg.rank-sprite'); if (sprites.length !== 1) console.error(`sprite count ${sprites.length}`);
+  if (sprites[0] !== document.body.firstElementChild) console.error('sprite is not the first child of body');
+  const row = (lbl, inner) => `<div class="line"><span class="lbl">${lbl}</span>${inner}</div>`;
+  const all = cls => RANKS.map(r => emblem(r, cls)).join('');
+  const ground = (cls, title) => `<div class="ground ${cls}"><span class="caps">${title}</span>
+    ${row('20 px', all('is-xs'))}${row('40 px', all('is-md'))}${row('120 px', all('is-xl'))}
+    <div class="line is-cards"><span class="lbl">Card</span></div>
+    ${row('Name', RANKS.map((r, i) => `<span class="name">${emblem(r.id)}${NAMES[i]} <small>· ${r.name}</small></span>`).join(''))}
+    ${row('2 vs 4', `<span class="name">${emblem(2, 'is-xs')}${emblem(4, 'is-xs')}${emblem(2, 'is-xs')}${emblem(4, 'is-xs')} <small>· Silver, Platinum, Silver, Platinum at 20 px</small></span><span class="name" data-zoom>${emblem(2, 'is-xs')}${emblem(4, 'is-xs')}${emblem(2, 'is-md')}${emblem(4, 'is-md')}</span><span class="name">${emblem(2)}${emblem(4)} <small>· 24 px</small></span>`)}
+    ${row('Swap', `<span class="name" data-swap>${emblem(1, 'is-md')}Bronze &rarr; Pro</span><span class="name" data-hide>${emblem(4, 'is-md')}hidden &rarr;</span><span class="name" data-pop>${emblem(5, 'is-md is-pop')}pop</span><span class="name" data-el></span>`)}
+  </div>`;
+  document.getElementById('grounds').innerHTML = ground('is-light', 'Light ground') + ground('is-navy', 'Stadium navy #0e2a4d');
+  for (const g of document.querySelectorAll('.ground')) {
+    const cards = g.querySelector('.is-cards'); for (const r of RANKS) { const c = document.createElement('div'); c.className = 'card'; const ce = emblemCard(r); if (g.classList.contains('is-navy')) ce.classList.add('is-inverse'); c.appendChild(ce); cards.appendChild(c); }
+    setEmblem(g.querySelector('[data-swap] .rank-em'), 7); setEmblem(g.querySelector('[data-hide] .rank-em'), null);
+    const el = emblemEl(rankOf(THRESHOLDS[5]), 'is-md'); g.querySelector('[data-el]').append(el, ' emblemEl(rankOf(1000))');
+    if (el.outerHTML.replace('></use>', '/>') !== emblem(6, 'is-md')) console.error('emblemEl and emblem differ: ' + el.outerHTML);
+  }
+  // every visible emblem must draw something: an unresolved <use> has an empty box
+  const dud = [...document.querySelectorAll('.rank-em:not([hidden])')].filter(e => { const b = e.querySelector('use').getBBox(); return !(b.width > 0 && b.height > 0); }).length;
+  if (dud) console.error(`${dud} emblems drew nothing`);
+  const hid = document.querySelector('[data-hide] .rank-em'); if (getComputedStyle(hid).display !== 'none') console.error('hidden emblem still shows');
+  await document.fonts.ready; document.title = 'ready · Rank emblems';
+</script>

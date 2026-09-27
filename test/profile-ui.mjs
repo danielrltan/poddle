@@ -15,7 +15,8 @@ const day = Date.UTC(2026, 8, 20), rung = (level, name, wins, losses, streak, be
 const FIXTURE = { guest: true, since: day - 864e5, expiresAt: day + 90 * 864e5, played: 9,
   human: { wins: 3, losses: 2, streak: 1, bestStreak: 2, pointsWon: 50, pointsLost: 41 }, titles: 1,
   matt: [rung(0, 'Rookie', 3, 0, 3, 3, day), rung(1, 'Club', 1, 1, 0, 1, day + 3600e3), rung(3, 'Tour', 0, 2, 0, 0, null), rung(2, 'Pro', 0, 0, 0, 0, null)],   // BOT_ORDER [0, 1, 3, 2]
-  bests: { rally: { v: 14, at: day }, hit: { v: 22, at: day }, speed: { v: 9.4, at: day } } };
+  bests: { rally: { v: 14, at: day }, hit: { v: 22, at: day }, speed: { v: 9.4, at: day } },
+  ladder: { trophies: 240, tier: 2, div: 2, floor: 150, next: 250, bestTrophies: 240, bestTier: 2, bestDiv: 2, bestTierAt: day, wins: 3, losses: 1, streak: 1, botWins: 9, botLosses: 4, mattDayLeft: 32 } };      // the Ranked ladder (docs/RANKED.md 10.1 profileOf)
 const API = { signin: false, profile: FIXTURE, delClears: false, acct: null, stale: false, signoutFail: false, log: [] };      // log: [method, path, body] in arrival order. delClears: DELETE /api/account empties the fake store (section D)
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   let b = null; try { b = body ? JSON.parse(body) : null; } catch { b = null; } API.log.push([q.method, u, b]);
@@ -57,11 +58,11 @@ const seen = (pg, id) => ev(pg, i => { const e = document.getElementById(i); if 
 
 // ---------- A. ui-mock: the markup without any of the stats elements. ui.js must not care (they are optional) ----------
 { const pg = await page('mock'); await pg.goto(`http://127.0.0.1:${W}/test/ui-mock.html?screen=lobby`); await pg.waitForFunction(() => document.title.startsWith('ready'), { timeout: 15000 }).catch(() => {});
-  const r = await ev(pg, () => { const ids = ['btn-profile', 'lobby-profile', 'result-save', 'signin-card'], ui = window.__ui; let threw = '';
+  const r = await ev(pg, () => { const ids = ['btn-profile', 'lobby-profile', 'result-save', 'signin-card', 'btn-ranked', 'lobby-ranked', 'rk-pill'], ui = window.__ui; let threw = '';
     for (const id of ids) document.getElementById(id)?.remove();
-    try { ui.showScreen('lobby'); ui.setNames({ me: 'You', them: 'Bob', reg: [false, true] }); ui.settings(true); ui.settings(false); ui.showScreen('title'); } catch (e) { threw = e.message; }
+    try { ui.showScreen('lobby'); ui.setNames({ me: 'You', them: 'Bob', reg: [false, true], rank: [2, 3] }); ui.settings(true); ui.settings(false); ui.tilesFit(); ui.rkTile({ tier: 2, trophies: 240, queued: 1 }); ui.rkView({ tier: 2, trophies: 240 }); ui.rkNote('x'); ui.rkSearch(true); ui.rkPill({ on: true }); ui.rkCourt('warm'); ui.rkCourt(null); ui.lobbyView('ranked'); ui.showScreen('title'); } catch (e) { threw = e.message; }
     return { left: ids.filter(i => document.getElementById(i)), threw, ui: typeof ui }; });
-  ok(r.ui === 'object' && !r.left.length && !r.threw, `ui-mock: no #btn-profile/#lobby-profile/#result-save/#signin-card and ui.js still runs (${r.threw || 'no throw'})`);
+  ok(r.ui === 'object' && !r.left.length && !r.threw, `ui-mock: no #btn-profile/#lobby-profile/#result-save/#signin-card/#btn-ranked/#lobby-ranked/#rk-pill and ui.js still runs (${r.threw || 'no throw'})`);
   await pg.close(); }
 
 // ---------- B. sign-in OFF: first load, lobby, first seat, the result card, names ----------
@@ -137,22 +138,46 @@ ok(r.on.ro && r.on.btn && r.on.lobbyBtn && !r.off.ro && !r.off.btn, `username: S
 await pg.close(); pg = await page('stats');      // a new tab: same browser storage (the id), no court to rejoin
 await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
 await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start'); await sleep(900);
-// the four tiles lay out as one row, 2x2 or a single column: never three and a lone fourth
+// the five tiles (docs/RANKED.md 1.1) lay out as a hero row of two over a utility row of three, as 2 / 1 / 1 / 1 in portrait, or a single column: never a lone straggler
 const SIZES = [[1920, 1080], [1280, 720], [1024, 768], [900, 700], [760, 600], [1366, 500], [700, 900], [600, 900], [390, 844]];
 const rows = () => ev(pg, () => { const t = [...document.querySelectorAll('#lobby-home .tile')].filter(e => !e.hidden).map(e => e.offsetTop), m = new Map();      // offsetTop: the focused or hovered tile is lifted by a transform
-  for (const y of t) m.set(y, (m.get(y) || 0) + 1); return { n: t.length, rows: [...m.values()], over: document.querySelector('#lobby-home .tiles').scrollWidth > innerWidth }; });
+  for (const y of t) m.set(y, (m.get(y) || 0) + 1); return { n: t.length, rows: [...m.values()], over: document.querySelector('#lobby-home .tiles').scrollWidth > innerWidth, dn: document.querySelector('#lobby-home .tiles').dataset.n }; });
 { const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250); const r = await rows();
-    if (r.n !== 4 || !['4', '2,2', '1,1,1,1'].includes(r.rows.join()) || r.over) bad.push(`${w}x${h}: ${J(r)}`); }
-  ok(!bad.length, `home tiles: 4 in one row, 2x2 or one column at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
+    if (r.n !== 5 || r.dn !== '5' || !['2,3', '2,1,1,1', '1,1,1,1,1'].includes(r.rows.join()) || r.over) bad.push(`${w}x${h}: ${J(r)}`); }
+  ok(!bad.length, `home tiles: 5 as 2 over 3, 2 / 1 / 1 / 1 or one column at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 await pg.setViewport({ width: 1280, height: 720 }); await sleep(250);
+r = await ev(pg, () => ({ tile: !document.getElementById('btn-ranked').hidden, line: document.getElementById('ranked-line-text').textContent, noRow: !document.getElementById('btn-set-ranked') }));
+ok(r.tile && r.noRow, `with a database the Ranked tile shows; Settings has no Ranked row (NOTES 109: stats rows left Settings) (tile ${r.tile}, no row ${r.noRow})`);
+// the Ranked view (docs/RANKED.md 2): from the tile, from Settings > You; the head and the road from /api/stats; it fits every size
+await ev(pg, () => document.getElementById('btn-ranked').click()); await sleep(1500);
+r = await ev(pg, () => ({ view: !document.getElementById('lobby-ranked').hidden, title: document.getElementById('lobby-title').textContent, tier: document.getElementById('rk-tier').textContent, n: document.getElementById('rk-trophies').textContent, next: document.getElementById('rk-next').textContent,
+  road: [...document.querySelectorAll('#rk-road .rk-step')].map(l => l.querySelector('b').textContent + (l.classList.contains('is-now') ? '*' : l.classList.contains('is-done') ? '+' : '')), now: [...document.querySelectorAll('#rk-road .rk-step')].findIndex(l => l.classList.contains('is-now')), reached: document.querySelector('#rk-road .rk-step.is-now')?.title || '', pips: [...document.querySelectorAll('#rk-road .rk-step')].map(l => l.querySelectorAll('.rk-pips .is-lit').length).join(), line: document.getElementById('ranked-line-text').textContent, venue: document.body.dataset.venue, go: document.getElementById('btn-ranked-go').disabled }));
+ok(r.view && r.title === 'Ranked' && r.tier === 'Silver II' && r.n === '240' && r.next === '10 to Silver III' && r.road.length === 7 && r.now === 1 && r.road[0] === 'Bronze+' && r.road[6] === 'Pro' && !r.go && r.pips === '3,2,0,0,0,0,0', `the Ranked view from the fixture: ${r.tier} ${r.n}, "${r.next}", the road ${J(r.road)}, pips ${r.pips}`);
+ok(/^Reached on /.test(r.reached) && r.line === 'Silver II · 240' && r.venue === 'stadium', `the current step says when it was reached ("${r.reached}"), the tile's line "${r.line}", the stadium behind the glass (${r.venue})`);
+ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'the Ranked view asks /api/stats with the device id in the body');
+{ const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);
+    const r = await ev(pg, () => { const v = document.getElementById('lobby-ranked'), b = v.getBoundingClientRect(), cut = [...v.querySelectorAll('.rk-step b, .rk-step small, #rk-next, #rk-status')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.slice(0, 30)), rg = document.createRange(); rg.selectNodeContents(document.getElementById('btn-ranked-go'));
+      return { left: Math.round(b.left), right: Math.round(b.right), top: Math.round(b.top), bottom: Math.round(b.bottom), w: innerWidth, h: innerHeight, cut, goLines: new Set([...rg.getClientRects()].map(r => Math.round(r.top))).size }; });      // goLines: how many rows the button's words take
+    if (r.left < 0 || r.right > r.w || r.top < 0 || r.bottom > r.h || r.cut.length || r.goLines > 1) bad.push(`${w}x${h}: ${J(r)}`); }
+  ok(!bad.length, `the Ranked view fits at ${SIZES.length} window sizes, nothing clipped, Find a match on one line${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
+  await pg.setViewport({ width: 1280, height: 720 }); await sleep(250); }
+await ev(pg, () => document.querySelector('#screen-lobby [data-back]').click()); await sleep(600);
+r = await ev(pg, () => ({ view: !document.getElementById('lobby-home').hidden, venue: document.body.dataset.venue })); ok(r.view && r.venue === 'park', `Back from the view: home, the park again (${r.venue})`);
 await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500);
 r = await ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, rungs: [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.querySelector('b')?.textContent, l.querySelector('small')?.textContent, l.className, l.dataset.level]),
   badge: document.getElementById('st-mbadge').className, best: document.getElementById('st-mbest').textContent, mcap: document.getElementById('st-mcap').textContent, road: !!document.querySelector('.st-road, #btn-pf-next'), bests: document.getElementById('pf-bests').textContent, human: document.getElementById('pf-human').textContent,
-  w: document.getElementById('st-w').textContent, l: document.getElementById('st-l').textContent, rank: document.getElementById('st-rank').textContent, trophies: document.getElementById('st-trophies').textContent, cap: document.getElementById('st-rank-cap').textContent, streak: document.getElementById('st-streak').textContent.replace(/\s+/g, ' ').trim(), crest: document.getElementById('st-crest').className}));
+  w: document.getElementById('st-w').textContent, l: document.getElementById('st-l').textContent, rank: document.getElementById('st-rank').textContent, trophies: document.getElementById('st-trophies').textContent, em: document.querySelector('#st-crest .st-em')?.dataset.div, cap: document.getElementById('st-rank-cap').textContent, streak: document.getElementById('st-streak').textContent.replace(/\s+/g, ' ').trim(), crest: document.getElementById('st-crest').className}));
 ok(r.view && J(r.rungs.map(x => x[0])) === J(['Rookie', 'Club', 'Tour', 'Pro']) && J(r.rungs.map(x => x[3])) === J(['0', '1', '3', '2']), `Your stats: a Matt chip a level in difficulty order, Rookie, Club, Tour, Pro (${J(r.rungs.map(x => x[0] + ':' + x[3]))})`);
 ok(r.best === 'Club Matt' && r.badge === 'st-mbadge is-lv1' && /^Beaten /.test(r.mcap) && !r.road, `the Matt badge: the toughest beaten is Club, no road and no Next button ("${r.best}", ${r.badge}, "${r.mcap}", road ${r.road})`);
 ok(J(r.rungs.map(x => x[2])) === J(['st-mlv is-won', 'st-mlv is-won is-top', 'st-mlv', 'st-mlv']) && /^3-0 · streak 3$/.test(r.rungs[0][1]) && r.rungs[2][1] === '0-2', `Matt chips: Rookie and Club ticked, Club outlined as the badge, records drawn (${J(r.rungs)})`);
-ok(r.rank === 'Gold' && r.crest === 'st-crest is-gold' && r.trophies === '155' && /· 145 to Platinum$/.test(r.cap) && /^3 win streak vs Rookie Matt · best 3$/.test(r.streak), `hero: 155 trophies = Gold (3 wins 30 + Rookie 25 + Club 50 + a title 50), 145 to Platinum, the hottest streak is 3 vs Rookie Matt (${r.rank}, ${r.stars}, ${r.crest}, "${r.streak}")`);
+ok(r.rank === 'Silver II' && r.crest === 'st-crest is-rk is-silver' && r.trophies === '240' && /· 10 to Silver III$/.test(r.cap) && /^3 win streak vs Rookie Matt · best 3$/.test(r.streak) && r.em === '2', `hero: the Ranked ladder (one rank per player): Silver II with 240 trophies, 10 to Silver III, the crest wears the Silver emblem with the II tag; the hottest streak is 3 vs Rookie Matt (${r.rank}, ${r.crest}, ${r.em}, "${r.cap}", "${r.streak}")`);
+{ // the crest is a link to the Ranks page (every medal), and Back comes home to Your stats
+  await ev(pg, () => document.getElementById('st-crest').click()); await sleep(700);
+  const k = await ev(pg, () => ({ view: window.__ui.lobbyView(), cards: document.querySelectorAll('#rkx-grid .rkx-card').length, now: document.querySelector('#rkx-grid .rkx-card.is-now')?.dataset.tier, tag: document.querySelector('#rkx-grid .rkx-tag.is-now')?.textContent, done: document.querySelectorAll('#rkx-grid .rkx-card.is-done').length, venue: document.body.dataset.venue, role: document.getElementById('st-crest').getAttribute('role') }));
+  ok(k.view === 'ranks' && k.cards === 7 && k.now === '2' && k.tag === 'You · Silver II' && k.done === 1 && k.venue === 'stadium' && k.role === 'button', `the crest opens Ranks: seven medals, Silver II ringed, Bronze reached, in the stadium (${J(k)})`);
+  await ev(pg, () => document.querySelector('#screen-lobby [data-back]').click()); await sleep(700);
+  const b = await ev(pg, () => ({ view: window.__ui.lobbyView(), venue: document.body.dataset.venue }));
+  ok(b.view === 'profile' && b.venue === 'park', `Back from Ranks: Your stats again, in the park (${J(b)})`); }
 ok(r.bests.includes('14 hits') && r.bests.includes('540°/s') && !r.bests.includes('Hardest') && r.w === '3' && r.l === '2' && r.human.includes('60% won') && r.human.includes('50-41') && r.human.includes('Streak 1') && r.human.includes('Best 2'), `bests and the human record drawn (${r.bests.slice(0, 80)} | ${r.human.slice(0, 80)})`);
 ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your stats asks /api/stats with the device id in the body');
 { // the panel fits every window: inside the viewport's width, and no rung line or chip cut short with an ellipsis
@@ -216,8 +241,8 @@ await pg.close();
     API.profile = { ...FIXTURE, matt: [rung(0, 'Rookie', 3, 0, 3, 3, day), rung(1, 'Club', 0, 1, 0, 0, null), rung(3, 'Tour', 0, 0, 0, 0, null), rung(2, 'Pro', 1, 0, 1, 1, day + 7200e3)] }; await reopen();
     const o = await ev(pg, () => ({ rank: document.getElementById('st-rank').textContent, cap: document.getElementById('st-rank-cap').textContent, crest: document.getElementById('st-crest').className,
       nodes: [...document.querySelectorAll('#pf-rungs > li')].map(l => l.className.replace('st-mlv', '').trim()), best: document.getElementById('st-mbest').textContent, badge: document.getElementById('st-mbadge').className, mcap: document.getElementById('st-mcap').textContent }));
-    ok(/^(Bronze|Silver|Gold|Platinum|Diamond|Legend)$/.test(o.rank) && /^(trophy|trophies) · \d+ to /.test(o.cap) && /^st-crest is-/.test(o.crest) && J(o.nodes) === J(['is-won', '', '', 'is-won is-top']) && o.best === 'Pro Matt' && o.badge === 'st-mbadge is-lv3' && /^The top level · beaten /.test(o.mcap),
-      `Rookie + Pro beaten: a tier from trophies, the Pro Matt badge, Club and Tour simply not ticked (${J(o)})`);
+    ok(o.rank === 'Silver II' && /^(trophy|trophies) · \d+ to /.test(o.cap) && o.crest === 'st-crest is-rk is-silver' && J(o.nodes) === J(['is-won', '', '', 'is-won is-top']) && o.best === 'Pro Matt' && o.badge === 'st-mbadge is-lv3' && /^The top level · beaten /.test(o.mcap),
+      `Rookie + Pro beaten: the rank is still the ladder's, the Pro Matt badge, Club and Tour simply not ticked (${J(o)})`);
     API.profile = FIXTURE; await reopen(); }
   for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-${w}x${h}.png`) }); }
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();
@@ -240,7 +265,7 @@ await pg.close();
   r = await ev(pg, () => ({ crest: document.getElementById('st-crest').className, rank: document.getElementById('st-rank').textContent, cap: document.getElementById('st-rank-cap').textContent, streak: document.getElementById('st-streak').className, n: document.getElementById('st-streak-n').textContent,
     won: document.querySelectorAll('#pf-rungs .is-won').length, best: document.getElementById('st-mbest').textContent, badge: document.getElementById('st-mbadge').className, mcap: document.getElementById('st-mcap').textContent, hint: !document.getElementById('st-people-hint').hidden, chips: document.getElementById('st-chips').hidden,
     tiles: [...document.querySelectorAll('.st-tile')].map(t => [t.querySelector('.st-num b').textContent, t.querySelector('.st-cap').textContent, t.querySelector('.st-cap').classList.contains('is-hint'), t.querySelector('.st-chip').hidden]) }));
-  ok(r.crest === 'st-crest is-bronze' && r.rank === 'Bronze' && r.cap === 'Win a match for your first trophies' && r.streak === 'st-streak' && r.n === '0' && r.won === 0 && r.best === 'None yet' && r.badge === 'st-mbadge is-none' && r.mcap === 'Beat Matt at any level to earn a badge' && r.hint && r.chips && r.tiles.every(t => t[0] === '0' && t[2] && t[3]),
+  ok(r.crest === 'st-crest is-rk is-bronze' && r.rank === 'Bronze I' && r.cap === 'Play Ranked for your first trophies' && r.streak === 'st-streak' && r.n === '0' && r.won === 0 && r.best === 'None yet' && r.badge === 'st-mbadge is-none' && r.mcap === 'Beat Matt at any level to earn a badge' && r.hint && r.chips && r.tiles.every(t => t[0] === '0' && t[2] && t[3]),
     `empty state: a Bronze crest with no trophies, an empty Matt badge with its coaching line, the people hint, blue zeros with coaching captions (${J(r)})`);
   for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-empty-${w}x${h}.png`) }); }
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();

@@ -1973,3 +1973,112 @@ The owner: a road does not fit, because any Matt level can be picked at any time
 - The hero (rank crest, trophies, streak) is untouched; the first-win trophy bounty per Matt still counts. test/profile-ui.mjs
   checks the badge, the chips, the out-of-order case (Rookie + Pro beaten: the badge is Pro) and the empty state.
 - No data, storage or visibility change: the legal pages are unchanged.
+
+## 112. Ranked: a queue with Matt as the warm-up, best-of-3 series in a night stadium, seven ranks with three divisions
+- The owner: "a menu reorganization / overhaul, as I want to now add another button there: for ranked … a quickplay
+  thing, where u play against matt until someone also queues and then they get match made with u … a trophy road that
+  you climb … 6-7 [ranks] … custom rank emblems … pickleball related … next to names in ranked mode … a different court,
+  a more serious stadium like one … brawlstars multi round games to win and the tv show like win transitions and counts".
+  Then: the ranks are the familiar ladder (Bronze, Silver, Gold, Platinum, Diamond, Champion, Pro; no Olympic wording),
+  each with divisions I, II, III. The spec is docs/RANKED.md (the protocol in 9, the data in 10, the rules in 5 and 13).
+- **Menu.** Five entries: a hero row (Quick play, Ranked) over a utility row (Courts, Play a bot, Your stats). The layout
+  keys on `.tiles[data-n]` written by `ui.tilesFit()` from the visible count, never on `:has(nth-child)` (Ranked and Your
+  stats show only with a stats database). 2 over 3 in landscape, 2 / 1 / 1 / 1 in portrait, one column under 480 px.
+  The Ranked tile's line is the player's emblem, rank and trophies. /ranked is a menu path (NOTES 108).
+- **The Ranked view:** the emblem, "Gold II", trophies, a bar across the division, "28 to Gold III", the trophy road of
+  seven ranks with three division pips each, Find a match, and the rules line (best of 3, first to 7, win by 2; Matt
+  while you wait; leaving is a loss; your emblem is shown to your opponent and anyone watching). Opening it builds the
+  stadium behind the glass.
+- **Queue and matchmaking** (server/game.js `rk*`): being queued is being seated on a private warm-up court against Matt
+  (Rookie at Bronze up to Pro at Champion), in the stadium, with a queue pill ("Finding an opponent · 0:42"). A second
+  player pairs by trophies (a window that widens every 15 s); the same computer, device or account is never paired, and a
+  pair already at the daily cap plays a "Friendly match, no trophies", said on the VS card before it starts. Pairing takes
+  both players off their warm-ups at once (no Matt loss is recorded for it), shows MATCH FOUND for 5 s, then seats them.
+  Caps: 12 queued, 2 per computer, the room cap; a 2 s cooldown on re-queueing.
+- **The series:** best of 3, each game first to 7, win by 2, golden point at 11, alternating first serve. Between games a
+  6 s game card over the darkened stadium ("You take game 1", the score, two rows of pips, "Game 2 in 6", "Deciding game"
+  at 1-1, who serves first); GAME POINT / MATCH POINT in the rally lozenge with a pressure ring and one floor-tom hit;
+  pips beside the rally count. The series card: "You win the match", the games and each game's score, emblems beside the
+  names, Play again / Leave. Leaving, a drop past the hold, or a calibration stall is a forfeit of the whole series.
+- **Trophies and ranks** (server/ladder.js, web/emblems.js mirrors it; test/ladder.test.mjs checks they agree): ranks start
+  at 0, 150, 300, 450, 600, 750, 900, each split into three divisions of 50 (Pro III is 1000+). A series win is about
+  +30 and a loss about −20, moved by the trophy gap (18 to 45 / −8 to −32, +3 for a 2-0). Bronze to Platinum are yours
+  to keep once reached (trophies never fall below that rank's floor); Diamond and up can drop, never below 450. A counted
+  Matt win while queued pays +10 at Bronze down to +4 at Champion, 40 a day, never past 899: Pro needs people. The trophy
+  row counts up on the card; a division up pops the emblem to the new numeral, a rank up swaps the emblem with rays,
+  confetti and a sting, a drop shrinks it. Everyone starts at Bronze I.
+- **One rank per player.** NOTES 107 had given Your stats a rank of its own (tiers derived from wins, Matt first wins and
+  titles). With a real ladder that would be two ranks with the same names and different numbers, so the crest on Your
+  stats now wears the Ranked emblem and shows the ladder's "Silver II", trophies and bar (`ui.rankCrest`); the derived
+  tiers are gone. A player who has not played Ranked shows Bronze I, 0: "Play Ranked for your first trophies".
+- **The Ranks page** (/ranks, the owner: "when u click on the rank medal / icon, it pulls up a page showing all the rank
+  medals that u can get"): the crest on Your stats, the emblem on the Ranked view and See all ranks open it. Seven cards,
+  each medal large with where it starts and its I / II / III thresholds; the player's own rank ringed ("You · Silver II"),
+  the ranks reached marked, Bronze to Platinum tagged Yours to keep; Play Ranked at the foot. It stands in the stadium,
+  and Back returns to where it was opened from (`ui.viewParent`).
+- **Emblems** (web/emblems.js, one SVG sprite): bronze shield, silver shield, gold hexagon, platinum octagon, diamond gem,
+  winged champion star, the Pro crest with laurels and a crown; the pickleball is the centre of every one. They show beside
+  names only on Ranked courts (scoreboard, VS card, result card, spectator chip); the division tag shows at the larger sizes.
+- **The stadium** (web/scenery/stadium.js, `scene.setVenue('stadium'|'park')`): a night arena, tiered stands with a
+  swaying crowd, four floodlight masts with light cones, an LED hoarding ring, a darker blue court, stars. Fewer draw calls
+  than the park. The park is unchanged. `body[data-venue]` tints the lobby for it.
+- **No stamps** (NOTES 104): the series card uses the light sweep, not a MATCH! slam, and the game card has no GAME 1
+  stamp; the rank-up is the emblem's moment. The owner can ask for slams back.
+- **Fair play** (docs/ACCOUNTS.md rule table RK1-RK5, R10 and R11b by series). Every game is judged by abuse.js as
+  before. Ladder rules: the leaver always takes the full loss; the stayer wins the delta only if a played game counted
+  (the forfeited game's own cut-short flags never deny the stayer); a no-show before the first ball voids the series and
+  the stayer goes back to the front of the queue; `new_opponent` halves only a win over a new player; settlement writes
+  through the identities frozen at pairing, so turning stats off mid-series is that seat's forfeit and cannot void the
+  opponent. R10 counts series, not games, and leaves the series in progress out (R11b too). Series ids are stamped from
+  boot time so a restart never rewrites an older series' deltas. A Ranked seat may be held twice (or 2 x 15 s) and
+  stall 2 x CAL_S in all before its next drop or stall is the forfeit (tournaments keep today's rules). A restart voids
+  the series in flight ("Updating. The Ranked match is void, no trophies changed."); nothing of Ranked is revived.
+- **Data** (legal pages in this commit): a `ladder` table per owner (trophies, rank and division, best and when, Ranked
+  W/L and streaks, Matt queue W/L, Matt trophies awarded today; migration 2) and `match_log.mode`, `series`,
+  `delta_a/b`. It folds into the account on sign-in (max trophies, sums of counts), goes with the owner on delete, and is
+  in the export (poddle-export-2). Newly shown to others: the rank emblem and division beside a name on Ranked courts.
+  Never sent: the opponent's trophies, any id or address.
+- Small fixes on the way: MATCH FOUND clears the warm-up's confetti and any toast; "New best" leaves out "(was …)" when the
+  old value rounds to the same number.
+- Tests: test/ranked.test.mjs (6 servers, ~5 min: queue, warm-up, pairing, series, settlement, every forfeit path,
+  refusals, restart, leak scan), test/ranked-e2e.mjs (two Chromes through a whole series), test/ladder.test.mjs; menu,
+  profile-ui, ui-next, verify and shoot gained the new views. deploy.sh runs ladder.test and ranked.test.
+
+## 113. Ranked client review fixes: late results, the leaver's line, spectators, a queued sign-in, contrast and live regions
+
+- **A result heard on reconnect** (the rkLate replay). A seat held while its socket was down, whose series settled
+  meanwhile, got back only its `rkres`. The client drew it into a result card that was not showing and 5 s later its
+  watchdog said "Updating. The Ranked match is void, no trophies changed." although the trophies were written. An `rkres`
+  that answers a `&rk=1` reconnect now ends the watchdog like `rkend` does: off the dead court, onto the Ranked view with
+  the line (`+33 trophies`, `Forfeit: 20 trophies`). The restart toast now writes Ranked with a capital (both toasts).
+- **The Ranked view's line** puts the change as applied first: `Void`, then `Forfeit: 20 trophies` (my own leave, Q Q,
+  stats off, a held seat that ran out) or `−20 trophies`, `+33 trophies`, the floor (`You keep Silver`, `Forfeit: you
+  keep Silver`), and "No trophies: that match didn’t count" only when nothing moved and I did not leave. The card's trophy
+  row follows the same order, and a win by forfeit shows its Walkover (from the series card's `matchover.forfeit`: rkres
+  has no such field, the server is unchanged). The line is held over the view's own redraws (showRanked draws it twice),
+  so it is also shown when a parked result's court closes behind a set-up screen, and after a refusal.
+- **Off dead courts.** An `rkfail` on a Ranked court (Play again refused, stats off, no hello) comes after the server took
+  the seat, with no `closed`: the client leaves the court at once, then says why. The VS card's fallback does the same
+  from a warm-up, and an `rk { phase:'off' }` under a warm-up leaves it too. Leave on the series card works after Play again.
+- **Spectators** of a Ranked court never send `&rk=1` (they reconnect to watch like anyone) and never get the queue state
+  or pill. Q, C, B and 1-4 do nothing under a VS card (the seat is already drawn).
+- **A sign-in, sign-out or stats switch while queued** no longer drops the queue: the socket reopens once Ranked is left
+  (a warm-up has no hold). A forfeit's rkres is waited for before a held redial goes.
+- Smaller: the queue pill starts from its own entry's clock and its 30 s hop re-bases; the rank-down shrink stays shrunk;
+  Find a match stops saying Searching when a request times out; /api/me's ladder and Your stats feed the home tile;
+  with stats off the Ranked view focuses See all ranks; the '1 waiting' badge breathes on a halo so its bump plays.
+- **Accessibility.** The stadium footer and the NAME pill reach 12:1 and 5:1; rank ink is the rim colour 15% darker as
+  text (Gold 5.1:1, Silver 5.4:1) and the VS card's label is lifted toward white (Champion 5.2:1); the division tag has
+  an 11 px floor and empty alt text (no "Silver II II"); the queue pill's timer and the GAME card's countdown are
+  aria-hidden, so the live regions announce changes, not ticks. A series court reserves the lozenge's width for MATCH
+  POINT (8.6em; 7.3em with tighter tracking at 900 px and under), so the tabs never jump; at 600x900 the tabs are 19 px
+  narrower than before for the whole series.
+- **Legal pages** (dates stay 2026-09-27): Ranked needs Save my stats on, and turning it off during a started Ranked match
+  is that match's forfeit, its loss still saved (and counting for the deletion schedule); the controls are named where
+  they now are (the privacy page's section 9; Delete my data for the account); the section 2 Ranked row lists every
+  ladder column (best trophies, best streak, Matt queue wins and losses, Matt trophies today, the series id); the IP row
+  lists the Ranked queue's cap (two per network) and its no-same-network pairing. docs/ropa.md, docs/RANKED.md (a client
+  DEVIATION list) and docs/ui-spec.md follow. changelog dateModified and the '/' lastmod are 2026-09-27.
+- Tests: test/menu.mjs B7 gains the rkLate replay (rkres on rk=1, no void toast after the watchdog), the leaver's lines and
+  a Ranked warm-up spectator's reconnect; test/ui-shots/verify.mjs reads the tag's alt-text form and no longer stops at
+  the stamp NOTES 104 removed.

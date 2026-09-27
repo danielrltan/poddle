@@ -9,8 +9,11 @@ import puppeteer from 'puppeteer-core';
 import { makeSynth, CALIBRATE, SESSION_LOOP } from './fake-bridge.mjs';
 const P0 = +process.env.MENU_PORT || 8330, W = P0, G = P0 + 1, DEAD = P0 + 2, POD = P0 + 3, ONLY = (process.env.ONLY || 'ab').toLowerCase(), root = new URL('..', import.meta.url).pathname, sleep = ms => new Promise(r => setTimeout(r, ms));
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const MENU_PATHS = ['/play', '/courts', '/create', '/bot', '/stats'];      // the menu views' addresses are index.html, as server/game.js serves them: a reload stays on its view
-const web = http.createServer((q, r) => { let u = decodeURIComponent(q.url.split('?')[0]); if (MENU_PATHS.includes(u)) u = '/'; let f = path.join(root, 'web', u); if (f.endsWith('/')) f += 'index.html';
+const LADDER = { trophies: 240, tier: 2, div: 2, floor: 150, next: 250, bestTrophies: 240, bestTier: 2, bestDiv: 2, bestTierAt: Date.UTC(2026, 9, 2), wins: 3, losses: 1, streak: 1, botWins: 9, botLosses: 4, mattDayLeft: 32 };      // /api/stats profile.ladder (docs/RANKED.md 10.1)
+const MENU_PATHS = ['/play', '/courts', '/create', '/bot', '/stats', '/ranked', '/ranks'];      // the menu views' addresses are index.html, as server/game.js serves them: a reload stays on its view
+const web = http.createServer((q, r) => { let u = decodeURIComponent(q.url.split('?')[0]);
+  if (u.startsWith('/api/')) { const j = o => { r.writeHead(200, { 'content-type': 'application/json' }); r.end(JSON.stringify(o)); }; q.on('data', () => {}); q.on('end', () => u === '/api/me' ? j({ db: true, signin: { enabled: false, clientId: null }, account: null }) : u === '/api/stats' ? j({ profile: { guest: true, ladder: LADDER } }) : j({})); return; }      // ?acctest=1: web/profile.js is on, the stats server 'has' a database
+  if (MENU_PATHS.includes(u)) u = '/'; let f = path.join(root, 'web', u); if (f.endsWith('/')) f += 'index.html';
   fs.readFile(f, (e, d) => { r.writeHead(e ? 404 : 200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(e ? '' : d); }); }).listen(W);
 
 // ---- the fake: a lobby with two listed rooms. WXYZ and KXQ7 exist, FVVV is full, FWWW is full but can be watched, anything else is not found. MUTE=1 answers nothing (an old server).
@@ -19,21 +22,25 @@ const got = [], urls = [], J = o => JSON.stringify(o), COURT = { halfW: 3.05, ha
 const ME = { x: 0, y: 1, z: 6.5, q: [0, 0, 0, 1], bot: false }, MATT = { x: 0, y: 1, z: -6.5, q: [0, 0, 0, 1], bot: true }, HUMAN = { x: 0, y: 1, z: -6.5, q: [0, 0, 0, 1], bot: false };
 let mute = false, gone = false, evil = false, wss = null, last = null;
 const push = (m, ws = last) => ws && ws.readyState === 1 && ws.send(J(m));
-function seat(ws, code, pub, role = 'player', names = [ws.name || 'Player 1', null]) { ws.room = code; ws.role = role; ws.st = { type: 'state', t: 0, p: [0, 1, 5], v: [0, 0, 0], spin: 0, b: 0, k: 0, live: false, serving: 0, reach: false, score: [0, 0], paddles: [ME, role === 'spectator' ? HUMAN : null] };
-  ws.send(J({ type: 'room', code, public: pub, role })); ws.send(J({ type: 'welcome', side: role === 'spectator' ? null : 0, role, court: COURT, names }));
+let rkWaiting = 0, rkLateRes = null;      // the fake queue: how many the lobby list says are waiting (lobby.rk.queued). rkLateRes: the next rk=1 reconnect gets this rkres instead of rkend (server/game.js rkLate: its series settled while it was down)
+function seat(ws, code, pub, role = 'player', names = [ws.name || 'Player 1', null], tag = {}) { ws.room = code; ws.role = role; ws.st = { type: 'state', t: 0, p: [0, 1, 5], v: [0, 0, 0], spin: 0, b: 0, k: 0, live: false, serving: 0, reach: false, score: [0, 0], paddles: [ME, role === 'spectator' ? HUMAN : tag.rk ? MATT : null] };
+  ws.send(J({ type: 'room', code, public: pub, role, ...tag })); ws.send(J({ type: 'welcome', side: role === 'spectator' ? null : 0, role, court: COURT, names, ...(tag.rk ? { rank: [{ tier: 2, div: 2 }, null], venue: 'stadium' } : {}) }));
   clearInterval(ws.tick); ws.tick = setInterval(() => { if (ws.readyState !== 1) return; if (!ws.st.paused) ws.st.t = Date.now(); ws.send(J(ws.st)); }, 50); }
 function join(ws, code) { code = String(code || '').trim().toUpperCase(); if (gone) ws.send(J({ type: 'joinfail', reason: 'notfound' })); else if (code === 'FVVV') ws.send(J({ type: 'joinfail', reason: 'full' })); else if (code === 'FWWW') ws.send(J({ type: 'joinfail', reason: 'full', watch: true, code }));
   else if (!['WXYZ', 'KXQ7', 'M3PD', 'CRTD', 'QQQQ'].includes(code)) ws.send(J({ type: 'joinfail', reason: 'notfound' })); else seat(ws, code, true); }
-function watch(ws, code) { code = String(code || '').trim().toUpperCase(); if (code === 'BUSY') ws.send(J({ type: 'joinfail', reason: 'busy' })); else if (gone || !['FWWW', 'KXQ7'].includes(code)) ws.send(J({ type: 'joinfail', reason: 'notfound' })); else seat(ws, code, true, 'spectator', ['Ann', 'Bo']); }
+function watch(ws, code) { code = String(code || '').trim().toUpperCase(); if (code === 'BUSY') ws.send(J({ type: 'joinfail', reason: 'busy' })); else if (code === 'RKWT') seat(ws, code, false, 'spectator', ['Ann', 'Matt'], { rk: true, kind: 'warm' }); else if (gone || !['FWWW', 'KXQ7'].includes(code)) ws.send(J({ type: 'joinfail', reason: 'notfound' })); else seat(ws, code, true, 'spectator', ['Ann', 'Bo']); }      // RKWT: a Ranked warm-up, watched by code (docs/RANKED.md 3.11)
 const JUNK = [{ type: 'welcome', side: 1, court: COURT, names: ['Old', 'Server'] }, { type: 'state', t: 1, p: [0, 1, 0], v: [0, 0, 9], spin: 0, live: true, serving: 0, score: [3, 10], watchers: 2, paused: true, paddles: [ME, MATT] }, { type: 'names', names: ['Old', 'Server'] }, { type: 'botinfo', active: true, level: 2, name: 'Pro' },
   { type: 'serve', by: 1, wait: true }, { type: 'hit', side: 1, n: 0.9, spin: 0.8, kind: 'smash' }, { type: 'bounce' }, { type: 'point', winner: 1 }, { type: 'hold', side: 0, left: 9 }, { type: 'paused', on: true, by: 1 }, { type: 'left' },
   { type: 'match', winner: 1, score: [3, 11] }, { type: 'matchover', winner: 1, score: [3, 11], forfeit: false, rematchBy: 20 }, { type: 'rematch', votes: [null, true], left: 12 }, { type: 'nonsense', x: [[[]]] }];
 // A legacy socket (no lobby=1) gets a 'room' too here. The contract does not say it will: the client must show no room UI either way.
 function startFake() { wss = new WebSocketServer({ port: G }); wss.on('connection', (ws, req) => { const q = new URL(req.url, 'http://x').searchParams; urls.push(req.url); last = ws;
-  if (q.get('lobby') !== '1') { seat(ws, 'LOCAL', false); return; } ws.send(J(LIST)); if (evil) for (const m of JUNK) ws.send(J(m));
-  if (q.get('room')) { ws.name = q.get('name'); if (q.get('watch') === '1') watch(ws, q.get('room')); else join(ws, q.get('room')); }
+  if (q.get('lobby') !== '1') { seat(ws, 'LOCAL', false); return; } ws.send(J(rkWaiting ? { ...LIST, rk: { queued: rkWaiting } } : LIST)); if (evil) for (const m of JUNK) ws.send(J(m));
+  const rkEnded = q.get('rk') === '1'; if (rkEnded) { ws.send(J(rkLateRes || { type: 'rkend', why: 'restart' })); rkLateRes = null; }      // a reconnect into the queue after a restart: nothing is revived, the socket stays in the lobby (docs/RANKED.md 3.10)
+  if (q.get('room') && !rkEnded) { ws.name = q.get('name'); if (q.get('watch') === '1') watch(ws, q.get('room')); else join(ws, q.get('room')); }
   ws.on('message', raw => { const m = JSON.parse(raw); if (m.type === 'ping') return ws.send(J({ type: 'pong', c: m.c })); got.push(m); if (mute) return;
-    if (m.type === 'leave') { clearInterval(ws.tick); ws.room = null; ws.send(J(LIST)); }
+    if (m.type === 'leave') { clearInterval(ws.tick); const rk = ws.rk; ws.room = null; ws.rk = false; ws.send(J(LIST)); if (rk) ws.send(J({ type: 'rk', phase: 'off', queued: 0 })); }
+    else if (m.type === 'rk' && typeof m.name === 'string' && !ws.room) { ws.name = m.name; if (m.name === 'Busy') return ws.send(J({ type: 'rkfail', why: 'busy' })); ws.rk = true; seat(ws, 'RNKD', false, 'player', [m.name, 'Matt'], { rk: true, kind: 'warm' }); ws.send(J({ type: 'rk', phase: 'queue', you: { tier: 2, div: 2, trophies: 240, floor: 150, next: 250, best: 2, matt: { level: 1, win: 8, dayLeft: 32 } }, queued: rkWaiting, place: 1, since: Date.now() })); }      // docs/RANKED.md 3.4: a warm-up court, then the snapshot
+    else if (m.type === 'rkleave') { ws.rk = false; ws.send(J({ type: 'rk', phase: 'off', queued: 0 })); }
     else if (ws.room) { if (m.type === 'pause' && ws.role === 'player') { const human = ws.st.paddles[1] && !ws.st.paddles[1].bot; if (human) push({ type: 'paused', on: false, refused: true }, ws); else { ws.st.paused = m.on ? true : undefined; push({ type: 'paused', on: !!m.on, by: 0 }, ws); } } }
     else if (typeof m.name === 'string') { ws.name = m.name; if (m.type === 'quick') seat(ws, 'QQQQ', true); else if (m.type === 'create') seat(ws, 'CRTD', !!m.public); else if (m.type === 'join') join(ws, m.code); else if (m.type === 'watch') watch(ws, m.code); } });
   ws.on('close', () => clearInterval(ws.tick)); }); }
@@ -44,7 +51,7 @@ const CHROME = process.env.CHROME || ['/Applications/Google Chrome.app/Contents/
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 fs.mkdirSync(root + 'test/ui-shots', { recursive: true });
 const out = [], errs = [], ok = (c, what) => { out.push((c ? 'PASS ' : 'FAIL ') + what); if (!c) console.log('FAIL', what); };
-setTimeout(() => { console.log(out.join('\n')); console.log('MENU FAIL (timeout)'); process.exit(2); }, 240000);
+setTimeout(() => { console.log(out.join('\n')); console.log('MENU FAIL (timeout)'); process.exit(2); }, 370000);      // 370 s: Part A's two Ranked passes and B7 added about a minute, B7's rkLate / leaver / spectator checks about 20 s more
 const st = pg => pg.evaluate(() => { const t = id => document.getElementById(id), seen = el => !!el && !el.hidden && getComputedStyle(el).visibility !== 'hidden';
   return { screen: document.body.dataset.screen, view: [...document.querySelectorAll('#screen-lobby .lobby-view')].find(v => !v.hidden)?.dataset.view, title: t('lobby-title').textContent, focus: document.activeElement?.id || document.activeElement?.className || '',
     search: location.search, err: t('code-err').textContent, typed: [...document.querySelectorAll('#code-boxes input')].map(b => b.value).join(''), share: t('share-code').textContent.replace(/\s/g, ''), pill: t('room-pill').hidden ? null : t('room-code').textContent,
@@ -139,6 +146,45 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.close();
 }
 
+// Ranked (docs/RANKED.md 1, 2, 8.1): with a stats server (?acctest=1, the fake /api/me says db) the home has five tiles, Ranked opens its view over the stadium,
+// Find a match sends rk and lands on the warm-up court, leaving it lands back on the view, Back from the view brings the park back
+for (const [w, h] of [[1280, 720], [600, 900]]) {
+  const tag = `ranked ${w}x${h}`, pg = await open(tag, '&acctest=1', w, h); let s; got.length = 0; urls.length = 0;
+  await pg.evaluate(() => localStorage.setItem('poddle.device', '0123456789abcdef0123456789abcdef'));      // a device with saved stats (the fake /api/stats answers with a Silver ladder): web/profile.js asks only when there is an id
+  const shot = async n => { await sleep(450); await pg.screenshot({ path: `${root}test/ui-shots/menu-${n}-${w}x${h}.png` }); const c = (await st(pg)).clipped; ok(!c.length, `${tag} ${n}: nothing clipped ${c}`); };
+  await pg.click('#btn-start'); await sleep(900); s = await st(pg);
+  const tiles = await pg.evaluate(() => ({ b: [...document.querySelectorAll('#lobby-home .tile:not([hidden])')].map(b => b.querySelector('b').textContent.trim()), n: document.querySelector('#lobby-home .tiles').dataset.n, line: document.getElementById('ranked-line-text').textContent, em: !!document.querySelector('#ranked-em .rank-em:not([hidden])'), venue: document.body.dataset.venue }));
+  ok(tiles.b.join('|') === 'Quick play|Ranked|Courts|Play a bot|Your stats' && tiles.n === '5' && s.focus === 'btn-quick', `${tag} five tiles in order, data-n=5, Quick play focused (${tiles.b.join(' | ')}, n=${tiles.n}, ${s.focus})`);
+  ok(tiles.line === 'Play your first match' && tiles.em && tiles.venue !== 'stadium', `${tag} the Ranked tile says "${tiles.line}" with a dimmed emblem before a rank is known; the park behind the home (${tiles.venue})`);
+  await shot('11-home-five');
+  await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-ranked', `${tag} Right from Quick play is Ranked`); await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-courts', `${tag} then Courts`); await pg.keyboard.press('ArrowLeft');
+  await pg.keyboard.press('Enter'); await sleep(900); s = await st(pg);
+  const view = await pg.evaluate(() => ({ venue: document.body.dataset.venue, tier: document.getElementById('rk-tier').textContent, n: document.getElementById('rk-trophies').textContent, next: document.getElementById('rk-next').textContent, steps: [...document.querySelectorAll('#rk-road .rk-step')].map(l => l.querySelector('b').textContent + (l.classList.contains('is-now') ? '*' : l.classList.contains('is-done') ? '+' : '') + l.querySelectorAll('.rk-pips .is-lit').length).join(','), div: document.querySelector('#rk-emblem .rank-card-em')?.dataset.div, go: document.getElementById('btn-ranked-go').textContent, status: document.getElementById('rk-status').textContent, line: document.getElementById('ranked-line-text').textContent, name: !document.getElementById('name-row').hidden }));
+  ok(s.view === 'ranked' && s.title === 'Ranked' && s.focus === 'btn-ranked-go' && view.name, `${tag} Enter on Ranked -> the Ranked view (${s.view}, "${s.title}", focus ${s.focus}, name row ${view.name})`);
+  ok(view.venue === 'stadium' && view.tier === 'Silver II' && view.n === '240' && view.next === '10 to Silver III' && view.steps === 'Bronze+3,Silver*2,Gold0,Platinum0,Diamond0,Champion0,Pro0' && view.go === 'Find a match' && view.status === 'You play Matt while it looks for someone', `${tag} the view over the stadium: ${view.tier} ${view.n}, "${view.next}", road ${view.steps}, "${view.status}" (venue ${view.venue})`);
+  ok(view.line === 'Silver II · 240' && view.div === '2', `${tag} and the tile's line follows: "${view.line}"; the head's emblem carries division ${view.div}`);
+  ok(!/[—–…!]/.test(await pg.evaluate(() => document.getElementById('lobby-ranked').textContent)), `${tag} no dashes, ellipses or exclamation marks on the Ranked view`);
+  await shot('12-ranked');
+  await pg.keyboard.press('Enter'); await sleep(900); s = await st(pg);
+  ok(J(sent('rk').at(-1)) === J({ type: 'rk', name: NAME }) && s.screen === 'connect' && !/court=/.test(s.search) && s.pill === null, `${tag} Find a match sent ${J(sent('rk').at(-1))} -> ${s.screen}, no code in the address bar or the corner (url "${s.search}")`);
+  const court = await pg.evaluate(() => ({ rk: document.body.dataset.rk, venue: document.body.dataset.venue, leave: document.getElementById('btn-leave-room').textContent, note: document.getElementById('set-note').hidden ? '' : document.getElementById('set-note').textContent, bot: document.getElementById('set-bot').hidden, stats: window.__stats.rk }));
+  ok(court.rk === 'warm' && court.venue === 'stadium' && court.leave === 'Leave queue' && court.note === 'Ranked: Matt is fixed while you wait' && court.bot && court.stats.kind === 'warm' && court.stats.queued === true && court.stats.tier === 2, `${tag} the warm-up court: body[data-rk=${court.rk}], stadium, Leave queue, "${court.note}", no Difficulty row, __stats.rk ${J(court.stats)}`);
+  urls.length = 0; await stopFake(); await sleep(700); startFake(); await sleep(2500);
+  ok(urls.length && urls.every(u => /[?&]rk=1/.test(u) && /room=RNKD/.test(u) && !/back=1/.test(u)), `${tag} a reconnect from the queue carries rk=1 and never back=1: ${urls[0]}`);
+  s = await st(pg); ok(s.screen === 'lobby' && s.view === 'ranked' && s.toast === 'Updating. The Ranked match is void, no trophies changed.', `${tag} rkend restart: back on the Ranked view with the notice (${s.screen}/${s.view}, "${s.toast}")`);
+  await sleep(1200); await pg.keyboard.press('Enter'); await sleep(900); s = await st(pg); ok(s.screen === 'connect' && sent('rk').length === 2, `${tag} Find a match again seats again (${s.screen}, focus ${s.focus}, sent ${J(got.map(m => m.type))}, rk ${J(await pg.evaluate(() => window.__stats.rk))})`);
+  got.length = 0; await pg.keyboard.press('Escape'); await sleep(800); s = await st(pg);
+  ok(J(sent('leave')) === J([{ type: 'leave' }]) && s.screen === 'lobby' && s.view === 'ranked' && (await pg.evaluate(() => document.body.dataset.venue)) === 'stadium', `${tag} Esc on the way to the court leaves the queue and lands on the Ranked view, still in the stadium (${s.screen}/${s.view})`);
+  await pg.keyboard.press('Escape'); await sleep(700); s = await st(pg);
+  ok(s.view === 'home' && (await pg.evaluate(() => document.body.dataset.venue)) === 'park', `${tag} Back from the view: home, the park again (${s.view}, ${await pg.evaluate(() => document.body.dataset.venue)})`);
+  rkWaiting = 1; await stopFake(); await sleep(700); startFake(); await sleep(2500); rkWaiting = 0;
+  const badge = await pg.evaluate(() => { const b = document.getElementById('ranked-n'); return { t: b.textContent, on: !b.classList.contains('is-off') }; });
+  ok(badge.t === '1 waiting' && badge.on, `${tag} the lobby's rk.queued lights the tile badge "${badge.t}"`);
+  await pg.evaluate(() => { const i = document.getElementById('name-input'); i.value = 'Busy'; i.dispatchEvent(new Event('input', { bubbles: true })); }); await pg.click('#btn-ranked'); await sleep(900); await pg.click('#btn-ranked-go'); await sleep(700); s = await st(pg);
+  ok(s.toast === 'Ranked is full right now. Try again in a minute' && s.view === 'ranked' && s.screen === 'lobby' && (await pg.evaluate(() => document.getElementById('rk-status').textContent)) === 'Courts are full right now. Try again in a moment' && (await pg.evaluate(() => document.getElementById('btn-ranked-go').textContent)) === 'Find a match', `${tag} rkfail busy: toast "${s.toast}", the line under the button, Find a match again`);
+  await pg.close();
+}
+
 // ?room=WXYZ: nothing joins until Play, then it joins at once and moves on
 { got.length = 0; urls.length = 0; const pg = await open('link', '&room=wxyz'); let s = await st(pg);
   ok(s.chip === 'Joining court WXYZ' && !got.length && !urls.some(u => /room=/.test(u)), `?room=WXYZ: chip "${s.chip}", nothing sent before Play`);
@@ -217,8 +263,9 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
 // ['ui.name' | 'scene.name', ...args]; a call identical to the last one of the same name is dropped (state arrives 20 x a second),
 // the per-frame ones are only counted (window.__n). The stubs keep just enough state for main.js to find its way.
 if (ONLY.includes('b')) {
-const UI_NAMES = 'camPrimer onCamPrimer onCamOn backLabel countdown emote emotesOff onEmote setPing showScreen showOverlay currentScreen currentOverlay setNames setScore setServe setRally callout toast toastOff watcherNote notesOff confetti confettiOff setStatus setLink setServerAddress calibrationReset calibration setMode toggle setCamera isVisible setStat fullscreen wake onStart onRetry cleanCode onLobby lobbyView lobbyRooms lobbyBusy lobbyLink codeError setRoom titleRoom pointBanner joinBanner matchResult show playerName askWatch asking onSettings settings setSettings setPaused setSpectator setWatchers onView setView onRematch rematch hold setBot setPaddle padPair onPaddleSwap paddleKind viewParent typedCode askCard askShowing onAnswer askPlay askCan showAsk onAsk onTour setTour tourCourt tourCard tourVs tourNote champion championShowing tourEnded'.split(' ');
-const SCENE_NAMES = 'setCourt setSide setViewer setView getView setMenu startAttract stopAttract setFrozen setDim setSelfBody updatePaddle updateBall hideBall onEvent unlockAudio render resize jingle'.split(' ');
+const B7 = process.env.B7 === '1';      // B7=1: only the Ranked block (a quick loop while building it)
+const UI_NAMES = 'camPrimer onCamPrimer onCamOn backLabel countdown emote emotesOff onEmote setPing showScreen showOverlay currentScreen currentOverlay setNames setScore setServe setRally callout toast toastOff watcherNote notesOff confetti confettiOff setStatus setLink setServerAddress calibrationReset calibration setMode toggle setCamera isVisible setStat fullscreen wake onStart onRetry cleanCode onLobby lobbyView lobbyRooms lobbyBusy lobbyLink codeError setRoom titleRoom pointBanner joinBanner matchResult show playerName askWatch asking onSettings settings setSettings setPaused setSpectator setWatchers onView setView onRematch rematch hold setBot setPaddle padPair onPaddleSwap paddleKind viewParent typedCode askCard askShowing onAnswer askPlay askCan showAsk onAsk onTour setTour tourCourt tourCard tourVs tourNote champion championShowing tourEnded tilesFit rkTile rkView rkNote rkSearch rkCourt rkPill rankBadge rkVs rkGame setSeries setPressure trophyRow rankUp gameBanner'.split(' ');      // + the Ranked exports (docs/RANKED.md 8): main.js calls the optional ones as ui.fn?.()
+const SCENE_NAMES = 'setCourt setSide setViewer setView getView setMenu startAttract stopAttract setFrozen setDim setSelfBody updatePaddle updateBall hideBall onEvent unlockAudio render resize jingle setVenue'.split(' ');
 const REC = `const C = window.__calls = window.__calls || [], N = window.__n = window.__n || {}, lastOf = {}, QUIET = ['ui.setStat', 'ui.setStatus', 'ui.setLink', 'ui.lobbyLink', 'ui.isVisible', 'ui.currentScreen', 'ui.currentOverlay', 'ui.wake', 'ui.asking', 'ui.playerName', 'ui.cleanCode', 'ui.calibration', 'scene.render', 'scene.updateBall', 'scene.updatePaddle', 'scene.setViewer', 'scene.getView'];
   const rec = (n, a) => { N[n] = (N[n] || 0) + 1; if (QUIET.includes(n)) return; const j = JSON.stringify(a, (k, v) => typeof v === 'function' ? 'fn' : v === undefined ? null : v); if (lastOf[n] === j && !/settings|askWatch|toast|rematch|onEvent|pointBanner|joinBanner|setView|Attract|setSide|setMenu|setRoom/.test(n)) return; lastOf[n] = j; C.push([n, ...JSON.parse(j)]); };`;
 const UI_STUB = `${REC}
@@ -253,7 +300,7 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
   GAME_SCENE = ['scene.setCourt', 'scene.setSide', 'scene.updateBall', 'scene.updatePaddle', 'scene.onEvent', 'scene.setFrozen', 'scene.hideBall', 'scene.stopAttract', 'scene.setView'];
 
 // B1. the guard: an old server seats the lobby socket by itself and plays a match at it. Nothing of it may reach the UI or the scene.
-{ evil = true; got.length = 0; const pg = await openB('guard'); let cs = await since(pg, 0), n = await counts(pg), i = await info(pg);
+if (!B7) { evil = true; got.length = 0; const pg = await openB('guard'); let cs = await since(pg, 0), n = await counts(pg), i = await info(pg);
   ok(has(cs, 'scene.setMenu', on => on === true) && has(cs, 'scene.startAttract') && i.view.attract && i.view.menu, `page load: menu mode on, attract rally started (${names(cs).filter(c => c.startsWith('scene.')).join(' ')})`);
   ok(has(cs, 'ui.lobbyRooms', (r, o) => r.length === 2 && o === 3), 'guard: the lobby list still gets through');
   const leak = () => [...GAME_UI, ...GAME_SCENE].filter(c => n[c] || has(cs, c));
@@ -264,7 +311,7 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
   ok(!got.some(m => ['paddle', 'swing', 'bot', 'pause'].includes(m.type)), `guard: nothing but lobby talk goes out (${[...new Set(got.map(m => m.type))]})`); evil = false; await pg.close(); }
 
 // B2. a shared link with no name yet: the code is filled in, nothing is sent until there is a name
-{ got.length = 0; const pg = await openB('noname', '&room=wxyz', { name: '' }); await h(pg, 'start'); await sleep(600); const cs = await since(pg, 0), i = await info(pg);
+if (!B7) { got.length = 0; const pg = await openB('noname', '&room=wxyz', { name: '' }); await h(pg, 'start'); await sleep(600); const cs = await since(pg, 0), i = await info(pg);
   ok(has(cs, 'ui.lobbyView', (v, o) => v === 'courts' && o && o.code === 'WXYZ') && !got.length && i.phase === 'lobby', `?room=WXYZ with no name: code view prefilled, nothing sent (${J(got)})`);
   await pg.evaluate(() => { window.__name = '  <b>Zed</b>   the \u0007 Great!! '; }); await h(pg, 'lobby.join', 'WXYZ'); await sleep(600);
   ok(J(got[0]) === J({ type: 'join', code: 'WXYZ', name: 'bZed/b the G' }), `a name typed then Join: sent cleaned and cut to 12 (${J(got[0])})`);
@@ -273,7 +320,7 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
   ok(has(cs, 'ui.lobbyView', (v, o) => v === 'courts' && o && o.code === 'WXYZ' && o.watch === true) && !got.length && i.phase === 'lobby', `?court=WXYZ&watch=1 with no name: Courts, code prefilled, watch lit, nothing sent (${J(got)})`); await pg.close(); }
 
 // B3. Play a bot, then a whole player's evening against the script: names, pause, hold, points, result, rematch, settings, keys, leave
-{ got.length = 0; rest(); const pg = await openB('player', '', { airpod: true }); let m0 = await mark(pg), cs, i;
+if (!B7) { got.length = 0; rest(); const pg = await openB('player', '', { airpod: true }); let m0 = await mark(pg), cs, i;
   await h(pg, 'start'); await sleep(400); await h(pg, 'lobby.bot', 2); await waitFor('bot level sent', () => sent('bot').length > 0); await sleep(300); cs = await since(pg, m0); i = await info(pg);
   ok(J(sent('create').at(-1)) === J({ type: 'create', public: false, name: NAME }) && J(sent('bot')[0]) === J({ type: 'bot', level: 2 }) && got.findIndex(m => m.type === 'bot') > got.findIndex(m => m.type === 'create'), `Play a bot: ${J(sent('create').at(-1))} then, after the welcome, ${J(sent('bot')[0])}`);
   ok(!has(cs, 'ui.lobbyView', v => v === 'share') && has(cs, 'scene.stopAttract') && has(cs, 'ui.setRoom', c => c === 'CRTD') && has(cs, 'scene.setSide', s => s === 0) && has(cs, 'scene.setCourt') && has(cs, 'ui.setSpectator', on => on === false) && has(cs, 'ui.setSettings', o => o.inRoom === true && o.spectator === false) && /court=CRTD/.test(i.search) && !/watch/.test(i.search),
@@ -361,7 +408,7 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
   rest(); await pg.close(); }
 
 // B4. watching: full court -> prompt -> watch -> straight onto the court; views; no AirPod anything; reload and reconnect keep the role
-{ got.length = 0; urls.length = 0; const pg = await openB('watch'); let m0 = await mark(pg), cs, i;
+if (!B7) { got.length = 0; urls.length = 0; const pg = await openB('watch'); let m0 = await mark(pg), cs, i;
   await h(pg, 'start'); await sleep(400); await h(pg, 'lobby.join', 'FWWW'); await sleep(500); cs = await since(pg, m0); i = await info(pg);
   ok(has(cs, 'ui.askWatch', c => c === 'FWWW') && i.asking === 'FWWW' && i.phase === 'lobby' && !has(cs, 'ui.toast'), 'joinfail full + watch -> "Court is full. Watch instead?"');
   await pg.keyboard.press('Escape'); await sleep(200); i = await info(pg); ok(!i.asking && i.screen === 'lobby', 'Esc answers No, the lobby stays');
@@ -396,8 +443,65 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
   ok(J(sent('leave')) === J([{ type: 'leave' }]) && i.phase === 'lobby' && !/court=|room=|watch=/.test(i.search) && has(cs, 'ui.setSpectator', on => on === false) && i.view.attract && !i.view.spectator, `Q Q leaves: ${i.phase}, url "${i.search}", player again`);
   await pg.close(); }
 
+// B7. Ranked (docs/RANKED.md 9): rk / rkfail / rkend / rkres are heard above the guard; a Ranked court tags the HUD, shares no code, hides Matt's keys, and its closing is quiet
+// and lands on the Ranked view; the warm-up's reconnect carries rk=1 and never back=1; welcome.rank reaches setNames; a series card comes with no vote and the ranks
+{ rest(); got.length = 0; urls.length = 0; const pg = await openB('ranked', '', { airpod: true }); let cs, i, m0; await h(pg, 'start'); await sleep(400);
+  await pg.evaluate(() => { window.__uistub.view = 'ranked'; });
+  m0 = await mark(pg); await h(pg, 'lobby.rankedOpen'); await sleep(200); cs = await since(pg, m0);
+  ok(has(cs, 'scene.setVenue', v => v === 'stadium') && has(cs, 'ui.rkView'), `the view opened: the stadium behind the glass, the view drawn (${names(cs).filter(n => /Venue|rkView/.test(n)).join(' ')})`);
+  await pg.evaluate(() => { window.__name = 'Busy'; });      // the fake refuses this name: rkfail busy
+  m0 = await mark(pg); await h(pg, 'lobby.ranked'); await sleep(500); cs = await since(pg, m0); i = await info(pg);
+  ok(J(sent('rk')) === J([{ type: 'rk', name: 'Busy' }]) && has(cs, 'ui.rkSearch', on => on === true) && has(cs, 'ui.lobbyBusy', b => b === true), `Find a match sends ${J(sent('rk'))}, the button says Searching, the lobby waits`);
+  ok(has(cs, 'ui.toast', t => /Ranked is full right now/.test(t)) && has(cs, 'ui.rkSearch', on => on === false) && has(cs, 'ui.lobbyBusy', b => b === false) && has(cs, 'ui.rkNote', t => /Courts are full/.test(t)) && i.phase === 'lobby' && i.room === null, `rkfail busy: the toast, the line under the button, Find a match again, the request settled (${i.phase})`);
+  m0 = await mark(pg); push({ type: 'rkfail', why: 'addr' }); await sleep(200); cs = await since(pg, m0); ok(has(cs, 'ui.toast', t => /Two players on your network/.test(t)), 'rkfail addr: its toast');
+  await pg.evaluate(() => { window.__name = 'Dan'; }); got.length = 0; m0 = await mark(pg); await h(pg, 'lobby.ranked'); await sleep(600);      // the fake seats: room { rk, kind: warm } + welcome { rank, venue } + the rk snapshot, Matt across the net
+  push({ type: 'botinfo', active: true, level: 1, name: 'Club' }); await sleep(300); cs = await since(pg, m0); i = await info(pg);
+  ok(has(cs, 'ui.rkCourt', k => k === 'warm') && has(cs, 'ui.setRoom', c => c === null) && !has(cs, 'ui.setRoom', c => c === 'RNKD') && !/court=/.test(i.search) && i.room === 'RNKD', `the warm-up court: rkCourt('warm'), no code in the corner or the address bar (${i.search}, room ${i.room}, sent ${J(got.map(m => [m.type, m.name]))}, calls ${names(cs).join(' ')}, toasts ${J(cs.filter(c => c[0] === 'ui.toast').map(c => c[1]))}, phase ${i.phase})`);
+  ok(has(cs, 'ui.rkPill', o => o && o.on === true) && has(cs, 'ui.setBot', l => l === null) && !has(cs, 'ui.setBot', l => l === 'Club') && has(cs, 'ui.setNames', o => o && Array.isArray(o.rank) && o.rank[0] && o.rank[0].tier === 2 && o.rank[0].div === 2 && o.rank[1] === null) && has(cs, 'ui.setSettings', o => o && o.rkWarm === true), `the pill, no 1 2 3 4, my emblem beside You, the settings note (the stadium was already up from the view: the recorder drops a repeated setVenue) (setBot ${J(cs.filter(c => c[0] === 'ui.setBot').map(c => c[1]))})`);
+  ok(!sent('bot').length && (await pg.evaluate(() => JSON.stringify([window.__stats.rk.kind, window.__stats.rk.queued, window.__stats.rk.tier, window.__stats.rk.div]))) === '["warm",true,2,2]', `no 'bot' is sent on a Ranked court; __stats.rk says warm, queued, Silver II (${await pg.evaluate(() => JSON.stringify(window.__stats.rk))})`);
+  m0 = await mark(pg); push({ type: 'botinfo', active: true, level: 1, name: 'Club', reason: 'ranked' }); await sleep(200); cs = await since(pg, m0); ok(!has(cs, 'ui.toast'), 'a refused bot change (reason ranked) is silent');
+  urls.length = 0; last.terminate(); await sleep(1800); ok(urls.some(u => /[?&]rk=1/.test(u) && /room=RNKD/.test(u) && !/back=1/.test(u)), `a reconnect from the warm-up: rk=1, the room, never back=1: ${urls.at(-1)}`);
+  await sleep(1500); i = await info(pg); ok(i.phase === 'lobby' && i.room === null && has(await since(pg, m0), 'ui.toast', t => /void, no trophies changed/.test(t)), `the fake answers rk=1 with rkend restart: back in the lobby with the notice (${i.phase}, room ${i.room})`);
+  got.length = 0; await h(pg, 'lobby.ranked'); await sleep(600); go(); await waitFor('the warm-up court open', async () => { const i = await info(pg); return i.phase === 'play' && i.screen === null; }, 30000);      // queued again, and the fake AirPod calibrates: the court is what is on screen, so the cards draw
+  m0 = await mark(pg); push({ type: 'matchover', winner: 0, score: [7, 3], forfeit: false, rematchBy: 20, names: [NAME, 'Matt'], reg: [false, false], rank: [{ tier: 2, div: 2 }, null], rk: { matt: true, next: 6 } }); await sleep(300); cs = await since(pg, m0);
+  ok(has(cs, 'ui.matchResult', o => o.won === true && o.vote === false && o.rk && o.rk.matt === true && Array.isArray(o.rank) && o.rank[0] && o.rank[0].tier === 2) && !has(cs, 'ui.rematch'), `a warm-up game's card: no vote, rk.matt and the ranks passed on (${J(cs.find(c => c[0] === 'ui.matchResult')?.[1]?.rk)})`);
+  m0 = await mark(pg); push({ type: 'rkres', matt: true, saved: true, won: true, delta: 8, trophies: 248, tier: 2, div: 2, tierWas: 2, divWas: 2, counted: true, why: [] }); await sleep(200);
+  ok((await pg.evaluate(() => JSON.stringify([window.__stats.rk.trophies, window.__stats.rk.div]))) === '[248,2]', `rkres on the card: my trophies and division follow (${await pg.evaluate(() => JSON.stringify([window.__stats.rk.trophies, window.__stats.rk.div]))})`);
+  push({ type: 'rematchon' }); await sleep(200);
+  m0 = await mark(pg); push({ type: 'room', code: 'SRS1', public: false, role: 'player', rk: true, kind: 'match' }); push({ type: 'welcome', side: 1, role: 'player', court: COURT, names: ['Kim', NAME], reg: [true, false], rank: [{ tier: 3, div: 1 }, { tier: 2, div: 2 }], venue: 'stadium', series: { game: 1, games: [0, 0], bestOf: 3 } }); push({ type: 'state', t: 3, p: [0, 1, 0], v: [0, 0, 0], live: true, serving: 0, score: [0, 0], paddles: [HUMAN, ME] }); await sleep(600); cs = await since(pg, m0); i = await info(pg);
+  ok(i.room === 'SRS1' && !has(cs, 'ui.toast', t => /closed/i.test(t)) && has(cs, 'ui.rkCourt', k => k === 'match') && has(cs, 'ui.setNames', o => o && o.rank && o.rank[0] && o.rank[0].tier === 2 && o.rank[1] && o.rank[1].tier === 3 && o.rank[1].div === 1) && has(cs, 'ui.setSettings', o => o && o.rkMatch === true) && (await pg.evaluate(() => window.__stats.rk.series.bestOf)) === 3 && i.phase === 'play', `moved to the series court with no closed: rkCourt('match'), both emblems, the can't-pause note, the series known (room ${i.room}, ${i.phase})`);
+  m0 = await mark(pg); push({ type: 'matchover', winner: 1, score: [4, 7], forfeit: false, rematchBy: 20, names: ['Kim', NAME], reg: [true, false], rank: [{ tier: 3, div: 1 }, { tier: 2, div: 2 }], rk: { games: [1, 2], bestOf: 3, game: 3, scores: [[7, 4], [5, 7], [4, 7]], done: true, gap: 12 } }); await sleep(300); cs = await since(pg, m0);
+  ok(has(cs, 'ui.matchResult', o => o.won === true && o.vote === false && o.rk && o.rk.done === true && o.rank[0].tier === 2 && o.rank[1].tier === 3) && !has(cs, 'ui.rematch'), `the series card: won, no vote, rk.done, my rank left and theirs right`);
+  m0 = await mark(pg); push({ type: 'closed', reason: 'round' }); await sleep(400); cs = await since(pg, m0); i = await info(pg);
+  ok(!has(cs, 'ui.toast', t => /closed/i.test(t)) && has(cs, 'ui.lobbyView', v => v === 'ranked') && has(cs, 'ui.rkCourt', k => k === null) && i.room === null && (await pg.evaluate(() => window.__stats.rk.on)) === false, `closed round: quiet, the Ranked view, out of the queue (room ${i.room})`);
+  // NOTES 111: the rkLate replay. A held seat's series settles while its socket is down; the reconnect's &rk=1 gets only that rkres: off the dead court, the result on the Ranked view, never the 'void' toast
+  const SERIES = code => { push({ type: 'room', code, public: false, role: 'player', rk: true, kind: 'match' }); push({ type: 'welcome', side: 0, role: 'player', court: COURT, names: [NAME, 'Kim'], reg: [false, true], rank: [{ tier: 2, div: 2 }, { tier: 3, div: 1 }], venue: 'stadium', series: { game: 1, games: [0, 0], bestOf: 3 } }); push({ type: 'state', t: 3, p: [0, 1, 0], v: [0, 0, 0], live: true, serving: 0, score: [2, 1], paddles: [ME, HUMAN] }); };
+  const heldNow = async from => { await h(pg, 'lobby.rankedOpen'); await sleep(150); return (await since(pg, from)).filter(c => c[0] === 'ui.rkView').map(c => c[1] && c[1].hold).filter(Boolean).at(-1) || ''; };      // the view opening (the stub's lobbyView does not call it; the recorder drops a repeat of the same call, so read from the event's mark): what the real profile.showRanked draws under Find a match, the line main.js holds over its redraws
+  let hv = ''; SERIES('SRS2'); await waitFor('the second series court open', async () => { const i = await info(pg); return i.phase === 'play' && i.room === 'SRS2'; }, 20000);
+  rkLateRes = { type: 'rkres', won: true, delta: 33, trophies: 273, tier: 2, div: 3, tierWas: 2, divWas: 2, floorHeld: false, counted: true, saved: true, why: [], games: [1, 0], scores: [[7, 3]] };
+  urls.length = 0; m0 = await mark(pg); last.terminate(); await sleep(7000); cs = await since(pg, m0); i = await info(pg);      // past the 5 s watchdog
+  ok(urls.some(u => /[?&]rk=1/.test(u) && /room=SRS2/.test(u)) && i.room === null && i.phase === 'lobby' && has(cs, 'ui.lobbyView', v => v === 'ranked') && !has(cs, 'ui.toast', t => /void/.test(t)) && (hv = await heldNow(m0)) === '+33 trophies' && (await pg.evaluate(() => window.__stats.rk.trophies)) === 273, `rkLate: the reconnect's rkres takes me off the dead court to the Ranked view with "${hv}", no void toast (room ${i.room}, ${i.phase}, toasts ${J(cs.filter(c => c[0] === 'ui.toast').map(c => c[1]))})`);
+  // the leaver's own result: 'Forfeit: 20 trophies' (or the floor), never 'didn't count'
+  SERIES('SRS3'); await waitFor('the third series court open', async () => { const i = await info(pg); return i.phase === 'play' && i.room === 'SRS3'; }, 20000);
+  got.length = 0; await pg.keyboard.press('KeyQ'); await sleep(150); await pg.keyboard.press('KeyQ'); await sleep(300); i = await info(pg);
+  m0 = await mark(pg); push({ type: 'rkres', won: false, delta: -20, trophies: 220, tier: 2, div: 1, tierWas: 2, divWas: 2, floorHeld: false, counted: true, saved: true, why: [] }); await sleep(300); cs = await since(pg, m0);
+  ok(sent('leave').length === 1 && i.room === null && (hv = await heldNow(m0)) === 'Forfeit: 20 trophies', `Q Q out of a series, then its rkres: "${hv}" (leave ${sent('leave').length}, room ${i.room})`);
+  m0 = await mark(pg); push({ type: 'rkres', won: false, delta: -18, trophies: 202, tier: 2, div: 2, tierWas: 2, divWas: 2, floorHeld: false, counted: false, saved: true, why: ['left_early'] }); await sleep(300); cs = await since(pg, m0);
+  ok((hv = await heldNow(m0)) === 'Forfeit: 18 trophies', `a leaver's rkres with counted:false and 18 taken (a line unlike the last: the recorder drops a repeated call) says "${hv}", not 'did not count'`);
+  m0 = await mark(pg); push({ type: 'rkres', won: false, delta: 0, trophies: 150, tier: 2, div: 1, tierWas: 2, divWas: 1, floorHeld: true, counted: false, saved: true, why: ['left_early'] }); await sleep(300); cs = await since(pg, m0);
+  ok((hv = await heldNow(m0)) === 'Forfeit: you keep Silver', `the floor held the leaver's loss: "${hv}"`);
+  // a spectator of a Ranked warm-up: no queue state, no pill, and its reconnect watches again (never &rk=1)
+  m0 = await mark(pg); await h(pg, 'lobby.watch', 'RKWT'); await sleep(600); cs = await since(pg, m0); i = await info(pg);
+  ok(i.room === 'RKWT' && i.phase === 'watch' && !has(cs, 'ui.rkPill', o => o && o.on === true) && (await pg.evaluate(() => JSON.stringify([window.__stats.rk.queued, window.__stats.rk.on]))) === '[false,true]', `watching a Ranked warm-up: no pill, not queued (${i.room}, ${i.phase}, rk ${await pg.evaluate(() => JSON.stringify(window.__stats.rk))})`);
+  urls.length = 0; m0 = await mark(pg); last.terminate(); await sleep(1800); cs = await since(pg, m0); i = await info(pg);
+  ok(urls.length && urls.every(u => !/[?&]rk=1/.test(u) && /room=RKWT&watch=1/.test(u)) && i.room === 'RKWT' && i.phase === 'watch' && !has(cs, 'ui.lobbyView', v => v === 'ranked'), `a spectator's reconnect watches again: no rk=1 (${urls.at(-1)}, room ${i.room}, ${i.phase})`);
+  await pg.keyboard.press('KeyQ'); await sleep(150); await pg.keyboard.press('KeyQ'); await sleep(400);
+  m0 = await mark(pg); push({ type: 'rkend', why: 'restart' }); await sleep(300); cs = await since(pg, m0);
+  ok(has(cs, 'ui.toast', t => t === 'Updating. The Ranked match is void, no trophies changed.') && has(cs, 'ui.lobbyView', v => v === 'ranked'), `rkend restart: the notice, the Ranked view`);
+  ok((await info(pg)).errors === 0, `ranked: no errors`); rest(); await pg.close(); }
+
 // B5. the legacy page: no lobby, no attract, no votes, 'closed' is harmless; a matchover that lands mid-calibration waits for the court
-{ rest(); const pg = await openB('legacy', '&skiptitle=1', { airpod: true }); let cs, i; await waitFor('legacy calibrate screen', async () => (await info(pg)).screen === 'calibrate', 6000); go();
+if (!B7) { rest(); const pg = await openB('legacy', '&skiptitle=1', { airpod: true }); let cs, i; await waitFor('legacy calibrate screen', async () => (await info(pg)).screen === 'calibrate', 6000); go();
   push({ type: 'matchover', winner: 0, score: [11, 3], forfeit: false, rematchBy: 5 }); push({ type: 'closed', reason: 'empty' }); await sleep(400); cs = await since(pg, 0); i = await info(pg);
   ok(i.phase === 'calibrate' && i.view.menu && !i.view.attract && !has(cs, 'scene.startAttract') && has(cs, 'scene.setSide', s => s === 0) && !has(cs, 'ui.matchResult') && i.errors === 0, `legacy: seated at once, menu mode on, no attract rally, the result waits (${i.phase})`);
   await waitFor('legacy on the court', async () => { const i = await info(pg); return i.phase === 'play' && i.screen === null; }, 30000); await sleep(300); cs = await since(pg, 0); i = await info(pg);
@@ -406,7 +510,7 @@ const GAME_UI = ['ui.setNames', 'ui.setScore', 'ui.setServe', 'ui.setRally', 'ui
 
 // B6. tournaments (docs/COURTS-TOURNEY.md 4.5-4.7): tour, tmove, tourfail and tourend are heard above the guard; a tournament's court shows the
 // tournament's code, never its own; its closing is quiet and lands on the bracket; a reconnect carries &tour= and never back=1; tourend ends it
-{ got.length = 0; const pg = await openB('tour'); let cs, i, m0; await h(pg, 'start'); await sleep(400);
+if (!B7) { got.length = 0; const pg = await openB('tour'); let cs, i, m0; await h(pg, 'start'); await sleep(400);
   const SNAP = { type: 'tour', code: 'TRNY', phase: 'reg', min: 4, max: 16, n: 1, host: NAME, win: 7, final: 11, you: { id: 1, host: true, out: false, viewer: false, warm: 'off' }, players: [{ id: 1, name: NAME, host: true, out: false, left: false, on: true }], rounds: [], next: null, champ: null };
   await h(pg, 'tour.create'); await sleep(300); ok(J(sent('tcreate')) === J([{ type: 'tcreate', name: NAME }]), `Create tournament sends ${J(sent('tcreate'))}`);
   m0 = await mark(pg); push(SNAP); await sleep(300); cs = await since(pg, m0); i = await info(pg);

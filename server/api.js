@@ -73,7 +73,7 @@ const deviceOf = (b, req) => {                                    // the body's 
 // ---- the routes (8.2) ----
 async function me(req, res) {
   const s = db.isOpen() ? session(req) : null;                   // a failed write elsewhere (a full disk) does not sign anyone out
-  send(res, 200, { signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok() });
+  send(res, 200, { signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok(), ladder: s ? db.ladderOf(s.ownerId, Date.now()) : null });   // ladder (docs/RANKED.md 10.1): the signed-in account's rank for the home tile; a guest reads it from /api/stats with its device id
 }
 async function statsRoute(req, res, b) {
   const s = session(req); if (s) return send(res, 200, { profile: db.profileOf(s.ownerId) });
