@@ -1,6 +1,6 @@
 // The share card (docs/SHARE.md 2): a player's rank, Matt badge and best stats drawn as a 1200x630 SVG, turned into a PNG by @resvg/resvg-js.
 // Pure until png(): dataOf picks exactly what is drawn (nothing from a request), hashOf names that picture, svgOf draws it. png() renders one
-// card at a time off the main thread (renderAsync), keeps the last 64 in memory, and answers null when the renderer is missing or fails, so
+// card at a time in a worker thread, keeps the last 64 in memory, and answers null when the renderer is missing or fails, so
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
@@ -187,10 +187,34 @@ function svgOf(d) {
   return out.join('\n');
 }
 
-// ---- rendering: lazily loaded, one at a time, the last 64 kept ----
-let R, failAt = -Infinity;                                       // R: the resvg module, null once it failed to load
-const lib = () => { if (R !== undefined) return R; try { R = require('@resvg/resvg-js'); } catch { R = null; } return R; };
+// ---- rendering: in one worker thread (resvg's render AND its PNG encode would otherwise take the 60 Hz loop's time), one card at a time, the last 64 kept ----
+const OPTS = { fitTo: { mode: 'original' }, font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: F[800] } };
+const JOB_MS = 15e3, RESPAWN_MS = 60e3;                           // a card that takes longer is abandoned (the worker with it); a dead worker is replaced at most once a minute
+const WORKER = `const { parentPort, workerData } = require('node:worker_threads'); let R = null; try { R = require(workerData.lib); } catch { /* answered as null below */ }
+parentPort.on('message', ({ id, svg }) => { let buf = null; try { if (R) buf = new R.Resvg(svg, workerData.opts).render().asPng(); } catch { buf = null; } parentPort.postMessage({ id, buf }); });`;
+let libPath, worker = null, diedAt = -Infinity, jobN = 0, failAt = -Infinity;
+const jobs = new Map();                                          // job id -> { done, timer }
+const lib = () => { if (libPath !== undefined) return libPath; try { libPath = require.resolve('@resvg/resvg-js'); } catch { libPath = null; } return libPath; };   // resolved here, loaded in the worker
 function say(line) { const t = Date.now(); if (t - failAt < 3600e3) return; failAt = t; console.log(line); }   // one line an hour, never a name or a slug
+function kill() { const w = worker; worker = null; diedAt = Date.now(); for (const [id, j] of jobs) { clearTimeout(j.timer); jobs.delete(id); j.done(null); } try { if (w) w.terminate().catch(() => {}); } catch { /* gone */ } }
+function spawn() {
+  if (worker) return worker; if (Date.now() - diedAt < RESPAWN_MS) return null;
+  try {
+    const { Worker } = require('node:worker_threads');
+    const w = new Worker(WORKER, { eval: true, workerData: { lib: libPath, opts: OPTS }, resourceLimits: { maxOldGenerationSizeMb: 64 } });
+    w.on('message', m => { const j = m && jobs.get(m.id); if (!j) return; jobs.delete(m.id); clearTimeout(j.timer); j.done(m.buf ? Buffer.from(m.buf.buffer, m.buf.byteOffset, m.buf.byteLength) : null); });
+    w.on('error', () => { if (worker === w) kill(); }); w.on('exit', () => { if (worker === w) kill(); });
+    w.unref(); worker = w; return w;
+  } catch { diedAt = Date.now(); return null; }
+}
+function inWorker(svg) {                                         // -> Promise<Buffer | null>, never rejects
+  return new Promise(done => {
+    const w = spawn(); if (!w) return done(null);
+    const id = ++jobN, timer = setTimeout(() => { if (jobs.has(id)) kill(); }, JOB_MS); if (timer.unref) timer.unref();
+    jobs.set(id, { done, timer });
+    try { w.postMessage({ id, svg }); } catch { jobs.delete(id); clearTimeout(timer); done(null); }
+  });
+}
 const cache = new Map(), CACHE_MAX = 64, inflight = new Map();
 let chain = Promise.resolve(), pending = 0;
 const QUEUE_MAX = 16;
@@ -199,14 +223,15 @@ const cached = key => { const b = cache.get(key); if (b) { cache.delete(key); ca
 function png(key, data) {
   const hit = cached(key); if (hit) return Promise.resolve(hit);
   if (inflight.has(key)) return inflight.get(key);
-  const r = lib(); if (!r) { say('card: renderer unavailable, serving og.jpg'); return Promise.resolve(null); }
+  if (!lib()) { say('card: renderer unavailable, serving og.jpg'); return Promise.resolve(null); }
   if (pending >= QUEUE_MAX) return Promise.resolve('busy');
   pending++;
   const p = chain.then(async () => {
     let svg; try { svg = svgOf(data); } catch { return null; }
-    const img = await r.renderAsync(svg, { fitTo: { mode: 'original' }, font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: F[800] } });
-    const buf = img.asPng(); cache.set(key, buf); while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value); return buf;
-  }).catch(() => { say('card: render failed, serving og.jpg'); return null; }).finally(() => { pending--; inflight.delete(key); });
+    const buf = await inWorker(svg);
+    if (!buf) { say('card: render failed, serving og.jpg'); return null; }
+    cache.set(key, buf); while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value); return buf;
+  }).catch(() => null).finally(() => { pending--; inflight.delete(key); });
   chain = p; inflight.set(key, p);
   return p;
 }
