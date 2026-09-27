@@ -41,16 +41,17 @@ function make(o, req, now) {
   }
   return null;
 }
-const drop = o => db.shareDrop(o);                               // stop sharing: the row goes, the old link is dead, the next make() is a new slug
+function forget(o) { try { const s = db.shareOf(o); if (s) card.forget(s.slug); } catch { /* memory only */ } }   // before a delete or a merge takes the row: its cached pictures go with it
+const drop = o => { forget(o); return db.shareDrop(o); };        // stop sharing: the row goes, the old link is dead, the next make() is a new slug
 
 // ---- the public routes ----
 let salt = crypto.randomBytes(32), saltAt = Date.now(); const buckets = new Map();
-function allowRender(req) {                                      // a per-computer budget for cache-miss renders (a keyed hash of the address, never the address; replaced daily)
+function allowRender(req) {                                      // -> { wait (s), b: the bucket charged }. A per-computer budget for cache-miss renders (a keyed hash of the address, never the address; replaced daily)
   const t = Date.now(); if (t - saltAt >= DAY) { salt = crypto.randomBytes(32); saltAt = t; buckets.clear(); }
   const k = crypto.createHmac('sha256', salt).update(abuse.computerKey(auth.clientAddr(req).addr)).digest('base64').slice(0, 22);
   let b = buckets.get(k); if (!b || t - b.at >= MIN) { if (!b && buckets.size >= KEYS_MAX) buckets.clear(); b = { at: t, n: 0 }; buckets.set(k, b); }
-  if (b.n >= RENDERS()) return Math.max(1, Math.ceil((b.at + MIN - t) / 1000));
-  b.n++; return 0;
+  if (b.n >= RENDERS()) return { wait: Math.max(1, Math.ceil((b.at + MIN - t) / 1000)) };
+  b.n++; return { wait: 0, b };
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function blurb(d) {                                              // og:description: one line of the best of the card, then where to play
@@ -144,8 +145,10 @@ async function page(req, res, rel, notFound) {
     const inm = String(req.headers['if-none-match'] || '');
     if (inm && inm.split(',').some(t => t.trim().replace(/^W\//, '') === etag)) { res.writeHead(304, { ...HEAD, ETag: etag }); return res.end(); }
     const key = slug + ':' + hash;
-    if (!card.isCached(key)) { const wait = allowRender(req); if (wait) { res.writeHead(429, { 'Retry-After': String(wait), 'Content-Length': 0, 'Cache-Control': 'no-store' }); return res.end(); } }
+    const charged = card.isCached(key) ? null : allowRender(req);
+    if (charged && charged.wait) { res.writeHead(429, { 'Retry-After': String(charged.wait), 'Content-Length': 0, 'Cache-Control': 'no-store' }); return res.end(); }
     const buf = await card.png(key, d);
+    if (buf === 'busy' && charged && charged.b.n > 0) charged.b.n--;   // nothing was drawn for it: the retry Retry-After asks for must not find the budget spent
     if (buf === 'busy') { res.writeHead(503, { 'Retry-After': '5', 'Content-Length': 0, 'Cache-Control': 'no-store' }); return res.end(); }
     if (!buf) return fallback(req, res);
     send(req, res, 200, { 'Content-Type': 'image/png', ...HEAD, ETag: etag }, buf);
@@ -154,4 +157,4 @@ async function page(req, res, rel, notFound) {
   }
 }
 
-module.exports = { make, drop, linkOf, page, newSlug, origin, SLUG };
+module.exports = { make, drop, forget, linkOf, page, newSlug, origin, SLUG };

@@ -1596,8 +1596,11 @@ Added next to `nosniff` (server/game.js:23) for every response:
 
 ### 11.7 `server/admin.js` (operator CLI, never reachable over HTTP)
 `node server/admin.js <cmd>` against `PODDLE_DB`: `counts` (rows per table), `rename <username> <new>`, `release
-<username>` (drop a name hold), `delete-account <username>`, `backup [--clean]` (11.6), `sweep`. Run with `fly ssh
-console -C`. `delete-account` is for OPERATOR-initiated cases only: an under-13 report (6.5) or a Terms breach. It is
+<username>` (drop a name hold), `delete-account <username>`, `backup [--clean]` (11.6), `sweep`, `unshare <link or
+code>` and `unshare-user <username>` (docs/SHARE.md; NOTES 112). Run with `fly ssh console -C`. `unshare` honours an e-mailed
+"stop this link" that sends the link itself (the privacy page, sections 7 and 9: holding a link is all it grants, so no proof of
+ownership is asked), and a link the Terms (5) let us disable; `unshare-user` stops the link of an account whose username is
+offensive (then `rename`). Neither prints a code, a name or an id. `delete-account` is for OPERATOR-initiated cases only: an under-13 report (6.5) or a Terms breach. It is
 never used to honour an e-mailed "delete account X" on a username alone (anyone who knows a username could then
 delete it); a player's own request goes through the in-game tools or a signed-in session (8.1).
 

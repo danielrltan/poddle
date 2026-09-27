@@ -95,7 +95,8 @@ async function signin(req, res, b) {
   const now = Date.now(), old = auth.readSession(req.headers.cookie);
   if (old) { stats.forget({ tokenHash: auth.tokenHash(old) }); db.session.revoke(old); }   // fixation: the session the request carried goes first, whoever's it was
   const a = db.accountBySub(p.sub) || db.createAccount(p.sub, now); if (!a) return fail(res, 503, 'db_unavailable', { 'Set-Cookie': clear });
-  const h = deviceOf(b, req), merged = h ? db.mergeDevice(h, a.id, now) : 'none';
+  const h = deviceOf(b, req), g0 = h ? db.guestOwner(h) : null; if (g0 != null) share.forget(g0);   // a merge deletes the guest's link: its pictures leave memory first
+  const merged = h ? db.mergeDevice(h, a.id, now) : 'none';
   const out = {}, raw = db.session.create(a.id, now, out); if (!raw) return fail(res, 503, 'db_unavailable', { 'Set-Cookie': clear });
   for (const t of out.evicted || []) stats.forget({ tokenHash: t });   // the 11th session evicted the oldest: its sockets stop speaking for the account
   send(res, 200, { account: account({ accountId: a.id }), merged, profile: withShare(db.profileOf(a.owner_id), a.owner_id, req) }, { 'Set-Cookie': [auth.sessionCookie(raw), clear] });
@@ -121,8 +122,8 @@ async function del(req, res, b) {
   const g = h ? db.guestOwner(h) : null;                         // only an UNMERGED guest: a merged device id deletes nothing by itself (8.1)
   const merged = !!h && !!s && db.accountByDevice(h) === s.accountId;   // ...but with the session it names this account's own browser
   if (s || g != null) stats.forget({ accountId: s ? s.accountId : null, devHash: g != null || merged ? h : null, deleted: true });   // first: no live seat or socket frozen on this account or device may write it again (3.3)
-  if (s) out.account = db.deleteOwner(s.ownerId, now);
-  if (g != null) out.device = db.deleteOwner(g, now);
+  if (s) { share.forget(s.ownerId); out.account = db.deleteOwner(s.ownerId, now); }   // forget: the card pictures in memory go with the link
+  if (g != null) { share.forget(g); out.device = db.deleteOwner(g, now); }
   send(res, 200, { deleted: out }, { 'Set-Cookie': auth.clearSessionCookie() });
 }
 async function exportRoute(req, res, b) {
@@ -144,7 +145,11 @@ async function shareMake(req, res, b) {
   if (!r) return fail(res, 503, 'db_unavailable');
   send(res, 200, r);
 }
-async function shareStop(req, res, b) { const o = shareOwner(req, b); if (o != null) share.drop(o); send(res, 204); }   // idempotent: no link, no owner, still 204
+async function shareStop(req, res, b) {                            // idempotent: no link, no owner, still 204
+  const o = shareOwner(req, b); if (o != null) share.drop(o);
+  if (session(req)) { const h = deviceOf(b, req), g = h ? db.guestOwner(h) : null; if (g != null && g !== o) share.drop(g); }   // signed in on a browser whose guest stats did not merge (the caps): its link stops too, as Delete my data deletes both
+  send(res, 204);
+}
 // path -> method -> [handler, per-minute-or-hour limit, window, needs sign-in on, needs the database]
 const ROUTES = {
   '/api/me': { GET: [me, 60, MIN, false, false] },

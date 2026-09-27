@@ -98,7 +98,8 @@ function optOut(m, pl, ws, mem) {
 function launched(m) { if (!m || m.done) return; if (!m.t0) m.t0 = Date.now(); m.rally++; }   // launch(): every struck ball
 function rallyReset(m) { if (!m || m.done) return; m.rally = 0; for (const s of m.seats) if (s && !s.bot) s.rallyReal = s.rallyHeld = 0; }   // reset(): a fresh point
 // A contact's kind is final only once the settled report had its chance: strike() never calls a bet a smash (game.js caps a bet's power at
-// SMASH) and the settled report rewrites pl.hit.kind in place (reaim / fixBlock). Every fix path needs ball.lastHit === that side and a live
+// SMASH) and the settled report rewrites pl.hit.kind in place (reaim / fixBlock; only when the ball really flies as that kind: a lofted bet or a
+// settled landing that cannot clear the net keeps the kind it was struck as). Every fix path needs ball.lastHit === that side and a live
 // ball, so by the seat's next contact, the point's end or the match's end the kind can no longer move: it is counted then (docs/SHARE.md 1)
 function shotDone(s) { if (s.shot && s.shot.kind === 'smash') s.smashes++; s.shot = null; }
 // contact(m, pl, sw) -> true when this contact recorded a settled swing itself (the caller marks pl.hit.statted)

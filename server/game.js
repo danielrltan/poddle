@@ -338,6 +338,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // speed is never eased (that swung it out wide and the pull hooked it back, a zig-zag: NOTES 72). The pull alone carries it from where
   // it is, on the heading it has, onto the marker: c = 2 (land - x - vx T) / T^2. At least CURVE.swoop m of bow, the way solve() hooks
   // it (or more, if the settled aim needs more bend that same way); the marker says where that lands, kept on the court.
+  // -> true when it flew the settled `kind` (announced it): the callers keep pl.hit.kind true to the ball, which stats counts smashes from
   function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
     if (kind && (kind === 'lob' || kind === 'dink') !== ball.lofted) kind = undefined;   // the arc was chosen at contact: a flat ball is never announced as a lob (a white trail on a drive), a lofted one never as a drive or a smash
@@ -350,7 +351,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     let land = sol.land; const net = pz * land[1] < 0;            // still to cross it
     if (net && !over(ball.v[2], 0.05)) land = null;
     for (let d = Math.abs(land ? land[1] : 0); net && land && !over((land[1] - pz) / T, 0); d += 0.1) land = d + 0.1 > 6.2 ? null : [land[0], Math.sign(land[1]) * (d + 0.1)];
-    if (!land) { broadcast({ type: 'launch', by: side, land: ball.land, spin: ball.spin, k: ball.kick, c: ball.curl, n, p: ball.p, v: ball.v, t: now }); return; }   // flies as struck: the marker stays where it really lands. n: the trail still burns for the real power
+    if (!land) { broadcast({ type: 'launch', by: side, land: ball.land, spin: ball.spin, k: ball.kick, c: ball.curl, n, p: ball.p, v: ball.v, t: now }); return false; }   // flies as struck: the marker stays where it really lands. n: the trail still burns for the real power
     let v = [(land[0] - x) / T, vy, (land[1] - pz) / T];
     if (sol.curl) {
       const vx = ball.v[0], cReq = 2 * (land[0] - x - vx * T) / (T * T), cMin = Math.abs(sol.curl) * CURVE.swoop / CURVE.bow;
@@ -361,7 +362,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     ball.land = land; ball.aim = { land, T, k: Math.max(1, Math.round(clamp(FIX_SHARE * T, FIX_EASE, FIX_EASE_MAX) / DT)), side, swoop: !!sol.curl };
     if (ball.spin > 0 && sol.spin > 0) ball.kick = sol.kick * ball.spin / sol.spin;
     planFootwork(1 - side, v);
-    broadcast({ type: 'launch', by: side, land, spin: ball.spin, k: ball.kick, c: ball.curl, n, kind, p: ball.p, v: ball.v, t: now });     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet). p v t: vy is the one it was struck with, only the curl is new
+    broadcast({ type: 'launch', by: side, land, spin: ball.spin, k: ball.kick, c: ball.curl, n, kind, p: ball.p, v: ball.v, t: now }); return !!kind;     // the landing marker moves now. n: the trail burns for the real power, not the bet. kind: only when the settled swing changed it (a smash is announced here, never on a bet). p v t: vy is the one it was struck with, only the curl is new
   }
   const aimV = [0, 0, 0];
   // The ease steers only across and along: the height is the ball's own, ballistic from the paddle (NOTES 90), so the landing time is
@@ -465,9 +466,9 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   function fixBlock(pl, n, dir, lob, slice) {
     const h = pl.hit, w = h.near || 0;
     const b = w > 0 && n < PUSH.full ? blockShot(n, h.spd) : null;
-    const out = b ? lerp(n, b.n, w) : n, kind = b && w >= 0.5 ? pushKind(out) : shotKind(n, lob, slice), changed = kind !== h.kind;
+    const out = b ? lerp(n, b.n, w) : n, kind = b && w >= 0.5 ? pushKind(out) : shotKind(n, lob, slice), was = h.kind, changed = kind !== was;
     Object.assign(h, { n, dir, lob, slice, kind, held: false, blk: b ? { w, spd: h.spd } : null });
-    reaim(pl.side, out, dir, lob, slice, changed ? kind : undefined, b ? { depth: b.depth, w } : null, h.floor ? 0 : 1);   // settled: a hard one from up here curls too (a push under PUSH.full never can)
+    if (!reaim(pl.side, out, dir, lob, slice, changed ? kind : undefined, b ? { depth: b.depth, w } : null, h.floor ? 0 : 1) && changed) h.kind = was;   // settled: a hard one from up here curls too (a push under PUSH.full never can). Not flown as the new kind: it stays what it was struck as (a smash is counted only if it flew as one)
   }
 
   // a fresh pair (human+human or human+bot): clean score, first serve
@@ -909,8 +910,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
         else if (me.hit && me.hit.near > 0 && final && now - me.hit.at < PUSH.fix && ball.live && ball.lastHit === me.side && ball.p[2] * sgn(me.side) > PUSH.gate) { fixBlock(me, pw, dir, lob, slice); ran = true; }
         else if (me.hit && !me.hit.near && final && now - me.hit.at < FIX_WINDOW && ball.live && ball.lastHit === me.side && !ball.bounces && ball.p[2] * sgn(me.side) > 1
           && (Math.abs(pw - me.hit.n) > 0.04 || (pw > SMASH) !== (me.hit.n > SMASH) || Math.abs(dir - me.hit.dir) > 0.1 || Math.abs(lob - me.hit.lob) > 0.1 || Math.abs(sliced(slice, lob) - sliced(me.hit.slice, me.hit.lob)) > 0.2 || (slice < 0) !== (me.hit.slice < 0) && sliced(slice, lob) > 0.3)) {
-          const kind = shotKind(pw, lob, slice), changed = kind !== me.hit.kind;
-          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined, undefined, me.hit.floor ? 0 : 1);   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
+          const kind = shotKind(pw, lob, slice), was = me.hit.kind, changed = kind !== was;
+          Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); if (!reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined, undefined, me.hit.floor ? 0 : 1) && changed) me.hit.kind = was;   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
           ran = true;
         }
         if (sure && !me.swing && stats.fixRecords(me.hit, betN, pw, ran, now, Math.max(FIX_WINDOW, PUSH.fix))) { swingStat(me, pw, pk, src); me.hit.statted = true; }   // a settled report that speaks for the contact (docs/ACCOUNTS.md 4.5)

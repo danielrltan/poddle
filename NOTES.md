@@ -2061,3 +2061,23 @@ No home-page notice: sharing is opt-in and the changelog carries the change.
 (RANK_NAME + divisions); it is the one function to change, and bump `CARD_V` with it so every card URL changes. The
 play counters use their own `playAdd` statement and `PLAY_COLS` columns (no MIGRATIONS entry), and stats.js's seatAcc,
 onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
+
+**Review fixes (before launch).**
+- Memory (critical): each render left ~3.5 MB of native memory (resvg's pixmap, tree and PNG) that is freed only when the
+  worker's V8 collects, and its JS heap stays near 4 MB, so it rarely did: 100 renders in a row took RSS from 45 to 361 MB
+  (the Fly VM has 256 MB; an out-of-memory kill ends every match). The worker now turns on `--expose-gc` for itself and
+  collects after every job: 45 -> 122 MB with the cache full. test/share.test.mjs asserts under 100 MB of growth.
+- Smashes: reaim() now says whether the ball flew as the settled kind; when it did not (a lofted bet, or a settled
+  landing that cannot clear the net, which flies as struck) `pl.hit.kind` goes back to what it was struck as, so a smash
+  is counted only if it flew as one.
+- Stop sharing while signed in on a browser whose guest stats did not merge (the caps) now stops that guest's link too,
+  as Delete my data deletes both (the privacy page, section 7, says so).
+- A 503 (render queue full) refunds its charge on the per-computer render budget: the retry Retry-After asks for is no
+  longer a 429.
+- Operator: `node server/admin.js unshare <link or code>` and `unshare-user <username>` (docs/ACCOUNTS.md 11.7), which the
+  privacy page's "ask us to delete it" and the Terms' "we may disable any link" needed. Sending the link is enough (it
+  grants nothing more than itself), and privacy section 9 now says that proof of ownership is not asked for it.
+- Card pictures in memory: Stop sharing, Delete my data and a merge drop that link's cached PNGs (`card.forget`); the
+  sweeps and the admin CLI cannot reach the server's memory, so privacy section 7 now says pictures stay in memory until
+  replaced or a restart and are never shown through a deleted link.
+- The changelog no longer says every signed-in card carries a username (only one that has picked one).

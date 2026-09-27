@@ -45,7 +45,7 @@ Last reviewed: 2026-09-27 (play counters and share cards, NOTES 112; before that
 ## 3a. Share cards (docs/SHARE.md; opt-in, Your stats > Share card)
 - Data: table `share` (owner id, a 10-char random slug from `crypto.randomBytes`, never derived from an id; created
   date). One per owner. In memory only: a keyed hash (daily key) of the requester's network address counting card
-  renders a minute (server/share.js), and the last 64 rendered PNGs.
+  renders a minute (server/share.js), and the last 64 rendered PNGs (until replaced or a restart; privacy section 7 says so).
 - Made public to anyone with the link (page /c/<slug> and its PNG, both `noindex`): the username (or "Poddle player";
   guest display names are never stored), rank + trophies, the toughest Matt beaten, up to six stats (return rate,
   longest rally, fastest swing, W-L vs people, best streak, titles, winners, aces, smashes, matches played), read
@@ -56,7 +56,11 @@ Last reviewed: 2026-09-27 (play counters and share cards, NOTES 112; before that
 - Retention: until Stop sharing, or deleted with the profile (cascade: Delete my data, the guest 90 d / account 24 month
   sweeps). A guest->account merge deletes the guest's link. Responses are `Cache-Control: public, max-age=300`. A guest
   who turns stats off without deleting, or clears storage, can no longer reach Stop sharing: the link lives until the
-  guest sweep or an emailed request (the privacy page says so).
+  guest sweep or an emailed request (the privacy page says so). The operator stops a link with `node server/admin.js
+  unshare <link or code>` (sending the link is enough: it grants nothing more than itself) or `unshare-user <username>`
+  (an offensive username, Terms 5). Stop sharing while signed in also stops the browser's unmerged guest link (the caps).
+  The PNG cache is in memory only: Stop sharing, Delete my data and a merge clear that link's pictures; the sweeps and
+  the admin CLI (another process) cannot, but a dead link never serves one (the owner is checked first).
 - Security: unknown or malformed slugs get a 404 and nothing is rendered; per-computer render budget; no slug, name or
   id in the logs; the export includes the link (`share: { url, created }`).
 

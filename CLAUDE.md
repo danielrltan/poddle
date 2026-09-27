@@ -35,7 +35,7 @@ Important changes also need a notice on the home page. Open questions for the op
   profile + bot_record (W/L, streaks, points, titles, best rally/hit/speed + dates, four Matt rungs: wire 0,1,3,2;
   play totals over counted matches: hits, returns, chances, winners, aces, smashes, points won/lost, seconds played);
   share (owner, random 10-char slug, created; one per owner, opt-in via Share card, deleted by Stop sharing, with the
-  owner, and for the guest on a merge);
+  owner, for the guest on a merge, or by the operator: `admin.js unshare <link>` / `unshare-user <username>`);
   match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length).
   No IPs, no guest display names, no emails. Retention (db.sweep at boot + every 24 h): guests 90 d after last
   recorded match (7 d if only one), accounts 24 months idle, match_log 30 d (sooner, oldest first, near the DB_MAX_MB

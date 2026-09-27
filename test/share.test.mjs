@@ -2,7 +2,7 @@
 // slug after Stop sharing, 404s that never render, the hash following the stats, merge / export / delete, the render budget, and the
 // og.jpg fallback when @resvg/resvg-js cannot load (test/no-resvg.cjs preloaded into that server only). No match is played: the profiles
 // are written into the database file through server/db.js by this process, which the servers read at request time.
-//   node test/share.test.mjs        SHARE_PORT=<base> moves the servers (base .. +2; default 9850-9852). Takes a few seconds.
+//   node test/share.test.mjs        SHARE_PORT=<base> moves the servers (base .. +3; default 9850-9853). Takes a few seconds.
 // Saves the served card to test/ui-shots/share/served.png and the page at 1280x800 / 390x844 (share-page-*.png) when Chrome is there.
 import { spawn } from 'child_process';
 import { createRequire } from 'module';
@@ -13,7 +13,7 @@ import path from 'path';
 import crypto from 'crypto';
 const require = createRequire(import.meta.url);
 const root = new URL('..', import.meta.url).pathname, SHOTS = path.join(root, 'test/ui-shots/share');
-const PORT = +process.env.SHARE_PORT || 9850, P_NORES = PORT + 1, P_HOST = PORT + 2;
+const PORT = +process.env.SHARE_PORT || 9850, P_NORES = PORT + 1, P_HOST = PORT + 2, P_BUSY = PORT + 3;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-share-')), DBF = path.join(tmp, 's.db');
 const db = require('../server/db.js'), auth = require('../server/auth.js'), names = require('../server/usernames.js'), card = require('../server/card.js');
 const { DatabaseSync } = require('node:sqlite');
@@ -56,8 +56,8 @@ ok(!!win(A.owner_id) && !!win(gOwner) && !!win(g2Owner), 'three profiles have a 
 const raw = new DatabaseSync(DBF); raw.exec('PRAGMA busy_timeout=2000');
 raw.prepare('UPDATE profile SET hits = 140, returns = 120, chances = 150, winners = 30, aces = 12, smashes = 9 WHERE owner_id = ?').run(A.owner_id);   // part A's counters, by hand
 
-console.log('servers: ' + PORT + ' (SHARE_RENDERS 2), ' + P_NORES + ' (no resvg), ' + P_HOST + ' (hosted)');
-await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS: `--require ${root}test/no-resvg.cjs` }), up(P_HOST, { FLY_APP_NAME: 'poddle-test' })]);
+console.log('servers: ' + PORT + ' (SHARE_RENDERS 2), ' + P_NORES + ' (no resvg), ' + P_HOST + ' (hosted), ' + P_BUSY + ' (SHARE_RENDERS 24)');
+await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS: `--require ${root}test/no-resvg.cjs` }), up(P_HOST, { FLY_APP_NAME: 'poddle-test' }), up(P_BUSY, { SHARE_RENDERS: '24' })]);
 
 // ---- create / get: one link per owner ----
 const a1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieA });
@@ -147,6 +147,34 @@ const gone = await req(PORT, 'DELETE', '/api/account', { dev: G2, confirm: 'dele
 ok(g2.status === 200 && gone.status === 200 && gone.json.deleted.device === true && db.shareOwner(g2Slug) === null && (await req(PORT, 'GET', `/c/${g2Slug}`)).status === 404, 'Delete my data (guest): the profile goes and its link with it');
 ok(db.counts().share === 2, 'two links are left (A and B)');
 
+// ---- signed in on a browser whose guest stats did not merge (the caps): Stop sharing stops both links ----
+const C = db.createAccount('share-sub-c', Date.now()), vc = names.validate('Share_Cee'); db.claimUsername(C.id, vc.name, vc.key, Date.now());
+const cookieC = `${SES}=${db.session.create(C.id, Date.now())}`, G3 = crypto.randomUUID(), g3Owner = db.ownerForDevice(auth.deviceHash(G3), Date.now(), { create: true });
+ok(!!win(C.owner_id) && !!win(g3Owner), 'account C and an unmerged guest G3 have a match on record');
+const g3 = await req(PORT, 'POST', '/api/share', { dev: G3 }), g3Slug = slugOf(g3.json && g3.json.url), c1 = await req(PORT, 'POST', '/api/share', { dev: G3 }, { cookie: cookieC }), cSlug = slugOf(c1.json && c1.json.url);
+ok(g3Slug && cSlug && g3Slug !== cSlug, 'the guest and the account (same browser, signed in) each have a link');
+const stopBoth = await req(PORT, 'DELETE', '/api/share', { dev: G3 }, { cookie: cookieC });
+ok(stopBoth.status === 204 && (await req(PORT, 'GET', `/c/${cSlug}`)).status === 404 && (await req(PORT, 'GET', `/c/${g3Slug}`)).status === 404 && (await req(PORT, 'GET', `/c/${g3Slug}.png`)).status === 404,
+  "Stop sharing while signed in with the unmerged guest's device id: the account's link AND the guest's link are 404");
+const stopOther = async () => { const x = await req(PORT, 'POST', '/api/share', { dev: G3 }); await req(PORT, 'DELETE', '/api/share', { dev: crypto.randomUUID() }, { cookie: cookieC }); return slugOf(x.json && x.json.url); };
+const g3b = await stopOther();
+ok(g3b && (await req(PORT, 'GET', `/c/${g3b}`)).status === 200, "...another browser's device id stops nothing of this guest's");
+await req(PORT, 'DELETE', '/api/share', { dev: G3 });
+
+// ---- the operator: node server/admin.js unshare <link or code> | unshare-user <username> (a separate process, like fly ssh) ----
+const admin = (...args) => new Promise(res => { const p = spawn('node', ['server/admin.js', ...args], { cwd: root, env: { ...process.env, NODE_OPTIONS: '', PODDLE_DB: DBF } }); let out = '';
+  p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { out += d; }); p.on('exit', code => res({ code, out })); });
+const c2 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieC }), c2Slug = slugOf(c2.json && c2.json.url);
+ok((await req(PORT, 'GET', new URL(c2.json.image).pathname)).status === 200, 'a live link whose picture the server now holds in memory');
+const un = await admin('unshare', c2.json.image);
+ok(un.code === 0 && /removed/.test(un.out) && !un.out.includes(c2Slug) && !un.out.includes('Share_Cee'), 'admin unshare <the .png?v= link>: exit 0, "removed", no code or name printed');
+ok((await req(PORT, 'GET', `/c/${c2Slug}`)).status === 404 && (await req(PORT, 'GET', `/c/${c2Slug}.png`)).status === 404, '...the running server answers 404 for the page and the picture (the cached PNG is never served)');
+const un2 = await admin('unshare', c2Slug), un3 = await admin('unshare', 'https://poddleball.com/c/short');
+ok(un2.code === 1 && /no live link/.test(un2.out) && un3.code === 1 && /not a share link/.test(un3.out), 'unshare again: exit 1 "no live link"; a malformed link: exit 1');
+const c3 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieC }), c3Slug = slugOf(c3.json && c3.json.url), uu = await admin('unshare-user', 'share_cee');
+ok(c3Slug && c3Slug !== c2Slug && uu.code === 0 && (await req(PORT, 'GET', `/c/${c3Slug}`)).status === 404, 'admin unshare-user <username> (any case): the account\'s link is 404');
+ok((await admin('unshare-user', 'share_cee')).code === 1, '...again: exit 1, no live link');
+
 // ---- no renderer: web/og.jpg ----
 const nr = await req(P_NORES, 'GET', `/c/${slug3}.png`), og = fs.readFileSync(path.join(root, 'web/og.jpg'));
 ok(nr.status === 200 && nr.headers['content-type'] === 'image/jpeg' && nr.buf.equals(og) && nr.headers['cache-control'] === 'public, max-age=60', 'resvg missing: the card is web/og.jpg (image/jpeg, cached a minute)');
@@ -163,7 +191,30 @@ ok(hs.status === 200 && hs.json.url === `https://poddleball.com/c/${slug3}`, 'ho
 
 // ---- the logs never name anyone ----
 const all = logs.map(l => l.out).join('\n');
-ok(![slug, slug3, gSlug, g2Slug, 'Share_Ace', G, G2].some(s => all.includes(s)), 'no slug, username or device id in any server log');
+ok(![slug, slug3, gSlug, g2Slug, g3Slug, cSlug, c2Slug, 'Share_Ace', 'Share_Cee', G, G2, G3].some(s => all.includes(s)), 'no slug, username or device id in any server log');
+
+// ---- a full render queue (503) spends none of the budget: the retry Retry-After asks for is not a 429 ----
+{
+  const many = []; for (let i = 0; i < 24; i++) { const d = crypto.randomUUID(), o = db.ownerForDevice(auth.deviceHash(d), Date.now(), { create: true }); win(o); many.push(slugOf((await req(P_BUSY, 'POST', '/api/share', { dev: d })).json?.url)); }
+  const who = ip(), first = await Promise.all(many.map(sl => req(P_BUSY, 'GET', `/c/${sl}.png`, undefined, { addr: who })));
+  const busy = many.filter((sl, i) => first[i].status === 503), drawn = first.filter(r => r.status === 200).length;
+  if (!busy.length) console.log('  skip the busy refund: the queue never filled (' + first.map(r => r.status).join(',') + ')');
+  else {
+    const retry = await Promise.all(busy.map(sl => req(P_BUSY, 'GET', `/c/${sl}.png`, undefined, { addr: who })));
+    ok(drawn + busy.length === many.length && retry.every(r => r.status !== 429), `${busy.length} of ${many.length} got 503 (queue full), and their retries from the same computer are not 429 (budget ${many.length}: ${retry.map(r => r.status).join(',')})`);
+  }
+}
+
+// ---- memory: every render's native memory is freed (the worker collects after each job), so a burst cannot push the 256 MB VM over ----
+{
+  const mb = () => process.memoryUsage().rss / 1048576, base = { played: 30, human: { wins: 5, losses: 3, bestStreak: 3 }, titles: 1, bests: { rally: { v: 12 }, speed: { v: 20 } } };
+  const keep = setInterval(() => {}, 1000);                        // the worker is unref'd: hold the loop open while awaiting it
+  let d0 = card.dataOf(base, 'Mem0'); await card.png('warm:' + card.hashOf(d0), d0);
+  const r0 = mb(); let peak = r0, good = 0;
+  for (let i = 0; i < 100; i++) { const d = card.dataOf({ ...base, played: 31 + i }, 'Mem' + i), b = await card.png('mem' + i + ':' + card.hashOf(d), d); if (Buffer.isBuffer(b) && isPng(b)) good++; peak = Math.max(peak, mb()); }
+  clearInterval(keep);
+  ok(good === 100 && peak - r0 < 100, `100 cache-miss renders in a row: RSS grew ${Math.round(peak - r0)} MB (under 100 MB; the 64-card cache is ~15 MB of it). Unfixed it passed 300`);
+}
 
 // ---- the page in a browser (optional: Chrome as the other UI tests use it) ----
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

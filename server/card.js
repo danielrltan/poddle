@@ -190,8 +190,11 @@ function svgOf(d) {
 // ---- rendering: in one worker thread (resvg's render AND its PNG encode would otherwise take the 60 Hz loop's time), one card at a time, the last 64 kept ----
 const OPTS = { fitTo: { mode: 'original' }, font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: F[800] } };
 const JOB_MS = 15e3, RESPAWN_MS = 60e3;                           // a card that takes longer is abandoned (the worker with it); a dead worker is replaced at most once a minute
-const WORKER = `const { parentPort, workerData } = require('node:worker_threads'); let R = null; try { R = require(workerData.lib); } catch { /* answered as null below */ }
-parentPort.on('message', ({ id, svg }) => { let buf = null; try { if (R) buf = new R.Resvg(svg, workerData.opts).render().asPng(); } catch { buf = null; } parentPort.postMessage({ id, buf }); });`;
+// gc after every job: each render leaves ~3.5 MB of NATIVE memory (resvg's pixmap, tree and PNG) that is freed only when V8 collects its
+// handles, and the worker's JS heap stays near 4 MB, so V8 almost never does: a burst of renders took the process past the 256 MB VM
+const WORKER = `const { parentPort, workerData } = require('node:worker_threads'); let gc = () => {}; try { require('node:v8').setFlagsFromString('--expose-gc'); gc = require('node:vm').runInNewContext('gc'); } catch { /* no gc: renders still work */ }
+let R = null; try { R = require(workerData.lib); } catch { /* answered as null below */ }
+parentPort.on('message', ({ id, svg }) => { let buf = null; try { if (R) buf = new R.Resvg(svg, workerData.opts).render().asPng(); } catch { buf = null; } parentPort.postMessage({ id, buf }); buf = null; setImmediate(() => { try { gc(); } catch { /* next time */ } }); });`;
 let libPath, worker = null, diedAt = -Infinity, jobN = 0, failAt = -Infinity;
 const jobs = new Map();                                          // job id -> { done, timer }
 const lib = () => { if (libPath !== undefined) return libPath; try { libPath = require.resolve('@resvg/resvg-js'); } catch { libPath = null; } return libPath; };   // resolved here, loaded in the worker
@@ -236,5 +239,6 @@ function png(key, data) {
   return p;
 }
 const isCached = key => cache.has(key);
+function forget(slug) { for (const k of [...cache.keys()]) if (k.startsWith(slug + ':')) cache.delete(k); }   // a link that went: its pictures leave memory too (never served anyway: share.page() checks the owner first)
 
-module.exports = { rankOf, mattOf, dataOf, hashOf, svgOf, png, isCached, measure, CARD_V, FONTS, F, W, H };
+module.exports = { rankOf, mattOf, dataOf, hashOf, svgOf, png, isCached, forget, measure, CARD_V, FONTS, F, W, H };
