@@ -4,7 +4,7 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-24 (full launch: statistics and Sign in with Google together).
+Last reviewed: 2026-09-27 (play counters and share cards, NOTES 112; before that 2026-09-24, the full launch).
 
 ## Recipients common to every activity
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`
@@ -31,7 +31,8 @@ Last reviewed: 2026-09-24 (full launch: statistics and Sign in with Google toget
 ## 3. Game statistics
 - Data: SHA-256 of a random device id (`localStorage['poddle.device']`); owner rows (created, last match or sign-in);
   profile (matches played, W/L, streaks, points, tournament titles, best rally, hardest hit and fastest swing with
-  dates); Matt ladder (four rungs Rookie, Club, Tour, Pro: W/L, abandons, streaks, first win date, best margin).
+  dates; play totals over every counted match: hits, returns, chances, winners, aces, smashes, points won/lost,
+  seconds played); Matt ladder (four rungs Rookie, Club, Tour, Pro: W/L, abandons, streaks, first win date, best margin).
 - Basis: legitimate interests (Art. 6(1)(f)): giving players a record of their progress; switchable off on the privacy page
   (Save my stats; off, nothing is recorded, signed in or not), with self-serve download and deletion. Canada: consent by saving statistics,
   withdrawn by turning them off or deleting. Consent is not the GDPR basis (Art. 8 would need verified parental
@@ -40,6 +41,22 @@ Last reviewed: 2026-09-24 (full launch: statistics and Sign in with Google toget
 - Retention: guest statistics 90 days after the last recorded match, 7 days if only one match was ever recorded;
   account statistics with the account (below). Deleted rows are zeroed (`secure_delete=ON`) and the WAL truncated.
 - Security: device id stored only as a hash; it never travels in a URL; export/delete need the raw id or a session.
+
+## 3a. Share cards (docs/SHARE.md; opt-in, Your stats > Share card)
+- Data: table `share` (owner id, a 10-char random slug from `crypto.randomBytes`, never derived from an id; created
+  date). One per owner. In memory only: a keyed hash (daily key) of the requester's network address counting card
+  renders a minute (server/share.js), and the last 64 rendered PNGs.
+- Made public to anyone with the link (page /c/<slug> and its PNG, both `noindex`): the username (or "Poddle player";
+  guest display names are never stored), rank + trophies, the toughest Matt beaten, up to six stats (return rate,
+  longest rally, fastest swing, W-L vs people, best streak, titles, winners, aces, smashes, matches played), read
+  from the profile at request time.
+- Basis: contract (Art. 6(1)(b)): the sharing feature the player asks for; stopped at any time (Stop sharing).
+- Recipients: anyone the player gives the link to; the servers of the apps it is pasted into (link-preview
+  crawlers: iMessage, WhatsApp, Discord, Slack, X, LinkedIn and so on), which may keep their own preview copy; Fly.io.
+- Retention: until Stop sharing, or deleted with the profile (cascade: Delete my data, the guest 90 d / account 24 month
+  sweeps). A guest->account merge deletes the guest's link. Responses are `Cache-Control: public, max-age=300`.
+- Security: unknown or malformed slugs get a 404 and nothing is rendered; per-computer render budget; no slug, name or
+  id in the logs; the export includes the link (`share: { url, created }`).
 
 ## 4. Fair-play checks (automated ranked/unranked decision)
 - Data: at match end, the two players' IPs compared in memory; in memory for up to 24 h, keyed hashes of the network

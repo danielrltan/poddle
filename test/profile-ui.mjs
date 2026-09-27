@@ -1,7 +1,7 @@
 // Player stats client (docs/ACCOUNTS.md 9, test plan 12.4): web/profile.js + main.js + index.html against a fake game and a fake /api.
 // The real page runs with ?acctest=1 (profile.js is off on localhost otherwise). Google is never reached: every request to
 // accounts.google.com or gstatic.com is intercepted, recorded and aborted.
-// Section F (docs/SHARE.md 3): the play row from profile.play and the Share card sheet against a fake /api/share. Until server/card.js lands the fake's image is web/og.jpg.
+// Section F (docs/SHARE.md 3): the play row from profile.play and the Share card sheet against a fake /api/share. The fake's card picture at /c/<slug>.png is a committed render (CARD below).
 // Usage: node test/profile-ui.mjs      PROFILE_UI_PORT=<base> moves the ports (default 9420: pages + /api, 9421: fake game, 9422: nothing = no AirPod).
 import http from 'http'; import fs from 'fs'; import path from 'path'; import os from 'os';
 import { WebSocketServer } from 'ws';
@@ -22,7 +22,7 @@ const API = { signin: false, profile: FIXTURE, delClears: false, acct: null, sta
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   let b = null; try { b = body ? JSON.parse(body) : null; } catch { b = null; } API.log.push([q.method, u, b]);
   if (u === '/api/me') return send(200, { db: true, signin: { enabled: API.signin, clientId: API.signin ? 'test-client.apps.googleusercontent.com' : null }, account: API.acct });
-  const link = () => { const url = `http://127.0.0.1:${W}/c/${API.slug}`; return { url, image: `http://127.0.0.1:${W}/og.jpg?v=${API.slugs}` }; };      // the real image is <url>.png?v=<hash> (server/card.js, part B): og.jpg stands in for it here
+  const link = () => { const url = `http://127.0.0.1:${W}/c/${API.slug}`; return { url, image: `${url}.png?v=${API.slugs}` }; };      // the real shape (server/share.js): <url>.png?v=<hash>; the fake's hash is the slug count
   if (u === '/api/stats') { const p = b && b.dev ? API.profile : null; return send(200, { profile: p && 'share' in p ? { ...p, share: API.slug ? link() : null } : p }); }      // no share key in the profile: an older server, left as it is
   if (u === '/api/share' && q.method === 'POST') { if (API.shareFail) return send(503, { error: 'unavailable' }); if (!b || !b.dev || !API.profile) return send(404, { error: 'nothing' });
     if (!API.slug) API.slug = 'Ab3' + String(++API.slugs).padStart(7, 'x'); return send(200, link()); }      // one live link: the same answer until DELETE, then a new slug
@@ -33,7 +33,9 @@ const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o)
   if (u === '/api/export' && q.method === 'POST') { if (!b || !b.dev || !API.profile) return send(404, { error: 'nothing' });      // the real route's shape: JSON attachment named poddle-data-<day>.json
     r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'content-disposition': 'attachment; filename="poddle-data-2026-09-24.json"' }); return r.end(J({ exportedAt: day, profile: API.profile })); }
   return send(404, { error: 'nope' }); };
+const CARD = path.join(root, 'test/ui-shots/share/veteran.png');      // a card server/card.js drew (test/share-shots.mjs), served for every live /c/<slug>.png
 const web = http.createServer((q, r) => {
+  if (/^\/c\/[A-Za-z0-9]{10}\.png(\?|$)/.test(q.url)) { const live = API.slug && q.url.startsWith(`/c/${API.slug}.png`); r.writeHead(live ? 200 : 404, { 'content-type': 'image/png' }); return r.end(live ? fs.readFileSync(CARD) : ''); }      // a dead link's picture is gone, as on the real server
   if (q.url.startsWith('/api/')) { let body = ''; q.on('data', c => { body += c; }); q.on('end', () => apiAnswer(q, body, r)); return; }
   let f = path.join(root, decodeURIComponent(q.url.split('?')[0])); if (!f.startsWith(root)) { r.writeHead(403); return r.end(); } if (f.endsWith('/')) f += 'index.html';
   const serve = (g, next) => fs.readFile(g, (e, d) => { if (e && next) return next(); r.writeHead(e ? 404 : 200, { 'content-type': MIME[path.extname(g)] || 'application/octet-stream' }); r.end(e ? '' : d); });
@@ -310,7 +312,7 @@ await pg.close();
   // the first click: no link yet -> POST /api/share, the url goes to the clipboard through a ClipboardItem promise, then the sheet
   let n0 = API.log.length; await pg.bringToFront(); await pg.click('#btn-pf-share'); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, 'share-copied-1280x800.png') }); await sleep(1100);
   r = await sheet(); const url1 = linkNow(); let p = shares(n0);
-  ok(p.length === 1 && p[0][0] === 'POST' && p[0][2]?.dev === ID && r.open && r.url === url1 && /^http:\/\/127\.0\.0\.1:\d+\/og\.jpg\?v=1$/.test(r.img) && r.clip.includes(url1) && r.toast === 'Link copied' && r.focus === 'btn-share-copy',
+  ok(p.length === 1 && p[0][0] === 'POST' && p[0][2]?.dev === ID && r.open && r.url === url1 && r.img === url1 + '.png?v=1' && r.clip.includes(url1) && r.toast === 'Link copied' && r.focus === 'btn-share-copy',
     `Share card, no link yet: one POST /api/share with the id, the link copied (${J(r.clip)}), the sheet with it and the picture, toast "${r.toast}", Copy focused (${r.focus})`);
   ok(r.prev === 'share-prev' && r.name === '' && r.native, `the sheet: the picture loaded (no skeleton: "${r.prev}"), no name line with sign-in off ("${r.name}"), Share... where navigator.share exists (${r.native})`);
   { let cb = ''; try { cb = await ev(pg, () => navigator.clipboard.readText()); } catch { cb = ''; } if (cb) ok(cb === url1, `the clipboard itself holds the link ("${cb}")`); }
@@ -320,7 +322,7 @@ await pg.close();
   r = await ev(pg, () => ({ b: document.getElementById('btn-share-copy').textContent, clip: window.__clip.slice() }));
   ok(r.b === 'Copied!' && J(r.clip) === J([url1]), `Copy: the link again, the button says "${r.b}" (${J(r.clip)})`);
   await pg.click('#btn-share-dl'); let file = ''; for (let k = 0; k < 30 && !file; k++) { await sleep(200); file = fs.readdirSync(DL).find(f => f === 'poddle-card.png') || ''; }
-  { const got = file ? fs.statSync(path.join(DL, file)).size : 0, want = fs.statSync(path.join(root, 'web/og.jpg')).size; ok(!!file && got === want, `Download image: poddle-card.png with the picture's bytes (${got} of ${want})`); }
+  { const got = file ? fs.statSync(path.join(DL, file)).size : 0, want = fs.statSync(CARD).size; ok(!!file && got === want, `Download image: poddle-card.png with the picture's bytes (${got} of ${want})`); }
   await pg.click('#btn-share-native'); await sleep(300); r = await ev(pg, () => window.__shared.slice());
   ok(r.length === 1 && r[0].url === url1 && r[0].title === 'My Poddle card', `Share...: navigator.share({ url, title }) (${J(r)})`);
   r = []; for (let k = 0; k < 9; k++) { await pg.keyboard.press('Tab'); await sleep(60); r.push(await ev(pg, () => !!document.activeElement?.closest('#share-card'))); }
@@ -339,7 +341,7 @@ await pg.close();
   API.shareFail = true; n0 = API.log.length; await pg.click('#btn-pf-share'); await sleep(900); r = await sheet();
   ok(shares(n0).length === 1 && !r.open && /Couldn’t make a link/.test(r.toast), `POST /api/share fails: no sheet, "${r.toast}"`);
   API.shareFail = false; n0 = API.log.length; await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-pf-share'); await sleep(1500); r = await sheet(); const url2 = linkNow();
-  ok(url2 !== url1 && shares(n0).length === 1 && r.open && r.url === url2 && r.clip.includes(url2) && /og\.jpg\?v=2$/.test(r.img), `after Stop sharing a new link: ${url2.split('/').pop()} (was ${url1.split('/').pop()}), copied (${J(r.clip)})`);
+  ok(url2 !== url1 && shares(n0).length === 1 && r.open && r.url === url2 && r.clip.includes(url2) && r.img === url2 + '.png?v=2', `after Stop sharing a new link: ${url2.split('/').pop()} (was ${url1.split('/').pop()}), copied (${J(r.clip)})`);
   await pg.keyboard.press('Escape'); await sleep(300);
   // Your stats again: /api/stats now carries the link, so the first click needs no request
   await openStats(); n0 = API.log.length; await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-pf-share'); await sleep(800); r = await sheet();

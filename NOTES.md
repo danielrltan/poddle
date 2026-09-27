@@ -1973,3 +1973,90 @@ The owner: a road does not fit, because any Matt level can be picked at any time
 - The hero (rank crest, trophies, streak) is untouched; the first-win trophy bounty per Matt still counts. test/profile-ui.mjs
   checks the badge, the chips, the out-of-order case (Rookie + Pro beaten: the badge is Pro) and the empty state.
 - No data, storage or visibility change: the legal pages are unchanged.
+
+## 112. More stats (return rate) and a share card
+
+The owner (2026-09-27): more stats on Your stats, "like return rate (amount of balls you actually are able to hit back)",
+and a **Share card** button that copies a poddleball.com link which unfurls as a stylised picture wherever it is pasted
+(iMessage, Discord, X, WhatsApp, Slack, LinkedIn): a word-of-mouth feature, so the card has to look great. The contract is
+docs/SHARE.md; it was built in three parts (A counting, B link/page/picture, C Your stats) and merged here.
+
+**Counting (server/stats.js, game.js point(), db.js).** Nine running totals per profile over every match kind (Matt,
+people, tournament): hits, returns, chances, winners, aces, smashes, points won / lost, seconds played (`PLAY_COLS`, added
+idempotently after the numbered migrations: the Ranked branch owns migration 2). The rules:
+- a contact while `m.rally === 0` is the seat's own serve (a hit, not a return); every other contact, held blocks and
+  volleys of a ball going out included, is a return and a chance;
+- point() now passes `(winner, why)` to `stats.pointEnd`; on 'double bounce' / 'passed' (won by `ball.lastHit`) the loser
+  gets a chance it missed and the winner an ace (rally 1: only the serve was struck) or a winner; 'out' moves points only;
+- smashes are read when the kind can no longer change (the seat's next contact, the point's end or onEnd), not from
+  strike(): a bet's power is capped at SMASH there, and the settled report rewrites `pl.hit.kind` in place later;
+- points are counted per point (not from the final score), so a revived match is not counted twice;
+- the totals are added in recordMatch by their own statement (`playAdd`, not a wider profSet) only when the seat's
+  `record && bests`, clamped 0..1e6 a match; one owner in both seats adds the seconds once; fold() adds a guest's totals
+  into the account (clamped 1e9: lifetime seconds pass 1e6); profileOf returns them as `play`, so the export has them.
+- Known edge: the 9 s auto-serve and Matt's serve call launch() with no contact, so an unreturned auto-serve is an ace
+  with no hit; the idle rule usually turns that match's bests off anyway.
+
+**Share link, page and picture (server/share.js, server/card.js, api.js, game.js).** Table `share(owner_id PK, slug
+UNIQUE, created_at)`, one link per owner; the slug is 10 reject-sampled `[A-Za-z0-9]` from `crypto.randomBytes`, never
+derived from an id. `POST /api/share` (session wins, else the guest's device id) answers `{ url, image }`
+(`https://poddleball.com/c/<slug>` hosted, `http://<host>` locally; `image` = `<url>.png?v=<hash>`), `DELETE` is 204 and
+idempotent; `/api/stats` and `/api/signin` profiles carry `share: { url, image } | null` so the click can copy
+synchronously (Safari). `/c/<slug>` is a small page on the site's look (the card big, "Play Poddle free", "Make your own
+card") with absolute og/twitter tags, `noindex` (meta and header) and `max-age=300`; `/c/<slug>.png` is the 1200x630
+card with a strong ETag = the hash (304 on a match). The hash is a 12-hex sha256 of exactly what is drawn plus `CARD_V`
+(bump it on any visual change so unfurlers fetch the new picture). Unknown or malformed slugs are a 404 (the site's
+404 page, an empty 404 for .png) and never render.
+- What the card draws (card.dataOf, read at request time, nothing from the query): the username or "Poddle player"
+  (guest display names are never stored), the rank from trophies (`rankOf`, exactly web/profile.js drawRoad), the
+  toughest Matt beaten in difficulty order in its level colour, up to three big figures (return rate from 10 chances,
+  longest rally, fastest swing, then W-L vs people, streak, titles, winners/aces from 10, matches) and up to three
+  chips; zeros are left off. The call to action is "Think you can return my serve? Play free at poddleball.com".
+- Rendering: SVG -> PNG with `@resvg/resvg-js` (package-lock carries `@resvg/resvg-js-linux-x64-musl` for the alpine
+  image), M PLUS Rounded 1c 500/800/900 converted from the site's woff2 subsets to TTF under server/fonts/ (OFL.txt);
+  text is measured from the fonts' advance widths so a 12-character name fits. Safety, since the server is one process:
+  resvg is required lazily inside try/catch; rendering and PNG encoding run in one long-lived, unref'd worker thread,
+  one card at a time, a 16-deep queue (503 beyond), a 15 s job timeout; an LRU of the last 64 PNGs keyed slug+hash; a
+  per-computer budget of cache-miss renders (keyed hash of `abuse.computerKey`, own daily salt, 30 a minute,
+  `SHARE_RENDERS`) answering 429; any failure serves web/og.jpg (max-age 60) and logs one fixed line an hour. No slug,
+  name or id is ever logged. A render takes about 80 ms off-thread; PNGs are 190-240 KB (under WhatsApp's ~300 KB).
+- Merge (db.mergeDevice) deletes the guest's share row before the owner goes: the link dies, it never moves to the
+  account. deleteOwner and the sweeps take it through the cascade. exportOf has `share: { url, created } | null`.
+
+**Your stats (web/profile.js, index.html, ui.css).** A play row under the people strip: the return-rate ring with a big %
+and "N of M returned" (under 10 chances: "Return 10 balls to see it"), then winners, aces, smashes, total hits, points won %
+and time on court. No `play` in the profile (an older server, the Ranked branch before its merge): the row stays hidden.
+**Share card** sits in the card header after Sign in / Sign out (a round gold icon button beside Google's, so the header
+stays one row at 1280x800) and shows only when the profile carries a `share` key. The click copies the known link at
+once, or POSTs and hands the clipboard a `ClipboardItem` promise inside the click (writeText, then a selected field, as
+fallbacks), toasts "Link copied" and opens the share sheet (openCard pattern, Escape, focus trap and return): the picture
+with a skeleton, the link with Copy ("Copied!"), Download image (`poddle-card.png`), Share... where `navigator.share`
+exists, a name line ("Sign in to put your name on your card", or pick a username), and Stop sharing with an inline
+confirm. No new browser storage keys.
+
+**Integration.** The three branches merged cleanly. Reconciled: part B's `db.playOf` fallback (a card drawn before
+profileOf had `play`) is gone now that it does; test/profile-ui.mjs's fake answers the real image shape
+`<url>.png?v=N` and serves a committed card render there instead of og.jpg; `og:image:alt` reads "A Poddle player card"
+for a guest and says "degrees a second". Checked end to end against a real server on a scratch database seeded through
+recordMatch: `/api/stats` play totals, POST /api/share, the page's absolute og tags, a real 1200x630 PNG with 304 on its
+ETag, Your stats in Chrome (77%, the six figures), Share card (one POST, the link on the clipboard, the sheet showing the
+rendered card), Download image (a real PNG) and Stop sharing (the old page and picture 404).
+Kept deviations from docs/SHARE.md: `og:title` is "A player on Poddle" for a guest (not "Poddle player on Poddle"); the
+page's h1 is "Think you can return <Name>'s serve?" plus one explainer line; `CARD_V` is in the hash; `/api/signin` also
+carries `share`; fold clamps at 1e9; smashes read at settle time (above).
+
+**Legal.** Privacy (Last updated 2026-09-27): the play totals in the statistics row; a share-link row; the IP purpose
+covers share requests and the render budget; section 4 "Shared cards" says exactly what anyone with the link sees and
+that the page asks not to be indexed; section 6 names the apps a link is pasted into as recipients that fetch it and may
+keep previews; section 7 retention (until Stop sharing or the profile goes; a merge deletes the guest's link; a browser
+may reuse a loaded card for five minutes; other apps' previews are theirs); section 9 (Stop sharing, the export and
+Delete my data include the link); section 11 (random code, 404s never render); section 13 a contract basis for sharing;
+section 15 dated. Terms: a Shared cards paragraph in section 5 (public to anyone with the link, personal non-commercial
+use, we may disable a link) and resvg (MPL-2.0) in section 9's list. CLAUDE.md "Current data flows" (memory, database,
+Public), docs/ropa.md 3a, docs/ACCOUNTS.md (profile `share`, export `share`), the changelog and sitemap lastmod follow.
+No home-page notice: sharing is opt-in and the changelog carries the change.
+
+**For the Ranked session:** when ranked merges, `rankOf(profile)` in server/card.js must switch to the ladder rank
+(RANK_NAME + divisions); it is the one function to change, and bump `CARD_V` with it so every card URL changes. The
+play counters use their own `playAdd` statement and `PLAY_COLS` columns (no MIGRATIONS entry), and stats.js's seatAcc,
+onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.

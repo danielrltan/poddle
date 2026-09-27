@@ -27,8 +27,8 @@ function rankOf(p) {
 }
 const mattOf = p => rows(p).map(beaten).lastIndexOf(true);      // the toughest Matt beaten, in difficulty order (0 Rookie .. 3 Pro), -1 for none
 
-// dataOf(profile, username, play?) -> exactly what the card draws (the hash is taken over this object). play: profile.play when part A's
-// profileOf has it, else the caller's db.playOf row. Zero or missing values are left off, never drawn as 0.
+// dataOf(profile, username, play?) -> exactly what the card draws (the hash is taken over this object). play: defaults to profile.play
+// (db.profileOf; the tests pass their own). Zero or missing values are left off, never drawn as 0.
 function dataOf(p, username, play) {
   p = p && typeof p === 'object' ? p : {};
   const P = play && typeof play === 'object' ? play : p.play && typeof p.play === 'object' ? p.play : {};

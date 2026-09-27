@@ -1029,6 +1029,8 @@ Because usernames are ASCII-only, the confusable problem shrinks to look-alike A
 `hits` every contact (serves and held blocks too), `returns` every contact but the seat's own serve, `chances` = returns + the
 opponent's in-play balls it never touched, `winners` / `aces` points won by a non-serve shot / a serve the opponent never touched,
 `smashes` contacts that settled as a smash, `secs` time on court.
+`/api/stats` and `/api/signin` also add `share: { url, image } | null` to the profile (the owner's live card link, docs/SHARE.md 2);
+the export carries `share: { url, created } | null` beside `profile`.
 `matt` is the three-rung ladder, easiest first (Rookie, Club, Pro). `tourMatt` is the level-3 row (tournament Matt,
 warm-ups, and Play a bot at Tour while it stays selectable; Q2), or null. `expiresAt` only for guests (`touched_at +
 GUEST_DAYS`, or `+ GUEST_ONE_DAYS` while `played <= 1`).
@@ -1498,6 +1500,7 @@ yielding with `setImmediate` between batches, so the daily run never stalls the 
   "device": { "created": "2026-09-30T10:00:00.000Z", "lastPlayed": "2026-10-01T11:58:00.000Z", "deletedAfter": "2026-12-30T11:58:00.000Z" },
   "profile": { "...": "the Profile shape of section 8.2" },
   "matches": [ { "at": "2026-10-01T11:58:00.000Z", "kind": "bot", "mattLevel": "Pro", "result": "win", "score": [11, 7], "ending": "won", "counted": true, "reasons": [] } ],
+  "share": { "url": "https://poddleball.com/c/Ab3dE6gH9k", "created": "2026-10-01T12:00:00.000Z" },
   "notes": "This file contains all personal information that Poddle holds about this profile. Opponents are shown only as Matt or a player. We do not store your IP address, your email address or names typed as a guest. The purposes, recipients and retention periods are described at https://poddleball.com/privacy.html."
 }
 ```

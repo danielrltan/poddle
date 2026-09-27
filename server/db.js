@@ -267,7 +267,6 @@ function prepare() {                                             // every statem
     shareBySlug: q('SELECT owner_id FROM share WHERE slug = ?'),
     shareIns: q('INSERT OR IGNORE INTO share (owner_id, slug, created_at) VALUES (?, ?, ?)'),
     shareDel: q('DELETE FROM share WHERE owner_id = ?'),
-    playGet: q(`SELECT ${PLAY_COLS.join(', ')} FROM profile WHERE owner_id = ?`),   // the play counters straight from the row, for a card drawn before profileOf has them (PLAY_COLS are constants)
   };
 }
 
@@ -502,8 +501,6 @@ const shareMake = guard(null, (o, slug, now) => {
     S.shareIns.run(o, slug, now); const r = S.shareGet.get(o); return !r ? 'taken' : r.slug === slug ? 'made' : 'have'; });
 });
 const shareDrop = guard(false, o => isId(o) && tx(() => S.shareDel.run(o).changes > 0));
-const playOf = guard(null, o => { if (!isId(o)) return null; const r = S.playGet.get(o); return r ? { hits: r.hits, returns: r.returns, chances: r.chances, winners: r.winners, aces: r.aces, smashes: r.smashes,
-  pointsWon: r.pts_won, pointsLost: r.pts_lost, secs: r.secs_played } : null; });   // profile.play's shape (docs/SHARE.md 1), for a card drawn where profileOf has no play yet
 const usernameOf = guard(null, o => { if (!isId(o)) return null; const a = S.acctByOwner.get(o); return a && a.username ? a.username : null; });   // the account's username, null for a guest or an account without one
 
 // deleteOwner(ownerId, now) -> true when something was deleted. Cascades (profile, bot_record, device/account, sessions, merged device rows),
@@ -580,4 +577,4 @@ const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp
 
 module.exports = { open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
-  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, shareOf, shareOwner, shareMake, shareDrop, playOf, usernameOf };
+  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, shareOf, shareOwner, shareMake, shareDrop, usernameOf };

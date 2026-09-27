@@ -25,12 +25,17 @@ Important changes also need a notice on the home page. Open questions for the op
 - Server memory only, up to 24 h, gone on restart (server/abuse.js): keyed hashes (daily key) of IPs / IPv6 /64s linked
   to device-id hashes, cids and recent results (link map, pair and new-guest counters), and API rate-limit buckets keyed
   the same way (server/api.js, its own key, also replaced every 24 h). SHA-256 of each sign-in nonce issued, 10 min,
-  single use. The raw IP is compared in memory at match end and never written to the database.
+  single use. The raw IP is compared in memory at match end and never written to the database. Share cards
+  (server/share.js, card.js): a keyed hash (own daily key) of the network address counting card renders a minute, and
+  the last 64 card PNGs.
 - Server database (SQLite `node:sqlite` at PODDLE_DB=/data/poddle.db on the Fly volume poddle_data; server/db.js,
   docs/ACCOUNTS.md 2.2): owners (kind, created, last match/sign-in); devices (SHA-256 of the device id, merge date);
   accounts (Google `sub` only, username + confusable-folded key, created, renamed, merge count; NO email, name or
   picture from Google); sessions (SHA-256 of the cookie token, created, expires 180 d, last seen hourly; max 10);
-  profile + bot_record (W/L, streaks, points, titles, best rally/hit/speed + dates, four Matt rungs: wire 0,1,3,2);
+  profile + bot_record (W/L, streaks, points, titles, best rally/hit/speed + dates, four Matt rungs: wire 0,1,3,2;
+  play totals over counted matches: hits, returns, chances, winners, aces, smashes, points won/lost, seconds played);
+  share (owner, random 10-char slug, created; one per owner, opt-in via Share card, deleted by Stop sharing, with the
+  owner, and for the guest on a merge);
   match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length).
   No IPs, no guest display names, no emails. Retention (db.sweep at boot + every 24 h): guests 90 d after last
   recorded match (7 d if only one), accounts 24 months idle, match_log 30 d (sooner, oldest first, near the DB_MAX_MB
@@ -39,8 +44,10 @@ Important changes also need a notice on the home page. Open questions for the op
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
   (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a DEV pill
-  and in orange. Stats are private to their owner (no
-  leaderboards); both players are told when a match did not count.
+  and in orange. Stats are private to their owner (no leaderboards) unless the owner presses Share card: then anyone
+  with poddleball.com/c/<slug> sees the card page and PNG (noindex, max-age 300): username or "Poddle player" (never a
+  guest's typed name), rank + trophies, toughest Matt beaten, up to six card stats, also in the og tags; the apps it is
+  pasted into fetch it for previews and may keep them. Both players are told when a match did not count.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at first seat with stats on; rotated on sign-out, delete,

@@ -23,10 +23,10 @@ function origin(req) {                                           // hosted: alwa
   const h = String(req && req.headers && req.headers.host || '');
   return /^(?:[A-Za-z0-9.-]{1,253}|\[[0-9A-Fa-f:.]{2,45}\])(?::\d{1,5})?$/.test(h) ? 'http://' + h : 'http://localhost';
 }
-// dataOf(ownerId) -> what the owner's card draws, or null when there is no profile. play: profileOf's when part A's build has it, else the row's
+// dataOf(ownerId) -> what the owner's card draws, or null when there is no profile (the play counters come with it as profile.play)
 function dataOf(o) {
   const p = db.profileOf(o); if (!p) return null;
-  return card.dataOf(p, db.usernameOf(o), p.play && typeof p.play === 'object' ? p.play : db.playOf(o));
+  return card.dataOf(p, db.usernameOf(o));
 }
 const links = (base, slug, d) => { const url = base + '/c/' + slug; return { url, image: url + '.png?v=' + card.hashOf(d) }; };
 // linkOf(ownerId, req) -> { url, image } | null: the owner's live link (for /api/stats), null when none
@@ -59,7 +59,7 @@ function blurb(d) {                                              // og:descripti
   return bits.join(' · ') + '. Play free at poddleball.com';
 }
 function html(d, url, image, img) {
-  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.name}'s Poddle player card: ${[`${d.rank} rank`, ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}`), d.matt ? `beat ${d.matt} Matt` : ''].filter(Boolean).join(', ')}`;
+  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat ${d.matt} Matt` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

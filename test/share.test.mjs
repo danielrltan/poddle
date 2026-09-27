@@ -62,7 +62,7 @@ await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS:
 // ---- create / get: one link per owner ----
 const a1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieA });
 const url = a1.json && a1.json.url, slug = slugOf(url);
-ok(a1.status === 200 && !!slug && url === `http://127.0.0.1:${PORT}/c/${slug}` && a1.json.image === `${url}.png?v=${card.hashOf(card.dataOf(db.profileOf(A.owner_id), 'Share_Ace', db.playOf(A.owner_id)))}`,
+ok(a1.status === 200 && !!slug && url === `http://127.0.0.1:${PORT}/c/${slug}` && a1.json.image === `${url}.png?v=${card.hashOf(card.dataOf(db.profileOf(A.owner_id), 'Share_Ace'))}`,
   'POST /api/share (session): 200 { url, image }, a 10-char slug on this host, image = url.png?v=<hash of the card>');
 ok(/^[0-9a-f]{12}$/.test(a1.json.image.split('?v=')[1]), 'the hash is 12 hex chars');
 const a2 = await req(PORT, 'POST', '/api/share', { dev: G }, { cookie: cookieA });
