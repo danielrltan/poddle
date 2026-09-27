@@ -110,10 +110,15 @@ report(await Promise.all([
     t.ok(ps[0].created === true && ps.slice(1).every(p => !p.created), 'created:true exactly once: the match that first stored data for this device');
     const P = await profileOf(c.d, c.addr);
     t.ok(P && P.guest && P.matt.length === 4 && P.matt.map(x => x.name).join() === 'Rookie,Club,Tour,Pro' && P.matt[0].wins === 1 && P.matt[0].losses === k - 1 && P.matt[0].firstWinAt > 0 && P.played === k, '/api/stats: four rungs, Rookie W-L ' + (P && P.matt[0].wins + '-' + P.matt[0].losses));
+    const y = P && P.play, pts = c.got('matchover').reduce((n, o) => n + (o.score ? o.score[0] + o.score[1] : 0), 0);   // docs/SHARE.md 1: every match kind counts
+    t.ok(y && y.hits > 0 && y.returns > 0 && y.returns <= y.hits && y.chances >= y.returns && y.winners + y.aces <= y.pointsWon && y.pointsWon + y.pointsLost <= pts && y.pointsWon > 0 && y.secs > 0,
+      `/api/stats play: the hitter's returns <= hits, chances >= returns, winners + aces <= points won, points <= the ${pts} played: ` + JSON.stringify(y));
     F.win = { d: c.d, addr: c.addr, played: k }; bye(c);
     const l = await vsMatt({ level: 0, how: lose }); await over(l); const lp = await prof(l);
     t.ok(l.last('matchover').winner !== l.side && lp && lp.saved && lp.first === false && lp.streak === 0 && lp.kind === 'bot' && lp.level === 0, 'a loss to Rookie: saved, no first, streak 0');
     const LP = await profileOf(l.d, l.addr); t.ok(LP && LP.matt[0].losses === 1 && LP.matt[0].wins === 0 && LP.human.losses === 0, 'the loss is on the Rookie rung, not against people');
+    const lz = LP && LP.play; t.ok(lz && lz.hits > 0 && lz.returns === 0 && lz.smashes > 0 && lz.chances > 0 && lz.pointsLost > 0 && lz.pointsWon >= lz.aces && lz.winners === 0,
+      'a player who only serves (power 30, flat: smashes) and never returns: hits and smashes but no return, only missed chances: ' + JSON.stringify(lz));
     bye(l);
   }),
   sc('2. Matt level changes: after the first strike the easiest level used, before it the new level', async t => {

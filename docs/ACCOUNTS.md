@@ -1021,9 +1021,14 @@ Because usernames are ASCII-only, the confusable problem shrinks to look-alike A
   "matt": [ { "level": 0, "name": "Rookie", "wins": 5, "losses": 1, "abandons": 0, "streak": 3, "bestStreak": 5, "firstWinAt": 1790000000000, "bestMargin": 9 },
             { "level": 1, "name": "Club",  "...": "..." }, { "level": 2, "name": "Pro", "...": "..." } ],
   "tourMatt": { "level": 3, "name": "Tour", "wins": 1, "losses": 2, "...": "..." },
-  "bests": { "rally": { "v": 14, "at": 1790000000000 }, "hit": { "v": 92, "at": 1790000000000 }, "speed": { "v": 27.4, "at": 1790000000000 } }
+  "bests": { "rally": { "v": 14, "at": 1790000000000 }, "hit": { "v": 92, "at": 1790000000000 }, "speed": { "v": 27.4, "at": 1790000000000 } },
+  "play": { "hits": 310, "returns": 262, "chances": 355, "winners": 41, "aces": 12, "smashes": 19, "pointsWon": 180, "pointsLost": 171, "secs": 5400 }
 }
 ```
+`play` (docs/SHARE.md 1): counters over every match kind (Matt, people, tournament), added only when the match's bests count.
+`hits` every contact (serves and held blocks too), `returns` every contact but the seat's own serve, `chances` = returns + the
+opponent's in-play balls it never touched, `winners` / `aces` points won by a non-serve shot / a serve the opponent never touched,
+`smashes` contacts that settled as a smash, `secs` time on court.
 `matt` is the three-rung ladder, easiest first (Rookie, Club, Pro). `tourMatt` is the level-3 row (tournament Matt,
 warm-ups, and Play a bot at Tour while it stays selectable; Q2), or null. `expiresAt` only for guests (`touched_at +
 GUEST_DAYS`, or `+ GUEST_ONE_DAYS` while `played <= 1`).

@@ -219,6 +219,7 @@ function prepare() {                                             // every statem
     profGet: q('SELECT * FROM profile WHERE owner_id = ?'),
     profSet: q(`UPDATE profile SET played = ?, h_wins = ?, h_losses = ?, h_streak = ?, h_best_streak = ?, h_points_won = ?, h_points_lost = ?, tour_titles = ?,
       best_rally = ?, best_rally_at = ?, best_hit = ?, best_hit_at = ?, best_speed = ?, best_speed_at = ?, updated_at = ? WHERE owner_id = ?`),
+    playAdd: q(`UPDATE profile SET ${PLAY_COLS.map(c => c + ' = ' + c + ' + ?').join(', ')} WHERE owner_id = ?`),   // the play counters, PLAY_COLS order (constants, never input). Its own statement: profSet stays as the Ranked branch edits it
     botGet: q('SELECT * FROM bot_record WHERE owner_id = ? AND level = ?'),
     botAll: q('SELECT * FROM bot_record WHERE owner_id = ? ORDER BY level'),
     botPut: q(`INSERT INTO bot_record (owner_id, level, wins, losses, abandons, streak, best_streak, first_win_at, best_margin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -298,6 +299,7 @@ function fold(g, a, now) {
     const [r, ra] = best('best_rally'), [h, ha] = best('best_hit'), [sp, spa] = best('best_speed');
     S.profSet.run(A.played + G.played, A.h_wins + G.h_wins, A.h_losses + G.h_losses, A.h_streak, Math.max(A.h_best_streak, G.h_best_streak),
       A.h_points_won + G.h_points_won, A.h_points_lost + G.h_points_lost, A.tour_titles + G.tour_titles, r, ra, h, ha, sp, spa, now, a);
+    S.playAdd.run(...PLAY_COLS.map(c => Math.round(num(G[c], 0, 1e9))), a);   // the play counters add (docs/SHARE.md 1)
   }
   for (const gb of S.botAll.all(g)) {
     const ab = S.botGet.get(a, gb.level) || { wins: 0, losses: 0, abandons: 0, streak: 0, best_streak: 0, first_win_at: null, best_margin: 0 };
@@ -357,7 +359,8 @@ const session = {
 // recordMatch(m): ONE transaction (4.7 step 4). The shape (built by stats.onEnd from the judge's verdict):
 //   { now, kind: 'bot'|'human'|'tour'|'tourbot', level: WIRE index 0..3 (bot kinds; tourbot defaults to 3) | levelRank: BOT_ORDER position (converted),
 //     winner: 0|1|null, ending: 'won'|'forfeit'|'left'|'dropped', score: [a, b], secs, ranked: bool, flags: string[] | 'a,b',
-//     seats: [ { owner: id|null, record: bool, bests: bool, swingBad?: bool, bestRally, bestHit (0..100), bestSpeed (rad/s) } | null, x2 ] }
+//     seats: [ { owner: id|null, record: bool, bests: bool, swingBad?: bool, bestRally, bestHit (0..100), bestSpeed (rad/s),
+//       play?: { hits, returns, chances, winners, aces, smashes, ptsWon, ptsLost } (added with secs only when record && bests: docs/SHARE.md 1) } | null, x2 ] }
 // A seat whose owner no longer exists is recorded as no owner (the other seat is kept). No owner at all -> nothing written.
 // No log row for leaving Matt ('left'/'dropped', bot_record counts it) or past LOG_CAP_DAY rows for a seat's owner in 24 h (capped: a bot result still
 // counts, a human one changes no record, since R10-R12 read the log). Near the size cap the oldest log rows go first, in their own transaction.
@@ -412,12 +415,15 @@ const recordMatch = guard(null, m => {
       }
       S.profSet.run(p.played, p.h_wins, p.h_losses, p.h_streak, p.h_best_streak, p.h_points_won, p.h_points_lost, p.tour_titles,
         p.best_rally, p.best_rally_at, p.best_hit, p.best_hit_at, p.best_speed, p.best_speed_at, now, o);
+      if (rec && s.bests && s.play && typeof s.play === 'object') S.playAdd.run(...playRow(s.play, i === 1 && seats[0] && seats[0].owner === o ? 0 : secs), o);   // the bests' switch: a result that did not count adds nothing. One owner in both seats (R6) plays the minutes once
       S.ownerTouch.run(now, o);
       out.seats[i] = res;
     }
     return out;
   });
 });
+// playRow(play, secs) -> the PLAY_COLS values for playAdd, each clamped (stats.js seat counters: docs/SHARE.md 1)
+const playRow = (x, secs) => [x.hits, x.returns, x.chances, x.winners, x.aces, x.smashes, x.ptsWon, x.ptsLost, secs].map(v => Math.round(num(v, 0, 1e6)));
 function trimLog() { try { tx(() => Number(S.swOldest.run(TRIM).changes)); } catch (e) { fail(e); } }   // the oldest TRIM log rows (a delete goes to the WAL, which max_page_count does not cap)
 // addTitle(ownerId, now) -> true when credited (addition: section 4.3 stats.title needs a write for tour_titles; the spec lists none).
 const addTitle = guard(false, (o, now) => isId(o) && isNow(now) && tx(() => { const P = S.profGet.get(o); if (!P) return false;
@@ -451,7 +457,9 @@ const profileOf = guard(null, o => {
   return { guest: w.kind === 'device', since: w.created_at, expiresAt: expiresOf(w, p), played: p.played,
     human: { wins: p.h_wins, losses: p.h_losses, streak: p.h_streak, bestStreak: p.h_best_streak, pointsWon: p.h_points_won, pointsLost: p.h_points_lost },
     titles: p.tour_titles, matt: BOT_ORDER.map(lv => levelRow(o, lv)),   // four rungs, easiest first: Rookie, Club, Tour, Pro (every Tour result, tournaments and warm-ups included, is the Tour rung)
-    bests: { rally: { v: p.best_rally, at: p.best_rally_at }, hit: { v: p.best_hit, at: p.best_hit_at }, speed: { v: p.best_speed, at: p.best_speed_at } } };
+    bests: { rally: { v: p.best_rally, at: p.best_rally_at }, hit: { v: p.best_hit, at: p.best_hit_at }, speed: { v: p.best_speed, at: p.best_speed_at } },
+    play: { hits: p.hits || 0, returns: p.returns || 0, chances: p.chances || 0, winners: p.winners || 0, aces: p.aces || 0, smashes: p.smashes || 0,   // every match kind (docs/SHARE.md 1)
+      pointsWon: p.pts_won || 0, pointsLost: p.pts_lost || 0, secs: p.secs_played || 0 } };
 });
 // exportOf(ownerId, now?) -> the section 10.6 export object | null. Matches from the requester's side, opponents never identified.
 const NOTES = 'This file contains all personal information that Poddle holds about this profile. Opponents are shown only as Matt or a player. We do not store your IP address, your email address or names typed as a guest. The purposes, recipients and retention periods are described at https://poddleball.com/privacy.html.';
