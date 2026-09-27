@@ -591,7 +591,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
 
   function point(winner, why) {
-    stats.pointEnd(match);                                       // the rally's length, before the score moves (docs/ACCOUNTS.md 4.4)
+    stats.pointEnd(match, winner, why);                          // the rally's length and the play counters, before the score moves (docs/ACCOUNTS.md 4.4, docs/SHARE.md 1)
     score[winner]++; ball.live = false;
     const loser = bySide(1 - winner);
     if (loser && loser.swing && ball.lastHit === winner) send(loser, { type: 'whiff', why: whyMissed(loser.swing, inZone(loser)) });

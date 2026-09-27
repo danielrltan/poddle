@@ -61,7 +61,8 @@ function seatAcc(pl) {
   const id = pl.sockIdent || null;
   return { pl, bot: false, contacts: 0, held: 0, rallyReal: 0, rallyHeld: 0, bestRally: 0, bestHit: 0, bestSpeed: 0, swingBad: false,
     ident: id && !id.anon ? id : null, computers: new Set(id ? [id.computer] : []), cids: new Set(pl.cid ? [pl.cid] : []),
-    identChanged: false, pendingAnon: false, gone: false, mv: { x: 0, y: 0, at: 0, fast: 0 }, teleport: false };
+    identChanged: false, pendingAnon: false, gone: false, mv: { x: 0, y: 0, at: 0, fast: 0 }, teleport: false,
+    hits: 0, returns: 0, chances: 0, winners: 0, aces: 0, smashes: 0, ptsWon: 0, ptsLost: 0, shot: null };   // play counters (docs/SHARE.md 1); shot: the last contact's pl.hit, its kind read once it can no longer change
 }
 // newMatch({ revived, rank, seats: [pl|null, pl|null] }) -> the match object a room keeps in `match` (4.1)
 function newMatch({ revived = false, rank = null, seats = [null, null] } = {}) {
@@ -96,17 +97,30 @@ function optOut(m, pl, ws, mem) {
 // ---- during the match: rallies (4.4), swings (4.5), level (4.6), paddle (4.8) ----
 function launched(m) { if (!m || m.done) return; if (!m.t0) m.t0 = Date.now(); m.rally++; }   // launch(): every struck ball
 function rallyReset(m) { if (!m || m.done) return; m.rally = 0; for (const s of m.seats) if (s && !s.bot) s.rallyReal = s.rallyHeld = 0; }   // reset(): a fresh point
+// A contact's kind is final only once the settled report had its chance: strike() never calls a bet a smash (game.js caps a bet's power at
+// SMASH) and the settled report rewrites pl.hit.kind in place (reaim / fixBlock). Every fix path needs ball.lastHit === that side and a live
+// ball, so by the seat's next contact, the point's end or the match's end the kind can no longer move: it is counted then (docs/SHARE.md 1)
+function shotDone(s) { if (s.shot && s.shot.kind === 'smash') s.smashes++; s.shot = null; }
 // contact(m, pl, sw) -> true when this contact recorded a settled swing itself (the caller marks pl.hit.statted)
 function contact(m, pl, sw) {
   const s = accOf(m, pl); if (!s || s.bot || !sw) return false;
+  shotDone(s); s.hits++; s.shot = pl.hit && typeof pl.hit === 'object' ? pl.hit : null;   // strike() sets pl.hit before it calls here
+  if (m.rally > 0) { s.returns++; s.chances++; }                  // rally 0: the seat's own serve (launched() counts it AFTER the contact). Held blocks are returns too
   if (sw.held) { s.held++; s.rallyHeld++; return false; }
   s.contacts++; s.rallyReal++;
   if (sw.sure) { swingBest(s, sw.n, sw.pk, sw.src); return true; }
   return false;
 }
-function pointEnd(m) {                                            // point(), before the score moves: a rally won by parking the paddle is not a best
+// pointEnd(m, winner, why): point(), before the score moves: a rally won by parking the paddle is not a best. winner is a side, and m.seats is
+// indexed by side (newMatch seats [bySide(0), bySide(1)], seatFill(m, side)). 'double bounce' / 'passed' are won by ball.lastHit: the receiver
+// never touched it (a chance missed); rally 1 means only the serve was struck (an ace). 'out' is the hitter's own fault: points only
+function pointEnd(m, winner, why) {
   if (!m || m.done) return;
-  for (const s of m.seats) if (s && !s.bot && m.rally >= 3 && s.rallyReal >= 1 && s.rallyReal >= s.rallyHeld) s.bestRally = Math.max(s.bestRally, m.rally);
+  for (const s of m.seats) if (s && !s.bot) { shotDone(s); if (m.rally >= 3 && s.rallyReal >= 1 && s.rallyReal >= s.rallyHeld) s.bestRally = Math.max(s.bestRally, m.rally); }
+  if (winner !== 0 && winner !== 1) return;
+  const W = m.seats[winner], L = m.seats[1 - winner], miss = why === 'double bounce' || why === 'passed';
+  if (W && !W.bot) { W.ptsWon++; if (miss) { if (m.rally === 1) W.aces++; else if (m.rally > 1) W.winners++; } }
+  if (L && !L.bot) { L.ptsLost++; if (miss && m.rally > 0) L.chances++; }
 }
 // swingBest(s, n, pk, src): a settled, real contact (4.5). hit 0..100 from the server-clamped n; speed only with a finite pk and a known source
 function swingBest(s, n, pk, src) {
@@ -163,6 +177,7 @@ function ownerOf(s, now, completed) {
 function onEnd(m, e) {
   if (!m || m.done) return null;
   m.done = true; live.delete(m);
+  for (const s of m.seats) if (s && !s.bot) shotDone(s);          // a forfeit mid-rally: the last contact is as settled as it will get
   const now = e.now || Date.now(), kind = e.kind, human = HUMAN.has(kind), score = [e.score[0] | 0, e.score[1] | 0], pts = score[0] + score[1];
   const winner = e.winner === 0 || e.winner === 1 ? e.winner : null;
   const completed = e.ending === 'won' || (e.ending === 'forfeit' && pts >= cfg.forfeitMin);
@@ -190,7 +205,8 @@ function onEnd(m, e) {
   const v = abuse.judge(facts, history, cfg);
   const rec = store ? store.recordMatch({ now, kind, level, winner, ending: e.ending, score, secs, ranked: v.ranked, flags: v.flags,
     seats: m.seats.map((s, i) => (!s || s.bot || info[i].owner == null ? null : { owner: info[i].owner, record: v.seats[i].record, bests: v.seats[i].bests,
-      swingBad: !v.seats[i].swing, bestRally: s.bestRally, bestHit: s.bestHit, bestSpeed: s.bestSpeed })) }) : null;
+      swingBad: !v.seats[i].swing, bestRally: s.bestRally, bestHit: s.bestHit, bestSpeed: s.bestSpeed,
+      play: { hits: s.hits, returns: s.returns, chances: s.chances, winners: s.winners, aces: s.aces, smashes: s.smashes, ptsWon: s.ptsWon, ptsLost: s.ptsLost } })) }) : null;
   if (rec && rec.capped && human) { v.ranked = false; if (!v.flags.includes('daily_cap')) v.flags.push('daily_cap'); for (const x of v.seats) x.record = x.bests = x.swing = false; }   // past LOG_CAP_DAY: saved as played only (db.recordMatch), so it is not ranked either
   if (human && winner != null && info[0] && info[1]) L.result(info[winner].keys, info[1 - winner].keys, v.ranked);   // after the transaction, ranked or not (5.4)
   const msgs = m.seats.map((s, i) => {

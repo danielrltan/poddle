@@ -623,4 +623,58 @@ console.log('stats');
   for (const x of [m, m2, m5]) stats.drop(x);
 }
 
+// ======================================================================= play counters (docs/SHARE.md 1): stats.js seat counters, recordMatch, fold, profileOf
+console.log('play counters');
+{
+  const stats = require('../server/stats.js');
+  const pa = { cid: 'pa' }, pb = { cid: 'pb' }, m = stats.newMatch({ seats: [pa, pb] }), A = m.seats[0], Bs = m.seats[1];
+  const touch = (pl, kind, sw = { n: 0.5 }) => { pl.hit = { kind }; stats.contact(m, pl, sw); stats.launched(m); };   // strike(): pl.hit first, then contact, then launch
+  const c = s => [s.hits, s.returns, s.chances, s.winners, s.aces, s.smashes, s.ptsWon, s.ptsLost].join();
+  ok(m.seats[0].pl === pa && m.seats[1].pl === pb, 'm.seats is indexed by side (newMatch seats [bySide(0), bySide(1)])');
+  stats.rallyReset(m); touch(pa, 'drive');
+  ok(A.hits === 1 && A.returns === 0 && A.chances === 0, 'a serve (contact at rally 0) is a hit, not a return');
+  touch(pb, 'drive'); ok(Bs.hits === 1 && Bs.returns === 1 && Bs.chances === 1, 'a return adds hits, returns and chances');
+  stats.pointEnd(m, 1, 'double bounce');
+  ok(c(A) === '1,0,1,0,0,0,0,1' && c(Bs) === '1,1,1,1,0,0,1,0', `double bounce after a return: the receiver a chance and a point lost, the striker a winner (A ${c(A)}, B ${c(Bs)})`);
+  stats.rallyReset(m); touch(pb, 'drive'); stats.pointEnd(m, 1, 'passed');
+  ok(c(A) === '1,0,2,0,0,0,0,2' && c(Bs) === '2,1,1,1,1,0,2,0', `passed after only the serve: an ace for the server, a chance for the receiver (A ${c(A)}, B ${c(Bs)})`);
+  stats.rallyReset(m); stats.launched(m); stats.pointEnd(m, 0, 'passed');   // Matt's serve / the 9 s auto-serve: launched with no contact
+  ok(A.aces === 1 && Bs.chances === 2 && Bs.hits === 2, 'a serve with no contact (auto-serve) is still rally 1: an ace, and no hit for the server');
+  stats.rallyReset(m); touch(pa, 'drive'); touch(pb, 'block', { held: true }); touch(pa, 'drive'); pa.hit.kind = 'smash';   // the settled report rewrites the kind in place
+  touch(pb, 'drive'); stats.launched(m); stats.pointEnd(m, 0, 'out');
+  ok(c(A) === '3,1,3,0,1,1,2,2' && c(Bs) === '4,3,4,1,1,0,2,2', `'out': points only, no chance, winner or ace; a held block is a return; a smash settled after the contact counts (A ${c(A)}, B ${c(Bs)})`);
+  const snap = c(A) + c(Bs); stats.pointEnd(m); ok(c(A) + c(Bs) === snap, 'pointEnd(m) with no winner (older callers) moves no counter');
+  stats.rallyReset(m); touch(pa, 'smash'); touch(pb, 'drive'); ok(A.smashes === 1, 'a smash is not counted while its settled report may still come');
+  stats.pointEnd(m, 1, 'double bounce'); ok(A.smashes === 2, 'a smash strike() called is counted at the seat\'s next point end or contact');
+  stats.contact(m, { cid: 'nobody' }, { n: 1 }); stats.contact(m, pa, null); stats.pointEnd(m, 7, 'passed'); stats.pointEnd(null, 0, 'out');
+  ok(A.hits === 4 && A.ptsWon === 2, 'no throw and no count for a stranger, a missing swing, a bad winner or no match');
+  // onEnd hands the counters and the length to recordMatch
+  let got = null; const fake = { ok: () => true, ownerForDevice: () => 7, established: () => false, recordMatch: x => { got = x; return { logged: true, capped: false, seats: [{ saved: true, bests: [], streak: 0 }, { saved: false }] }; } };
+  stats.init({ db: fake, env: {} });
+  const hp = { cid: 'hp' }, mm = stats.newMatch({ rank: 0, seats: [hp, { bot: true }] }); stats.identify(mm, hp, { devHash: dev('ph'), computer: '9.9.9.9', cid: 'hp' });
+  stats.rallyReset(mm); stats.launched(mm); hp.hit = { kind: 'drive' }; stats.contact(mm, hp, { n: 0.9 }); stats.launched(mm); hp.hit.kind = 'smash';
+  mm.t0 = Date.now() - 65e3; stats.onEnd(mm, { now: Date.now(), kind: 'bot', winner: 1, ending: 'forfeit', score: [3, 5] });
+  const gp = got && got.seats[0] && got.seats[0].play;
+  ok(gp && gp.hits === 1 && gp.returns === 1 && gp.chances === 1 && gp.smashes === 1 && got.secs === 65 && got.seats[1] === null, 'onEnd: recordMatch gets the seat\'s play (a smash settled mid-rally closed at a forfeit) and secs: ' + JSON.stringify(gp) + ' ' + (got && got.secs));
+  stats.init({}); stats.drop(m);
+  // the database: the gate, the clamp, one owner in both seats, fold, profileOf, export
+  ok(fresh() && db.ok(), 'open(:memory:)');
+  const PL = { hits: 10, returns: 8, chances: 12, winners: 3, aces: 1, smashes: 2, ptsWon: 11, ptsLost: 7 };
+  const g = db.ownerForDevice(dev('pl1'), T0, { create: true }), BM = (o, x = {}) => db.recordMatch({ now: T0, kind: 'bot', level: 0, winner: 0, ending: 'won', score: [11, 7], secs: 120, ranked: true, flags: [], ...x, seats: [{ owner: o, record: true, bests: true, play: PL, ...(x.seat || {}) }, null] });
+  ok(eq(P(g).play, { hits: 0, returns: 0, chances: 0, winners: 0, aces: 0, smashes: 0, pointsWon: 0, pointsLost: 0, secs: 0 }), 'a new profile: play all zeros');
+  BM(g); ok(eq(P(g).play, { hits: 10, returns: 8, chances: 12, winners: 3, aces: 1, smashes: 2, pointsWon: 11, pointsLost: 7, secs: 120 }), 'recordMatch adds the counters and secs: ' + JSON.stringify(P(g).play));
+  BM(g, { now: T0 + 1, seat: { bests: false } }); BM(g, { now: T0 + 2, seat: { record: false } }); BM(g, { now: T0 + 3, seat: { play: undefined } });
+  ok(P(g).play.hits === 10 && P(g).play.secs === 120 && P(g).played === 4, 'a result that did not count (bests false, record false) or has no play adds nothing; played still moves');
+  BM(g, { now: T0 + 4, seat: { play: { hits: 5e9, returns: -4, chances: NaN, winners: '3', aces: Infinity, smashes: 1.6 } } });
+  ok(P(g).play.hits === 10 + 1e6 && P(g).play.returns === 8 && P(g).play.chances === 12 && P(g).play.winners === 3 && P(g).play.aces === 1 && P(g).play.smashes === 4, 'each value clamped to 0..1e6, junk is 0, rounded');
+  const g2 = db.ownerForDevice(dev('pl2'), T0, { create: true });
+  db.recordMatch(H({ now: T0 + 5, ranked: true, seats: [{ owner: g2, record: true, bests: true, play: PL }, { owner: g2, record: true, bests: true, play: PL }] }));
+  ok(P(g2).play.hits === 20 && P(g2).play.secs === 300, 'one owner in both seats: both seats\' counters, the minutes once');
+  const acc = db.createAccount('sub-play', T0); BM(acc.owner_id, { now: T0 + 6 }); const before = P(acc.owner_id).play, gv = P(g).play;
+  ok(db.mergeDevice(dev('pl1'), acc.id, T0 + 7) === 'merged', 'the guest merges');
+  const M = P(acc.owner_id).play;
+  ok(Object.keys(M).every(k => M[k] === before[k] + gv[k]), 'fold adds all nine counters: ' + JSON.stringify(M));
+  const x = db.exportOf(acc.owner_id, T0 + 8); ok(x && eq(x.profile.play, M), 'the export carries play through profileOf');
+}
+
 console.log(fails ? fails + ' FAILURES' : 'ACCOUNTS UNIT PASSED'); process.exit(fails ? 1 : 0);
