@@ -1849,3 +1849,8 @@ body[data-overlay="rk-vs"] #screen-tour-vs{z-index:calc(var(--z-screen) + 1);bac
 .st-crest.is-link:active,.rk-emblem.is-link:active{scale:.96} .st-crest.is-link:focus-visible,.rk-emblem.is-link:focus-visible{outline:none;box-shadow:var(--glow)}
 
 .rk-keep-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;column-gap:var(--s-3);row-gap:var(--s-1);margin-top:calc(-1 * var(--s-2))} .rk-keep-row .rk-keep{margin:0}      /* See all ranks sits on the keep line: the view fits 1280x720 with it */
+
+/* the rank-up's words (no stamp since NOTES 104): a caps pill beside the trophy delta on the series card */
+.rank-kicker{display:inline-grid;place-items:center;height:1.9rem;padding:0 .75rem;margin-left:.5rem;border-radius:var(--r-pill);font:900 max(var(--t-sm),12px)/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--rank-c,var(--gold-4));box-shadow:var(--sh-1);vertical-align:middle;white-space:nowrap}
+.rank-kicker.ov-pop{animation:num-pop 450ms var(--ease-bounce)}
+@media (prefers-reduced-motion: reduce){ .rank-kicker.ov-pop{animation:none} }

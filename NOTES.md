@@ -2023,7 +2023,8 @@ The owner: a road does not fit, because any Matt level can be picked at any time
   swaying crowd, four floodlight masts with light cones, an LED hoarding ring, a darker blue court, stars. Fewer draw calls
   than the park. The park is unchanged. `body[data-venue]` tints the lobby for it.
 - **No stamps** (NOTES 104): the series card uses the light sweep, not a MATCH! slam, and the game card has no GAME 1
-  stamp; the rank-up is the emblem's moment. The owner can ask for slams back.
+  stamp; the rank-up is the emblem's moment, with a caps "Rank up" (or "Division up") pill in the new rank's colour beside the
+  trophy delta, so the moment has words. The owner can ask for slams back.
 - **Fair play** (docs/ACCOUNTS.md rule table RK1-RK5, R10 and R11b by series). Every game is judged by abuse.js as
   before. Ladder rules: the leaver always takes the full loss; the stayer wins the delta only if a played game counted
   (the forfeited game's own cut-short flags never deny the stayer); a no-show before the first ball voids the series and

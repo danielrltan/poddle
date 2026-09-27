@@ -182,7 +182,7 @@ export function matchResult(o, me, them, name) {
   if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60);
 }
 // the Ranked rows of the card, back to nothing: the pips, the game scores, the trophy roll and its ceremony (matchResult and champion both start clean)
-function resultRkReset() { show('result-pips', false); show('tally-games', false); show('rk-acts', false); trophyReset(); }
+function resultRkReset() { { const k = $('rank-kicker'); if (k) k.hidden = true; } show('result-pips', false); show('tally-games', false); show('rk-acts', false); trophyReset(); }
 function trophyReset() {
   clearTimeout(upT); upT = 0; const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll'); }
   $('trophy-em')?.querySelector('.medal-rays')?.remove(); $('trophy-em')?.querySelector('.rank-em')?.classList.remove('is-pop', 'is-down');
@@ -1313,6 +1313,8 @@ export function rankUp(o) {
   const em = $('trophy-em'), e = em && em.querySelector('.rank-em'); if (!e) return;
   setEmblem(e, r.tier); e.classList.remove('is-down', 'is-pop');
   const note = (t, sub) => { const n = $('result-note'); if (!n) return; n.textContent = t; if (sub) n.append(mk('small', 'result-note-sub', sub)); restart(n, 'ov-note'); };
+  const kick = t => { const n = $('result-note'); if (!n) return; let k = $('rank-kicker'); const d = $('trophy-d'); if (!k && d) { k = mk('b', 'rank-kicker'); k.id = 'rank-kicker'; d.after(k); } if (!k) return; k.hidden = !t; k.textContent = t || ''; k.style.setProperty('--rank-c', R.colour.deep); if (t) restart(k, 'ov-pop'); };      // the words for the moment (no stamp since NOTES 104): a caps pill beside the trophy delta, next to the emblem that just changed
+  kick(kind === 'rank' ? 'Rank up' : kind === 'div' ? 'Division up' : '');
   if (kind === 'down') { restart(e, 'is-down'); note(`Down to ${label}`); return; }
   restart(e, 'is-pop');
   if (kind === 'div') { note(label); return; }
