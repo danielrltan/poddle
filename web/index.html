@@ -378,7 +378,7 @@
       <div class="bot-levels" id="bot-levels" role="group" aria-labelledby="bot-title"><button class="btn btn-lg" id="btn-bot-0" data-level="0"><b>Rookie</b><small>Slow and forgiving</small></button><button class="btn btn-lg" id="btn-bot-1" data-level="1"><b>Club</b><small>A fair match</small></button><button class="btn btn-lg" id="btn-bot-3" data-level="3"><b>Tour</b><small>Tournament pace</small></button><button class="btn btn-lg" id="btn-bot-2" data-level="2"><b>Pro</b><small>Fast and accurate</small></button></div>
     </div>
 
-    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (crest, rank, streak), the Trophy Road of Matt's four bosses (filled in by profile.js, the Next button moves into the next boss), the people strip and three number tiles. The tile and this view show only where the server keeps stats -->
+    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (crest, rank, streak), the Matt badge (the toughest level beaten, and a chip a level with its record: any level can be played at any time, so it is a badge, not a road), the people strip and three number tiles. The tile and this view show only where the server keeps stats -->
     <div class="panel panel-wide lobby-view pf-view st" id="lobby-profile" data-view="profile" data-fit hidden>
       <div class="pf-head">
         <p class="pf-who"><span class="pf-name-row"><b id="pf-name">Guest</b><button class="btn btn-icon pf-edit" id="btn-pf-rename" aria-label="Change username" title="Change username" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3ZM13.5 8.5l3 3"/></svg></button></span><small id="pf-sub">Stats saved on this device</small><small class="pf-notice" id="pf-notice" hidden>You can turn this off on the <a class="foot-link" href="/privacy.html#your-data" target="_blank" rel="noopener" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a> page.</small></p>
@@ -401,10 +401,10 @@
           <small id="st-streak-cap">Win one match to light the flame</small>
         </div>
       </section>
-      <section class="st-road" aria-labelledby="pf-ladder-h">
-        <h2 class="caps st-road-h" id="pf-ladder-h"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/><path d="M10.25 8.5v.75M13.75 8.5v.75M10.5 17.25h3" style="stroke-width:2.5"/></svg>Matt difficulties beaten</h2>
-        <ol class="st-nodes" id="pf-rungs" style="--p:0"></ol>
-        <button class="btn btn-sm is-tall pf-next" id="btn-pf-next" hidden></button>
+      <section class="st-matt" id="pf-matt" aria-labelledby="pf-matt-h">
+        <div class="st-mbadge is-none" id="st-mbadge"><i class="st-mdisc"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/><path d="M10.25 8.5v.75M13.75 8.5v.75M10.5 17.25h3" style="stroke-width:2.5"/></svg></i><svg class="st-mstar" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div>
+        <div class="st-mtext"><h2 class="caps" id="pf-matt-h">Toughest Matt beaten</h2><p class="st-mbest" id="st-mbest">None yet</p><small id="st-mcap">Beat Matt at any level to earn a badge</small></div>
+        <ul class="st-mlevels" id="pf-rungs" aria-label="Your record against each Matt"></ul>
       </section>
       <section class="st-people" id="pf-human" aria-labelledby="pf-human-h">
         <h2 class="caps" id="pf-human-h"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 13.5a6 6 0 0 1 3.5 6.5"/></svg>Online multiplayer</h2>

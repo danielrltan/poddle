@@ -1958,3 +1958,18 @@ The stats page's "Against people" heading now reads "Online multiplayer", as the
   key); an open game tab hears the change through the storage event and does what the switch did (nostats, drop the id,
   redial). Turning it off no longer asks Delete or Keep: Delete my data is right there. The privacy page, terms, ROPA,
   changelog and the two in-game notices now point at the privacy page.
+
+## 111. Your stats: the Matt road becomes a badge
+
+The owner: a road does not fit, because any Matt level can be picked at any time. The "Matt difficulties beaten" strip
+(four boss nodes on a gold track, padlocks, "Up next", "The final boss", the Next button) is replaced by one compact row:
+
+- **The badge** (`#st-mbadge`, web/profile.js drawMatt): the toughest level beaten on a disc in that level's colour (Rookie
+  green, Club blue, Tour purple, Pro gold), a gold star on its rim, the name ("Pro Matt") and the date it was first beaten.
+  Toughest means difficulty order (Rookie, Club, Tour, Pro), never the wire number: Pro is 2 and Tour 3 on the wire, so
+  `rungs().top` picks it, as the rank did. Nothing beaten: a grey disc, "None yet" and a coaching line in the player's blue.
+- **A chip a level** (`#pf-rungs`, now a `ul`): each level's W-L (and its streak), ticked once beaten, the badge's level
+  outlined in its colour. Nothing is locked or ordered like a climb, and there is no Next button.
+- The hero (rank crest, trophies, streak) is untouched; the first-win trophy bounty per Matt still counts. test/profile-ui.mjs
+  checks the badge, the chips, the out-of-order case (Rookie + Pro beaten: the badge is Pro) and the empty state.
+- No data, storage or visibility change: the legal pages are unchanged.

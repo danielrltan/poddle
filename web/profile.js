@@ -82,14 +82,8 @@ export function result(p) {                                 // the 'profile' mes
   show('result-save', !!(line || notice || nudge));      // no focus is taken: the rematch buttons keep it
 }
 
-// ---------- Your stats (9.4): the player card. drawRoad (the hero and the four boss nodes), drawPeople and drawTiles fill index.html's markup ----------
-const NS = 'http://www.w3.org/2000/svg', dayS = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(new Date(ms).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) }) : '';      // "Sep 19": the card's dates are chips, the long form is for sentences
-const ICON = {      // the boss discs: won = the result card's star, next = Matt's face, locked = a padlock. Constants only: nothing from the server goes through here
-  star: ['0 0 48 48', [['path', { d: 'M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z' }]]],
-  face: ['0 0 24 24', [['circle', { cx: 12, cy: 8.25, r: 4.25 }], ['path', { d: 'M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z' }], ['path', { d: 'M10.25 8.5v.75M13.75 8.5v.75', 'stroke-width': 2.5 }], ['path', { d: 'M10.5 17.25h3', 'stroke-width': 2.5 }]]],      // Matt: the Play a bot tile's head and shoulders (index.html #btn-bot), scaled 96 -> 24
-  lock: ['0 0 24 24', [['rect', { x: 5, y: 10.5, width: 14, height: 10, rx: 2.5 }], ['path', { d: 'M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2.5' }]]] };
-function svg(name) { const [box, parts] = ICON[name], s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', box); s.setAttribute('aria-hidden', 'true');
-  for (const [tag, at] of parts) { const e = document.createElementNS(NS, tag); for (const k of Object.keys(at)) e.setAttribute(k, at[k]); s.append(e); } return s; }
+// ---------- Your stats (9.4): the player card. drawRoad (the hero, then drawMatt: the Matt badge), drawPeople and drawTiles fill index.html's markup ----------
+const dayS = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(new Date(ms).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) }) : '';      // "Sep 19": the card's dates are chips, the long form is for sentences
 const cls = (id, c, onOff) => { const el = $(id); if (el) el.classList.toggle(c, !!onOff); };
 const human = p => p && p.human && typeof p.human === 'object' ? p.human : {};
 function rungs(p) {                                         // the four Matt rows in difficulty order, and what the card makes of them
@@ -111,20 +105,24 @@ function drawRoad(p) {
   if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one
   text('st-streak-n', String(hot.n));
   const cap = $('st-streak-cap'); if (cap) { cap.textContent = hot.n === 1 ? `vs ${hot.who} · win again to build it` : hot.n ? `vs ${hot.who} · best ` : 'Win one match to light the flame'; if (hot.n >= 2) cap.append(mk('b', '', String(best))); }
-  // the road: a node a Matt, the gold track to the last one beaten. The Next button is the SAME element every draw (its click handler is wired once): it moves into the next node
-  const ol = $('pf-rungs'), btn = $('btn-pf-next'); if (!ol) return; ol.textContent = '';
-  rows.forEach((r, i) => {
-    const lv = ORDER[i], state = won[i] ? 'won' : i === nextI ? 'next' : 'locked', li = mk('li', 'st-node is-' + state); li.dataset.level = lv;
-    const disc = mk('i', 'st-disc'); disc.append(svg(state === 'won' ? 'star' : state === 'next' ? 'face' : 'lock'));
-    const who = mk('span', 'pf-level'), rec = mk('small', '', `${num(r.wins)}-${num(r.losses)}`);      // the record leads (test/profile-ui.mjs reads it), the streak is its small print
-    if (num(r.streak)) rec.append(mk('i', '', `· streak ${num(r.streak)}`)); else if (num(r.bestStreak)) rec.append(mk('i', '', `· best ${num(r.bestStreak)}`));
-    who.append(mk('b', '', name(i)), rec);
-    const tag = mk('span', 'st-tag' + (state === 'won' ? ' is-medal' : state === 'next' ? ' is-next' : ''), state === 'won' ? `Beaten ${dayS(r.firstWinAt)}` : state === 'next' ? (top < 0 ? 'Start here' : 'Up next') : i === 3 ? 'The final boss' : `Beat ${LEVEL[ORDER[i - 1]]} first`);
-    li.append(disc, who, tag);
-    if (state === 'next' && btn) { btn.hidden = false; btn.dataset.level = String(lv); btn.textContent = `Next: beat ${LEVEL[lv]} Matt`; btn.classList.add('is-focus'); li.append(btn); }
-    ol.append(li);
+  drawMatt(p);
+}
+// the Matt badge: every level can be picked at any time, so this is a badge for the toughest one beaten (difficulty order, never the
+// wire number: Tour is 3 on the wire but easier than Pro), and a chip a level with its record. No order to climb, no locks, no Next
+function drawMatt(p) {
+  const { rows, won, top } = rungs(p), badge = $('st-mbadge'), ul = $('pf-rungs');
+  if (badge) badge.className = 'st-mbadge ' + (top < 0 ? 'is-none' : 'is-lv' + top);
+  text('st-mbest', top < 0 ? 'None yet' : `${LEVEL[ORDER[top]]} Matt`);
+  const r = top < 0 ? null : rows[top];
+  text('st-mcap', !r ? 'Beat Matt at any level to earn a badge' : top === 3 ? `The top level · beaten ${dayS(r.firstWinAt)}` : `Beaten ${dayS(r.firstWinAt)}`);
+  if (!ul) return; ul.textContent = '';
+  rows.forEach((row, i) => {
+    const li = mk('li', 'st-mlv' + (won[i] ? ' is-won' : '') + (i === top ? ' is-top' : '')); li.dataset.level = ORDER[i];
+    const rec = mk('small', '', `${num(row.wins)}-${num(row.losses)}`);      // the record (test/profile-ui.mjs reads it), the streak its small print
+    if (num(row.streak)) rec.append(mk('i', '', ` · streak ${num(row.streak)}`));
+    li.append(mk('b', '', LEVEL[ORDER[i]]), rec); li.title = won[i] ? `${LEVEL[ORDER[i]]} Matt: beaten ${dayS(row.firstWinAt)}` : `${LEVEL[ORDER[i]]} Matt: not beaten yet`;
+    ul.append(li);
   });
-  if (btn && nextI < 0) { btn.hidden = true; btn.dataset.level = ''; btn.textContent = ''; btn.classList.remove('is-focus'); ol.after(btn); }      // all four beaten: parked, hidden, back under the list
 }
 function drawPeople(p) {                                    // W-L, the tug-of-war bar with its two labels, the streak chips; nothing played: the empty track and a coaching line
   const H = human(p), w = num(H.wins), l = num(H.losses), played = w + l, pct = played ? Math.round(100 * w / played) : 0;
@@ -287,7 +285,6 @@ function wire() {
   for (const id of ['btn-pf-signin', 'btn-set-signin', 'btn-save-signin']) click(id, () => signIn());
   for (const id of ['btn-pf-signout', 'btn-set-signout']) click(id, () => signOut());
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
-  click('btn-pf-next', e => { const lv = +e.currentTarget.dataset.level; if (ORDER.includes(lv)) h.bot(lv); });
   addEventListener('storage', e => { if (e.key === ON_KEY || e.key === null) statsChanged(); });      // the privacy page (another tab) flipped Save my stats, or the site's storage was cleared
   click('btn-signin-close', () => closeCard());
   click('btn-claim-skip', () => closeCard());
