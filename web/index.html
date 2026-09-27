@@ -235,6 +235,18 @@
       <p class="acct-btns"><button class="btn btn-sm is-tall" id="btn-claim" type="submit">Claim</button><button class="btn btn-sm is-tall btn-quiet" id="btn-claim-skip" type="button">Skip for now</button></p>
     </form>
   </div>
+  <div class="panel panel-sm acct-card share-card" id="share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" tabindex="-1" hidden>
+    <div class="acct-body">
+      <div class="acct-head"><h2 id="share-title">Share your card</h2><button class="btn btn-icon acct-close" id="btn-share-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <figure class="share-prev is-loading" id="share-prev"><img id="share-img" alt="Your Poddle card: your rank, Matt badge and best stats" width="1200" height="630" decoding="async"><figcaption id="share-prev-msg">The picture isn’t ready yet. The link still works.</figcaption></figure>
+      <p class="share-lead">Paste the link anywhere: it shows up as this picture.</p>
+      <div class="share-urlrow"><input class="field" id="share-url" readonly autocomplete="off" spellcheck="false" aria-label="Your card’s link"><button class="btn btn-sm is-tall share-copy" id="btn-share-copy" data-first>Copy</button></div>
+      <p class="share-btns"><button class="btn btn-sm is-tall btn-quiet" id="btn-share-dl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5V15M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg><span>Download image</span></button><button class="btn btn-sm is-tall btn-quiet" id="btn-share-native" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14V3.5M7.5 8 12 3.5 16.5 8M6 11.5v6.5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6.5"/></svg><span>Share…</span></button></p>
+      <p class="share-name" id="share-name" hidden><button class="share-lnk" id="btn-share-name" type="button">Sign in to put your name on your card</button></p>
+      <p class="share-foot" id="share-stop"><span>Anyone with the link can see this card.</span><button class="share-lnk is-quiet" id="btn-share-stop" type="button">Stop sharing</button></p>
+      <p class="share-foot share-confirm" id="share-confirm" role="alert" hidden><span>Stop sharing? This link will stop working.</span><button class="btn btn-sm is-tall btn-danger" id="btn-share-stop-yes">Stop sharing</button><button class="btn btn-sm is-tall btn-quiet" id="btn-share-stop-no">Keep it</button></p>
+    </div>
+  </div>
 </div>
 
 <!-- ============================================== TITLE ============================================== -->
@@ -378,13 +390,14 @@
       <div class="bot-levels" id="bot-levels" role="group" aria-labelledby="bot-title"><button class="btn btn-lg" id="btn-bot-0" data-level="0"><b>Rookie</b><small>Slow and forgiving</small></button><button class="btn btn-lg" id="btn-bot-1" data-level="1"><b>Club</b><small>A fair match</small></button><button class="btn btn-lg" id="btn-bot-3" data-level="3"><b>Tour</b><small>Tournament pace</small></button><button class="btn btn-lg" id="btn-bot-2" data-level="2"><b>Pro</b><small>Fast and accurate</small></button></div>
     </div>
 
-    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (crest, rank, streak), the Matt badge (the toughest level beaten, and a chip a level with its record: any level can be played at any time, so it is a badge, not a road), the people strip and three number tiles. The tile and this view show only where the server keeps stats -->
+    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (crest, rank, streak), the Matt badge (the toughest level beaten, and a chip a level with its record: any level can be played at any time, so it is a badge, not a road), the people strip, the play row (return rate and six figures from profile.play, docs/SHARE.md 3) and three number tiles; Share card in the header opens #share-card. The tile and this view show only where the server keeps stats -->
     <div class="panel panel-wide lobby-view pf-view st" id="lobby-profile" data-view="profile" data-fit hidden>
       <div class="pf-head">
         <p class="pf-who"><span class="pf-name-row"><b id="pf-name">Guest</b><button class="btn btn-icon pf-edit" id="btn-pf-rename" aria-label="Change username" title="Change username" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3ZM13.5 8.5l3 3"/></svg></button></span><small id="pf-sub">Stats saved on this device</small><small class="pf-notice" id="pf-notice" hidden>You can turn this off on the <a class="foot-link" href="/privacy.html#your-data" target="_blank" rel="noopener" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a> page.</small></p>
         <div class="pf-acct" id="pf-acct" hidden>
           <button class="btn is-tall g-btn pf-signin" id="btn-pf-signin" hidden><svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span><b>Sign in with Google</b><small>Save your stats and keep them on every device!</small></span></button>
           <button class="btn btn-sm is-tall pf-signout" id="btn-pf-signout" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/></svg><span>Sign out</span></button>
+          <button class="btn btn-sm is-tall pf-share" id="btn-pf-share" title="Share card" hidden><i class="pf-share-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14V3.5M7.5 8 12 3.5 16.5 8M6 11.5v6.5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6.5"/></svg></i><span>Share card</span></button>
         </div>
       </div>
       <p class="pf-msg" id="pf-msg" role="status" hidden></p>
@@ -411,6 +424,20 @@
         <p class="st-wl"><b class="is-me" id="st-w">0</b><i></i><b class="is-them" id="st-l">0</b><small>W-L</small></p>
         <div class="st-bar" id="st-bar" style="--w:0%"><i></i><i></i><span class="st-bar-l" id="st-bar-l" hidden></span><span class="st-bar-r" id="st-bar-r" hidden>Points <b id="st-pts"></b></span><span class="st-hint" id="st-people-hint">Play a person to start your record</span></div>
         <p class="st-chips" id="st-chips" hidden><span class="st-chip" id="st-hchip"><svg class="st-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 4.5 5.5 5.5 5.5 10.5a5.5 5.5 0 0 1-11 0c0-2 1-3.2 2.2-4.2 0 2 1 3.2 2.3 3.2 0-3.5-1-5.5 1-9.5Z"/></svg>Streak <b id="st-hstreak">0</b></span><span class="st-chip">Best <b id="st-hbest">0</b></span></p>
+      </section>
+      <section class="st-play" id="pf-play" aria-labelledby="pf-play-h" hidden>
+        <div class="st-ret" id="st-ret">
+          <div class="st-ring is-zero" id="st-ring" style="--p:0" aria-hidden="true"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" pathLength="100"/><circle class="st-ring-on" cx="22" cy="22" r="18" pathLength="100"/></svg><svg class="st-ring-ic" viewBox="0 0 24 24"><path d="M9.5 14.5 4.5 9.5l5-5M4.5 9.5h10a5 5 0 0 1 0 10H11"/></svg></div>
+          <div class="st-ret-text"><h2 class="caps" id="pf-play-h">Return rate</h2><p class="st-ret-n"><b id="st-ret-pct" hidden></b><small id="st-ret-cap">Return 10 balls to see it</small></p></div>
+        </div>
+        <dl class="st-figs" id="st-figs">
+          <div class="st-fig" id="st-f-winners" title="Points won with a shot they never touched"><dt>Winners</dt><dd>0</dd></div>
+          <div class="st-fig" id="st-f-aces" title="Serves they never touched"><dt>Aces</dt><dd>0</dd></div>
+          <div class="st-fig" id="st-f-smashes" title="Overhead smashes"><dt>Smashes</dt><dd>0</dd></div>
+          <div class="st-fig" id="st-f-hits" title="Every ball you hit, serves included"><dt>Total hits</dt><dd>0</dd></div>
+          <div class="st-fig" id="st-f-points" title="Of every point you played, Matt and people"><dt>Points won</dt><dd>0%</dd></div>
+          <div class="st-fig" id="st-f-time" title="Time in matches"><dt>On court</dt><dd>0m</dd></div>
+        </dl>
       </section>
       <section class="st-tiles" id="pf-bests" aria-labelledby="pf-bests-h">
         <h2 class="caps" id="pf-bests-h" hidden>Personal bests</h2>

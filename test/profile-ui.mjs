@@ -1,6 +1,7 @@
 // Player stats client (docs/ACCOUNTS.md 9, test plan 12.4): web/profile.js + main.js + index.html against a fake game and a fake /api.
 // The real page runs with ?acctest=1 (profile.js is off on localhost otherwise). Google is never reached: every request to
 // accounts.google.com or gstatic.com is intercepted, recorded and aborted.
+// Section F (docs/SHARE.md 3): the play row from profile.play and the Share card sheet against a fake /api/share. Until server/card.js lands the fake's image is web/og.jpg.
 // Usage: node test/profile-ui.mjs      PROFILE_UI_PORT=<base> moves the ports (default 9420: pages + /api, 9421: fake game, 9422: nothing = no AirPod).
 import http from 'http'; import fs from 'fs'; import path from 'path'; import os from 'os';
 import { WebSocketServer } from 'ws';
@@ -8,19 +9,24 @@ import puppeteer from 'puppeteer-core';
 const P0 = +process.env.PROFILE_UI_PORT || 9420, W = P0, G = P0 + 1, DEAD = P0 + 2, root = new URL('..', import.meta.url).pathname, sleep = ms => new Promise(r => setTimeout(r, ms));
 if ([8080, 8787, 3000].some(p => p >= P0 && p <= P0 + 2)) { console.log('refusing: that port range holds the player\'s own game'); process.exit(2); }
 const J = o => JSON.stringify(o), UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
 // ---------- the fake /api (same origin as the page, as on poddleball.com) ----------
 const day = Date.UTC(2026, 8, 20), rung = (level, name, wins, losses, streak, bestStreak, firstWinAt) => ({ level, name, wins, losses, abandons: 0, streak, bestStreak, firstWinAt, bestMargin: 0 });
 const FIXTURE = { guest: true, since: day - 864e5, expiresAt: day + 90 * 864e5, played: 9,
   human: { wins: 3, losses: 2, streak: 1, bestStreak: 2, pointsWon: 50, pointsLost: 41 }, titles: 1,
   matt: [rung(0, 'Rookie', 3, 0, 3, 3, day), rung(1, 'Club', 1, 1, 0, 1, day + 3600e3), rung(3, 'Tour', 0, 2, 0, 0, null), rung(2, 'Pro', 0, 0, 0, 0, null)],   // BOT_ORDER [0, 1, 3, 2]
-  bests: { rally: { v: 14, at: day }, hit: { v: 22, at: day }, speed: { v: 9.4, at: day } } };
-const API = { signin: false, profile: FIXTURE, delClears: false, acct: null, stale: false, signoutFail: false, log: [] };      // log: [method, path, body] in arrival order. delClears: DELETE /api/account empties the fake store (section D)
+  bests: { rally: { v: 14, at: day }, hit: { v: 22, at: day }, speed: { v: 9.4, at: day } },
+  play: { hits: 412, returns: 187, chances: 256, winners: 38, aces: 9, smashes: 21, pointsWon: 214, pointsLost: 173, secs: 4980 }, share: null };      // play: docs/SHARE.md 1. share: the fake answers the live link in its place (API.slug)
+const API = { signin: false, profile: FIXTURE, delClears: false, acct: null, stale: false, signoutFail: false, slug: null, slugs: 0, shareFail: false, log: [] };      // log: [method, path, body] in arrival order. delClears: DELETE /api/account empties the fake store (section D)
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   let b = null; try { b = body ? JSON.parse(body) : null; } catch { b = null; } API.log.push([q.method, u, b]);
   if (u === '/api/me') return send(200, { db: true, signin: { enabled: API.signin, clientId: API.signin ? 'test-client.apps.googleusercontent.com' : null }, account: API.acct });
-  if (u === '/api/stats') return send(200, { profile: b && b.dev ? API.profile : null });
+  const link = () => { const url = `http://127.0.0.1:${W}/c/${API.slug}`; return { url, image: `http://127.0.0.1:${W}/og.jpg?v=${API.slugs}` }; };      // the real image is <url>.png?v=<hash> (server/card.js, part B): og.jpg stands in for it here
+  if (u === '/api/stats') { const p = b && b.dev ? API.profile : null; return send(200, { profile: p && 'share' in p ? { ...p, share: API.slug ? link() : null } : p }); }      // no share key in the profile: an older server, left as it is
+  if (u === '/api/share' && q.method === 'POST') { if (API.shareFail) return send(503, { error: 'unavailable' }); if (!b || !b.dev || !API.profile) return send(404, { error: 'nothing' });
+    if (!API.slug) API.slug = 'Ab3' + String(++API.slugs).padStart(7, 'x'); return send(200, link()); }      // one live link: the same answer until DELETE, then a new slug
+  if (u === '/api/share' && q.method === 'DELETE') { API.slug = null; r.writeHead(204); return r.end(); }
   if (u === '/api/signin/nonce') return send(200, { nonce: 'n'.repeat(32) });
   if (u === '/api/account' && q.method === 'DELETE') { if (API.delClears) API.profile = null; return send(200, { deleted: { account: !!API.acct && !API.stale, device: !!(b && b.dev) } }); }      // the real route's shape: what it deleted
   if (u === '/api/signout' && q.method === 'POST') { if (API.signoutFail) return send(500, { error: 'internal' }); r.writeHead(204); return r.end(); }
@@ -44,7 +50,7 @@ const last = () => socks[socks.length - 1], push = m => { const s = last(); if (
 const CHROME = process.env.CHROME || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(p => fs.existsSync(p));
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 const out = [], errs = [], ok = (c, what) => { out.push((c ? 'PASS ' : 'FAIL ') + what); if (!c) console.log('FAIL', what); };
-setTimeout(() => { console.log(out.join('\n')); console.log('PROFILE UI FAIL (timeout)'); process.exit(2); }, 240000);
+setTimeout(() => { console.log(out.join('\n')); console.log('PROFILE UI FAIL (timeout)'); process.exit(2); }, 420000);
 const google = [];      // every request to Google, in order
 async function page(tag) { const pg = await browser.newPage(); await pg.setViewport({ width: 1280, height: 720 }); await pg.setRequestInterception(true);
   pg.on('request', q => { const u = q.url(); if (/^https:\/\/([a-z0-9-]+\.)*(accounts\.google\.com|gstatic\.com)\//.test(u)) { google.push(u); return q.abort(); } q.continue(); });
@@ -157,7 +163,7 @@ ok(r.bests.includes('14 hits') && r.bests.includes('540°/s') && !r.bests.includ
 ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your stats asks /api/stats with the device id in the body');
 { // the panel fits every window: inside the viewport's width, and no rung line or chip cut short with an ellipsis
   const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);
-    const r = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(), cut = [...v.querySelectorAll('.st-mlv b, .st-mlv small, .st-mbest, .st-cap > span, .st-rank-name, .st-ribbon, .st-chip, .st-bar-l, .st-bar-r')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.slice(0, 30));
+    const r = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(), cut = [...v.querySelectorAll('.st-mlv b, .st-mlv small, .st-mbest, .st-cap > span, .st-rank-name, .st-ribbon, .st-chip, .st-bar-l, .st-bar-r, .st-fig dt, .st-fig dd, .st-ret-n, .pf-share span')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.slice(0, 30));
       const wide = [...v.querySelectorAll('*')].filter(e => { const q = e.getBoundingClientRect(); return q.width && (q.left < b.left - 1 || q.right > b.right + 1); }).map(e => (e.id || e.className || e.tagName).toString().slice(0, 30));      // nothing pokes out of the panel (the crest's rays are masked, they may)
       return { left: Math.round(b.left), right: Math.round(b.right), w: innerWidth, cut, wide: wide.filter(c => !/st-rays/.test(c)) }; });
     if (r.left < 0 || r.right > r.w || r.cut.length || r.wide.length) bad.push(`${w}x${h}: ${J(r)}`); }
@@ -274,6 +280,100 @@ await pg.close();
   r = await ev(pg, () => document.getElementById('data-status').textContent);
   ok(/sign in to Poddle first/.test(r) && !/account and your statistics/.test(r), `delete with a session that had ended: deleted.account false -> "${r}", never the account deleted`);
   API.acct = null; API.stale = false; API.signoutFail = false; await pg.close(); }
+
+// ---------- F. the play row and Share card (docs/SHARE.md 3): the numbers, the fit, the copy, the sheet, Copy, Download, Share..., Esc, Stop sharing, the coaching line, an older server ----------
+{ API.signin = false; API.acct = null; API.profile = FIXTURE; API.slug = null; API.delClears = false;
+  const SHOTS = path.join(root, 'test/ui-shots/accounts'), DL = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-share-')), ID = '5c2f0a3e-8b1d-4c6e-9f7a-1d2e3f4a5b6c';
+  fs.mkdirSync(SHOTS, { recursive: true });
+  await browser.defaultBrowserContext().overridePermissions(`http://127.0.0.1:${W}`, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
+  const pg = await page('share'); const cdp = await pg.createCDPSession(); await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL });
+  await pg.evaluateOnNewDocument(id => { try { localStorage.clear(); localStorage.setItem('poddle.device', id); localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {}
+    window.__clip = []; window.__shared = []; const c = navigator.clipboard;      // a spy that calls through (headless readText is not always there): what the page handed the clipboard
+    if (c) { const w = c.write.bind(c), wt = c.writeText.bind(c); c.writeText = t => { window.__clip.push(String(t)); return wt(t); };
+      c.write = items => { Promise.all(items.map(i => i.getType('text/plain').then(b => b.text()))).then(t => window.__clip.push(t.join('')), () => window.__clip.push('(rejected)')); return w(items); }; }
+    navigator.share = d => { window.__shared.push({ url: d.url, title: d.title }); return Promise.resolve(); }; }, ID);      // never the real sheet: it can hang a headless run
+  await pg.setViewport({ width: 1280, height: 800 }); await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
+  const openStats = async () => { await ev(pg, () => window.__ui.lobbyView('home')); await sleep(200); await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500); };
+  const sheet = () => ev(pg, () => { const g = id => document.getElementById(id); return { open: !g('acct-layer').hidden && !g('share-card').hidden, url: g('share-url').value, img: g('share-img').getAttribute('src') || '', prev: g('share-prev').className, clip: window.__clip.slice(),
+    toast: g('toast').textContent, name: g('share-name').hidden ? '' : g('btn-share-name').textContent, native: !g('btn-share-native').hidden, focus: document.activeElement?.id || '' }; });
+  const shares = n => API.log.slice(n).filter(l => l[1] === '/api/share'), linkNow = () => `http://127.0.0.1:${W}/c/${API.slug}`;
+  await openStats();
+  let r = await ev(pg, () => { const g = id => document.getElementById(id), f = id => g(id).querySelector('dd').textContent;
+    return { row: !g('pf-play').hidden, pct: g('st-ret-pct').hidden ? '' : g('st-ret-pct').textContent, cap: g('st-ret-cap').textContent, p: g('st-ring').style.getPropertyValue('--p'), hint: g('st-ret').classList.contains('is-hint'), zero: g('st-ring').classList.contains('is-zero'),
+      figs: ['winners', 'aces', 'smashes', 'hits', 'points', 'time'].map(k => f('st-f-' + k)), btn: !!g('btn-pf-share').offsetParent && !g('btn-pf-share').closest('[hidden]'), label: g('btn-pf-share').textContent.trim() }; });
+  ok(r.row && r.pct === '73%' && r.cap === '187 of 256 returned' && r.p === '0.730' && !r.hint && !r.zero && J(r.figs) === J(['38', '9', '21', '412', '55%', '1h 23m']) && r.btn && r.label === 'Share card',
+    `play row: return rate 73% (187 of 256 returned, the ring at 0.730), winners 38, aces 9, smashes 21, hits 412, points won 55%, 1h 23m on court; the Share card button shows (${J(r)})`);
+  r = await ev(pg, () => { const b = document.querySelector('#screen-lobby .menu-body'), v = document.getElementById('lobby-profile').getBoundingClientRect(), m = b.getBoundingClientRect(); return { sh: b.scrollHeight, ch: b.clientHeight, top: Math.round(v.top), bot: Math.round(v.bottom), mtop: Math.round(m.top), mbot: Math.round(m.bottom) }; });
+  ok(r.sh <= r.ch + 1 && r.top >= r.mtop && r.bot <= r.mbot, `1280x800: Your stats fits without a scroll, the play row and Share card included (${J(r)})`);
+  for (const [w, h] of [[1920, 1080], [1366, 500], [1024, 768], [900, 700], [760, 600]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, `stats-play-${w}x${h}.png`) }); }      // for review: the play row at the in-between sizes
+  await pg.setViewport({ width: 1280, height: 800 }); await sleep(300);
+  // the first click: no link yet -> POST /api/share, the url goes to the clipboard through a ClipboardItem promise, then the sheet
+  let n0 = API.log.length; await pg.bringToFront(); await pg.click('#btn-pf-share'); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, 'share-copied-1280x800.png') }); await sleep(1100);
+  r = await sheet(); const url1 = linkNow(); let p = shares(n0);
+  ok(p.length === 1 && p[0][0] === 'POST' && p[0][2]?.dev === ID && r.open && r.url === url1 && /^http:\/\/127\.0\.0\.1:\d+\/og\.jpg\?v=1$/.test(r.img) && r.clip.includes(url1) && r.toast === 'Link copied' && r.focus === 'btn-share-copy',
+    `Share card, no link yet: one POST /api/share with the id, the link copied (${J(r.clip)}), the sheet with it and the picture, toast "${r.toast}", Copy focused (${r.focus})`);
+  ok(r.prev === 'share-prev' && r.name === '' && r.native, `the sheet: the picture loaded (no skeleton: "${r.prev}"), no name line with sign-in off ("${r.name}"), Share... where navigator.share exists (${r.native})`);
+  { let cb = ''; try { cb = await ev(pg, () => navigator.clipboard.readText()); } catch { cb = ''; } if (cb) ok(cb === url1, `the clipboard itself holds the link ("${cb}")`); }
+  for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(500); await pg.screenshot({ path: path.join(SHOTS, `share-${w}x${h}.png`) }); }
+  await pg.setViewport({ width: 1280, height: 800 }); await sleep(300);
+  await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-share-copy'); await sleep(400);
+  r = await ev(pg, () => ({ b: document.getElementById('btn-share-copy').textContent, clip: window.__clip.slice() }));
+  ok(r.b === 'Copied!' && J(r.clip) === J([url1]), `Copy: the link again, the button says "${r.b}" (${J(r.clip)})`);
+  await pg.click('#btn-share-dl'); let file = ''; for (let k = 0; k < 30 && !file; k++) { await sleep(200); file = fs.readdirSync(DL).find(f => f === 'poddle-card.png') || ''; }
+  { const got = file ? fs.statSync(path.join(DL, file)).size : 0, want = fs.statSync(path.join(root, 'web/og.jpg')).size; ok(!!file && got === want, `Download image: poddle-card.png with the picture's bytes (${got} of ${want})`); }
+  await pg.click('#btn-share-native'); await sleep(300); r = await ev(pg, () => window.__shared.slice());
+  ok(r.length === 1 && r[0].url === url1 && r[0].title === 'My Poddle card', `Share...: navigator.share({ url, title }) (${J(r)})`);
+  r = []; for (let k = 0; k < 9; k++) { await pg.keyboard.press('Tab'); await sleep(60); r.push(await ev(pg, () => !!document.activeElement?.closest('#share-card'))); }
+  ok(r.every(Boolean), `Tab stays inside the sheet (${J(r)})`);
+  await pg.keyboard.press('Escape'); await sleep(300); r = await ev(pg, () => ({ open: !document.getElementById('acct-layer').hidden, focus: document.activeElement?.id || '' }));
+  ok(!r.open && r.focus === 'btn-pf-share', `Esc closes the sheet and focus goes back to Share card (${J(r)})`);
+  // a known link: copied at once, no request
+  n0 = API.log.length; await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-pf-share'); await sleep(800); r = await sheet();
+  ok(!shares(n0).length && r.open && J(r.clip) === J([url1]) && r.url === url1, `Share card again: the known link copied straight away, no request (${J(r.clip)}, ${shares(n0).length} requests)`);
+  // Stop sharing: an inline confirm (Keep it focused), then DELETE /api/share; the next click makes a NEW link
+  await pg.click('#btn-share-stop'); await sleep(250);
+  r = await ev(pg, () => ({ confirm: !document.getElementById('share-confirm').hidden, stop: !document.getElementById('share-stop').hidden, focus: document.activeElement?.id || '' }));
+  ok(r.confirm && !r.stop && r.focus === 'btn-share-stop-no', `Stop sharing asks first, Keep it focused (${J(r)})`);
+  n0 = API.log.length; await pg.click('#btn-share-stop-yes'); await sleep(700); r = await sheet(); p = shares(n0);
+  ok(p.length === 1 && p[0][0] === 'DELETE' && p[0][2]?.dev === ID && !r.open && /^Sharing stopped/.test(r.toast), `Stop sharing: DELETE /api/share with the id, the sheet closes, "${r.toast}"`);
+  API.shareFail = true; n0 = API.log.length; await pg.click('#btn-pf-share'); await sleep(900); r = await sheet();
+  ok(shares(n0).length === 1 && !r.open && /Couldn’t make a link/.test(r.toast), `POST /api/share fails: no sheet, "${r.toast}"`);
+  API.shareFail = false; n0 = API.log.length; await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-pf-share'); await sleep(1500); r = await sheet(); const url2 = linkNow();
+  ok(url2 !== url1 && shares(n0).length === 1 && r.open && r.url === url2 && r.clip.includes(url2) && /og\.jpg\?v=2$/.test(r.img), `after Stop sharing a new link: ${url2.split('/').pop()} (was ${url1.split('/').pop()}), copied (${J(r.clip)})`);
+  await pg.keyboard.press('Escape'); await sleep(300);
+  // Your stats again: /api/stats now carries the link, so the first click needs no request
+  await openStats(); n0 = API.log.length; await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-pf-share'); await sleep(800); r = await sheet();
+  ok(!shares(n0).length && r.open && r.url === url2 && J(r.clip) === J([url2]), `profile.share known from /api/stats: copied with no request (${J(r.clip)})`);
+  await pg.keyboard.press('Escape'); await sleep(300);
+  // under 10 chances: no percentage, the coaching line, an empty ring
+  API.profile = { ...FIXTURE, play: { ...FIXTURE.play, returns: 4, chances: 6 } }; await openStats();
+  r = await ev(pg, () => ({ pct: !document.getElementById('st-ret-pct').hidden, cap: document.getElementById('st-ret-cap').textContent, hint: document.getElementById('st-ret').classList.contains('is-hint'), zero: document.getElementById('st-ring').classList.contains('is-zero') }));
+  ok(!r.pct && r.cap === 'Return 10 balls to see it' && r.hint && r.zero, `6 chances: no percentage, "${r.cap}", an empty ring (${J(r)})`);
+  await pg.screenshot({ path: path.join(SHOTS, 'stats-coach-1280x800.png') });
+  // an older server (or the Ranked branch before the merge): no play, no share -> no play row, no Share card, the rest as before
+  { const OLD = { ...FIXTURE }; delete OLD.play; delete OLD.share; API.profile = OLD; } await openStats();
+  r = await ev(pg, () => ({ row: !document.getElementById('pf-play').hidden, btn: !document.getElementById('btn-pf-share').hidden, acct: !document.getElementById('pf-acct').hidden, rungs: document.querySelectorAll('#pf-rungs > li').length, rank: document.getElementById('st-rank').textContent }));
+  ok(!r.row && !r.btn && !r.acct && r.rungs === 4 && r.rank === 'Gold', `older server (no play, no share): no play row, no Share card, the card as before (${J(r)})`);
+  // sign-in on, a guest: the widest header (Google's button and Share card), and the name line in the sheet opens sign-in. No navigator.share: no Share...
+  API.profile = FIXTURE; API.signin = true; await pg.reload(); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900); await openStats();
+  await pg.screenshot({ path: path.join(SHOTS, 'stats-signin-1280x800.png') });
+  r = await ev(pg, () => { const a = document.getElementById('btn-pf-signin').getBoundingClientRect(), b = document.getElementById('btn-pf-share').getBoundingClientRect(); return { both: a.width > 0 && b.width > 0, row: Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 2 }; });
+  ok(r.both && r.row, `sign-in on: Sign in with Google and Share card side by side in the header (${J(r)})`);
+  r = await ev(pg, () => { const b = document.querySelector('#screen-lobby .menu-body'), h = document.querySelector('#lobby-profile .pf-head'), w = document.getElementById('pf-who') || h.firstElementChild, a = document.getElementById('pf-acct');
+    return { sh: b.scrollHeight, ch: b.clientHeight, oneRow: Math.abs(w.getBoundingClientRect().top - a.getBoundingClientRect().top) < a.getBoundingClientRect().height, label: document.getElementById('btn-pf-share').textContent.trim(), w: Math.round(document.getElementById('btn-pf-share').getBoundingClientRect().width) }; });
+  ok(r.sh <= r.ch + 1 && r.oneRow && r.label === 'Share card', `sign-in on, 1280x800: the header stays one row (a round Share card button beside Google's) and the card fits without a scroll (${J(r)})`);
+  { const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);      // the widest header at every size: nothing pokes out of the card
+      const q = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(); return [...v.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < b.left - 1 || r.right > b.right + 1); }).map(e => (e.id || e.className || e.tagName).toString().slice(0, 30)).filter(c => !/st-rays/.test(c)); });
+      if (q.length) bad.push(`${w}x${h}: ${J(q)}`); if (w === 390) await pg.screenshot({ path: path.join(SHOTS, 'stats-signin-390x844.png') }); }
+    ok(!bad.length, `sign-in on: the header with Google's button and Share card stays inside the card at ${SIZES.length} sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
+    await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); }
+  await ev(pg, () => { delete navigator.share; delete Navigator.prototype.share; }); await pg.click('#btn-pf-share'); await sleep(800); r = await sheet();
+  ok(r.open && r.name === 'Sign in to put your name on your card' && !r.native, `a guest's sheet: "${r.name}", no Share... without navigator.share (${r.native})`);
+  await pg.click('#btn-share-name'); await sleep(600);
+  r = await ev(pg, () => ({ signin: !document.getElementById('signin-card').hidden, share: !document.getElementById('share-card').hidden }));
+  ok(r.signin && !r.share, `the name line opens the sign-in card (${J(r)})`);
+  await pg.keyboard.press('Escape'); await sleep(300);
+  await pg.close(); fs.rmSync(DL, { recursive: true, force: true }); API.signin = false; API.profile = FIXTURE; API.slug = null; }
 
 const uniq = [...new Set(errs.map(e => e.split('\n')[0].slice(0, 220)))];
 ok(!uniq.length, 'no page errors' + (uniq.length ? ':\n  ' + uniq.join('\n  ') : ''));
