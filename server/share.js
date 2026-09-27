@@ -56,11 +56,11 @@ function allowRender(req) {                                      // -> { wait (s
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function blurb(d) {                                              // og:description: one line of the best of the card, then where to play
   const bits = [`${d.rank} rank`, ...d.big.slice(0, 2).map(b => b.label === 'Return rate' ? `${b.value} return rate` : b.label === 'Longest rally' ? `${b.value}-hit rally`
-    : b.label === 'Fastest swing' ? `${b.value}°/s swing` : `${b.value} ${b.label.toLowerCase()}`), d.matt ? `beat ${d.matt} Matt` : null].filter(Boolean);
-  return bits.join(' · ') + '. Play free at poddleball.com';
+    : b.label === 'Fastest swing' ? `${b.value}°/s swing` : `${b.value} ${b.label.toLowerCase()}`), d.matt ? `beat ${d.matt} Matt (the bot)` : null].filter(Boolean);
+  return bits.join(' · ') + '. Pickleball with your phone as the paddle. Play free at poddleball.com';   // what the game is: most people who see the preview never open the page
 }
 function html(d, url, image, img) {
-  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat ${d.matt} Matt` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
+  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat ${d.matt} Matt, the bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -102,8 +102,9 @@ main{width:100%;max-width:1000px;display:flex;flex-direction:column;align-items:
   background:radial-gradient(circle at 30% 32%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 62% 24%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 50% 52%,var(--ball-deep) 0 8%,transparent 9%),
     radial-gradient(circle at 22% 62%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 78% 54%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 48% 82%,var(--ball-deep) 0 7%,transparent 8%),
     radial-gradient(circle at 34% 28%,#fbffa8,var(--ball) 58%,#c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35)}
-.card{width:min(100%,960px,max(440px,calc((100vh - 390px) * 1.905)));aspect-ratio:1200/630;border-radius:clamp(14px,2.4vw,28px);overflow:hidden;background:#dcecf6;border:4px solid #fff;box-shadow:0 3px 0 rgba(90,150,185,.25),0 18px 40px rgba(20,60,100,.28)}
+.card{display:block;width:min(100%,960px,max(440px,calc((100vh - 390px) * 1.905)));aspect-ratio:1200/630;border-radius:clamp(14px,2.4vw,28px);overflow:hidden;background:#dcecf6;border:4px solid #fff;box-shadow:0 3px 0 rgba(90,150,185,.25),0 18px 40px rgba(20,60,100,.28)}
 .card img{display:block;width:100%;height:100%}
+.card:focus-visible{outline:4px solid #fff;outline-offset:4px}
 h1{margin:0;font-size:clamp(22px,3.4vw,30px);font-weight:900;line-height:1.25;color:var(--me-navy);text-align:center;text-shadow:0 2px 0 rgba(255,255,255,.8)}
 .what{margin:-6px 0 0;font-size:clamp(16px,2.2vw,19px);font-weight:800;color:var(--me-navy);text-align:center}
 .play{display:inline-flex;align-items:center;gap:12px;min-height:64px;padding:0 36px;border-radius:999px;font:900 clamp(22px,3vw,28px)/1 var(--font);color:#fff;text-decoration:none;
@@ -119,9 +120,9 @@ h1{margin:0;font-size:clamp(22px,3.4vw,30px);font-weight:900;line-height:1.25;co
 </head><body>
 <main>
 <a class="logo" href="/" aria-label="Poddle home">P<i></i>ddle</a>
-<div class="card"><img src="${esc(img)}" width="1200" height="630" alt="${esc(alt)}"></div>
-<h1>Think you can return ${d.guest ? 'this player&#8217;s' : esc(d.name) + '&#8217;s'} serve?</h1>
-<p class="what">Pickleball in your browser: your phone or AirPod is the paddle.</p>
+<a class="card" href="/"><img src="${esc(img)}" width="1200" height="630" alt="${esc(alt)}"></a>
+<h1>${d.guest ? 'This player' : esc(d.name)} plays pickleball with a phone for a paddle.</h1>
+<p class="what">Free in your browser, with your phone or AirPod. Your turn.</p>
 <a class="play" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>Play Poddle free</a>
 <p class="own">Make your own card: <a href="/">play</a>, then open Your stats</p>
 </main>

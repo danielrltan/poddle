@@ -4,7 +4,7 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 2;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 3;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
@@ -39,19 +39,21 @@ function dataOf(p, username, play) {
   const titles = num(p.titles), aces = num(P.aces), winners = num(P.winners), smashes = num(P.smashes), played = num(p.played);
   // [key, big figure, chip line], best first. label: the long name (share.js words the og tags from it); tag + cap: what the tile draws, short
   // enough to stay 32 px in a third of the panel (a chat app shows the card ~300-400 px wide: that is 8-11 px there). A card is a brag the
-  // owner will only share if it flatters: the return rate only from 20 chances at 50% or better, the rally from 5 hits (Your stats has both)
+  // owner will only share if it flatters: the return rate only from 20 chances at 50% or better, the rally from 5 hits (Your stats has both),
+  // the record vs people only from 3 wins and more wins than losses (a 1-14 is left off, tile and chip), matches played only as a chip.
+  // The swing (deg/s: a number a stranger cannot judge) comes after the figures anyone reads, so a streak or a title takes its tile first
   const rate = chances ? Math.round(100 * returns / chances) : 0;
   const all = [
     chances >= 20 && rate >= 50 && ['ret', { label: 'Return rate', tag: 'Returns', value: rate + '%', bar: rate }],
     rally >= 5 && ['rally', { label: 'Longest rally', tag: 'Rally', value: String(rally), cap: 'hits' }],
-    speed && ['speed', { label: 'Fastest swing', tag: 'Swing', value: String(speed), cap: '°/s' }],
-    w && ['people', { label: 'Vs people', tag: 'Record', value: `${w}-${l}`, cap: 'vs people' }, `${w}-${l} vs people`],
+    w >= 3 && w > l && ['people', { label: 'Vs people', tag: 'Record', value: `${w}-${l}`, cap: 'vs people' }, `${w}-${l} vs people`],
     streak >= 2 && ['streak', { label: 'Best streak', tag: 'Streak', value: String(streak), cap: 'in a row' }, `${streak}-win streak`],
     titles && ['titles', { label: titles === 1 ? 'Title' : 'Titles', tag: titles === 1 ? 'Title' : 'Titles', value: String(titles), cap: 'won' }, `${titles} title${titles === 1 ? '' : 's'}`],
-    winners && ['winners', winners >= 10 && { label: 'Winners', tag: 'Winners', value: String(winners), cap: 'unreturned' }, `${winners} winner${winners === 1 ? '' : 's'}`],
-    aces && ['aces', aces >= 10 && { label: 'Aces', tag: 'Aces', value: String(aces), cap: 'unreturned' }, `${aces} ace${aces === 1 ? '' : 's'}`],
-    smashes && ['smashes', null, `${smashes} smash${smashes === 1 ? '' : 'es'}`],
-    played && ['played', { label: played === 1 ? 'Match' : 'Matches', tag: played === 1 ? 'Match' : 'Matches', value: String(played), cap: 'played' }, `${played} match${played === 1 ? '' : 'es'}`],
+    speed && ['speed', { label: 'Fastest swing', tag: 'Swing', value: String(speed), cap: '°/s' }, `${speed}°/s swing`],
+    winners >= 5 && ['winners', winners >= 10 && { label: 'Winners', tag: 'Winners', value: String(winners), cap: 'unreturned' }, `${winners} winners`],   // "1 winner" as a chip reads as a confession, not a brag
+    aces >= 5 && ['aces', aces >= 10 && { label: 'Aces', tag: 'Aces', value: String(aces), cap: 'unreturned' }, `${aces} aces`],
+    smashes >= 5 && ['smashes', null, `${smashes} smashes`],
+    played && ['played', null, `${played} match${played === 1 ? '' : 'es'}`],
   ].filter(Boolean);
   const big = all.filter(x => x[1]).slice(0, 3), used = new Set(big.map(x => x[0]));   // a handful of winners or aces reads better as a chip than as a big figure
   const chips = all.filter(x => x[2] && !used.has(x[0])).slice(0, 3).map(x => x[2]);
@@ -136,10 +138,11 @@ function svgOf(d) {
 <filter id="lift" x="-10%" y="-20%" width="120%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#ffffff" flood-opacity=".85"/></filter>
 </defs>`);
   out.push(`<rect width="${W}" height="${H}" fill="url(#sky)"/><rect width="${W}" height="${H}" fill="url(#diag)"/>`);
-  // left: the wordmark, the rank crest, the rank, the trophies, the Matt badge
+  // left: the wordmark and what the game is (a stranger in a feed has never heard of Poddle), the rank crest, the rank, the trophies, the Matt badge
   const cx = 198, [wm, ww] = wordmark(0, 0, 60, '#39434d');
-  out.push(`<g transform="translate(${r2(cx - ww / 2)} 96)" filter="url(#lift)">${wm}</g>`);
-  const lh = 312 + (d.trophies ? 70 : 0) + (d.matt ? 64 : 0), top = 120 + Math.max(0, (480 - lh) / 2);   // the crest, the rank and its pills, centred under the wordmark
+  out.push(`<g transform="translate(${r2(cx - ww / 2)} 82)" filter="url(#lift)">${wm}</g>`);
+  out.push(text(cx + 3, 124, 'PICKLEBALL', { size: 28, wt: 900, fill: '#0e3f8c', anchor: 'middle', ls: 6, extra: ' filter="url(#lift)"' }));   // +3: half the trailing letter-spacing, so it centres on the wordmark
+  const lh = 312 + (d.trophies ? 70 : 0) + (d.matt ? 64 : 0), top = 136 + Math.max(0, (470 - lh) / 2);   // the crest, the rank and its pills, centred under the tagline
   out.push(crest(cx, top + 108, 90, d.tier));
   const rk = d.rank.toUpperCase();
   out.push(text(cx, top + 272, rk, { size: fit(rk, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
@@ -150,7 +153,7 @@ function svgOf(d) {
     out.push(text(cx, ly + 33, tro, { size: 28, wt: 800, fill: '#7a4a00', anchor: 'middle' })); ly += 70;
   } else ly += 20;
   if (d.matt) {
-    const lv = LV[d.mattI] || LV[0], s = `Beat ${d.matt} Matt`, fs = fit(s, 900, 30, 246), sw = measure(s, 900, fs) + 98, x0 = cx - sw / 2;   // at most 344 px wide: clear of the edge and the panel
+    const lv = LV[d.mattI] || LV[0], s = `Beat the ${d.matt} bot`, fs = fit(s, 900, 30, 262), sw = measure(s, 900, fs) + 98, x0 = cx - sw / 2;   // "bot", not "Matt": a stranger does not know Matt is the AI. At most 360 px wide: clear of the edge and the panel
     out.push(`<rect x="${r2(x0)}" y="${ly}" width="${r2(sw)}" height="64" rx="32" fill="#ffffff" filter="url(#sh)"/>`);
     out.push(`<circle cx="${r2(x0 + 34)}" cy="${ly + 32}" r="24" fill="${lv[0]}" stroke="${lv[1]}" stroke-width="3"/><g transform="translate(${r2(x0 + 34 - 15)} ${ly + 16}) scale(1.25)" fill="#ffffff">${MATT}</g>`);
     out.push(text(x0 + 70, ly + 32 + fs * 0.36, s, { size: fs, wt: 900, fill: lv[1] }));
@@ -162,35 +165,33 @@ function svgOf(d) {
   if (d.guest) out.push(text(x0, py + 122, d.name, { size: 56, wt: 900, fill: '#65717b' }));   // no username: the generic words stay small and grey, the stats are the hero
   else out.push(text(x0, py + 138, d.name, { size: fit(d.name, 900, 86, iw), wt: 900, fill: '#39434d' }));
   const n = d.big.length, gap = 16, tw1 = n ? (iw - gap * (n - 1)) / n : iw, pad = 20, bh = 94, chips = d.chips.length > 0;
-  const th = chips ? 176 : 200, ty = chips ? py + 164 : py + 150 + Math.round((ph - 34 - 150 - (th + 18 + bh)) / 2);   // no chips: taller tiles, the call to action right under them, the two centred in the panel
-  const vs = Math.min(...d.big.map(b => fit(b.value, 900, 88, tw1 - 2 * pad)), 88);   // one figure size for every tile: they read as a set
+  const by = py + ph - 34 - bh, ty = py + 164, th = chips ? 176 : by - 24 - ty, dy = th - 176;   // the call to action always sits on the panel's floor; no chips: the tiles grow down to it
+  const vs = Math.min(...d.big.map(b => fit(b.value, 900, 88 + dy / 3, tw1 - 2 * pad)), 88 + dy / 3);   // one figure size for every tile: they read as a set (a taller tile allows a bigger one)
   d.big.forEach((b, i) => {
-    const x = x0 + i * (tw1 + gap);
+    const x = x0 + i * (tw1 + gap), lab = (b.tag || b.label).toUpperCase();
     out.push(`<rect x="${r2(x)}" y="${ty}" width="${r2(tw1)}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    const lab = (b.tag || b.label).toUpperCase(), dy = th - 176;   // dy: a taller tile moves the figure and its caption down with it
-    out.push(`<rect x="${r2(x)}" y="${ty}" width="${r2(tw1)}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    out.push(text(x + pad, ty + 44 + dy / 3, lab, { size: fit(lab, 800, 32, tw1 - 2 * pad, 1.5), wt: 800, fill: '#65717b', ls: 1.5 }));
-    out.push(text(x + pad, ty + 124 + dy * 2 / 3, b.value, { size: vs, wt: 900, fill: '#1b63b8' }));
-    if (b.bar != null) { const bw = tw1 - 2 * pad, f = Math.max(0.04, Math.min(1, b.bar / 100)), by0 = ty + 140 + dy;
-      out.push(`<rect x="${r2(x + pad)}" y="${by0}" width="${r2(bw)}" height="14" rx="7" fill="#cfe3ef"/><rect x="${r2(x + pad)}" y="${by0}" width="${r2(bw * f)}" height="14" rx="7" fill="url(#bar)"/>`); }
-    else if (b.cap) out.push(text(x + pad, ty + 160 + dy, b.cap, { size: fit(b.cap, 800, 32, tw1 - 2 * pad), wt: 800, fill: '#1b63b8' }));
+    out.push(text(x + pad, ty + 44 + dy * 0.2, lab, { size: fit(lab, 800, 32, tw1 - 2 * pad, 1.5), wt: 800, fill: '#65717b', ls: 1.5 }));   // dy: a taller tile spreads the label, figure and caption over its height
+    out.push(text(x + pad, ty + 124 + dy * 0.75, b.value, { size: vs, wt: 900, fill: '#1b63b8' }));
+    if (b.bar != null) { const bw = tw1 - 2 * pad, f = Math.max(0.04, Math.min(1, b.bar / 100)), by0 = ty + 140 + dy * 0.85;
+      out.push(`<rect x="${r2(x + pad)}" y="${r2(by0)}" width="${r2(bw)}" height="14" rx="7" fill="#cfe3ef"/><rect x="${r2(x + pad)}" y="${r2(by0)}" width="${r2(bw * f)}" height="14" rx="7" fill="url(#bar)"/>`); }
+    else if (b.cap && n === 1) out.push(text(x + pad + measure(b.value, 900, vs) + 14, ty + 124 + dy * 0.75, b.cap, { size: 40, wt: 800, fill: '#1b63b8' }));   // one wide tile: the caption beside the figure, not under it in an empty strip
+    else if (b.cap) out.push(text(x + pad, ty + 160 + dy * 0.85, b.cap, { size: fit(b.cap, 800, 32, tw1 - 2 * pad), wt: 800, fill: '#1b63b8' }));
   });
   if (!n) {                                                       // nothing to boast yet: an invitation instead of empty tiles
     out.push(`<rect x="${x0}" y="${ty}" width="${iw}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    out.push(text(x0 + iw / 2, ty + th / 2 - 4, 'Fresh on the court', { size: 48, wt: 900, fill: '#1b63b8', anchor: 'middle' }));
-    out.push(text(x0 + iw / 2, ty + th / 2 + 46, 'First match coming up', { size: 32, wt: 800, fill: '#65717b', anchor: 'middle' }));
+    out.push(text(x0 + iw / 2, ty + th / 2 - 4, 'Fresh on the court', { size: 56, wt: 900, fill: '#1b63b8', anchor: 'middle' }));
+    out.push(text(x0 + iw / 2, ty + th / 2 + 50, 'First match coming up', { size: 34, wt: 800, fill: '#65717b', anchor: 'middle' }));
   }
   let cxp = x0; const cy = ty + th + 18;
   for (const c of d.chips) { const w2 = measure(c, 800, 30) + 36; if (cxp + w2 > x0 + iw) continue;   // one that does not fit is skipped: a shorter one after it may
     out.push(`<rect x="${r2(cxp)}" y="${cy}" width="${r2(w2)}" height="52" rx="26" fill="#ffffff" stroke="#c3dbe8" stroke-width="2"/>`);
     out.push(text(cxp + 18, cy + 36, c, { size: 30, wt: 800, fill: '#4b535b' })); cxp += w2 + 12; }
-  const by = chips ? py + ph - 34 - bh : ty + th + 18;
   out.push(`<rect x="${x0}" y="${by}" width="${iw}" height="${bh}" rx="32" fill="url(#cta)" stroke="#0e3f8c" stroke-opacity=".22" stroke-width="2"/>`);
   out.push(`<rect x="${x0 + 14}" y="${by + 6}" width="${iw - 28}" height="${bh / 2 - 8}" rx="${bh / 2 - 12}" fill="#ffffff" opacity=".14"/>`);
-  out.push(ball(x0 + 52, by + bh / 2, 32));
-  const q = 'Think you can return my serve?';
-  out.push(text(x0 + 100, by + 42, q, { size: fit(q, 900, 32, iw - 124), wt: 900, fill: '#ffffff' }));
-  out.push(text(x0 + 100, by + 79, 'Play free at poddleball.com', { size: 30, wt: 800, fill: '#ffffff' }));   // white: the old pale gold was ~3.5:1 on the blue and went first when shrunk
+  out.push(ball(x0 + 48, by + bh / 2, 30));
+  const q = 'Think you can return my serve?', q2 = 'Your phone is the paddle · poddleball.com';   // the second line says how the game is played: the hook a stranger clicks for
+  out.push(text(x0 + 92, by + 42, q, { size: fit(q, 900, 32, iw - 116), wt: 900, fill: '#ffffff' }));
+  out.push(text(x0 + 92, by + 79, q2, { size: fit(q2, 800, 30, iw - 116), wt: 800, fill: '#ffffff' }));   // white: the old pale gold was ~3.5:1 on the blue and went first when shrunk
   out.push('</svg>');
   return out.join('\n');
 }

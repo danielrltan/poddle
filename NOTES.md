@@ -2098,3 +2098,14 @@ onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
   (under 561 px tall, e.g. 1366x500) keeps the six play figures in one row ("N of M returned" under the %), ~30 px
   shorter than the 2x3 block; the card still scrolls there by ~24 px, as short windows do by design (profile-ui asserts
   the one row and no cut label, not no-scroll).
+- Design polish round 1 (a judge scored the card 6/10), `CARD_V` 3: the record vs people is on the card only from 3 wins
+  with more wins than losses (a 1-14 was a hero tile and in og:description), matches played is a chip, never a tile, and
+  1-4 winners / aces / smashes are no chip. The swing (a deg/s figure a stranger cannot judge) now ranks after the
+  record, streak and titles, and a lone tile puts its caption beside the figure. What the game is, on the picture: a
+  PICKLEBALL tagline under the wordmark, the call to action's second line "Your phone is the paddle · poddleball.com",
+  and the badge "Beat the Tour bot" (nobody outside knows Matt is the AI; the og text says "Matt (the bot)"). The call to
+  action always sits on the panel floor; with no chips the tiles grow down to it (no blank band). og:description ends
+  "Pickleball with your phone as the paddle. Play free at poddleball.com"; og:title stays "<Name> on Poddle" (the spec).
+  /c/<slug>: the card picture is a link to / (its alt names it), the h1 no longer repeats the card's question ("<Name>
+  plays pickleball with a phone for a paddle."), then "Free in your browser, with your phone or AirPod. Your turn."
+  The card shows less than before, so the privacy page and terms need no change.

@@ -61,8 +61,11 @@ await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS:
 
 // ---- what a card leads with: only figures that flatter (a weak start shows no 5% and no 3-hit rally) ----
 const weak = card.dataOf({ played: 6, bests: { rally: { v: 3 }, speed: { v: 5.06 } }, play: { chances: 60, returns: 3 } }, 'x'), fair = card.dataOf({ bests: { rally: { v: 8 } }, play: { chances: 20, returns: 10 } }, 'x');
-ok(weak.big.map(b => b.label).join() === 'Fastest swing,Matches' && fair.big[0].label === 'Return rate' && fair.big[0].value === '50%' && fair.big[1].label === 'Longest rally',
-  'the return rate is a tile only from 20 chances at 50%+, the rally from 5 hits; otherwise the next figures move up');
+ok(weak.big.map(b => b.label).join() === 'Fastest swing' && weak.chips.join() === '6 matches' && fair.big[0].label === 'Return rate' && fair.big[0].value === '50%' && fair.big[1].label === 'Longest rally',
+  'the return rate is a tile only from 20 chances at 50%+, the rally from 5 hits, matches played only as a chip; otherwise the next figures move up');
+const lose = card.dataOf({ human: { wins: 1, losses: 14 }, played: 15, bests: { speed: { v: 5 } } }, 'sam', { chances: 30, returns: 9, winners: 2, smashes: 1 }), even = card.dataOf({ human: { wins: 9, losses: 9 } }, 'x'), win3 = card.dataOf({ human: { wins: 3, losses: 1, bestStreak: 2 }, bests: { speed: { v: 20 } } }, 'x');
+ok(!lose.big.some(b => b.label === 'Vs people' || /Match/.test(b.label)) && !lose.chips.some(c => /vs people|winner|smash/.test(c)) && !even.big.length && !even.chips.length && win3.big.map(b => b.label).join() === 'Vs people,Best streak,Fastest swing' && win3.big[0].value === '3-1',
+  'a losing or even record is neither a tile nor a chip (nor 1-2 winners or smashes); from 3 wins and more wins than losses it leads the swing');
 // ---- create / get: one link per owner ----
 const a1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieA });
 const url = a1.json && a1.json.url, slug = slugOf(url);
@@ -85,8 +88,8 @@ ok(pg.status === 200 && /^text\/html/.test(pg.headers['content-type']) && pg.hea
 ok(meta(html, 'og:title') === 'Share_Ace on Poddle' && meta(html, 'og:site_name') === 'Poddle' && meta(html, 'twitter:card') === 'summary_large_image' && meta(html, 'robots') === 'noindex', 'og:title "<Name> on Poddle", og:site_name, twitter:card, robots noindex');
 ok(meta(html, 'og:image') === a1.json.image && meta(html, 'og:url') === url && meta(html, 'og:image:width') === '1200' && meta(html, 'og:image:height') === '630', 'og:image (the same url as the API), og:url, 1200x630');
 ok(/^https?:\/\//.test(meta(html, 'og:image')) && /^https?:\/\//.test(meta(html, 'og:url')) && /^https?:\/\//.test(meta(html, 'twitter:image')), 'every og/twitter URL is absolute');
-ok(/Play free at poddleball\.com$/.test(meta(html, 'og:description') || '') && /80% return rate/.test(meta(html, 'og:description')) && (meta(html, 'og:image:alt') || '').startsWith("Share_Ace's Poddle player card"), 'og:description: the best stats + "Play free at poddleball.com"; og:image:alt');
-ok(/href="\/"[^>]*>[\s\S]*Play Poddle free/.test(html) && /Make your own card/.test(html) && /src="\/vendor\/fonts\//.test(html.replace(/url\(/g, 'src="')) && !/url\(vendor/.test(html), 'the body: the Play Poddle free button to /, the make-your-own line, root-absolute font URLs');
+ok(/Pickleball with your phone as the paddle\. Play free at poddleball\.com$/.test(meta(html, 'og:description') || '') && /80% return rate/.test(meta(html, 'og:description')) && (meta(html, 'og:image:alt') || '').startsWith("Share_Ace's Poddle player card"), 'og:description: the best stats + "Play free at poddleball.com"; og:image:alt');
+ok(/<a class="card" href="\/"><img [^>]*alt="Share_Ace/.test(html) && /plays pickleball/.test(html) && /href="\/"[^>]*>[\s\S]*Play Poddle free/.test(html) && /Make your own card/.test(html) && /src="\/vendor\/fonts\//.test(html.replace(/url\(/g, 'src="')) && !/url\(vendor/.test(html), 'the body: the Play Poddle free button to /, the make-your-own line, root-absolute font URLs');
 ok((await req(PORT, 'HEAD', `/c/${slug}`)).status === 200, 'HEAD /c/<slug>: 200');
 
 // ---- the PNG ----

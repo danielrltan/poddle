@@ -85,7 +85,7 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
   Ranked branch swaps it for the ladder rank (RANK_NAME + divisions) when it merges.
 - The Matt badge: the toughest Matt beaten in difficulty order (Rookie, Club, Tour, Pro; wire 0, 1, 3, 2), level colour
   as web/ui.css .st-matt (Rookie #3ecf72, Club #3aa0ff, Tour #a77bf3, Pro gold), or nothing if none.
-- The stats: return rate (returns / chances, shown only from 10 chances up; since the review fixes, NOTES 112: a card tile only from 20 chances at 50% or better, the rally from 5 hits), longest rally, fastest swing (deg/s,
+- The stats: return rate (returns / chances, shown only from 10 chances up; since the review fixes, NOTES 112: a card tile only from 20 chances at 50% or better, the rally from 5 hits; since design round 1: W-L vs people only from 3 wins with more wins than losses, matches played as a chip only, the swing after record / streak / titles), longest rally, fastest swing (deg/s,
   rounded to 10 like the page), W-L vs people, best win streak, titles, winners/aces if room. Choose what reads best;
   zero or missing values are left off rather than shown as 0.
 - The brand: the Poddle wordmark/ball, "poddleball.com", a call to action ("Think you can return my serve?").

@@ -20,6 +20,8 @@ const V = {
   'no-matt': [prof({ played: 12, human: { wins: 3, losses: 6, streak: 0, bestStreak: 2 }, bests: { rally: { v: 11 }, hit: { v: 50 }, speed: { v: 20 } },
     play: { hits: 200, returns: 120, chances: 190, winners: 22, aces: 4, smashes: 5 } }), 'pickle_pat'],
   'fresh-account': [prof({ played: 0 }), 'Newbie'],
+  losing: [prof({ played: 15, human: { wins: 1, losses: 14, streak: 0, bestStreak: 1 }, bests: { rally: { v: 4 }, hit: { v: 20 }, speed: { v: 5 } }, play: { hits: 40, returns: 9, chances: 30, winners: 2, aces: 0, smashes: 1 } }), 'sam'],   // a 1-14 record: neither a tile nor a chip
+  'streak-no-rate': [prof({ played: 20, human: { wins: 6, losses: 2, streak: 4, bestStreak: 5 }, titles: 1, matt: matt([1, 0, 0, 0]), bests: { rally: { v: 9 }, hit: { v: 50 }, speed: { v: 25 } }, play: { hits: 300, returns: 70, chances: 160, winners: 12, aces: 3, smashes: 8 } }), 'Rookie_Rick'],   // under 50%: the record, streak, title take the tiles before the swing
   lowret: [prof({ played: 6, human: { wins: 0, losses: 2, streak: 0, bestStreak: 0 }, bests: { rally: { v: 3 }, hit: { v: 30 }, speed: { v: 5.06 } }, play: { hits: 20, returns: 3, chances: 60, winners: 1, aces: 0, smashes: 0 } }), 'rookie_rae'],   // a weak start: no 5% tile, no 3-hit rally
 };
 for (const [name, [p, user]] of Object.entries(V)) {
