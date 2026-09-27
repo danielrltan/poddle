@@ -381,10 +381,10 @@ await pg.close();
   r = await ev(pg, () => ({ pct: !document.getElementById('st-ret-pct').hidden, cap: document.getElementById('st-ret-cap').textContent, hint: document.getElementById('st-ret').classList.contains('is-hint'), zero: document.getElementById('st-ring').classList.contains('is-zero') }));
   ok(!r.pct && r.cap === 'Return 10 balls to see it' && r.hint && r.zero, `6 chances: no percentage, "${r.cap}", an empty ring (${J(r)})`);
   await pg.screenshot({ path: path.join(SHOTS, 'stats-coach-1280x800.png') });
-  // an older server (or the Ranked branch before the merge): no play, no share -> no play row, no Share card, the rest as before
+  // an older server: no play, no share -> no play row, no Share card, the rest as before (the Ranked hero from the fixture's ladder: Silver II)
   { const OLD = { ...FIXTURE }; delete OLD.play; delete OLD.share; API.profile = OLD; } await openStats();
   r = await ev(pg, () => ({ row: !document.getElementById('pf-play').hidden, btn: !document.getElementById('btn-pf-share').hidden, acct: !document.getElementById('pf-acct').hidden, rungs: document.querySelectorAll('#pf-rungs > li').length, rank: document.getElementById('st-rank').textContent }));
-  ok(!r.row && !r.btn && !r.acct && r.rungs === 4 && r.rank === 'Gold', `older server (no play, no share): no play row, no Share card, the card as before (${J(r)})`);
+  ok(!r.row && !r.btn && !r.acct && r.rungs === 4 && r.rank === 'Silver II', `older server (no play, no share): no play row, no Share card, the card as before (${J(r)})`);
   // sign-in on, a guest: the widest header (Google's button and Share card), and the name line in the sheet opens sign-in. No navigator.share: no Share...
   API.profile = FIXTURE; API.signin = true; await pg.reload(); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900); await openStats();
   await pg.screenshot({ path: path.join(SHOTS, 'stats-signin-1280x800.png') });
