@@ -4,7 +4,7 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 1;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 2;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
@@ -37,17 +37,21 @@ function dataOf(p, username, play) {
   const rank = rankOf(p), w = num(Hm.wins), l = num(Hm.losses), streak = Math.max(num(Hm.bestStreak), ...rows(p).map(r => num(r.bestStreak)));
   const chances = num(P.chances), returns = Math.min(num(P.returns), chances), rally = Math.round(best('rally')), speed = best('speed') ? degs(best('speed')) : 0;
   const titles = num(p.titles), aces = num(P.aces), winners = num(P.winners), smashes = num(P.smashes), played = num(p.played);
-  const all = [                                                   // [key, big figure, chip line], best first
-    chances >= 10 && ['ret', { label: 'Return rate', value: Math.round(100 * returns / chances) + '%', bar: Math.round(100 * returns / chances) }],
-    rally && ['rally', { label: 'Longest rally', value: String(rally), cap: rally === 1 ? 'hit' : 'hits' }],
-    speed && ['speed', { label: 'Fastest swing', value: String(speed), cap: 'degrees a second' }],
-    w && ['people', { label: 'Vs people', value: `${w}-${l}`, cap: 'won - lost' }, `${w}-${l} vs people`],
-    streak >= 2 && ['streak', { label: 'Best streak', value: String(streak), cap: 'wins in a row' }, `${streak}-win streak`],
-    titles && ['titles', { label: titles === 1 ? 'Title' : 'Titles', value: String(titles), cap: titles === 1 ? 'tournament won' : 'tournaments won' }, `${titles} title${titles === 1 ? '' : 's'}`],
-    winners && ['winners', winners >= 10 && { label: 'Winners', value: String(winners), cap: 'unreturned shots' }, `${winners} winner${winners === 1 ? '' : 's'}`],
-    aces && ['aces', aces >= 10 && { label: 'Aces', value: String(aces), cap: 'unreturned serves' }, `${aces} ace${aces === 1 ? '' : 's'}`],
+  // [key, big figure, chip line], best first. label: the long name (share.js words the og tags from it); tag + cap: what the tile draws, short
+  // enough to stay 32 px in a third of the panel (a chat app shows the card ~300-400 px wide: that is 8-11 px there). A card is a brag the
+  // owner will only share if it flatters: the return rate only from 20 chances at 50% or better, the rally from 5 hits (Your stats has both)
+  const rate = chances ? Math.round(100 * returns / chances) : 0;
+  const all = [
+    chances >= 20 && rate >= 50 && ['ret', { label: 'Return rate', tag: 'Returns', value: rate + '%', bar: rate }],
+    rally >= 5 && ['rally', { label: 'Longest rally', tag: 'Rally', value: String(rally), cap: 'hits' }],
+    speed && ['speed', { label: 'Fastest swing', tag: 'Swing', value: String(speed), cap: '°/s' }],
+    w && ['people', { label: 'Vs people', tag: 'Record', value: `${w}-${l}`, cap: 'vs people' }, `${w}-${l} vs people`],
+    streak >= 2 && ['streak', { label: 'Best streak', tag: 'Streak', value: String(streak), cap: 'in a row' }, `${streak}-win streak`],
+    titles && ['titles', { label: titles === 1 ? 'Title' : 'Titles', tag: titles === 1 ? 'Title' : 'Titles', value: String(titles), cap: 'won' }, `${titles} title${titles === 1 ? '' : 's'}`],
+    winners && ['winners', winners >= 10 && { label: 'Winners', tag: 'Winners', value: String(winners), cap: 'unreturned' }, `${winners} winner${winners === 1 ? '' : 's'}`],
+    aces && ['aces', aces >= 10 && { label: 'Aces', tag: 'Aces', value: String(aces), cap: 'unreturned' }, `${aces} ace${aces === 1 ? '' : 's'}`],
     smashes && ['smashes', null, `${smashes} smash${smashes === 1 ? '' : 'es'}`],
-    played && ['played', { label: played === 1 ? 'Match' : 'Matches', value: String(played), cap: 'played' }, `${played} match${played === 1 ? '' : 'es'}`],
+    played && ['played', { label: played === 1 ? 'Match' : 'Matches', tag: played === 1 ? 'Match' : 'Matches', value: String(played), cap: 'played' }, `${played} match${played === 1 ? '' : 'es'}`],
   ].filter(Boolean);
   const big = all.filter(x => x[1]).slice(0, 3), used = new Set(big.map(x => x[0]));   // a handful of winners or aces reads better as a chip than as a big figure
   const chips = all.filter(x => x[2] && !used.has(x[0])).slice(0, 3).map(x => x[2]);
@@ -155,34 +159,38 @@ function svgOf(d) {
   const px = 388, py = 36, pw = 776, ph = 558, x0 = px + 36, iw = pw - 72;
   out.push(`<rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="40" fill="url(#panel)" stroke="#ffffff" stroke-width="4" filter="url(#sh)"/>`);
   out.push(text(x0, py + 58, 'PLAYER CARD', { size: 24, wt: 800, fill: m[4], ls: 4 }));
-  out.push(text(x0, py + 138, d.name, { size: fit(d.name, 900, 86, iw), wt: 900, fill: '#39434d' }));
-  const n = d.big.length, gap = 16, tw1 = n ? (iw - gap * (n - 1)) / n : iw, ty = py + 164, th = 176, pad = 20;
+  if (d.guest) out.push(text(x0, py + 122, d.name, { size: 56, wt: 900, fill: '#65717b' }));   // no username: the generic words stay small and grey, the stats are the hero
+  else out.push(text(x0, py + 138, d.name, { size: fit(d.name, 900, 86, iw), wt: 900, fill: '#39434d' }));
+  const n = d.big.length, gap = 16, tw1 = n ? (iw - gap * (n - 1)) / n : iw, pad = 20, bh = 94, chips = d.chips.length > 0;
+  const th = chips ? 176 : 200, ty = chips ? py + 164 : py + 150 + Math.round((ph - 34 - 150 - (th + 18 + bh)) / 2);   // no chips: taller tiles, the call to action right under them, the two centred in the panel
   const vs = Math.min(...d.big.map(b => fit(b.value, 900, 88, tw1 - 2 * pad)), 88);   // one figure size for every tile: they read as a set
   d.big.forEach((b, i) => {
-    const x = x0 + i * (tw1 + gap), lab = b.label.toUpperCase();
+    const x = x0 + i * (tw1 + gap);
     out.push(`<rect x="${r2(x)}" y="${ty}" width="${r2(tw1)}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    out.push(text(x + pad, ty + 40, lab, { size: fit(lab, 800, 24, tw1 - 2 * pad, 1.5), wt: 800, fill: '#65717b', ls: 1.5 }));
-    out.push(text(x + pad, ty + 124, b.value, { size: vs, wt: 900, fill: '#1b63b8' }));
-    if (b.bar != null) { const bw = tw1 - 2 * pad, f = Math.max(0.04, Math.min(1, b.bar / 100));
-      out.push(`<rect x="${r2(x + pad)}" y="${ty + 140}" width="${r2(bw)}" height="14" rx="7" fill="#cfe3ef"/><rect x="${r2(x + pad)}" y="${ty + 140}" width="${r2(bw * f)}" height="14" rx="7" fill="url(#bar)"/>`); }
-    else if (b.cap) out.push(text(x + pad, ty + 158, b.cap, { size: fit(b.cap, 800, 24, tw1 - 2 * pad), wt: 800, fill: '#1b63b8' }));
+    const lab = (b.tag || b.label).toUpperCase(), dy = th - 176;   // dy: a taller tile moves the figure and its caption down with it
+    out.push(`<rect x="${r2(x)}" y="${ty}" width="${r2(tw1)}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
+    out.push(text(x + pad, ty + 44 + dy / 3, lab, { size: fit(lab, 800, 32, tw1 - 2 * pad, 1.5), wt: 800, fill: '#65717b', ls: 1.5 }));
+    out.push(text(x + pad, ty + 124 + dy * 2 / 3, b.value, { size: vs, wt: 900, fill: '#1b63b8' }));
+    if (b.bar != null) { const bw = tw1 - 2 * pad, f = Math.max(0.04, Math.min(1, b.bar / 100)), by0 = ty + 140 + dy;
+      out.push(`<rect x="${r2(x + pad)}" y="${by0}" width="${r2(bw)}" height="14" rx="7" fill="#cfe3ef"/><rect x="${r2(x + pad)}" y="${by0}" width="${r2(bw * f)}" height="14" rx="7" fill="url(#bar)"/>`); }
+    else if (b.cap) out.push(text(x + pad, ty + 160 + dy, b.cap, { size: fit(b.cap, 800, 32, tw1 - 2 * pad), wt: 800, fill: '#1b63b8' }));
   });
   if (!n) {                                                       // nothing to boast yet: an invitation instead of empty tiles
     out.push(`<rect x="${x0}" y="${ty}" width="${iw}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    out.push(text(x0 + iw / 2, ty + 78, 'Fresh on the court', { size: 44, wt: 900, fill: '#1b63b8', anchor: 'middle' }));
-    out.push(text(x0 + iw / 2, ty + 124, 'First match coming up', { size: 28, wt: 800, fill: '#65717b', anchor: 'middle' }));
+    out.push(text(x0 + iw / 2, ty + th / 2 - 4, 'Fresh on the court', { size: 48, wt: 900, fill: '#1b63b8', anchor: 'middle' }));
+    out.push(text(x0 + iw / 2, ty + th / 2 + 46, 'First match coming up', { size: 32, wt: 800, fill: '#65717b', anchor: 'middle' }));
   }
   let cxp = x0; const cy = ty + th + 18;
-  for (const c of d.chips) { const w2 = measure(c, 800, 26) + 40; if (cxp + w2 > x0 + iw) break;
-    out.push(`<rect x="${r2(cxp)}" y="${cy}" width="${r2(w2)}" height="46" rx="23" fill="#ffffff" stroke="#c3dbe8" stroke-width="2"/>`);
-    out.push(text(cxp + 20, cy + 32, c, { size: 26, wt: 800, fill: '#4b535b' })); cxp += w2 + 12; }
-  const bh = 94, by = py + ph - 34 - bh;
+  for (const c of d.chips) { const w2 = measure(c, 800, 30) + 36; if (cxp + w2 > x0 + iw) continue;   // one that does not fit is skipped: a shorter one after it may
+    out.push(`<rect x="${r2(cxp)}" y="${cy}" width="${r2(w2)}" height="52" rx="26" fill="#ffffff" stroke="#c3dbe8" stroke-width="2"/>`);
+    out.push(text(cxp + 18, cy + 36, c, { size: 30, wt: 800, fill: '#4b535b' })); cxp += w2 + 12; }
+  const by = chips ? py + ph - 34 - bh : ty + th + 18;
   out.push(`<rect x="${x0}" y="${by}" width="${iw}" height="${bh}" rx="32" fill="url(#cta)" stroke="#0e3f8c" stroke-opacity=".22" stroke-width="2"/>`);
   out.push(`<rect x="${x0 + 14}" y="${by + 6}" width="${iw - 28}" height="${bh / 2 - 8}" rx="${bh / 2 - 12}" fill="#ffffff" opacity=".14"/>`);
   out.push(ball(x0 + 52, by + bh / 2, 32));
   const q = 'Think you can return my serve?';
-  out.push(text(x0 + 100, by + 44, q, { size: fit(q, 900, 32, iw - 124), wt: 900, fill: '#ffffff' }));
-  out.push(text(x0 + 100, by + 78, 'Play free at poddleball.com', { size: 27, wt: 800, fill: '#fff1a6' }));
+  out.push(text(x0 + 100, by + 42, q, { size: fit(q, 900, 32, iw - 124), wt: 900, fill: '#ffffff' }));
+  out.push(text(x0 + 100, by + 79, 'Play free at poddleball.com', { size: 30, wt: 800, fill: '#ffffff' }));   // white: the old pale gold was ~3.5:1 on the blue and went first when shrunk
   out.push('</svg>');
   return out.join('\n');
 }

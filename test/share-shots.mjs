@@ -20,6 +20,7 @@ const V = {
   'no-matt': [prof({ played: 12, human: { wins: 3, losses: 6, streak: 0, bestStreak: 2 }, bests: { rally: { v: 11 }, hit: { v: 50 }, speed: { v: 20 } },
     play: { hits: 200, returns: 120, chances: 190, winners: 22, aces: 4, smashes: 5 } }), 'pickle_pat'],
   'fresh-account': [prof({ played: 0 }), 'Newbie'],
+  lowret: [prof({ played: 6, human: { wins: 0, losses: 2, streak: 0, bestStreak: 0 }, bests: { rally: { v: 3 }, hit: { v: 30 }, speed: { v: 5.06 } }, play: { hits: 20, returns: 3, chances: 60, winners: 1, aces: 0, smashes: 0 } }), 'rookie_rae'],   // a weak start: no 5% tile, no 3-hit rally
 };
 for (const [name, [p, user]] of Object.entries(V)) {
   const d = card.dataOf(p, user), svg = card.svgOf(d), t = Date.now();

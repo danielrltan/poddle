@@ -59,6 +59,10 @@ raw.prepare('UPDATE profile SET hits = 140, returns = 120, chances = 150, winner
 console.log('servers: ' + PORT + ' (SHARE_RENDERS 2), ' + P_NORES + ' (no resvg), ' + P_HOST + ' (hosted), ' + P_BUSY + ' (SHARE_RENDERS 24)');
 await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS: `--require ${root}test/no-resvg.cjs` }), up(P_HOST, { FLY_APP_NAME: 'poddle-test' }), up(P_BUSY, { SHARE_RENDERS: '24' })]);
 
+// ---- what a card leads with: only figures that flatter (a weak start shows no 5% and no 3-hit rally) ----
+const weak = card.dataOf({ played: 6, bests: { rally: { v: 3 }, speed: { v: 5.06 } }, play: { chances: 60, returns: 3 } }, 'x'), fair = card.dataOf({ bests: { rally: { v: 8 } }, play: { chances: 20, returns: 10 } }, 'x');
+ok(weak.big.map(b => b.label).join() === 'Fastest swing,Matches' && fair.big[0].label === 'Return rate' && fair.big[0].value === '50%' && fair.big[1].label === 'Longest rally',
+  'the return rate is a tile only from 20 chances at 50%+, the rally from 5 hits; otherwise the next figures move up');
 // ---- create / get: one link per owner ----
 const a1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieA });
 const url = a1.json && a1.json.url, slug = slugOf(url);

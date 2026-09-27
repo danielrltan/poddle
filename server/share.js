@@ -104,7 +104,7 @@ main{width:100%;max-width:1000px;display:flex;flex-direction:column;align-items:
     radial-gradient(circle at 34% 28%,#fbffa8,var(--ball) 58%,#c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35)}
 .card{width:min(100%,960px,max(440px,calc((100vh - 390px) * 1.905)));aspect-ratio:1200/630;border-radius:clamp(14px,2.4vw,28px);overflow:hidden;background:#dcecf6;border:4px solid #fff;box-shadow:0 3px 0 rgba(90,150,185,.25),0 18px 40px rgba(20,60,100,.28)}
 .card img{display:block;width:100%;height:100%}
-h1{margin:0;font-size:clamp(22px,3.4vw,30px);font-weight:900;line-height:1.25;color:#fff;text-align:center;text-shadow:0 2px 0 rgba(14,63,140,.45),0 0 14px rgba(14,63,140,.35)}
+h1{margin:0;font-size:clamp(22px,3.4vw,30px);font-weight:900;line-height:1.25;color:var(--me-navy);text-align:center;text-shadow:0 2px 0 rgba(255,255,255,.8)}
 .what{margin:-6px 0 0;font-size:clamp(16px,2.2vw,19px);font-weight:800;color:var(--me-navy);text-align:center}
 .play{display:inline-flex;align-items:center;gap:12px;min-height:64px;padding:0 36px;border-radius:999px;font:900 clamp(22px,3vw,28px)/1 var(--font);color:#fff;text-decoration:none;
   background:linear-gradient(180deg,#5ab6ff 0%,var(--me) 50%,#2b8df2 52%,var(--me-deep) 100%);border:2px solid rgba(14,63,140,.25);

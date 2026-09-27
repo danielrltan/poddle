@@ -2081,3 +2081,20 @@ onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
   sweeps and the admin CLI cannot reach the server's memory, so privacy section 7 now says pictures stay in memory until
   replaced or a restart and are never shown through a deleted link.
 - The changelog no longer says every signed-in card carries a username (only one that has picked one).
+- The card, legible where it is seen (a chat thumbnail ~300-400 px wide shows 1200 px at a quarter to a third): tile
+  labels are short (RETURNS, RALLY, SWING, RECORD, STREAK...) and drawn at 32 px (was 24), captions at 32 px ("°/s" as on
+  Your stats, not "degrees a second"), chips 30 px (52 tall; one that does not fit is skipped, not the rest), the call to
+  action's second line 30 px in white (the pale gold was ~3.5:1 on the blue). `CARD_V` 2. `label` keeps the long names
+  that share.js words the og tags from; the tile draws `tag`.
+- The card flatters or stays quiet: the return rate is a tile only from 20 chances at 50% or better, the rally from 5
+  hits (Your stats still shows both); the next figures move up and the tiles widen. Kept deviation from docs/SHARE.md
+  ("shown only from 10 chances up"). A guest's "Poddle player" is 56 px in grey, not the 86 px headline (the words stay
+  exactly "Poddle player", as the privacy page and terms quote them). No chips: taller tiles with the call to action
+  right under them, centred in the panel (the fresh card had a 90 px blank band).
+- /c/<slug>: the "Think you can return ...?" line is navy with a white lift (white on the pale sky was ~1.7:1).
+- Your stats: Share card is a labelled gold button at every size (it used to shrink to an unlabelled gold circle
+  whenever Sign in with Google showed, which is every guest). Google's subtitle is now "Keep your stats on every device"
+  so both fit one header row at 1280x800; on a phone Share card has its own full-width row. A short landscape window
+  (under 561 px tall, e.g. 1366x500) keeps the six play figures in one row ("N of M returned" under the %), ~30 px
+  shorter than the 2x3 block; the card still scrolls there by ~24 px, as short windows do by design (profile-ui asserts
+  the one row and no cut label, not no-scroll).

@@ -308,6 +308,9 @@ await pg.close();
   r = await ev(pg, () => { const b = document.querySelector('#screen-lobby .menu-body'), v = document.getElementById('lobby-profile').getBoundingClientRect(), m = b.getBoundingClientRect(); return { sh: b.scrollHeight, ch: b.clientHeight, top: Math.round(v.top), bot: Math.round(v.bottom), mtop: Math.round(m.top), mbot: Math.round(m.bottom) }; });
   ok(r.sh <= r.ch + 1 && r.top >= r.mtop && r.bot <= r.mbot, `1280x800: Your stats fits without a scroll, the play row and Share card included (${J(r)})`);
   for (const [w, h] of [[1920, 1080], [1366, 500], [1024, 768], [900, 700], [760, 600]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, `stats-play-${w}x${h}.png`) }); }      // for review: the play row at the in-between sizes
+  await pg.setViewport({ width: 1366, height: 500 }); await sleep(400);
+  r = await ev(pg, () => { const f = document.getElementById('st-figs'), d = [...f.children].map(e => e.getBoundingClientRect().top), cut = [...f.querySelectorAll('dt')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent); return { oneRow: Math.max(...d) - Math.min(...d) < 2, cut }; });
+  ok(r.oneRow && !r.cut.length, `1366x500 (a short landscape window): the six play figures stay one row, no label cut (${J(r)}); the card scrolls there by design`);
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300);
   // the first click: no link yet -> POST /api/share, the url goes to the clipboard through a ClipboardItem promise, then the sheet
   let n0 = API.log.length; await pg.bringToFront(); await pg.click('#btn-pf-share'); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, 'share-copied-1280x800.png') }); await sleep(1100);
@@ -363,7 +366,7 @@ await pg.close();
   ok(r.both && r.row, `sign-in on: Sign in with Google and Share card side by side in the header (${J(r)})`);
   r = await ev(pg, () => { const b = document.querySelector('#screen-lobby .menu-body'), h = document.querySelector('#lobby-profile .pf-head'), w = document.getElementById('pf-who') || h.firstElementChild, a = document.getElementById('pf-acct');
     return { sh: b.scrollHeight, ch: b.clientHeight, oneRow: Math.abs(w.getBoundingClientRect().top - a.getBoundingClientRect().top) < a.getBoundingClientRect().height, label: document.getElementById('btn-pf-share').textContent.trim(), w: Math.round(document.getElementById('btn-pf-share').getBoundingClientRect().width) }; });
-  ok(r.sh <= r.ch + 1 && r.oneRow && r.label === 'Share card', `sign-in on, 1280x800: the header stays one row (a round Share card button beside Google's) and the card fits without a scroll (${J(r)})`);
+  ok(r.sh <= r.ch + 1 && r.oneRow && r.label === 'Share card', `sign-in on, 1280x800: the header stays one row (Google's button and a labelled Share card) and the card fits without a scroll (${J(r)})`);
   { const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);      // the widest header at every size: nothing pokes out of the card
       const q = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(); return [...v.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < b.left - 1 || r.right > b.right + 1); }).map(e => (e.id || e.className || e.tagName).toString().slice(0, 30)).filter(c => !/st-rays/.test(c)); });
       if (q.length) bad.push(`${w}x${h}: ${J(q)}`); if (w === 390) await pg.screenshot({ path: path.join(SHOTS, 'stats-signin-390x844.png') }); }
