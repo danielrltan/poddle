@@ -261,6 +261,12 @@ function prepare() {                                             // every statem
     swOldest: q(`DELETE FROM match_log WHERE rowid IN (SELECT rowid FROM match_log ORDER BY rowid LIMIT ?)`),   // size-aware retention: the oldest rows first, whatever their age
     logDay: q('SELECT count(*) AS n FROM match_log WHERE (owner_a = ? OR owner_b = ?) AND at >= ?'),   // the per-owner daily cap on log rows
     swHolds: q(`DELETE FROM name_holds WHERE rowid IN (SELECT rowid FROM name_holds WHERE until_at <= ? LIMIT ${BATCH})`),
+    // share links (docs/SHARE.md 2): one row per owner. OR IGNORE: a second link for the owner or a slug collision inserts nothing, and the read-back tells which
+    shareGet: q('SELECT slug, created_at FROM share WHERE owner_id = ?'),
+    shareBySlug: q('SELECT owner_id FROM share WHERE slug = ?'),
+    shareIns: q('INSERT OR IGNORE INTO share (owner_id, slug, created_at) VALUES (?, ?, ?)'),
+    shareDel: q('DELETE FROM share WHERE owner_id = ?'),
+    playGet: q(`SELECT ${PLAY_COLS.join(', ')} FROM profile WHERE owner_id = ?`),   // the play counters straight from the row, for a card drawn before profileOf has them (PLAY_COLS are constants)
   };
 }
 
@@ -317,6 +323,7 @@ const mergeDevice = guard('none', (devHash, acctId, now) => {
     const g = d.owner_id;
     fold(g, acct.owner_id, now); S.acctMerges.run(acctId);
     S.devLink.run(acctId, now, d.id);                           // owner_id NULL BEFORE the owner goes, or the cascade would take the device row too
+    S.shareDel.run(g);                                          // the guest's share link dies, never moves: it pointed at the guest card (the cascade would take it too; this says so)
     S.ownerDel.run(g);
     S.ownerTouch.run(now, acct.owner_id);
     return 'merged';
@@ -454,6 +461,7 @@ const profileOf = guard(null, o => {
     bests: { rally: { v: p.best_rally, at: p.best_rally_at }, hit: { v: p.best_hit, at: p.best_hit_at }, speed: { v: p.best_speed, at: p.best_speed_at } } };
 });
 // exportOf(ownerId, now?) -> the section 10.6 export object | null. Matches from the requester's side, opponents never identified.
+const SHARE_URL = 'https://poddleball.com/c/';                   // a share link's public address (server/share.js makes it; locally the page answers on the test host)
 const NOTES = 'This file contains all personal information that Poddle holds about this profile. Opponents are shown only as Matt or a player. We do not store your IP address, your email address or names typed as a guest. The purposes, recipients and retention periods are described at https://poddleball.com/privacy.html.';
 const exportOf = guard(null, (o, now = Date.now()) => {
   const prof = profileOf(o); if (!prof) return null;
@@ -465,6 +473,7 @@ const exportOf = guard(null, (o, now = Date.now()) => {
       ending: r.ending, counted: r.ranked === 1, reasons: r.flags ? r.flags.split(',') : [], secs: r.secs };
   });
   const x = { format: 'poddle-export-1', exportedAt: iso(now), kind: a ? 'account' : 'guest', account: null, device: null, profile: prof, matches, notes: NOTES };
+  const sh = S.shareGet.get(o); x.share = sh ? { url: SHARE_URL + sh.slug, created: iso(sh.created_at) } : null;   // the public card link, if one is live
   if (a) {
     x.account = { username: a.username, created: iso(a.created_at), renamed: iso(a.renamed_at), lastActivity: iso(w.touched_at), merges: a.merges, google: 'linked', googleSubject: a.google_sub };
     x.sessions = S.sesOfAcct.all(a.id).map(s => ({ created: iso(s.created_at), expires: iso(s.expires_at), lastUsed: iso(s.seen_at) }));
@@ -472,6 +481,22 @@ const exportOf = guard(null, (o, now = Date.now()) => {
   } else x.device = { created: iso(d ? d.created_at : w.created_at), lastPlayed: iso(w.touched_at), deletedAfter: iso(prof.expiresAt) };
   return x;
 });
+
+// Share links (docs/SHARE.md 2; server/share.js makes the slug). One per owner; deleteOwner and the sweeps take it through the cascade.
+// shareOf(ownerId) -> { slug, createdAt } | null. shareOwner(slug) -> owner id | null. shareMake(ownerId, slug, now) -> 'made' | 'have' (the owner
+// already has one: shareOf reads it) | 'taken' (the slug belongs to someone else: make another) | null. shareDrop(ownerId) -> true when a row went.
+const SLUG_RE = /^[A-Za-z0-9]{10}$/;
+const shareOf = guard(null, o => { if (!isId(o)) return null; const r = S.shareGet.get(o); return r ? { slug: r.slug, createdAt: r.created_at } : null; });
+const shareOwner = guard(null, slug => { if (typeof slug !== 'string' || !SLUG_RE.test(slug)) return null; const r = S.shareBySlug.get(slug); return r ? r.owner_id : null; });
+const shareMake = guard(null, (o, slug, now) => {
+  if (!isId(o) || typeof slug !== 'string' || !SLUG_RE.test(slug) || !isNow(now)) return null;
+  return tx(() => { if (!S.ownerGet.get(o)) return null; const had = S.shareGet.get(o); if (had) return 'have';
+    S.shareIns.run(o, slug, now); const r = S.shareGet.get(o); return !r ? 'taken' : r.slug === slug ? 'made' : 'have'; });
+});
+const shareDrop = guard(false, o => isId(o) && tx(() => S.shareDel.run(o).changes > 0));
+const playOf = guard(null, o => { if (!isId(o)) return null; const r = S.playGet.get(o); return r ? { hits: r.hits, returns: r.returns, chances: r.chances, winners: r.winners, aces: r.aces, smashes: r.smashes,
+  pointsWon: r.pts_won, pointsLost: r.pts_lost, secs: r.secs_played } : null; });   // profile.play's shape (docs/SHARE.md 1), for a card drawn where profileOf has no play yet
+const usernameOf = guard(null, o => { if (!isId(o)) return null; const a = S.acctByOwner.get(o); return a && a.username ? a.username : null; });   // the account's username, null for a guest or an account without one
 
 // deleteOwner(ownerId, now) -> true when something was deleted. Cascades (profile, bot_record, device/account, sessions, merged device rows),
 // nulls match_log, holds an account's username key for 90 days, then checkpoints the WAL (10.6; secure_delete zeroes the rows).
@@ -541,10 +566,10 @@ function cleanBackups(now, dir) {                                // 11.6: /tmp/p
 }
 
 // Operator helpers for admin.js (additions, never reachable over HTTP).
-const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log'];
+const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'share'];
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
 module.exports = { open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
-  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME };
+  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, shareOf, shareOwner, shareMake, shareDrop, playOf, usernameOf };

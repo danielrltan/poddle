@@ -4,6 +4,7 @@
 const { WebSocketServer } = require('ws');
 const http = require('http'), fs = require('fs'), path = require('path');
 const db = require('./db'), stats = require('./stats'), auth = require('./auth'), api = require('./api'), abuse = require('./abuse'), usernames = require('./usernames');   // player stats (docs/ACCOUNTS.md): none does anything when loaded
+const share = require('./share');                                // share links: /c/<slug>, its page and its picture (docs/SHARE.md 2); nothing runs on require
 const safeName = (n, fb) => (n && !usernames.impersonates(n) ? n : fb);   // a guest name that passes as Matt or staff is shown as `fb` wherever others see it (docs/ACCOUNTS.md 7.3)
 const HOSTED = !!process.env.FLY_APP_NAME;                        // on Fly: the client address header, the production Origin allowlist, secure cookies, HSTS
 
@@ -40,6 +41,7 @@ const httpServer = http.createServer((req, res) => {
     const body = JSON.stringify({ courts: rooms.size, tours: tourneys.size, playing: pl, watching: sp, online: wss.clients.size - pads.size, phones: pads.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
   if (rel === '/404.html') return notFound(req, res);
+  if (rel.startsWith('/c/')) return void share.page(req, res, rel, notFound).catch(() => {});   // a share link's page and card picture (server/share.js; docs/SHARE.md 2), never a file
   if (MENU_PATHS.has(rel)) rel = '/index.html';
   const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
   if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }      // no climbing out of web/

@@ -6,7 +6,7 @@
 // checks and never spread or merged. Rate limits per computer node (a keyed hash, never the address). Logs: one fixed line per failure
 // class an hour at most, never an identity, a body, a token or an address. handle() never throws or rejects: a throw answers 500.
 const crypto = require('node:crypto');
-const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse');
+const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share');
 let names = null; try { names = require('./usernames'); } catch { /* usernames need sign-in, which then answers 503 */ }
 
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, BODY_MAX = 8192, BODY_MS = 5000;
@@ -75,10 +75,11 @@ async function me(req, res) {
   const s = db.isOpen() ? session(req) : null;                   // a failed write elsewhere (a full disk) does not sign anyone out
   send(res, 200, { signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok() });
 }
+const withShare = (p, o, req) => (p ? Object.assign(p, { share: share.linkOf(o, req) }) : p);   // the live share link ({ url, image } | null): the page knows it before any click (docs/SHARE.md 2)
 async function statsRoute(req, res, b) {
-  const s = session(req); if (s) return send(res, 200, { profile: db.profileOf(s.ownerId) });
+  const s = session(req); if (s) return send(res, 200, { profile: withShare(db.profileOf(s.ownerId), s.ownerId, req) });
   const h = deviceOf(b, req), o = h ? db.guestOwner(h) : null;   // a merged device reads nothing: account data needs the cookie (8.1)
-  send(res, 200, { profile: o != null ? db.profileOf(o) : null });
+  send(res, 200, { profile: o != null ? withShare(db.profileOf(o), o, req) : null });
 }
 async function nonce(req, res) {
   const n = auth.newNonce(); nonceIssue(n, Date.now());          // kept, so a token can only be used with a nonce this server handed out, once
@@ -97,7 +98,7 @@ async function signin(req, res, b) {
   const h = deviceOf(b, req), merged = h ? db.mergeDevice(h, a.id, now) : 'none';
   const out = {}, raw = db.session.create(a.id, now, out); if (!raw) return fail(res, 503, 'db_unavailable', { 'Set-Cookie': clear });
   for (const t of out.evicted || []) stats.forget({ tokenHash: t });   // the 11th session evicted the oldest: its sockets stop speaking for the account
-  send(res, 200, { account: account({ accountId: a.id }), merged, profile: db.profileOf(a.owner_id) }, { 'Set-Cookie': [auth.sessionCookie(raw), clear] });
+  send(res, 200, { account: account({ accountId: a.id }), merged, profile: withShare(db.profileOf(a.owner_id), a.owner_id, req) }, { 'Set-Cookie': [auth.sessionCookie(raw), clear] });
 }
 async function signout(req, res) {
   const raw = auth.readSession(req.headers.cookie);
@@ -134,6 +135,16 @@ async function exportRoute(req, res, b) {
     'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin', 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
 }
+// the share link (docs/SHARE.md 2): the session's owner, else this browser's unmerged guest (like /api/stats)
+const shareOwner = (req, b) => { const s = session(req); if (s) return s.ownerId; const h = deviceOf(b, req); return h ? db.guestOwner(h) : null; };
+async function shareMake(req, res, b) {
+  const o = shareOwner(req, b); if (o == null) return fail(res, 404, 'nothing');
+  const r = share.make(o, req, Date.now());
+  if (r === 'nothing') return fail(res, 404, 'nothing');
+  if (!r) return fail(res, 503, 'db_unavailable');
+  send(res, 200, r);
+}
+async function shareStop(req, res, b) { const o = shareOwner(req, b); if (o != null) share.drop(o); send(res, 204); }   // idempotent: no link, no owner, still 204
 // path -> method -> [handler, per-minute-or-hour limit, window, needs sign-in on, needs the database]
 const ROUTES = {
   '/api/me': { GET: [me, 60, MIN, false, false] },
@@ -144,6 +155,7 @@ const ROUTES = {
   '/api/username': { POST: [username, 10, MIN, true, true] },
   '/api/account': { DELETE: [del, 5, HOUR, false, true] },
   '/api/export': { POST: [exportRoute, 10, HOUR, false, true] },
+  '/api/share': { POST: [shareMake, 20, MIN, false, true], DELETE: [shareStop, 20, MIN, false, true] },
 };
 
 // handle(req, res) -> Promise that never rejects. game.js: api.handle(req, res).catch(() => {})
