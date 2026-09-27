@@ -2009,7 +2009,7 @@ card with a strong ETag = the hash (304 on a match). The hash is a 12-hex sha256
 404 page, an empty 404 for .png) and never render.
 - What the card draws (card.dataOf, read at request time, nothing from the query): the username or "Poddle player"
   (guest display names are never stored), the rank from trophies (`rankOf`, exactly web/profile.js drawRoad), the
-  toughest Matt beaten in difficulty order in its level colour, up to three big figures (return rate from 10 chances,
+  toughest Matt beaten in difficulty order in its level colour, up to three big figures (return rate from 20 chances at 50%+ since the review fixes below,
   longest rally, fastest swing, then W-L vs people, streak, titles, winners/aces from 10, matches) and up to three
   chips; zeros are left off. The call to action is "Think you can return my serve? Play free at poddleball.com".
 - Rendering: SVG -> PNG with `@resvg/resvg-js` (package-lock carries `@resvg/resvg-js-linux-x64-musl` for the alpine
@@ -2026,7 +2026,7 @@ card with a strong ETag = the hash (304 on a match). The hash is a 12-hex sha256
 **Your stats (web/profile.js, index.html, ui.css).** A play row under the people strip: the return-rate ring with a big %
 and "N of M returned" (under 10 chances: "Return 10 balls to see it"), then winners, aces, smashes, total hits, points won %
 and time on court. No `play` in the profile (an older server, the Ranked branch before its merge): the row stays hidden.
-**Share card** sits in the card header after Sign in / Sign out (a round gold icon button beside Google's, so the header
+**Share card** sits in the card header after Sign in / Sign out (a labelled gold button since the review fixes below; it was a round gold icon beside Google's, so the header
 stays one row at 1280x800) and shows only when the profile carries a `share` key. The click copies the known link at
 once, or POSTs and hands the clipboard a `ClipboardItem` promise inside the click (writeText, then a selected field, as
 fallbacks), toasts "Link copied" and opens the share sheet (openCard pattern, Escape, focus trap and return): the picture
