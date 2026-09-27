@@ -111,6 +111,25 @@ CREATE INDEX match_log_a  ON match_log(owner_a, at);
 CREATE INDEX match_log_b  ON match_log(owner_b, at);
 `];
 
+// Additive schema outside the numbered migrations (NOTES 112): new profile counters and the share table. Idempotent, run on every open
+// after the migrations. It deliberately takes no MIGRATIONS slot: the Ranked branch owns migration 2, and whichever build deploys first
+// would own a shared slot while the other's migration silently never ran. Columns are only ever ADDED here (never renamed or dropped).
+const PLAY_COLS = ['hits', 'returns', 'chances', 'winners', 'aces', 'smashes', 'pts_won', 'pts_lost', 'secs_played'];   // profile: every match kind, see stats.js play counters
+const EXTRA = `
+CREATE TABLE IF NOT EXISTS share (
+  owner_id    INTEGER PRIMARY KEY REFERENCES owners(id) ON DELETE CASCADE,
+  slug        TEXT    NOT NULL UNIQUE CHECK (length(slug) = 10),
+  created_at  INTEGER NOT NULL
+);`;
+function extra() {
+  const have = new Set(D.prepare('PRAGMA table_info(profile)').all().map(c => c.name));
+  D.exec('BEGIN IMMEDIATE');
+  try {
+    for (const c of PLAY_COLS) if (!have.has(c)) D.exec(`ALTER TABLE profile ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // c is a constant from PLAY_COLS, never input
+    D.exec(EXTRA); D.exec('COMMIT');
+  } catch (e) { if (D.isTransaction) D.exec('ROLLBACK'); throw e; }
+}
+
 let D = null, S = null, file = null, cfg = null;                  // the connection, its prepared statements, its path (null = memory), limits
 let broken = false, sweeping = false;                             // broken: the last write failed with FULL/IOERR/CORRUPT (ok() false until one succeeds)
 const logged = new Map();                                         // error code -> last log time: one line per code per hour (11.4)
@@ -165,6 +184,7 @@ function open(p, opts = {}) {
     let v = D.prepare('PRAGMA user_version').get().user_version;
     if (v >= MIGRATIONS.length) throw Object.assign(new Error('schema'), { code: 'SQLITE_SCHEMA_NEWER' });   // a newer build wrote this file: do not guess
     for (v++; v < MIGRATIONS.length; v++) { D.exec('BEGIN IMMEDIATE'); try { D.exec(MIGRATIONS[v]); D.exec('PRAGMA user_version=' + v); D.exec('COMMIT'); } catch (e) { if (D.isTransaction) D.exec('ROLLBACK'); throw e; } }
+    extra();
     prepare();
     file = where; broken = false;
     return true;
