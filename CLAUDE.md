@@ -26,8 +26,8 @@ Important changes also need a notice on the home page. Open questions for the op
   to device-id hashes, cids and recent results (link map, pair and new-guest counters), and API rate-limit buckets keyed
   the same way (server/api.js, its own key, also replaced every 24 h). SHA-256 of each sign-in nonce issued, 10 min,
   single use. The raw IP is compared in memory at match end and never written to the database. Share cards
-  (server/share.js, card.js): a keyed hash (own daily key) of the network address counting card renders a minute, and
-  the last 64 card PNGs.
+  (server/share.js, card.js): a keyed hash (own daily key) of the network address counting card renders a minute; and,
+  until evicted or a restart, the last 64 card PNGs.
 - Server database (SQLite `node:sqlite` at PODDLE_DB=/data/poddle.db on the Fly volume poddle_data; server/db.js,
   docs/ACCOUNTS.md 2.2): owners (kind, created, last match/sign-in); devices (SHA-256 of the device id, merge date);
   accounts (Google `sub` only, username + confusable-folded key, created, renamed, merge count; NO email, name or

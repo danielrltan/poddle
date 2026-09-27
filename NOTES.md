@@ -2049,7 +2049,8 @@ carries `share`; fold clamps at 1e9; smashes read at settle time (above).
 covers share requests and the render budget; section 4 "Shared cards" says exactly what anyone with the link sees and
 that the page asks not to be indexed; section 6 names the apps a link is pasted into as recipients that fetch it and may
 keep previews; section 7 retention (until Stop sharing or the profile goes; a merge deletes the guest's link; a browser
-may reuse a loaded card for five minutes; other apps' previews are theirs); section 9 (Stop sharing, the export and
+may reuse a loaded card for five minutes; other apps' previews are theirs; a guest who turns stats off without deleting,
+or clears storage, can no longer reach Stop sharing, so the link lives until the guest sweep or an emailed request); section 9 (Stop sharing, the export and
 Delete my data include the link); section 11 (random code, 404s never render); section 13 a contract basis for sharing;
 section 15 dated. Terms: a Shared cards paragraph in section 5 (public to anyone with the link, personal non-commercial
 use, we may disable a link) and resvg (MPL-2.0) in section 9's list. CLAUDE.md "Current data flows" (memory, database,

@@ -54,7 +54,9 @@ Last reviewed: 2026-09-27 (play counters and share cards, NOTES 112; before that
 - Recipients: anyone the player gives the link to; the servers of the apps it is pasted into (link-preview
   crawlers: iMessage, WhatsApp, Discord, Slack, X, LinkedIn and so on), which may keep their own preview copy; Fly.io.
 - Retention: until Stop sharing, or deleted with the profile (cascade: Delete my data, the guest 90 d / account 24 month
-  sweeps). A guest->account merge deletes the guest's link. Responses are `Cache-Control: public, max-age=300`.
+  sweeps). A guest->account merge deletes the guest's link. Responses are `Cache-Control: public, max-age=300`. A guest
+  who turns stats off without deleting, or clears storage, can no longer reach Stop sharing: the link lives until the
+  guest sweep or an emailed request (the privacy page says so).
 - Security: unknown or malformed slugs get a 404 and nothing is rendered; per-computer render budget; no slug, name or
   id in the logs; the export includes the link (`share: { url, created }`).
 
