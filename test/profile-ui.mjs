@@ -308,7 +308,7 @@ await pg.close();
   for (const [w, h] of [[1920, 1080], [1366, 500], [1024, 768], [900, 700], [760, 600]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, `stats-play-${w}x${h}.png`) }); }      // for review: the play row at the in-between sizes
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300);
   // the first click: no link yet -> POST /api/share, the url goes to the clipboard through a ClipboardItem promise, then the sheet
-  let n0 = API.log.length; await pg.bringToFront(); await pg.click('#btn-pf-share'); await sleep(1500);
+  let n0 = API.log.length; await pg.bringToFront(); await pg.click('#btn-pf-share'); await sleep(400); await pg.screenshot({ path: path.join(SHOTS, 'share-copied-1280x800.png') }); await sleep(1100);
   r = await sheet(); const url1 = linkNow(); let p = shares(n0);
   ok(p.length === 1 && p[0][0] === 'POST' && p[0][2]?.dev === ID && r.open && r.url === url1 && /^http:\/\/127\.0\.0\.1:\d+\/og\.jpg\?v=1$/.test(r.img) && r.clip.includes(url1) && r.toast === 'Link copied' && r.focus === 'btn-share-copy',
     `Share card, no link yet: one POST /api/share with the id, the link copied (${J(r.clip)}), the sheet with it and the picture, toast "${r.toast}", Copy focused (${r.focus})`);
@@ -362,6 +362,11 @@ await pg.close();
   r = await ev(pg, () => { const b = document.querySelector('#screen-lobby .menu-body'), h = document.querySelector('#lobby-profile .pf-head'), w = document.getElementById('pf-who') || h.firstElementChild, a = document.getElementById('pf-acct');
     return { sh: b.scrollHeight, ch: b.clientHeight, oneRow: Math.abs(w.getBoundingClientRect().top - a.getBoundingClientRect().top) < a.getBoundingClientRect().height, label: document.getElementById('btn-pf-share').textContent.trim(), w: Math.round(document.getElementById('btn-pf-share').getBoundingClientRect().width) }; });
   ok(r.sh <= r.ch + 1 && r.oneRow && r.label === 'Share card', `sign-in on, 1280x800: the header stays one row (a round Share card button beside Google's) and the card fits without a scroll (${J(r)})`);
+  { const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);      // the widest header at every size: nothing pokes out of the card
+      const q = await ev(pg, () => { const v = document.getElementById('lobby-profile'), b = v.getBoundingClientRect(); return [...v.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width && (r.left < b.left - 1 || r.right > b.right + 1); }).map(e => (e.id || e.className || e.tagName).toString().slice(0, 30)).filter(c => !/st-rays/.test(c)); });
+      if (q.length) bad.push(`${w}x${h}: ${J(q)}`); if (w === 390) await pg.screenshot({ path: path.join(SHOTS, 'stats-signin-390x844.png') }); }
+    ok(!bad.length, `sign-in on: the header with Google's button and Share card stays inside the card at ${SIZES.length} sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
+    await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); }
   await ev(pg, () => { delete navigator.share; delete Navigator.prototype.share; }); await pg.click('#btn-pf-share'); await sleep(800); r = await sheet();
   ok(r.open && r.name === 'Sign in to put your name on your card' && !r.native, `a guest's sheet: "${r.name}", no Share... without navigator.share (${r.native})`);
   await pg.click('#btn-share-name'); await sleep(600);

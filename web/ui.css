@@ -1595,6 +1595,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
   .st-hero{grid-template-columns:auto minmax(0,1fr);padding:var(--s-4) var(--s-3)} .st-crest{width:5.5rem;height:5.5rem} .st-crest .st-disc{width:5rem;height:5rem} .st-rank-name{font-size:var(--t-xl);white-space:normal} .st-streak{grid-column:1/-1;min-width:0} .st-ribbon{font-size:var(--t-md);padding:0 1.25rem}
   .st-matt{grid-template-columns:auto minmax(0,1fr);row-gap:.5rem} .st-mlevels{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))} .st-mlv{min-width:0}
   .st-people{grid-template-columns:1fr;grid-template-areas:"h" "wl" "bar" "chips"} .st-bar{margin-bottom:1.25rem}
+  .pf-acct{flex-wrap:wrap}      /* a phone: Google's button and Share card wrap rather than run out of the card */
   .st-play{grid-template-columns:1fr;row-gap:.5rem} .st-ret{padding:0 0 .5rem;border-right:0;border-bottom:.125rem solid var(--sky-2)}      /* the ring over the figures */
   .st-tiles{grid-template-columns:1fr} .st-tile{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto;grid-template-areas:"b l n" "b c n";column-gap:.75rem;align-items:center;min-height:4.5rem;padding:.5rem .875rem}
   .st-badge{position:static;grid-area:b} .st-tile .caps{grid-area:l} .st-cap{grid-area:c} .st-num{grid-area:n;margin:0} .st-num b{font-size:2.25rem} .st-cap{flex-wrap:wrap;row-gap:.25rem}      /* a row keeps its gold chip (a best has to look won); it wraps under the caption when the row is too narrow for both */
