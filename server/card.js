@@ -146,10 +146,10 @@ function svgOf(d) {
     out.push(text(cx, ly + 33, tro, { size: 28, wt: 800, fill: '#7a4a00', anchor: 'middle' })); ly += 70;
   } else ly += 20;
   if (d.matt) {
-    const lv = LV[d.mattI] || LV[0], s = `Beat ${d.matt} Matt`, sw = measure(s, 900, 30) + 98, x0 = cx - sw / 2;
+    const lv = LV[d.mattI] || LV[0], s = `Beat ${d.matt} Matt`, fs = fit(s, 900, 30, 246), sw = measure(s, 900, fs) + 98, x0 = cx - sw / 2;   // at most 344 px wide: clear of the edge and the panel
     out.push(`<rect x="${r2(x0)}" y="${ly}" width="${r2(sw)}" height="64" rx="32" fill="#ffffff" filter="url(#sh)"/>`);
     out.push(`<circle cx="${r2(x0 + 34)}" cy="${ly + 32}" r="24" fill="${lv[0]}" stroke="${lv[1]}" stroke-width="3"/><g transform="translate(${r2(x0 + 34 - 15)} ${ly + 16}) scale(1.25)" fill="#ffffff">${MATT}</g>`);
-    out.push(text(x0 + 70, ly + 43, s, { size: 30, wt: 900, fill: lv[1] }));
+    out.push(text(x0 + 70, ly + 32 + fs * 0.36, s, { size: fs, wt: 900, fill: lv[1] }));
   }
   // right: the panel with the name, the big figures, the chips and the call to action
   const px = 388, py = 36, pw = 776, ph = 558, x0 = px + 36, iw = pw - 72;
