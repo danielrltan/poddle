@@ -78,7 +78,8 @@ export function installSprite() {
 
 // The sprite. Parts: ball pb, frames f2 shield / f4 hexagon / f5 gem / f6 star / f7 crest / f8 octagon (+ clips c*), sheens sh and shc
 // (cool), ramps g2..g8, wing wg, laurel lf, sparkle sp, crown cr. Each tier: dark rim, gradient body, white ring, clipped sheen, ball.
-const SPRITE = `<svg class="rank-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+// Exported for server/card.js, which draws the same artwork on the share card (docs/SHARE.md): change it here and both follow.
+export const SPRITE = `<svg class="rank-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
 <g id="pb"><circle cx="32" cy="32" r="12.5" fill="#e6f03c" stroke="#b9c916" stroke-width="2"/><g fill="#b9c916"><circle cx="32" cy="32" r="2.3"/><circle cx="32" cy="24.6" r="2"/><circle cx="32" cy="39.4" r="2"/><circle cx="25.6" cy="28.3" r="2"/><circle cx="38.4" cy="28.3" r="2"/><circle cx="25.6" cy="35.7" r="2"/><circle cx="38.4" cy="35.7" r="2"/></g><path d="M23.5 27a10 10 0 0 1 6-5.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/></g>
 <path id="f2" d="M32 5 52 11v18c0 13-8 22-20 29C20 51 12 42 12 29V11Z"/>
 <path id="f4" d="M32 6l23 13v26L32 58 9 45V19Z"/>

@@ -53,7 +53,8 @@ Last reviewed: 2026-09-27 (Ranked mode, NOTES 112-113; play counters and share c
   date). One per owner. In memory only: a keyed hash (daily key) of the requester's network address counting card
   renders a minute (server/share.js), and the last 64 rendered PNGs (until replaced or a restart; privacy section 7 says so).
 - Made public to anyone with the link (page /c/<slug> and its PNG, both `noindex`): the username (or "Poddle player";
-  guest display names are never stored), rank + trophies, the toughest Matt beaten, up to six stats (return rate,
+  guest display names are never stored), the Ranked rank and division with its emblem and the ladder trophies
+  (Bronze I, no trophies, before any Ranked game), the toughest Matt beaten, up to six stats (return rate,
   longest rally, fastest swing, W-L vs people, best streak, titles, winners, aces, smashes, matches played), read
   from the profile at request time.
 - Basis: contract (Art. 6(1)(b)): the sharing feature the player asks for; stopped at any time (Stop sharing).

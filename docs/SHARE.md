@@ -9,7 +9,8 @@ This file is the contract between the three build parts: **A** (server: counting
 
 Already done on this branch (do not redo): the Matt badge (NOTES 111) and the database groundwork in server/db.js
 (`PLAY_COLS`, `EXTRA`, `extra()`): nine new `profile` columns and the `share` table, added idempotently after the
-numbered migrations. **Never add a MIGRATIONS entry**: the Ranked branch (~/poddle-ranked, not merged) owns migration 2.
+numbered migrations. **Never add a MIGRATIONS entry** for them: Ranked (merged, NOTES 112) owns migration 2, and `extra()` runs
+after the migrations loop.
 
 ## 1. Counting (part A: server/stats.js, server/game.js, server/db.js recordMatch + fold + profileOf)
 
@@ -39,7 +40,7 @@ Rules, pinned (verify each against server/game.js before relying on it):
 - **Gate**: the counters are added in recordMatch only when the seat's `rec && s.bests` (the same switch as the
   personal bests), so a result that did not count cannot inflate them. Add them with ONE new prepared statement
   (`playAdd`: `UPDATE profile SET hits = hits + ?, ... WHERE owner_id = ?`) called after `S.profSet.run(...)` — do not
-  widen `profSet` (the Ranked branch edits those lines too; a separate statement merges cleanly). Clamp each value with
+  widen `profSet` (Ranked edits those lines too; a separate statement merged cleanly). Clamp each value with
   `num(v, 0, 1e6)` like the rest.
 - **fold()** (guest merged into an account) adds the guest's nine counters into the account's (a separate statement too).
 - **profileOf** returns them as `play`:
@@ -80,9 +81,13 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
 **What the card shows** (the profile's owner, read at request time; nothing from the query string):
 - The name: the signed-in account's `username`; a guest (or an account with no username yet) is "Poddle player".
   Guest display names are NOT stored (privacy promise) — the client tells guests "Sign in to put your name on it".
-- The rank: the tier from trophies exactly as web/profile.js drawRoad computes it today (TIERS + FIRST_WIN + 10 per
-  win vs people + 50 a title). Put that in ONE function `rankOf(profile)` in server/card.js with a comment that the
-  Ranked branch swaps it for the ladder rank (RANK_NAME + divisions) when it merges.
+- The rank: the Ranked ladder's, exactly what Your stats' hero shows (web/profile.js drawRoad, docs/RANKED.md 2: one
+  rank per player): `profile.ladder` tier and division as "Gold II", the ladder's trophies, and the rank's emblem, drawn
+  from web/emblems.js's own SVG sprite (exported as `SPRITE`, its ids prefixed `em-` on the card, the tier's symbol
+  inlined; `rankOf(profile)` in server/card.js). The division is a white pill over the emblem's lower edge, as
+  `.st-em[data-div]`. No ladder (never played Ranked, an older server) is Bronze I with 0 trophies, as Your stats reads
+  it; the card leaves the trophy pill off at 0. og:description and the alt texts say "Gold II rank" (the alts add the
+  trophies). The emblem artwork is hashed with `CARD_V`, so a redrawn emblem is a new picture URL (NOTES 114).
 - The Matt badge: the toughest Matt beaten in difficulty order (Rookie, Club, Tour, Pro; wire 0, 1, 3, 2), level colour
   as web/ui.css .st-matt (Rookie #3ecf72, Club #3aa0ff, Tour #a77bf3, Pro gold), or nothing if none.
 - The stats: return rate (returns / chances, shown only from 10 chances up; since the review fixes, NOTES 114: a card tile only from 20 chances at 50% or better, the rally from 5 hits; since design round 1: W-L vs people only from 3 wins with more wins than losses, matches played as a chip only, the swing after record / streak / titles), longest rally, fastest swing (deg/s,
@@ -109,7 +114,7 @@ cascade on delete, rate limit, resvg missing -> og.jpg fallback. Save rendered P
 
 ## 3. Your stats (part C: web/profile.js, web/index.html, web/ui.css, test/profile-ui.mjs)
 
-- **New stats** from `profile.play` (absent on an older server or the Ranked branch: draw nothing new then, no errors).
+- **New stats** from `profile.play` (absent on an older server: draw nothing new then, no errors).
   Return rate is the headline (big %, with "N of M returned"; under 10 chances a coaching line "Return 10 balls to see
   it"). Then compact figures: winners, aces, smashes, total hits, points won %, time on court (h m). Fit them into the
   existing card without making it scroll at 1280x800 (it fits today with room to spare only on phones — check the

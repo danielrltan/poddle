@@ -2167,11 +2167,6 @@ use, we may disable a link) and resvg (MPL-2.0) in section 9's list. CLAUDE.md "
 Public), docs/ropa.md 3a, docs/ACCOUNTS.md (profile `share`, export `share`), the changelog and sitemap lastmod follow.
 No home-page notice: sharing is opt-in and the changelog carries the change.
 
-**For the Ranked session:** when ranked merges, `rankOf(profile)` in server/card.js must switch to the ladder rank
-(RANK_NAME + divisions); it is the one function to change, and bump `CARD_V` with it so every card URL changes. The
-play counters use their own `playAdd` statement and `PLAY_COLS` columns (no MIGRATIONS entry), and stats.js's seatAcc,
-onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
-
 **Review fixes (before launch).**
 - Memory (critical): each render left ~3.5 MB of native memory (resvg's pixmap, tree and PNG) that is freed only when the
   worker's V8 collects, and its JS heap stays near 4 MB, so it rarely did: 100 renders in a row took RSS from 45 to 361 MB
@@ -2219,3 +2214,33 @@ onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
   /c/<slug>: the card picture is a link to / (its alt names it), the h1 no longer repeats the card's question ("<Name>
   plays pickleball with a phone for a paddle."), then "Free in your browser, with your phone or AirPod. Your turn."
   The card shows less than before, so the privacy page and terms need no change.
+
+**Merged with Ranked** (NOTES 112-113 were deployed while this was built; merge commit on share-int, then this):
+- The card's rank is the Ranked ladder's, exactly what Your stats' hero now shows (one rank per player): `rankOf` in
+  server/card.js reads `profile.ladder` ("Gold II", its trophies); no ladder (never played Ranked) is Bronze I with 0
+  trophies, as drawRoad reads it. The NOTES 103/107 trophy tiers (Bronze..Legend, 10 a win and first-win bounties) and
+  the metal medal are gone from the card.
+- The emblem is the real artwork, not a lookalike: web/emblems.js now exports its sprite (`SPRITE`; the browser's
+  `installSprite` is unchanged) and card.js loads the module through Node's require(esm) (Node 24 here and in the
+  Dockerfile), lazily and inside try/catch (if it ever fails the card keeps the rank's name and loses only the emblem).
+  Every sprite id is prefixed `em-` on the card (the sprite's sheen is `sh`, as is the card's drop-shadow filter) and
+  the tier's symbol is inlined at 222 px in the left column, over a soft glow, rays from Platinum up (clipped under
+  the PICKLEBALL tagline), a drop shadow, and the division on a white pill over the emblem's lower edge in the rank's
+  ink (`.st-em[data-div]`). "PLAYER CARD" takes the same ink (the rim colour 15% darker). Crisp at 1200x630 and at
+  400 px (test/ui-shots/share/*-400.png).
+- Trophies: the gold pill says "240 trophies"; at 0 it is left off (the card's rule since round 1: zeros are never
+  drawn), a kept difference from Your stats, which prints 0 with "Play Ranked for your first trophies".
+- og:description leads with "Silver II rank"; og:image:alt, twitter:image:alt and the page's img alt say "Silver II
+  rank, 240 trophies, ...". `CARD_V` 4, and an 8-hex digest of the sprite and RANKS is in the hashed data (`em`), so
+  every card URL changed now and a redrawn emblem changes them again without a bump.
+- test/share.test.mjs: the rank from profile.ladder (Silver II, Pro III, Bronze I without one), CARD_V and the emblem
+  digest in the hash, each tier's symbol inlined verbatim from the sprite, prefixed ids, the numeral, name and trophies
+  in the SVG, and the served page's og:description and alts for a player seeded through db.ladderApply (and Bronze I
+  for one who never played Ranked). test/share-shots.mjs fixtures carry `ladder` across every rank, plus champion-3
+  (the longest name, CHAMPION III) and pro-top (Pro III, 1046). test/profile-ui.mjs's fake answers `ladder`, `play`
+  and `share` together.
+- Merge: db.js keeps migration 2 (ladder) with `extra()` after the migrations loop, profileOf returns `play` and
+  `ladder`, the export is poddle-export-2 with `share`, `counts()` lists ladder and share (accounts-unit updated);
+  stats.js/game.js auto-merged (Ranked's mode/series beside the counters and `pointEnd(m, winner, why)`). Legal pages,
+  ropa 3/3a and CLAUDE.md carry both features; the shared card now names the Ranked rank, its emblem and trophies
+  (privacy 4 and 15, terms 5), dates stay 2026-09-27.

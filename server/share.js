@@ -60,7 +60,7 @@ function blurb(d) {                                              // og:descripti
   return bits.join(' · ') + '. Pickleball with your phone as the paddle. Play free at poddleball.com';   // what the game is: most people who see the preview never open the page
 }
 function html(d, url, image, img) {
-  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat ${d.matt} Matt, the bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
+  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, d.trophies ? `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}` : '', ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat ${d.matt} Matt, the bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

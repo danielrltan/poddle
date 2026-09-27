@@ -1,29 +1,45 @@
-// The share card (docs/SHARE.md 2): a player's rank, Matt badge and best stats drawn as a 1200x630 SVG, turned into a PNG by @resvg/resvg-js.
+// The share card (docs/SHARE.md 2): a player's Ranked rank (its emblem from web/emblems.js), Matt badge and best stats drawn as a 1200x630 SVG,
+// turned into a PNG by @resvg/resvg-js.
 // Pure until png(): dataOf picks exactly what is drawn (nothing from a request), hashOf names that picture, svgOf draws it. png() renders one
 // card at a time in a worker thread, keeps the last 64 in memory, and answers null when the renderer is missing or fails, so
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 3;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 4;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
 const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];   // wire level -> name; the ladder in difficulty order (Tour is 3 on the wire, between Club and Pro)
-const TIERS = [['Bronze', 0], ['Silver', 50], ['Gold', 150], ['Platinum', 300], ['Diamond', 600], ['Legend', 1000]], FIRST_WIN = [25, 50, 75, 100];   // web/profile.js drawRoad, unchanged
+// The rank emblems are the browser's own artwork: web/emblems.js (an ES module, loaded here through require(esm), Node 22.12+) exports the
+// SVG sprite, the seven ranks and their colours. Loaded once, lazily: if it ever fails, the card still renders, with the rank's name and no emblem
+let EMB;
+function emblems() {
+  if (EMB !== undefined) return EMB;
+  try {
+    const E = require('../web/emblems.js');
+    // every id in the sprite gets a prefix: the card's own defs have ids too (its drop-shadow filter is `sh`, as is the sprite's sheen)
+    const pre = t => t.replace(/\bid="([^"]+)"/g, 'id="em-$1"').replace(/href="#([^"]+)"/g, 'href="#em-$1"').replace(/url\(#([^)]+)\)/g, 'url(#em-$1)');
+    const S = pre(E.SPRITE), defs = (S.match(/<defs>([\s\S]*?)<\/defs>/) || [])[1];
+    const sym = E.RANKS.map(r => (S.match(new RegExp(`<symbol id="em-rank-${r.id}" viewBox="0 0 64 64">([\\s\\S]*?)</symbol>`)) || [])[1]);
+    if (!defs || E.RANKS.length !== 7 || sym.some(x => !x)) throw new Error('sprite');
+    EMB = { defs, sym, ranks: E.RANKS, label: E.rankLabel, v: crypto.createHash('sha256').update(E.SPRITE + JSON.stringify(E.RANKS)).digest('hex').slice(0, 8) };   // v: a redrawn emblem is a new picture URL too
+  } catch { EMB = null; }
+  return EMB;
+}
+const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'];   // server/ladder.js NAMES; used only if web/emblems.js did not load
+const INK = ['#7e4512', '#6d7f8c', '#b8720a', '#3f6f8f', '#0f7fae', '#4f23a8', '#4a2f8a'];   // web/emblems.js RANKS colour.deep, the same fallback
 
 const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/s rounded to 10, as Your stats shows it
 const rows = p => ORDER.map(lv => (p && Array.isArray(p.matt) ? p.matt : []).find(x => x && x.level === lv) || {});   // the four Matt rows in difficulty order
 const beaten = r => Number.isFinite(r.firstWinAt) && r.firstWinAt > 0;
 
-// rankOf(profile) -> { name, tier (0..5), trophies }: the tier from trophies exactly as web/profile.js drawRoad computes it (10 a win against
-// people, 25/50/75/100 for a first win over each Matt in difficulty order, 50 a tournament title). When the Ranked branch merges, this is the
-// one function to swap for its ladder rank (RANK_NAME + divisions).
+// rankOf(profile) -> { name: 'Gold II', tier (1..7), div (1..3), trophies }: the Ranked ladder, exactly what Your stats' hero shows (web/profile.js
+// drawRoad, docs/RANKED.md 2: one rank per player). No ladder (never played Ranked, an older server) is Bronze I with 0 trophies, as there
+const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b ? v : a;
 function rankOf(p) {
-  const H0 = p && p.human && typeof p.human === 'object' ? p.human : {};
-  const T = 10 * num(H0.wins) + rows(p).reduce((a, r, i) => a + (beaten(r) ? FIRST_WIN[i] : 0), 0) + 50 * num(p && p.titles);
-  let tier = 0; TIERS.forEach((t, i) => { if (T >= t[1]) tier = i; });
-  return { name: TIERS[tier][0], tier, trophies: T };
+  const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : {}, tier = int(L.tier, 1, 7), div = int(L.div, 1, 3), E = emblems();
+  return { name: E ? E.label(tier, div) : `${RANK_NAME[tier - 1]} ${ROMAN[div]}`, tier, div, trophies: num(L.trophies) };
 }
 const mattOf = p => rows(p).map(beaten).lastIndexOf(true);      // the toughest Matt beaten, in difficulty order (0 Rookie .. 3 Pro), -1 for none
 
@@ -58,7 +74,8 @@ function dataOf(p, username, play) {
   const big = all.filter(x => x[1]).slice(0, 3), used = new Set(big.map(x => x[0]));   // a handful of winners or aces reads better as a chip than as a big figure
   const chips = all.filter(x => x[2] && !used.has(x[0])).slice(0, 3).map(x => x[2]);
   const top = mattOf(p);
-  return { v: CARD_V, name: username || 'Poddle player', guest: !username, rank: rank.name, tier: rank.tier, trophies: rank.trophies,
+  const E = emblems();
+  return { v: CARD_V, em: E ? E.v : null, name: username || 'Poddle player', guest: !username, rank: rank.name, tier: rank.tier, div: rank.div, trophies: rank.trophies,
     matt: top < 0 ? null : LEVEL[ORDER[top]], mattI: top, big: big.map(x => x[1]), chips };
 }
 const hashOf = d => crypto.createHash('sha256').update(JSON.stringify(d)).digest('hex').slice(0, 12);   // ?v= and the ETag: a stat change is a new picture URL
@@ -84,12 +101,7 @@ const r2 = n => Math.round(n * 100) / 100;
 function text(x, y, s, { size = 32, wt = 800, fill = '#39434d', anchor = 'start', ls = 0, extra = '' } = {}) {
   return `<text x="${r2(x)}" y="${r2(y)}" font-family="${F[wt]}" font-weight="${wt}" font-size="${r2(size)}"${ls ? ` letter-spacing="${r2(ls)}"` : ''} text-anchor="${anchor}" fill="${fill}"${extra}>${esc(s)}</text>`;
 }
-const STAR = 'M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z';   // web/index.html .st-star
-const CROWN = 'M3 20 5 6l7 7 4-10 4 10 7-7 2 14Z';              // web/index.html .st-crown (viewBox 32x24)
 const MATT = '<circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/>';   // web/index.html .st-mdisc, the Matt head
-// the crest metals, web/ui.css .st-crest.is-<tier>: [light, face, dark, deep, ink]
-const METAL = [['#f6c39a', '#e9a06a', '#b8662a', '#8f4a1a', '#8f4a1a'], ['#ffffff', '#d8e2ea', '#a9b8c4', '#8093a1', '#5d6f7d'], ['#fff1a6', '#ffd34a', '#f2a81d', '#c97f08', '#a86400'],
-  ['#ffffff', '#b9dcf0', '#6fa6c9', '#4f88ad', '#3d7196'], ['#ffffff', '#8fe0f6', '#1fa9d6', '#1387b0', '#0f7ea6'], ['#ffffff', '#cfb4fa', '#7c4fd8', '#5b34b0', '#5b34b0']];
 const LV = [['#3ecf72', '#13803f', '#e2f8ea'], ['#3aa0ff', '#1b63b8', '#e3f1ff'], ['#a77bf3', '#6a3fc2', '#f1e9ff'], ['#ffd34a', '#a86400', '#fff4c9']];   // .st-matt Rookie green, Club blue, Tour purple, Pro gold
 
 function ball(cx, cy, r) {                                       // web/favicon.svg, the Poddle ball, centred at cx,cy with radius r
@@ -104,29 +116,29 @@ function wordmark(x, base, S, fill) {                            // web/ui.css .
   const svg = text(x, base, 'P', { size: S, wt: 900, fill }) + ball(bx, base - 0.35 * S, br) + text(bx + br + gap, base, 'ddle', { size: S, wt: 900, fill });
   return [svg, P + 2 * gap + 2 * br + d];
 }
-function crest(cx, cy, R, tier) {                                // the rank medal: rays from Platinum up, a metal disc in a white ring, the star (the top tier wears the crown)
-  const m = METAL[tier] || METAL[0];
+const inkOf = tier => { const E = emblems(), c = E ? E.ranks[tier - 1].colour.deep : INK[tier - 1] || INK[0];   // the rank's rim colour 15% darker, as text (web/ui.css --rank-ink mixed with black)
+  return '#' + [1, 3, 5].map(k => Math.round(parseInt(c.slice(k, k + 2), 16) * 0.85).toString(16).padStart(2, '0')).join(''); };
+function emblem(cx, top, S, tier, div) {                         // the rank's emblem (web/emblems.js, the symbol inlined, S px square from top), a glow behind it, rays from Platinum up, the division on a pill over its lower edge
+  const E = emblems(), cy = top + S / 2, ink = inkOf(tier);
   let rays = '';
-  if (tier >= 3) { const n = 18; for (let i = 0; i < n; i++) { const a0 = (i / n) * 2 * Math.PI - Math.PI / 2, a1 = a0 + Math.PI / n * 0.8, R2 = R * 1.6;
+  if (tier >= 4) { const n = 18, R2 = S * 0.74; for (let i = 0; i < n; i++) { const a0 = (i / n) * 2 * Math.PI - Math.PI / 2, a1 = a0 + Math.PI / n * 0.8;
     rays += `M${r2(cx)} ${r2(cy)}L${r2(cx + R2 * Math.cos(a0))} ${r2(cy + R2 * Math.sin(a0))}L${r2(cx + R2 * Math.cos(a1))} ${r2(cy + R2 * Math.sin(a1))}Z`; } }
-  const sc = R * 1.2, icon = tier === 5
-    ? `<path d="${CROWN}" transform="translate(${r2(cx - 16 * sc / 32)} ${r2(cy - 11.5 * sc / 32)}) scale(${r2(sc / 32)})" fill="#ffffff" stroke="${m[3]}" stroke-width="2" stroke-linejoin="round"/>`
-    : `<path d="${STAR}" transform="translate(${r2(cx - 24 * sc / 48)} ${r2(cy - 23.6 * sc / 48)}) scale(${r2(sc / 48)})" fill="${tier === 0 ? '#ffe3c9' : '#ffffff'}" stroke="${m[3]}" stroke-width="2.8" stroke-linejoin="round"/>`;
-  return `<circle cx="${cx}" cy="${cy}" r="${r2(R * 1.75)}" fill="url(#glow)"/>` + (rays ? `<path d="${rays}" fill="#ffffff" opacity=".5"/>` : '') +
-    `<circle cx="${cx}" cy="${cy}" r="${R + 9}" fill="#ffffff" filter="url(#sh)"/>` +
-    `<circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#metal)"/><circle cx="${cx}" cy="${cy}" r="${r2(R * 0.74)}" fill="${m[1]}" stroke="${m[3]}" stroke-opacity=".35" stroke-width="2"/>` +
-    icon + `<path d="M${r2(cx - R * 0.86)} ${r2(cy - R * 0.1)}A${R} ${R} 0 0 1 ${r2(cx + R * 0.86)} ${r2(cy - R * 0.1)}Q${cx} ${r2(cy - R * 0.32)} ${r2(cx - R * 0.86)} ${r2(cy - R * 0.1)}Z" fill="#ffffff" opacity=".22"/>`;   // the gloss: the top of the disc, lit
+  const art = E ? `<g transform="translate(${r2(cx - S / 2)} ${r2(top)}) scale(${r2(S / 64)})" filter="url(#emsh)">${E.sym[tier - 1]}</g>` : '';
+  const R = ROMAN[div] || 'I', fs = 30, pw = Math.max(52, measure(R, 900, fs, 2) + 30), ph = 42, py = top + S * 0.86 - ph / 2;   // .st-em[data-div]: a white pill over the lower edge, the numeral in the rank's ink
+  return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(S * 0.72)}" fill="url(#glow)"/>` +
+    (rays ? `<clipPath id="rays"><rect x="0" y="${r2(top - 2)}" width="${r2(2 * cx)}" height="${r2(S + 60)}"/></clipPath><path d="${rays}" fill="#ffffff" opacity=".45" clip-path="url(#rays)"/>` : '') + art +   // the rays stop under the PICKLEBALL tagline and above the rank's name
+    `<rect x="${r2(cx - pw / 2)}" y="${r2(py)}" width="${r2(pw)}" height="${ph}" rx="${ph / 2}" fill="#ffffff" stroke="#143c64" stroke-opacity=".14" stroke-width="2" filter="url(#sh)"/>` +
+    text(cx, py + ph / 2 + fs * 0.36, R, { size: fs, wt: 900, fill: ink, anchor: 'middle', ls: 2 });
 }
 
 // svgOf(data) -> the SVG text, 1200x630. Everything drawn comes from `data`.
 function svgOf(d) {
-  const m = METAL[d.tier] || METAL[0], out = [];
+  const E = emblems(), ink = inkOf(d.tier), out = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`);
   out.push(`<defs>
 <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d9bf0"/><stop offset=".55" stop-color="#7cc6ff"/><stop offset="1" stop-color="#c4e8ff"/></linearGradient>
 <pattern id="diag" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="12" height="28" fill="#ffffff" opacity=".07"/></pattern>
 <radialGradient id="glow"><stop offset="0" stop-color="#ffffff" stop-opacity=".75"/><stop offset=".55" stop-color="#ffffff" stop-opacity=".22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-<linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${m[0]}"/><stop offset=".3" stop-color="${m[2]}"/><stop offset=".5" stop-color="${m[0]}"/><stop offset=".75" stop-color="${m[3]}"/><stop offset="1" stop-color="${m[0]}"/></linearGradient>
 <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#f7fbfd"/><stop offset="1" stop-color="#eaf3f8"/></linearGradient>
 <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f8fc"/><stop offset="1" stop-color="#e2eff7"/></linearGradient>
 <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7cc6ff"/><stop offset="1" stop-color="#1670d8"/></linearGradient>
@@ -136,17 +148,19 @@ function svgOf(d) {
 <linearGradient id="ballS" x1="0" y1="0" x2="0" y2="1"><stop offset=".62" stop-color="#5a6e00" stop-opacity="0"/><stop offset="1" stop-color="#5a6e00" stop-opacity=".3"/></linearGradient>
 <filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#143c64" flood-opacity=".26"/></filter>
 <filter id="lift" x="-10%" y="-20%" width="120%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#ffffff" flood-opacity=".85"/></filter>
+<filter id="emsh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#143c64" flood-opacity=".3"/></filter>
+${E ? E.defs : ''}
 </defs>`);
   out.push(`<rect width="${W}" height="${H}" fill="url(#sky)"/><rect width="${W}" height="${H}" fill="url(#diag)"/>`);
-  // left: the wordmark and what the game is (a stranger in a feed has never heard of Poddle), the rank crest, the rank, the trophies, the Matt badge
+  // left: the wordmark and what the game is (a stranger in a feed has never heard of Poddle), the rank emblem, the rank, the trophies, the Matt badge
   const cx = 198, [wm, ww] = wordmark(0, 0, 60, '#39434d');
   out.push(`<g transform="translate(${r2(cx - ww / 2)} 82)" filter="url(#lift)">${wm}</g>`);
   out.push(text(cx + 3, 124, 'PICKLEBALL', { size: 28, wt: 900, fill: '#0e3f8c', anchor: 'middle', ls: 6, extra: ' filter="url(#lift)"' }));   // +3: half the trailing letter-spacing, so it centres on the wordmark
-  const lh = 312 + (d.trophies ? 70 : 0) + (d.matt ? 64 : 0), top = 136 + Math.max(0, (470 - lh) / 2);   // the crest, the rank and its pills, centred under the tagline
-  out.push(crest(cx, top + 108, 90, d.tier));
+  const lh = 330 + (d.trophies ? 70 : 0) + (d.matt ? 64 : 0), top = 132 + Math.max(0, (474 - lh) / 2);   // the emblem, the rank and its pills, centred under the tagline
+  out.push(emblem(cx, top + 4, 222, d.tier, d.div));
   const rk = d.rank.toUpperCase();
-  out.push(text(cx, top + 272, rk, { size: fit(rk, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
-  let ly = top + 296;
+  out.push(text(cx, top + 290, rk, { size: fit(rk, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
+  let ly = top + 314;
   if (d.trophies) {
     const tro = `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}`, tw = measure(tro, 800, 28) + 44;
     out.push(`<rect x="${r2(cx - tw / 2)}" y="${ly}" width="${r2(tw)}" height="46" rx="23" fill="url(#gold)" stroke="#c97f08" stroke-width="2"/>`);
@@ -161,7 +175,7 @@ function svgOf(d) {
   // right: the panel with the name, the big figures, the chips and the call to action
   const px = 388, py = 36, pw = 776, ph = 558, x0 = px + 36, iw = pw - 72;
   out.push(`<rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="40" fill="url(#panel)" stroke="#ffffff" stroke-width="4" filter="url(#sh)"/>`);
-  out.push(text(x0, py + 58, 'PLAYER CARD', { size: 24, wt: 800, fill: m[4], ls: 4 }));
+  out.push(text(x0, py + 58, 'PLAYER CARD', { size: 24, wt: 800, fill: ink, ls: 4 }));
   if (d.guest) out.push(text(x0, py + 122, d.name, { size: 56, wt: 900, fill: '#65717b' }));   // no username: the generic words stay small and grey, the stats are the hero
   else out.push(text(x0, py + 138, d.name, { size: fit(d.name, 900, 86, iw), wt: 900, fill: '#39434d' }));
   const n = d.big.length, gap = 16, tw1 = n ? (iw - gap * (n - 1)) / n : iw, pad = 20, bh = 94, chips = d.chips.length > 0;
