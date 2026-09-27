@@ -4,7 +4,7 @@ The brief, in the player's words: "make the surroundings beyond the court nicer 
 trees, some wind breeze lines here and there, nice sky". It is also the backdrop of the main menu, where the live court
 is shown **blurred** behind the buttons: big shapes, strong silhouettes and colour matter more than fine detail.
 
-## How it plugs in (already wired, do not edit web/scene.js)
+## How it plugs in (already wired; web/scene.js changes only for a new venue's court colours)
 `scene.js` does `import('./scenery/index.js')` and calls
 `createScenery(THREE, ctx)` once, then `scenery.update(dt, timeS, camera)` every frame.
 
@@ -44,6 +44,18 @@ Each module exports `create(THREE, S) -> { group, update(dt, t, camera) }` where
 - **Lighting** may shift (warmer sun, new fog and hemisphere colours) but the court, lines, paddles and ball must keep
   their contrast, and the sun must stay high enough that court shadows stay short and readable.
 - Deterministic: seeded rng only, animation driven by the `t` passed in (the preview harness freezes time for screenshots).
+
+## Venues (ranked plays in a stadium)
+`scene.setVenue('park' | 'stadium')` (default `park`; `scene.venue()` reads it back) rebuilds the court group with that venue's colours
+and plain fallback look (sky gradient, fog, sun/hemi colour and intensity: `VENUE` in web/scene.js), sets `document.body.dataset.venue`
+for the CSS, and hands the name to `scenery.setVenue(name)`. index.js keeps ONE shared context + root per venue (`makeShared(THREE, ctx,
+venue)` gives it `S.pal` / `S.light` from `VENUES` in shared.js) and its own module list: `MODULES.park` is the four modules above,
+`MODULES.stadium` is `stadium.js` alone (night dome + stars, tiered stands with crowd rows, LED hoarding ring, four floodlight masts with
+lamp heads, light cones, the pool of light on the concourse: 10 draws, ~3k tris, 0.2 MB; 9 draws on low). A venue built before is a
+one-frame swap; a new one builds staged like the first, with scene.js's plain look up meanwhile, so switch when the ranked queue
+starts, not when the court opens. The sun VECTOR never moves: a venue recolours and dims it. The calm-band rules above apply to the
+stadium in full: the far stand fills the backdrop, so it is dark, mid-value and only sways 3 cm. Pictures + cost: `node test/venue-shots.mjs`
+(test/ui-shots/venue-*.png), `&venue=stadium` in test/scene-preview.html.
 
 ## Seeing it
 `test/scene-preview.html` renders the real scene with a fake rally: `?side=0|1`, `&t=<s>` freezes time,

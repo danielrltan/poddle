@@ -34,9 +34,10 @@ const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, scree
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
 else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
-const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get cam() { return body ? { ready: body.ready, error: body.error, errorName: body.errorName, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, get camView() { return phase === 'camera' ? camView : ''; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
+const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get rk() { return { phase: rkPhase, on: rkOn(), queued: rkQueued, kind: rkKind, tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, series: rkSeries, waiting: rkQueuedN, ranks: [...ranks] }; }, get cam() { return body ? { ready: body.ready, error: body.error, errorName: body.errorName, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, get camView() { return phase === 'camera' ? camView : ''; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let regs = [false, false];                     // a registered username in that seat (docs/ACCOUNTS.md 7.5): the badge beside the name, never text
+let ranks = [null, null];                      // the rank tier (1..7) in that seat in a Ranked court (docs/RANKED.md 6): the emblem beside the name, never text. null = none
 let side = 0, role = 'player', names = [null, null], state = null, players = 0, calibrating = true;      // role: 'player' | 'spectator' (docs/SPECTATE.md). names: the server's truth, null = empty seat
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
@@ -136,16 +137,18 @@ const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'B adds a bot', meS
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].replace(BADGE_OUT, '').slice(0, 24) || null : null);      // untrusted text: ui.js writes it with textContent only
 const cleanRegs = a => [0, 1].map(i => Array.isArray(a) && a[i] === true);      // only a literal true draws a badge (an old server sends none)
+const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r }; return Number.isInteger(o.tier) && o.tier >= 1 && o.tier <= 7 ? { tier: o.tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // { tier 1..7, div 1..3 } or nothing (a bare tier reads as division I)
+const cleanRanks = a => [0, 1].map(i => Array.isArray(a) ? rankRef(a[i]) : null);      // only a rank draws an emblem (a plain court sends [null, null] or nothing)
 // Who is on the scoreboard. A player reads 'You' on the left and the other seat on the right; a spectator reads side 0 on the
 // left (blue) and side 1 on the right (orange), names in both, never 'You'. Matt's second line is his level.
 function drawNames() {
   const pd = state ? state.paddles : [], sub = i => !pd[i] ? '' : pd[i].bot ? botLevel : STATUS_WORD[pd[i].status] || (pd[i].wait ? 'Calibrating' : '');      // the same word as the tag over their character (wait: a server from before 'status')
-  ui.setBot(!spec() && tourKind !== 'match' && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour)
-  if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1), reg: [!!pd[0] && regs[0], !!pd[1] && regs[1]] }); return; }
+  ui.setBot(!spec() && tourKind !== 'match' && !rkKind && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour) or a Ranked court (his level follows your rank)
+  if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1), reg: [!!pd[0] && regs[0], !!pd[1] && regs[1]], rank: [!!pd[0] && !pd[0].bot ? ranks[0] : null, !!pd[1] && !pd[1].bot ? ranks[1] : null] }); return; }
   const o = pd[1 - side];
-  if (!o) ui.setNames({ me: 'You', ...alone(), reg: [false, false] });
-  else if (o.bot) ui.setNames({ me: 'You', meSub: '', them: nameOf(1 - side), themSub: botLevel, reg: [false, false] });
-  else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [false, regs[1 - side]] });      // 'You' is not a name: no badge on it
+  if (!o) ui.setNames({ me: 'You', ...alone(), reg: [false, false], rank: [ranks[side], null] });
+  else if (o.bot) ui.setNames({ me: 'You', meSub: '', them: nameOf(1 - side), themSub: botLevel, reg: [false, false], rank: [ranks[side], null] });
+  else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [false, regs[1 - side]], rank: [ranks[side], ranks[1 - side]] });      // 'You' is not a name: no badge on it. The emblem is a rank, not a name: yours shows beside You in a Ranked court
 }
 const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' };
 function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDim(); }
@@ -154,28 +157,35 @@ function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDi
 function showOver() {                              // the result card. A matchover that came while a set-up screen was up waits in `over` for the court to open
   const m = over; over = null; if (!m) return;
   const T = m.tour && typeof m.tour === 'object' ? { round: String(m.tour.round || '').slice(0, 24), next: m.tour.next ? String(m.tour.next).slice(0, 24) : null, final: !!m.tour.final, gap: Math.max(0, Math.round((+m.tour.gap || 0) - (performance.now() - overAt) / 1000)) } : null;      // a tournament match: no vote, back to the bracket after gap s
-  const L = spec() ? 0 : side, won = m.winner === L, sc = Array.isArray(m.score) ? m.score : [0, 0], vote = LOBBY && m.type === 'matchover' && !T;      // the left slot: me, or side 0 for a spectator. Legacy room / old server: it restarts by itself
+  const RK = m.rk && typeof m.rk === 'object' ? m.rk : null;      // a Ranked court (docs/RANKED.md 8.2, 8.8): a warm-up game against Matt ({ matt, next }) or the series card ({ games, bestOf, scores, done, gap }). No vote either way
+  const L = spec() ? 0 : side, won = m.winner === L, sc = Array.isArray(m.score) ? m.score : [0, 0], vote = LOBBY && m.type === 'matchover' && !T && !RK;      // the left slot: me, or side 0 for a spectator. Legacy room / old server: it restarts by itself
   ui.setServe(null); ui.hold(null); ui.settings(false);
   const rg = Array.isArray(m.reg) ? m.reg.map(x => x === true) : [false, false];      // as it was when it ended, like its names
   const W = m.winner === 1 ? 1 : 0, n = (sc[0] | 0) + (sc[1] | 0);
   const mstats = ms && !m.forfeit && ms.sum === n ? (spec() ? { rally: ms.rally, smashes: ms.smash[0] + ms.smash[1], run: ms.best[W] }      // a spectator: both sides' smashes, the winner's best run
     : { rally: ms.rally, smashes: ms.smash[L], run: ms.best[L] }) : null; ms = null;      // every point seen from 0-0, or none at all (showOver runs once per matchover: it takes `over`)
-  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [spec() && rg[0], rg[1 - L]], stats: mstats });
+  const rk = Array.isArray(m.rank) ? cleanRanks(m.rank) : ranks;      // the tiers as they were when it ended (docs/RANKED.md 6)
+  const gone = (performance.now() - overAt) / 1000, RKo = !RK ? null : RK.matt ? { matt: true, next: Math.max(0, Math.round((+RK.next || 0) - gone)) }      // the card's own clock, less what was spent behind a set-up screen
+    : { games: [(Array.isArray(RK.games) ? RK.games[L] : 0) | 0, (Array.isArray(RK.games) ? RK.games[1 - L] : 0) | 0], bestOf: Math.max(1, RK.bestOf | 0) || 3, scores: (Array.isArray(RK.scores) ? RK.scores : []).filter(Array.isArray).map(x => [x[L] | 0, x[1 - L] | 0]), done: true, gap: Math.max(0, Math.round((+RK.gap || 0) - gone)) };      // games and scores from the left slot's side
+  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, rk: RKo || undefined, reg: [spec() && rg[0], rg[1 - L]], rank: [rk[L], rk[1 - L]], stats: mstats });
+  if (RKo && !RKo.matt) padFx('series');
+  if (RKo && rkRes) { const r = rkRes; rkRes = null; ui.trophyRow?.(rkRow(r)); rkCeremony(r); }      // its settlement came while a set-up screen was up
   scene.jingle(spec() ? (m.forfeit ? 'forfeit' : 'watch') : m.forfeit ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
   const left = Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000));      // less what was spent behind a set-up screen
   if (vote) ui.rematch(spec() ? { left } : { mine: null, theirs: null, left, name: nameOf(1 - L) });
-  else if (!T) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket
+  else if (!T && !RK) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket. Ranked: rematchon (the next warm-up game) or closed round
   if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card: a quick 'No rematch' had it falling over the lobby
   if (spec()) ui.confetti(W ? ['#ff8a3d', '#ffd34a', '#ffffff'] : ['#3aa0ff', '#ffd34a', '#ffffff'], 60);      // a spectator: one smaller burst in the winner's colours
 }
 
 // ---------- spectator views: keys 1-4 and the chips are one function (docs/API-NEXT.md 2.3, 3.4) ----------
 const VIEWS = ['broadcast', 'split', 'pov', 'free'];
-function showView() { const v = scene.getView(); if (v && spec()) ui.setView(v.name, v.name === 'pov' ? nameOf(v.side) : ''); }
+const chipView = v => { const r = v.name === 'pov' ? ranks[v.side] : null; if (r) ui.setView(v.name, nameOf(v.side), r); else ui.setView(v.name, v.name === 'pov' ? nameOf(v.side) : ''); };      // the chip names the player and, in a Ranked court, carries their emblem (the third argument only then: test/menu.mjs records the call)
+function showView() { const v = scene.getView(); if (v && spec()) chipView(v); }
 function setView(name, flip) {                     // flip: asked for by the viewer (Player again = the other player), not by a restore
   if (!spec() || !VIEWS.includes(name)) return;
   const was = scene.getView() || {}, v = scene.setView(name, name === 'pov' && was.name === 'pov' ? (flip ? 1 - was.side : was.side) : 0) || { name, side: 0 };
-  ui.setView(v.name, v.name === 'pov' ? nameOf(v.side) : ''); if (VIEWS.includes(v.name)) ls.set('poddle.view', v.name);
+  chipView(v); if (VIEWS.includes(v.name)) ls.set('poddle.view', v.name);
 }
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
@@ -186,7 +196,7 @@ let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? p
 const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
-function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !NO_CAM, bodyNote: NO_CAM || (body ? body.ready : camOn) ? '' : 'Body turns the camera on', tourMatch: tourKind === 'match',      // bodyOk: Body can be picked wherever a camera can be asked for
+function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !NO_CAM, bodyNote: NO_CAM || (body ? body.ready : camOn) ? '' : 'Body turns the camera on', tourMatch: tourKind === 'match', rkMatch: rkKind === 'match', rkWarm: rkKind === 'warm',      // bodyOk: Body can be picked wherever a camera can be asked for. rkMatch / rkWarm: the notes and the Leave button of a Ranked court (docs/RANKED.md 8.2, 8.5)
   sound: soundOn, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
   sinkWhy: !scene.audio.canSwitch() ? 'browser' : sinks.length ? '' : sinkDenied ? 'denied' : 'devices' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
@@ -221,20 +231,23 @@ function setPod(on) { showPod = !!on; show('podwrap', showPod); savePrefs(); syn
 function setBody(on) { showBody = !!on; scene.setSelfBody(showBody); savePrefs(); syncSettings(); }
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
 function recenter() { model.recenter(); if (body) body.center(); say('Recentred'); }
-function leave() { if (!LOBBY || !room) return; game.send({ type: 'leave' }); toLobby(); }
+const rkQuit = () => { if (rkKind === 'match' && !spec() && !(rkSeries && rkSeries.done)) { rkLeft = performance.now() + 5000; setTimeout(redialDue, 5100); } };      // leaving a Ranked series under way is my forfeit: its rkres reaches me in the lobby (onRkRes says 'Forfeit: 20 trophies'). A waiting redial holds for it: a socket closed before that frame is read would lose it
+function leave() { if (!LOBBY || !room) return; rkQuit(); game.send({ type: 'leave' }); toLobby(); }
 // The socket opens again so the server hears who this is now (docs/ACCOUNTS.md 6.2, 9.6, 9.7): signed in or out, stats switched, data
 // deleted. It keeps the device of a socket's first hello and reads the cookie at the upgrade, so a new socket is the only way. Never
 // in the middle of a match or on its result card (a drop there is a hold, a forfeit or 'No rematch' for the other player): then it
 // waits for the court to be left, or for the rematch to begin (rematchon, before its first ball: nothing of it is recorded yet).
 let redialWait = false;
-const midMatch = () => !!room && !spec() && (struck || over != null || ui.currentOverlay() === 'match' || !!(state && state.score && state.score[0] + state.score[1] > 0));
-function redial() { if (midMatch()) { redialWait = true; return; } redialWait = false; game.drop(); }
-function redialDue() { if (redialWait) { redialWait = false; game.drop(); } }
+const midMatch = () => !!room && !spec() && (rkKind === 'match' || struck || over != null || ui.currentOverlay() === 'match' || !!(state && state.score && state.score[0] + state.score[1] > 0));      // a Ranked series counts from its first moment to its last card (between games too: docs/RANKED.md 8.4)
+const rkBusy = () => rkOn() && !spec();      // in the Ranked queue anywhere (the lobby's VS card, a warm-up, a series, its card): a new socket there drops the queue entry (a warm-up is no hold), so the redial waits for Ranked to be left (docs/RANKED.md 3.10)
+function redial() { if (midMatch() || rkBusy()) { redialWait = true; return; } redialWait = false; game.drop(); }
+function redialDue() { if (redialWait && !rkBusy() && performance.now() >= rkLeft) { redialWait = false; game.drop(); } }      // never from a warm-up's rematchon: toLobby, endRk, onRk 'off' and onRkFail call it once the queue is left
 function openStats() { if (room) { say('Leave the court to see your stats', null, 2400); return; } ui.settings(false); if (phase === 'title') play(); if (phase === 'lobby') ui.lobbyView('profile'); }      // Settings > You > Your stats
+function openRanked() { if (room) { say('Leave the court to see Ranked', null, 2400); return; } ui.settings(false); if (phase === 'title') play(); if (phase === 'lobby') ui.lobbyView('ranked'); }      // Settings > You > Ranked
 function playBot(level) { if (pending) return; botWant = [0, 1, 2, 3].includes(level) ? level : 1; request({ type: 'create', public: false }); }      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
 // Opening the panel pauses a match against Matt (or an empty court); against a human it is only a card over a live rally.
 const vsHuman = () => { const o = state && state.paddles[1 - side]; return !!o && !o.bot; };
-const forfeits = () => LOBBY && !spec() && ui.currentOverlay() !== 'match' && (tourKind === 'match' || vsHuman() && !holding && (struck || !!state && state.score[0] + state.score[1] > 0));      // a tournament match: leaving is a forfeit from the first moment, against Matt too      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
+const forfeits = () => LOBBY && !spec() && ui.currentOverlay() !== 'match' && (tourKind === 'match' || rkKind === 'match' || vsHuman() && !holding && (struck || !!state && state.score[0] + state.score[1] > 0));      // a tournament or Ranked match: leaving is a forfeit from the first moment, against Matt too      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
 function pause(on) {
   if (spec() || !seated() || !live()) return;
   if (vsHuman()) { if (on) ui.setSettings({ canPause: !(noPause = true) }); return; }
@@ -299,11 +312,11 @@ function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
 function request(m) {                               // one lobby request at a time, each carrying the player's name. Not connected right now: it goes out when the socket opens
   if (pending) return; const n = myName(); m.name = sentName = n; if (n && !profile.username()) ls.set('poddle.name', n);
   pending = m; ui.lobbyBusy(true); game.send(m);
-  pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // an old server never answers: do not leave the lobby dimmed for good
+  pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (m.type === 'rk') ui.rkSearch?.(false); if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // Find a match stops saying Searching too      // an old server never answers: do not leave the lobby dimmed for good
 }
 // the menu's address (NOTES 108): each lobby view has a path the server answers with this same page, so a reload lands back on it instead of the title.
 // replaceState only: the browser's Back button still leaves the site as before. A court keeps '/' with its ?court=CODE (the invite).
-const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile' };
+const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', ranked: '/ranked', ranks: '/ranks', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile', '/ranked': 'ranked', '/ranks': 'ranks' };
 let routing = false;      // off until the reload's view is back (the boot's title screen must not wipe /stats first)
 function route() { if (!LOBBY || !routing) return; const p = room ? '/' : ui.currentScreen() === 'lobby' ? VIEW_PATH[ui.lobbyView()] || '/play' : ui.currentScreen() === 'title' ? '/' : null;
   if (p && p !== location.pathname && (location.pathname === '/' || PATH_VIEW[location.pathname])) history.replaceState(null, '', p + location.search + location.hash); }      // only ever swaps one of our own paths (a local copy served from /web/index.html keeps its path)
@@ -313,7 +326,7 @@ const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostn
 let askId = 0, askWho = '', askedFor = false, noBot = false;
 const CAN_PADDLE = CAN_PHONE || /Mac/.test(navigator.platform) && navigator.maxTouchPoints <= 1;      // this device can be a paddle (the inverse of the viewer-only note at the top): only then is there an Ask to play
 function askSync() { const pd = state && state.paddles || [], bots = pd.filter(p => p && p.bot).length, hum = pd.filter(p => p && !p.bot).length;      // a spectator, one human playing Matt
-  ui.showAsk(LOBBY && spec() && phase === 'watch' && CAN_PADDLE && bots === 1 && hum === 1); }
+  ui.showAsk(LOBBY && spec() && phase === 'watch' && CAN_PADDLE && bots === 1 && hum === 1 && !rkKind); }      // never in a Ranked warm-up: that seat is the queue's (docs/RANKED.md 3.11)
 function answer(yes) { if (!askId) return; game.send({ type: 'answer', id: askId, yes }); ui.askCard(null); }
 function askPlay() { game.send({ type: 'ask' }); }
 ui.onAnswer(answer); ui.onAsk(askPlay);
@@ -322,6 +335,81 @@ function switchSeat(m) { const toSpec = m.role === 'spectator'; role = toSpec ? 
 // ---------- tournaments (docs/COURTS-TOURNEY.md 4.5-4.7): the server runs it; this shows where you are in it ----------
 let tour = null, tourKind = null, tourMoving = false, tourVsT = 0, tourHang = 0, champShown = '';
 const tourOn = () => !!tour && tour.phase !== 'done';      // still running: a finished one (its champion shown) no longer steers the lobby, the address bar or the reconnect      // tour: the last snapshot. tourKind: 'warm' | 'match' while in one of its courts. tourMoving: a VS card is up, a match seat is on its way
+// ---------- Ranked (docs/RANKED.md 3.10, 8, 9): the server runs the queue and the series; this keeps where I am in it ----------
+// rkKind: 'warm' | 'match' while in one of its courts (from the room tag). rkQueued: in the queue (a warm-up, or the VS card). rkMoving: the VS card is up, the series seat is on its way.
+// rkSeries: { bestOf, game, games, done } of the series I am in. rkYou: my tier and trophies as the server last said. Nothing of the ladder is kept in the browser.
+let rkKind = null, rkQueued = false, rkMoving = false, rkSeries = null, rkYou = { tier: null, div: null, trophies: null }, rkPhase = 'off', rkQueuedN = 0, rkSinceP = 0, rkHang = 0, rkNoteHold = 0, rkVsT = 0, rkUpT = 0, rkRes = null, rkWait = false, rkNoteText = '', rkWalk = false, rkLeft = 0;      // rkRes: a settlement heard while its card still waits behind a set-up screen (drawn with the card). rkWait: a reconnect with &rk=1 waits for its answer (rkHang runs). rkNoteText: the view's held line. rkWalk: the series card's matchover was a forfeit (the stayer's Walkover). rkLeft: until when this seat's own forfeit (Leave, Q Q, Save my stats off) waits for its rkres
+const rkOn = () => rkQueued || !!rkKind;
+const RK_FAIL = { nocid: 'Reload and try again', busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', addr: 'Two players on your network are already in the queue', nostats: 'Turn on Save my stats on the privacy page to play Ranked', intour: 'Leave your tournament first' };
+const RK_VIEW_NOTE = { busy: 'Courts are full right now. Try again in a moment', full: 'Courts are full right now. Try again in a moment', intour: 'Leave your tournament first', nostats: 'Turn on Save my stats on the privacy page to play Ranked' };
+const onRankedView = () => phase === 'lobby' && !room && ui.currentScreen() === 'lobby' && ['ranked', 'ranks'].includes(ui.lobbyView());      // the Ranks page stands in the stadium too
+const THEME = { park: '#dfeef6', stadium: '#0b1116' };
+function setVenue(name) {                          // the scene's venue (web/scene.js setVenue, body[data-venue]) and the browser's own colour bar with it
+  if (scene.setVenue) scene.setVenue(name); const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', THEME[name] || THEME.park); }
+const venueSync = () => setVenue(rkOn() || onRankedView() ? 'stadium' : 'park');      // the stadium behind the Ranked view (built behind the glass, never on court) and in its courts; the park everywhere else
+const rkTile = () => ui.rkTile?.({ tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, queued: rkQueuedN });
+const rkViewNote = (text, ms = 4000) => { rkNoteHold = performance.now() + ms; rkNoteText = text; if (onRankedView()) ui.rkNote?.(text); };      // a line under Find a match, held over the lobby's own 'Someone is waiting' for a while
+const rkNoteHeld = () => performance.now() < rkNoteHold ? rkNoteText : '';      // and over the view's own redraws (profile.showRanked draws it twice as it opens): rkView gets it as s.hold
+const RK_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'];      // web/emblems.js RANKS, by tier
+const rkLeaver = m => m.won === false && (performance.now() < rkLeft || rkWait || Array.isArray(m.why) && m.why.includes('left_early'));      // my own forfeit: I left (or turned stats off), my held seat ran out while I was away (rkWait: nothing else ends a series while a socket is down), or the server says I left early
+function rkResNote(m) {                            // my side of a settlement as one line on the Ranked view (docs/RANKED.md 8.8): the change as applied first, 'didn’t count' only when nothing moved
+  const d = m.delta | 0, left = rkLeaver(m), r = rankRef(m), rank = m.floorHeld === true && r ? RK_NAMES[r.tier - 1] : '';      // floorHeld: the loss stopped at the rank's floor
+  if (m.void === true) return 'Void: no trophies changed';
+  if (d < 0) return left ? `Forfeit: ${-d} trophies` : `−${-d} trophies`;
+  if (d > 0) return `+${d} trophies`;
+  if (left) return rank ? `Forfeit: you keep ${rank}` : 'Forfeit: no trophies changed';
+  return rank ? `You keep ${rank}` : m.counted === false ? 'No trophies: that match didn’t count' : 'No trophies changed';
+}
+function onRk(m) {                                 // the queue snapshot { phase, you, queued, place, since }: on entry, on change, 'off' when the entry ends
+  clearTimeout(rkHang); rkWait = false; if (pending && pending.type === 'rk') settle();
+  rkPhase = ['queue', 'vs', 'match', 'off'].includes(m.phase) ? m.phase : 'off'; rkQueued = rkPhase !== 'off'; if (!rkQueued) rkSinceP = 0;      // the entry ended: the next one's pill starts from its own clock
+  if (m.you && typeof m.you === 'object') { const r = rankRef(m.you); rkYou = { tier: r ? r.tier : rkYou.tier, div: r ? r.div : rkYou.div, trophies: Number.isInteger(m.you.trophies) ? m.you.trophies : rkYou.trophies }; }
+  if (Number.isFinite(m.since) && m.since > 0) rkSinceP = performance.now() - Math.max(0, Date.now() - m.since);
+  if (Number.isInteger(m.queued)) rkQueuedN = Math.max(0, m.queued); rkTile();
+  if (rkKind === 'warm') ui.rkPill?.({ on: rkQueued, since: rkSinceP, queued: Math.max(0, rkQueuedN - (rkQueued ? 1 : 0)) });      // the snapshot's count includes me: the pill says whether SOMEONE ELSE is waiting
+  if (rkPhase === 'off' && rkKind === 'warm' && room && !spec()) { toLobby(); return; }      // the entry ended under a warm-up (it closed without a 'closed' to me: e.g. Leave pressed on the series card just after Play again): off that dead court
+  if (rkPhase === 'off' && !rkKind) { venueSync(); redialDue(); }      // out of Ranked in the lobby: a sign-in made meanwhile opens its socket now
+  ui.rkSearch?.(false);
+}
+function onRkFail(why) {                           // the queue said no: a toast, and the reason under Find a match while the view is up
+  if (pending && pending.type === 'rk') settle(); ui.rkSearch?.(false); rkSinceP = 0;
+  if (why === 'nostats') rkQuit();                 // Save my stats off mid-series: that is my forfeit (docs/RANKED.md 3.9), the rkres that follows says what it cost
+  if (RK_VIEW_NOTE[why]) rkViewNote(RK_VIEW_NOTE[why]);      // held first: the Ranked view that toLobby opens draws it
+  if (room && rkKind && !spec()) toLobby();         // every rkfail on a Ranked court comes after the server took the seat away (Play again on the series card, stats off, no hello): no 'closed' follows, so leave the dead court now (toLobby first: it clears toasts)
+  say(RK_FAIL[why] || 'Couldn’t join Ranked. Try again.', null, 3200); redialDue();
+}
+function endRk(why) {                              // rkend: restart | gone (and 'late': an rkres answered the reconnect). Only ever an answer to a reconnect with &rk=1, which left this socket in the lobby: nothing is revived (docs/RANKED.md 3.10)
+  clearTimeout(rkHang); clearTimeout(rkVsT); rkWait = false; rkLeft = 0; rkSinceP = 0; rkQueued = false; rkMoving = false; rkPhase = 'off'; rkSeries = null; ui.rkSearch?.(false); ui.setSeries?.(null);
+  if (['tour-vs', 'rk-vs'].includes(ui.currentOverlay())) ui.showOverlay(null);
+  if (room) toLobby(); else { if (phase === 'lobby' && ui.currentScreen() !== 'lobby') screen('lobby'); if (phase === 'lobby') ui.lobbyView('ranked'); }
+  if (why === 'restart') say('Updating. The Ranked match is void, no trophies changed.', null, 4000); venueSync(); redialDue();
+}
+const rkRow = m => ({ ...m, forfeit: m.forfeit === true || rkWalk && m.won === true, leaver: rkLeaver(m) });      // the card's row: a win by forfeit is a Walkover, my own forfeit is never 'didn’t count'
+function onRkRes(m) {                              // my side of a settlement (heard anywhere, the leaver in the lobby included): the card's trophy row on the court, a line on the view otherwise
+  const late = rkWait, text = rkResNote(m); clearTimeout(rkHang); rkWait = false;      // an rkres answers a reconnect with &rk=1 as fully as room, rk or rkend do (the rkLate replay: the series settled while this socket was down)
+  { const r = rankRef(m); if (r) { rkYou.tier = r.tier; rkYou.div = r.div; } } if (Number.isInteger(m.trophies)) rkYou.trophies = Math.max(0, m.trophies); rkTile();
+  if (!late && room && live()) { rkRes = null; ui.trophyRow?.(rkRow(m)); rkCeremony(m); return; }      // on the court: the series (or warm-up) card's trophy row, and the sounds of its roll and its ceremony
+  if (!late && room && over) { rkRes = m; return; }        // the card is still waiting for the court to open: the row goes on with it (showOver)
+  rkViewNote(text, 8000);                          // the line first (held): the view endRk / toLobby opens draws it
+  if (late) { endRk('late'); return; }             // the late replay (docs/RANKED.md 3.9, rkLate): my entry is gone and no card or matchover will ever come for that court. Off it, to the Ranked view, with no 'void' toast
+  if (room) toLobby(); else if (onRankedView()) profile.showRanked();      // the head and the road follow
+  rkLeft = 0; redialDue();                         // my forfeit's result is in: a redial held for it may go
+}
+function rkCeremony(m) {                            // the roll's ticks (8.9) and the ceremony's sound (8.10), timed to the card's beats: ui.js swaps the emblem and stamps RANK UP! at 2100 ms
+  clearTimeout(rkUpT); const now = rankRef(m), was = rankRef({ tier: m.tierWas, div: m.divWas }), d = Number.isInteger(m.delta) ? m.delta : 0;
+  if (d) for (let i = 0; i < 8; i++) setTimeout(() => { if (ui.currentOverlay() === 'match') scene.cue?.('tick'); }, 1100 + i * 100);      // eight clicks under the count
+  if (!now || !was || now.tier === was.tier && now.div === was.div) return;
+  const up = now.tier > was.tier, divUp = !up && now.tier === was.tier && now.div > was.div; if (!up && !divUp) return;      // a rank or division lost: the emblem shrinks, no sound
+  rkUpT = setTimeout(() => { if (ui.currentOverlay() !== 'match') return; scene.jingle(up ? 'rankup' : 'divup'); if (up) padFx('series'); }, 2100);
+}
+function drawSeries() { const S = rkSeries, L = spec() ? 0 : side; ui.setSeries?.(S ? { bestOf: S.bestOf, games: [S.games[L] | 0, S.games[1 - L] | 0], done: S.done } : null); }      // the pips in the rally lozenge, from my side (a spectator: side 0 left)
+function rkMove(m) {                               // rkvs: an opponent is found (docs/RANKED.md 8.3): the MATCH FOUND card now, the series seat in m.at s (the tourMove recipe)
+  clearTimeout(rkHang); rkWait = false; rkLeft = 0; rkMoving = true; rkQueued = true; rkPhase = 'vs'; if (pending && pending.type === 'rk') settle(); ui.rkSearch?.(false);
+  ui.settings(false); ui.tourCard(false); if (ui.currentScreen() === 'lobby') screen(null);
+  ui.confettiOff(); ui.toastOff();                  // the warm-up point's confetti and any toast sit above the veil: MATCH FOUND opens on a clean screen
+  scene.setFrozen(true); scene.jingle('found'); padFx('found'); ui.rkPill?.({ on: false }); ui.rkVs?.(m); clearTimeout(rkVsT);
+  rkVsT = setTimeout(() => { if (ui.currentOverlay() !== 'rk-vs') return; ui.rkVs?.(null); rkMoving = false; if (room && rkKind === 'warm') { toLobby(); return; } if (!rkKind) { rkQueued = false; rkSinceP = 0; if (phase === 'lobby' && !room) { screen('lobby'); ui.lobbyView('ranked'); } venueSync(); redialDue(); } }, ((+m.at || 5) + 10) * 1000);      // the seat never came (from a warm-up: that court was closed under me with no 'closed', so off it)
+}
 function tourScreen(force) {                        // between courts: the code screen while it signs up, the bracket once it runs. Only a view change calls lobbyView (it moves focus)
   if (!tour || phase !== 'lobby' || room || ui.currentScreen() !== 'lobby') return; const want = tour.phase === 'reg' ? 'tour' : 'bracket', v = ui.lobbyView();
   if ((force || v === 'tour' || v === 'bracket') && v !== want) ui.lobbyView(want);
@@ -368,21 +456,24 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
-  clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
+  const parked = rkRes; rkRes = null; rkWalk = false; clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();      // parked: a series result still waiting for its card behind a set-up screen: it becomes the Ranked view's line below
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
-  tourKind = null; tourMoving = false; ui.tourCourt(null); syncSettings();
-  redialDue(); if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // redialDue: off the court, the socket may open again (stats switched, signed in or out). In a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
-  padPhase();
+  tourKind = null; tourMoving = false; ui.tourCourt(null);
+  const wasRk = rkKind; rkKind = null; rkSeries = null; ranks = [null, null]; if (!rkMoving) { rkQueued = false; rkSinceP = 0; if (rkPhase === 'match' || rkPhase === 'vs') rkPhase = 'off'; }      /* a settled series took its entry with it: nothing of the queue is left */ ui.rkCourt?.(null); ui.rkPill?.({ on: false }); ui.setSeries?.(null); ui.setPressure?.(null); clearTimeout(rkUpT); syncSettings();      // out of a Ranked court: the queue went with it (unless the VS card holds my place while the series seat comes)
+  if (parked) rkViewNote(rkResNote(parked), 8000);      // held before the view opens: its redraws keep it
+  redialDue(); if (wasRk) ui.lobbyView('ranked'); else if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // redialDue: off the court, the socket may open again (stats switched, signed in or out). A Ranked court closing lands on the Ranked view. In a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
+  venueSync(); padPhase();
 }
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
-  if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
+  if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { rkQuit(); game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
   else if (undo && (phase === 'camera' || phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court (the help can come up there too, after a Turn on)
-  else if (phase === 'camera' || phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }      // the primer is a set-up screen like the others: Back leaves the court
+  else if (phase === 'camera' || phase === 'connect' || phase === 'calibrate') { rkQuit(); game.send({ type: 'leave' }); toLobby(); }      // the primer is a set-up screen like the others: Back leaves the court
+  venueSync();                                     // off the Ranked view (or the title): the park again, unless the queue is still mine
 }
 function refreshStatus() {
   const setup = phase === 'title' || phase === 'lobby' || phase === 'camera' || phase === 'connect', off = phase === 'watch';      // watching needs no AirPod and no camera: never 'signal lost'
@@ -411,7 +502,7 @@ function connect(urls, el, onmsg, onopen) {
   urls = [].concat(urls); let ws, delay = 400, i = 0, fails = 0;
   const open = () => {
     const url = urls[i % urls.length]; let opened = false;
-    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (CAN_PHONE ? '&pad=' + PAD : '') + (LOBBY ? '&lobby=1' + (tourOn() ? '&tour=' + tour.code : '') + (room ? '&room=' + room + (spec() ? '&watch=1' : '') : tourOn() && tour.you && tour.you.viewer ? '&watch=1' : '') + ((room || tourOn()) && myName() ? '&name=' + encodeURIComponent(myName()) : '') + (room && !tourOn() ? backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back. tour: its tournament (&watch=1 with no room: its viewer, never signed up by a reconnect; never back=1: nothing of a tournament is revived, docs/COURTS-TOURNEY.md 4.5)
+    ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (CAN_PHONE ? '&pad=' + PAD : '') + (LOBBY ? '&lobby=1' + (tourOn() ? '&tour=' + tour.code : '') + (rkBusy() ? '&rk=1' : '') + (room ? '&room=' + room + (spec() ? '&watch=1' : '') : tourOn() && tour.you && tour.you.viewer ? '&watch=1' : '') + ((room || tourOn() || rkOn()) && myName() ? '&name=' + encodeURIComponent(myName()) : '') + (room && !tourOn() && !rkKind ? backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back. tour: its tournament (&watch=1 with no room: its viewer, never signed up by a reconnect; never back=1: nothing of a tournament is revived, docs/COURTS-TOURNEY.md 4.5). rk=1: the queue (a warm-up or a series seat, rebound by the server; never back=1 either: docs/RANKED.md 3.10)
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
       if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Saved address didn’t answer. Using this Mac.', null, 2800); } }
@@ -538,22 +629,29 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'padtaken') { newPad(); game.send({ type: 'padcode', code: PAD }); showPair(); return; }      // another live tab drew this code first: pick again (nothing was paired to it yet)
   if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
   if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
-  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (tour) say('Updating. The tournament will end.', null, 4000); else if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect; a tournament does not
+  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (tour) say('Updating. The tournament will end.', null, 4000); else if (rkOn()) say('Updating. The Ranked match will end.', null, 4000); else if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect; a tournament or a Ranked match does not
   if (m.type === 'tourend') { clearTimeout(tourHang); if (tour) endTour(m.why); return; }      // before joinfail and closed (docs/COURTS-TOURNEY.md 4.5)
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
-  if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online, m.tours); return; }
+  if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online, m.tours); const q = m.rk && typeof m.rk === 'object' ? Math.max(0, m.rk.queued | 0) : 0;      // rk.queued: how many are waiting for an opponent (a count, no names): the home tile's '1 waiting' and the view's line
+    if (q !== rkQueuedN) { rkQueuedN = q; rkTile(); if (onRankedView() && performance.now() > rkNoteHold) ui.rkNote?.(q > 0 ? 'Someone is waiting to play' : '', q > 0); } return; }
   if (m.type === 'tour') { if (m.code && typeof m.code === 'string') onTour(m); return; }      // above the guard: between rounds nobody is in a court
   if (m.type === 'tmove') { tourMove(m); return; }
   if (m.type === 'tourfail') { say(m.why === 'busy' ? 'Courts are full right now. Try Start again in a moment.' : `Needs at least 4 players · ${m.n | 0} here now`, null, 3200); return; }
+  if (m.type === 'rk') { onRk(m); return; }                 // Ranked (docs/RANKED.md 9), above the guard: the queue outlives any one court
+  if (m.type === 'rkfail') { onRkFail(String(m.why || '')); return; }
+  if (m.type === 'rkend') { endRk(m.why === 'restart' ? 'restart' : 'gone'); return; }
+  if (m.type === 'rkres') { onRkRes(m && typeof m === 'object' ? m : {}); return; }
+  if (m.type === 'rkvs') { if (m && typeof m === 'object') rkMove(m); return; }      // MATCH FOUND (docs/RANKED.md 8.3): from the lobby or the warm-up court
   if (m.type === 'room') {                                       // seated, or let in to watch (the normal 'welcome' follows). Also the answer to a reconnect with room=CODE.
     clearTimeout(tourHang); roomPub = m.public === true; ms = null;      // a new court (or a reconnect into one): its stats start at its next 0-0
-    const tk = typeof m.tour === 'string' && (m.kind === 'warm' || m.kind === 'match') ? m.kind : null, moved = tk === 'match' && m.role !== 'spectator' && room !== m.code && room != null;      // a tournament's court. moved: pulled out of the stands (or another court) into my drawn match: no closed came first
+    const tk = typeof m.tour === 'string' && (m.kind === 'warm' || m.kind === 'match') ? m.kind : null, rkk = m.rk === true && (m.kind === 'warm' || m.kind === 'match') ? m.kind : null, moved = (tk === 'match' || rkk) && m.role !== 'spectator' && room !== m.code && room != null;      // a tournament's or a Ranked court. moved: pulled out of the stands (or another court: the Ranked warm-up) into my drawn match: no closed came first
     if ((m.promoted || m.demoted) && room === m.code) { settle(); switchSeat(m); say(m.promoted ? 'You’re in. Get your paddle ready.' : 'Time’s up. You’re watching again.', null, 2600); return; }      // moved between the stands and Matt's seat of the SAME court
     askedFor = !!m.asked;                                                                     // a join into Matt's court landed in the stands: the player is being asked
     const made = pending && pending.type === 'create' && botWant == null, again = room === m.code; settle(); room = m.code; role = m.role === 'spectator' ? 'spectator' : 'player'; wantRoom = ''; wantWatch = false;
-    tourKind = tk; ui.tourCourt(tk); if (tk) noBot = true; syncSettings();       // Matt comes by himself in a tournament's court, at Tour
-    const shown = tk ? m.tour : room; ui.askWatch(null); ui.setRoom(shown, shareLink(shown)); setUrl(shown, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined. A tournament's court shows (and copies) the tournament's code, never the private court's
-    if (moved) { clearFar(); ui.hold(null); over = null; ui.setSpectator(false); ui.askPlay(null); ui.showAsk(false); phase = 'lobby'; }      // from watching (or another court) straight to my match
+    tourKind = tk; ui.tourCourt(tk); if (tk) noBot = true;      // Matt comes by himself in a tournament's court, at Tour
+    clearTimeout(rkHang); rkWait = false; rkKind = rkk; ui.rkCourt?.(rkk); if (rkk) { noBot = true; rkMoving = false; clearTimeout(rkVsT); if (rkk === 'warm') { rkSeries = null; ui.setSeries?.(null); if (!spec()) { rkQueued = true; if (rkPhase === 'off') rkPhase = 'queue'; ui.rkPill?.({ on: true, since: rkSinceP, queued: Math.max(0, rkQueuedN - 1) }); } } else rkSeries = rkSeries || { bestOf: 3, game: 1, games: [0, 0], done: false }; } else { rkSeries = null; ui.setSeries?.(null); } ui.setPressure?.(null); syncSettings();      // a Ranked court (docs/RANKED.md 9): Matt is the queue's, at your rank's level; the warm-up shows the queue pill
+    const shown = tk ? m.tour : rkk ? null : room; ui.askWatch(null); ui.setRoom(shown, shareLink(shown)); setUrl(shown, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined. A tournament's court shows (and copies) the tournament's code, never the private court's; a Ranked court's code is nobody's to share
+    if (moved) { clearFar(); ui.hold(null); over = null; ui.setSpectator(false); ui.askPlay(null); ui.showAsk(false); if (ui.currentOverlay() === 'match') ui.showOverlay(null); phase = 'lobby'; }      // from watching (or another court) straight to my match
     if (phase === 'lobby' && !again) { if (spec()) enterWatch(); else if (made) ui.lobbyView('share'); else begin(); }        // again: a reconnect got the seat back, the player stays where they were. Play a bot skips the share view
     return;
   }
@@ -571,17 +669,20 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (was && (was.type === 'join' || watching) && ui.lobbyView() === 'courts' && was.code === ui.typedCode()) ui.codeError(text); else say(text, null, 2600);      // typed in the boxes: said under them. A row click: a toast
     return;
   }
-  if (m.type === 'closed') { if (room) toLobby(tourKind && ['round', 'tourstart', 'tourend', 'empty'].includes(m.reason) ? '' : m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling. A tournament's court closing is the tournament moving on: its screen says the rest
+  if (m.type === 'closed') { if (room) toLobby(tourKind && ['round', 'tourstart', 'tourend', 'empty'].includes(m.reason) || rkKind && ['round', 'rkmatch', 'empty', 'away'].includes(m.reason) ? '' : m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling. A tournament's or a Ranked court closing is the thing moving on: its screen says the rest
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
   if (m.type === 'welcome') {
-    ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); holding = false;
+    ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); ranks = cleanRanks(m.rank); holding = false;
+    if (m.series && typeof m.series === 'object') rkSeries = { bestOf: Math.max(1, m.series.bestOf | 0) || 3, game: Math.max(1, m.series.game | 0), games: Array.isArray(m.series.games) ? [m.series.games[0] | 0, m.series.games[1] | 0] : [0, 0], done: false };      // a Ranked series (docs/RANKED.md 9): where it stands (a reconnect lands mid-series)
+    drawSeries(); ui.setPressure?.(null);
+    setVenue(m.venue === 'stadium' ? 'stadium' : 'park');      // the court's venue: the stadium for Ranked, the park for everything else
     if (LOBBY && room && !spec()) profile.seated();              // a seat of my own: the device id is made now if there is none, and its hello goes at once (docs/ACCOUNTS.md 3.1)
     if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(spec() ? null : side);
     if (spec()) setView(VIEWS.includes(ls.get('poddle.view')) ? ls.get('poddle.view') : 'broadcast', false);
-    tourMoving = false; clearTimeout(tourVsT); if (ui.currentOverlay() === 'tour-vs') ui.showOverlay(null);      // the VS card gives way to the court (and its 3-2-1)
-    if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT && !noBot && !tourKind) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu. Never after taking Matt's seat
+    tourMoving = rkMoving = false; clearTimeout(tourVsT); if (['tour-vs', 'rk-vs'].includes(ui.currentOverlay())) ui.showOverlay(null);      // the VS card gives way to the court (and its 3-2-1)
+    if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT && !noBot && !tourKind && !rkKind) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu. Never after taking Matt's seat
     noBot = false; ui.askCard(null); ui.askPlay(null); askSync();
     if (askedFor && spec()) { const who = names.find(n => n && n !== 'Matt'); say(who ? `${who} is playing Matt. We asked if you can play.` : 'We asked the player if you can play.', null, 3200); } askedFor = false;
     net.rejoined(); ui.setSpectator(spec()); syncSettings(); drawNames();
@@ -589,7 +690,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'names') {
-    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
+    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); if (Array.isArray(m.rank)) ranks = cleanRanks(m.rank); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }
@@ -617,15 +718,30 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'botinfo') {
     const said = botLevel; if (m.active && typeof m.name === 'string') botLevel = m.name.slice(0, 12); drawNames();
-    if (m.reason) { if (live() && m.reason !== 'tournament') say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(`Matt · ${botLevel}`, null, 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
+    if (m.reason) { if (live() && m.reason !== 'tournament' && m.reason !== 'ranked') say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(`Matt · ${botLevel}`, null, 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
     return;
   }
+  if (m.type === 'rkgo') {                                       // a game of a series starts (docs/RANKED.md 8.4): the card between games goes, 'Game 2 of 3', then the server's 3-2-1. Never redialDue: a sign-in toggle waits for the series
+    if (ui.currentOverlay() === 'rk-game') ui.showOverlay(null); over = null; rkWalk = false; struck = false; ms = null; rally = 0; ui.setRally(0); ui.setPressure?.(null);
+    const g = Math.max(1, m.game | 0), bo = Math.max(1, m.bestOf | 0) || 3, gs = Array.isArray(m.games) ? [m.games[0] | 0, m.games[1] | 0] : rkSeries ? rkSeries.games : [0, 0];
+    rkSeries = { bestOf: bo, game: g, games: gs, done: false }; drawSeries(); if (live()) ui.gameBanner?.(`Game ${g} of ${bo}`); padFx('play'); return; }
+  if (m.type === 'rkgame') {                                     // a game of a series is won, the series goes on (docs/RANKED.md 8.7): the GAME card for RK_GAME_GAP_S, closed by rkgo
+    ui.countdown(0); struck = false; ms = null; ui.setServe(null); ui.setPressure?.(null); if (Array.isArray(m.rank)) ranks = cleanRanks(m.rank);
+    const L = spec() ? 0 : side, W = m.winner === 1 ? 1 : 0, won = W === L, sc = Array.isArray(m.score) ? m.score : [0, 0], gs = Array.isArray(m.games) ? [m.games[0] | 0, m.games[1] | 0] : [0, 0], g = Math.max(1, m.game | 0), bo = Math.max(1, m.bestOf | 0) || 3, need = Math.ceil(bo / 2);
+    rkSeries = { bestOf: bo, game: g, games: gs, done: false }; drawSeries(); drawNames();
+    if (!live()) return;                                         // behind a set-up screen: the card is a moment, not news to keep
+    ui.rkGame?.({ won, watching: spec(), nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), game: g, bestOf: bo, games: [gs[L], gs[1 - L]], score: [sc[L] | 0, sc[1 - L] | 0], serve: m.serve === L ? 'me' : 'them', next: m.next, deciding: gs[0] === gs[1] && gs[0] === need - 1 });
+    scene.jingle(won || spec() ? 'game' : 'gamelose'); if (won && !spec()) { padFx('game'); ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 46); }      // a spectator hears the winner's sting; the phone buzzes for a game taken
+    return; }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
   if (m.type === 'left') { ui.countdown(0); const who = lastOpp || nameOf(1 - side); clearFar(); ui.setServe(null); if (live() && !spec()) say(`${who} left`, null, 2200); return; }      // only before a match has started now; mid-match it is a hold or a forfeit
-  if (m.type === 'match' || m.type === 'matchover') { ui.countdown(0); struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false; profile.matchover(!!m.tour); if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
-  if (m.type === 'profile') { if (!spec()) profile.result(m); return; }      // what this match did to my own stats: a line on the result card (docs/ACCOUNTS.md 9.3), to my seat only
+  if (m.type === 'match' || m.type === 'matchover') { ui.countdown(0); struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false;
+    rkWalk = !!(m.rk && typeof m.rk === 'object' && !m.rk.matt && m.forfeit);      // the other side left: my win is a Walkover on the card's row
+    if (m.rk && typeof m.rk === 'object' && !m.rk.matt) rkSeries = { bestOf: Math.max(1, m.rk.bestOf | 0) || 3, game: Math.max(1, m.rk.game | 0), games: Array.isArray(m.rk.games) ? [m.rk.games[0] | 0, m.rk.games[1] | 0] : [0, 0], done: m.rk.done === true };      // the series card (docs/RANKED.md 8.8)
+    ui.setPressure?.(null); if (rkSeries && rkSeries.done) drawSeries(); profile.matchover(!!m.tour, rkKind === 'match' && !(m.rk && m.rk.done)); if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md. quiet: a game of a series that is not over: no nudge, no notice until the final card
+  if (m.type === 'profile') { if (!spec() && !(rkSeries && !rkSeries.done)) profile.result(m); return; }      // what this match did to my own stats: a line on the result card (docs/ACCOUNTS.md 9.3), to my seat only. Mid-series: the final card says it once
   if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
-  if (m.type === 'rematchon') { over = null; struck = false; ms = null; redialDue(); if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
+  if (m.type === 'rematchon') { over = null; struck = false; ms = null; redialDue(); if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); ui.setPressure?.(null); return; }      // the scores follow in 'state'
   if (m.type === 'hold') { holding = true; scene.setFrozen(true); setPaused(false); if (live()) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // their wifi dropped: the seat is held, the ball waits where it is
   if (m.type === 'holdoff') { holding = false; ui.hold(null); return; }                     // frozen follows the next 'state'
   if (m.type === 'paused') { if (m.refused) ui.setSettings({ canPause: false }); else { setPaused(!!m.on); scene.setFrozen(!!m.on || holding); } return; }
@@ -644,9 +760,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     else if (ms && sum !== ms.sum + 1) ms = null;                                  // a point was missed: no stats for this match
     if (ms) { ms.sum = sum; msCommit(0); msCommit(1); ms.rally = Math.max(ms.rally, rally);      // rally: this point's hits, the HUD's number ('serve' resets it later)
       const w = m.winner === 1 ? 1 : 0; ms.run[w] = ms.cur === w ? ms.run[w] + 1 : 1; ms.run[1 - w] = 0; ms.cur = w; ms.best[w] = Math.max(ms.best[w], ms.run[w]); } }
-  if (m.type === 'serve') { ui.countdown(0); over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match') ui.showOverlay(null);
+  if (m.type === 'serve') { ui.countdown(0); over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match' || ui.currentOverlay() === 'rk-game') ui.showOverlay(null);
     if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve!', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
+  if (m.type === 'point' && rkKind && !m.final) { const L = spec() ? 0 : side, gp = m.mp === 0 || m.mp === 1 ? m.mp : m.gp === 0 || m.gp === 1 ? m.gp : null; ui.setPressure?.(gp == null ? null : { side: gp === L ? 'me' : 'them', kind: m.mp === gp ? 'match' : 'game' }); }      // GAME POINT / MATCH POINT on the scoreboard (docs/RANKED.md 8.6); the ring goes with the next point without it
   if (m.type === 'point' && !m.final && live()) {
     if (spec()) ui.pointBanner(null, nameOf(m.winner === 1 ? 1 : 0), m.winner === 1 ? 1 : 0);
     else { const won = m.winner === side; ui.pointBanner(won, nameOf(m.winner === 1 ? 1 : 0)); if (won) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff']); } }      // "Your point!" / "<name> scores", nothing else
@@ -654,7 +771,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (SCENE_EVENTS.includes(m.type)) scene.onEvent(m);           // anything else: ignored, no throw
 }, () => { const hi = profile.opened(); if (hi) game.send(hi);      // FIRST on every socket: the device id (docs/ACCOUNTS.md 9.2), never in the URL
   if (pending && !room) game.send(pending);       // the request made while the socket was down
-  if (tourOn()) { clearTimeout(tourHang); tourHang = setTimeout(() => { if (tourOn()) endTour('restart'); }, 5000); } });      // a tournament socket back: no room, tour or tourend in 5 s = the server restarted under it (docs/COURTS-TOURNEY.md 4.5)
+  if (tourOn()) { clearTimeout(tourHang); tourHang = setTimeout(() => { if (tourOn()) endTour('restart'); }, 5000); }      // a tournament socket back: no room, tour or tourend in 5 s = the server restarted under it (docs/COURTS-TOURNEY.md 4.5)
+  if (rkBusy()) { clearTimeout(rkHang); rkWait = true; rkHang = setTimeout(() => { rkWait = false; if (rkBusy()) endRk('restart'); }, 5000); } });      // the same for the Ranked queue: no room, rk, rkres or rkend in 5 s (docs/RANKED.md 3.10). A spectator of a Ranked court holds no entry: it reconnects to watch like anyone
 
 // ---------- link quality ----------
 // The ball already rides out gaps by itself (scene.js coast()). This watches the connection so that (1) a swing can be
@@ -702,13 +820,16 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: playBot,
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
-  profile: () => profile.showProfile(), view: route });      // Your stats: web/profile.js fetches and draws it
+  profile: () => profile.showProfile(),      // Your stats: web/profile.js fetches and draws it
+  ranked: () => { if (pending || room) return; if (!profile.statsOn()) { say(RK_FAIL.nostats, null, 3200); rkViewNote(RK_VIEW_NOTE.nostats); return; } ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1). It settles on room (a warm-up), rk (a partner at once) or rkfail
+  rankedOpen: () => { venueSync(); profile.showRanked(); }, ranksOpen: () => profile.showRanked(), view: v => { route(v); venueSync(); } });      // every view change re-picks the venue: the Ranks page stands in the stadium whichever way it was opened      // the Ranked view opened: the stadium builds behind the glass, the head and the road come from /api/stats
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
-profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
-  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats,
+profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
+  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkQueuedN, ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0 }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
-{ const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats...: straight back to that view (after profile.init: Your stats fetches through it)
+rkTile();                                          // the Ranked tile's line before anything is known: the dimmed Bronze emblem and 'Play your first match'
+{ const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats, /ranked...: straight back to that view (after profile.init: Your stats fetches through it)
 // open(): the device list is re-read every time the card opens, because headphones come and go.
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
 ui.onSettings({
@@ -720,12 +841,16 @@ ui.onSettings({
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });
-ui.onRematch(yes => { if (!room || spec()) return; if (!yes && votedYes) { votedNo = true; return leave(); }      // Leave after Rematch: the server takes one answer each, and a player leaving the vote closes the court for everyone just the same
+ui.onRematch(yes => { if (!room || spec()) return;
+  if (rkKind === 'match' && rkSeries && rkSeries.done) { if (yes) game.send({ type: 'rk' }); else leave(); return; }      // the series card (docs/RANKED.md 8.8): Play again queues again (the server quits this court first: a warm-up or a VS card follows), Leave is Leave
+  if (!yes && votedYes) { votedNo = true; return leave(); }      // Leave after Rematch: the server takes one answer each, and a player leaving the vote closes the court for everyone just the same
   votedYes = !!yes; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
   if (!yes) { const r = room; setTimeout(() => { if (room === r && votedNo) leave(); }, 3000); } });      // unless it never answers
 ui.onRetry(() => location.reload());
-function esc() { if (ui.championShowing()) { tourCourts(); return; } if (ui.currentOverlay() === 'tour-vs') return; if (ui.tourCard()) { ui.tourCard(false); return; }
-  if (tourKind === 'match' && spec() && live() && !ui.currentScreen() && !ui.currentOverlay() && !ui.settings()) { leave(); return; }      // watching one of its matches: Esc (and T) is back to the bracket
+function esc() { if (ui.championShowing()) { tourCourts(); return; } if (['tour-vs', 'rk-vs', 'rk-game'].includes(ui.currentOverlay())) return;
+  if (ui.currentOverlay() === 'match' && rkKind === 'match' && rkSeries && rkSeries.done && !spec()) { leave(); return; }      // the series card (docs/RANKED.md 8.8): Esc is Leave
+  if (ui.tourCard()) { ui.tourCard(false); return; }
+  if ((tourKind === 'match' || rkKind === 'match') && spec() && live() && !ui.currentScreen() && !ui.currentOverlay() && !ui.settings()) { leave(); return; }      // watching one of its matches: Esc (and T) is back to the bracket, or the Ranked view
   if (ui.asking()) ui.askWatch(null); else if (live() && !ui.currentScreen()) { if (!ui.currentOverlay()) ui.settings(!ui.settings()); } else back(); }      // in play and while watching Esc is the hamburger
 addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Tab'].includes(e.key)) return;   // browser shortcuts are not ours
@@ -738,8 +863,9 @@ addEventListener('keydown', e => {
   if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
   if (k === 't' && tour && !e.repeat) { tourKey(); return; }     // T: the tournament (its card in a warm-up; back to the bracket while watching; its screen from the lobby)
+  if (['tour-vs', 'rk-vs'].includes(ui.currentOverlay())) return;      // the VS card: the seat is already drawn (q.series holds it), so Q Q, C, B and 1-4 would only tear the card down and the seat would still pull me in (Esc is gated in esc())
   if (phase === 'lobby' || phase === 'camera') return;           // the lobby's keys live in ui.js; game keys wait for a room. On the primer C, B and 1-4 would calibrate or call Matt behind it
-  if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
+  if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { rkQuit(); game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
   if (k === 'h') setStats(!showStats);
   if (spec()) { if ('1234'.includes(k) && !e.repeat) setView(VIEWS[+k - 1], true); else if (k === 'a' && !e.repeat && ui.askCan()) askPlay(); return; }      // A: Ask to play      // watching: 1-4 pick the view (3 again = the other player), F, H, Q Q and Esc. Nothing else
   if (k === 'c') startCal();

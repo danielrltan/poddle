@@ -130,12 +130,13 @@ function glow(n, fresh) {
     { duration: smash ? 900 : 420 + 380 * n, easing: 'cubic-bezier(.2,.7,.3,1)' }); glowAnim.smash = smash;
 }
 window.__glow = glow;      // test/pad-glow shots
-const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '' };
+const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '', found: 'Match found', game: 'Game won', series: 'Match over' };      // found / game / series: Ranked (docs/RANKED.md 8.11), a buzz each and the headline
 function fx(m) {
   if (m.fx === 'hit') { try { navigator.vibrate && navigator.vibrate(20 + Math.round(50 * (m.b != null ? m.b : m.n || 0))); } catch { /* no buzzer (iOS) */ }
     glow(m.n || 0, true); }
   else if (m.fx === 'tint') glow(m.n || 0, false);      // the settled swing, a moment after the hit went out on the early guess: recolour, no second buzz
   else if (m.fx === 'point') { try { navigator.vibrate && navigator.vibrate([30, 60, 30]); } catch { /* same */ } }
+  else if (m.fx === 'found' || m.fx === 'game' || m.fx === 'series') { try { navigator.vibrate && navigator.vibrate({ found: [80, 60, 80, 60, 200], game: [120], series: [300] }[m.fx]); } catch { /* same */ } fxText = FX_TEXT[m.fx]; render(); }
   else if (m.fx in FX_TEXT) { fxText = FX_TEXT[m.fx]; render(); }
 }
 

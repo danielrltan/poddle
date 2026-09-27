@@ -6,6 +6,7 @@
 // SQL: every value is a bound parameter of a statement prepared once in open(). The only number spliced into SQL text is
 // max_page_count (a PRAGMA cannot take a parameter): an operator env value, forced to a clamped integer first.
 const crypto = require('node:crypto'), fs = require('node:fs'), path = require('node:path');
+const LAD = require('./ladder');                                  // the Ranked ladder's pure table: tiers, floors, the Matt ceiling (docs/RANKED.md 5)
 
 const WEB = path.join(__dirname, '..', 'web');                    // served publicly: the database may never live under it (11.1)
 const DAY = 24 * 3600e3, HOUR = 3600e3;
@@ -109,9 +110,36 @@ CREATE TABLE match_log (
 CREATE INDEX match_log_at ON match_log(at);
 CREATE INDEX match_log_a  ON match_log(owner_a, at);
 CREATE INDEX match_log_b  ON match_log(owner_b, at);
+`,
+// Schema version 2 (docs/RANKED.md 10.1): the Ranked ladder, one row per owner, and the mode / series / trophy-delta columns on match_log.
+// A separate table, not profile columns: profSet is a positional full-row update. kind keeps human/bot (its CHECK cannot be widened by ALTER).
+`
+CREATE TABLE ladder (
+  owner_id      INTEGER PRIMARY KEY REFERENCES owners(id) ON DELETE CASCADE,
+  trophies      INTEGER NOT NULL DEFAULT 0,
+  tier          INTEGER NOT NULL DEFAULT 1,
+  div           INTEGER NOT NULL DEFAULT 1,
+  best_trophies INTEGER NOT NULL DEFAULT 0,
+  best_tier     INTEGER NOT NULL DEFAULT 1,
+  best_div      INTEGER NOT NULL DEFAULT 1,
+  best_tier_at  INTEGER,
+  wins          INTEGER NOT NULL DEFAULT 0,
+  losses        INTEGER NOT NULL DEFAULT 0,
+  streak        INTEGER NOT NULL DEFAULT 0,
+  best_streak   INTEGER NOT NULL DEFAULT 0,
+  bot_wins      INTEGER NOT NULL DEFAULT 0,
+  bot_losses    INTEGER NOT NULL DEFAULT 0,
+  matt_day      INTEGER NOT NULL DEFAULT 0,
+  matt_day_at   INTEGER NOT NULL DEFAULT 0,
+  updated_at    INTEGER NOT NULL
+);
+ALTER TABLE match_log ADD COLUMN mode    TEXT    NOT NULL DEFAULT 'casual';
+ALTER TABLE match_log ADD COLUMN series  INTEGER;
+ALTER TABLE match_log ADD COLUMN delta_a INTEGER;
+ALTER TABLE match_log ADD COLUMN delta_b INTEGER;
 `];
 
-// Additive schema outside the numbered migrations (NOTES 112): new profile counters and the share table. Idempotent, run on every open
+// Additive schema outside the numbered migrations (NOTES 114): new profile counters and the share table. Idempotent, run on every open
 // after the migrations. It deliberately takes no MIGRATIONS slot: the Ranked branch owns migration 2, and whichever build deploys first
 // would own a shared slot while the other's migration silently never ran. Columns are only ever ADDED here (never renamed or dropped).
 const PLAY_COLS = ['hits', 'returns', 'chances', 'winners', 'aces', 'smashes', 'pts_won', 'pts_lost', 'secs_played'];   // profile: every match kind, see stats.js play counters
@@ -161,7 +189,7 @@ function open(p, opts = {}) {
   const env = process.env;
   cfg = { guestDays: intEnv(env, 'GUEST_DAYS', 90, 1, 3650), guestOneDays: intEnv(env, 'GUEST_ONE_DAYS', 7, 1, 3650), logDays: intEnv(env, 'LOG_DAYS', 30, 1, 3650),
     renameDays: intEnv(env, 'RENAME_DAYS', 30, 0, 3650), mergeMax: intEnv(env, 'MERGE_MAX', 10, 0, 1000), devicesMax: intEnv(env, 'DEVICES_MAX', 50, 0, 10000),
-    maxMb: intEnv(env, 'DB_MAX_MB', 256, 1, 65536), logCap: intEnv(env, 'LOG_CAP_DAY', 100, 1, 100000) };
+    maxMb: intEnv(env, 'DB_MAX_MB', 256, 1, 65536), logCap: intEnv(env, 'LOG_CAP_DAY', 100, 1, 100000), mattDay: intEnv(env, 'RK_MATT_DAY', 40, 0, 100000) };   // mattDay: Ranked trophies Matt may pay one owner per UTC day (RANKED.md 5.3)
   const where = p && String(p) !== ':memory:' ? path.resolve(String(p)) : null;
   try {
     if (where) {
@@ -243,16 +271,28 @@ function prepare() {                                             // every statem
     holdGet: q('SELECT until_at FROM name_holds WHERE username_key = ? AND until_at > ?'),
     holdPut: q('INSERT INTO name_holds (username_key, until_at) VALUES (?, ?) ON CONFLICT (username_key) DO UPDATE SET until_at = max(until_at, excluded.until_at)'),   // a 30-day hold never shortens a 90-day one
     holdDel: q('DELETE FROM name_holds WHERE username_key = ?'),
-    logIns: q('INSERT INTO match_log (at, kind, bot_level, owner_a, owner_b, score_a, score_b, winner, ending, ranked, flags, secs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+    logIns: q('INSERT INTO match_log (at, kind, bot_level, owner_a, owner_b, score_a, score_b, winner, ending, ranked, flags, secs, mode, series) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
     logMoveA: q('UPDATE match_log SET owner_a = ? WHERE owner_a = ?'),
     logMoveB: q('UPDATE match_log SET owner_b = ? WHERE owner_b = ?'),
     logOf: q('SELECT * FROM match_log WHERE (owner_a = ? OR owner_b = ?) AND at >= ? ORDER BY at'),
-    pairs: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ? AND winner IS NOT NULL
-      AND ((owner_a = ? AND owner_b = ?) OR (owner_a = ? AND owner_b = ?))`),
+    // RANKED.md 5.6: a best-of-3 writes up to three rows, so R10 counts SERIES between a pair, not games (a casual match is its own series). REVIEW FIX: series
+    // ids and row ids are two number spaces ('s' / 'i'), and the series being played is left out (its own first game must not cap its second)
+    pairs: q(`SELECT count(DISTINCT CASE WHEN series IS NULL THEN 'i' || id ELSE 's' || series END) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ? AND winner IS NOT NULL
+      AND ((owner_a = ? AND owner_b = ?) OR (owner_a = ? AND owner_b = ?)) AND (series IS NULL OR series <> ?)`),
+    // the Ranked ladder (RANKED.md 10.1)
+    ladGet: q('SELECT * FROM ladder WHERE owner_id = ?'),
+    ladTier: q('SELECT tier, div, trophies, best_tier, best_div, matt_day, matt_day_at FROM ladder WHERE owner_id = ?'),
+    ladPut: q(`INSERT INTO ladder (owner_id, trophies, tier, div, best_trophies, best_tier, best_div, best_tier_at, wins, losses, streak, best_streak, bot_wins, bot_losses, matt_day, matt_day_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (owner_id) DO UPDATE SET trophies = excluded.trophies, tier = excluded.tier, div = excluded.div, best_trophies = excluded.best_trophies, best_tier = excluded.best_tier, best_div = excluded.best_div,
+      best_tier_at = excluded.best_tier_at, wins = excluded.wins, losses = excluded.losses, streak = excluded.streak, best_streak = excluded.best_streak,
+      bot_wins = excluded.bot_wins, bot_losses = excluded.bot_losses, matt_day = excluded.matt_day, matt_day_at = excluded.matt_day_at, updated_at = excluded.updated_at`),
+    logDeltaA: q('UPDATE match_log SET delta_a = ? WHERE owner_a = ? AND (series = ? OR id = ?)'),   // the trophy change on that side's rows of a series (or the one Matt game)
+    logDeltaB: q('UPDATE match_log SET delta_b = ? WHERE owner_b = ? AND (series = ? OR id = ?)'),
     humanOf: q(`SELECT owner_a, owner_b, winner FROM match_log WHERE kind IN ('human','tour') AND winner IS NOT NULL AND at >= ? AND (owner_a = ? OR owner_b = ?)`),
     winsOf: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ? AND ((owner_a = ? AND winner = 0) OR (owner_b = ? AND winner = 1))`),
     winsOver: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ?
-      AND ((owner_a = ? AND owner_b = ? AND winner = 0) OR (owner_b = ? AND owner_a = ? AND winner = 1))`),
+      AND ((owner_a = ? AND owner_b = ? AND winner = 0) OR (owner_b = ? AND owner_a = ? AND winner = 1)) AND (series IS NULL OR series <> ?)`),   // R11b, per game, the series being played left out (REVIEW FIX: a clean best-of-3 must not flag itself mid-series)
     // sweep (10.5): rowid batches, one short transaction each
     swGuests: q(`DELETE FROM owners WHERE rowid IN (SELECT o.rowid FROM owners o LEFT JOIN profile p ON p.owner_id = o.id WHERE o.kind = 'device'
       AND (o.touched_at < ? OR (o.touched_at < ? AND coalesce(p.played, 0) <= 1)) LIMIT ${BATCH})`),
@@ -312,6 +352,17 @@ function fold(g, a, now) {
     S.botPut.run(a, gb.level, ab.wins + gb.wins, ab.losses + gb.losses, ab.abandons + gb.abandons, ab.streak, Math.max(ab.best_streak, gb.best_streak), first, Math.max(ab.best_margin, gb.best_margin));
   }
   S.logMoveA.run(a, g); S.logMoveB.run(a, g);                    // the pair caps keep working across the merge
+  // the Ranked ladder (RANKED.md 10.1): a merge must never double a position: trophies / best_* / tier take the max, W/L and Matt games add, the streak is
+  // the account's, and Matt's day count is the sum (capped) when both rows are on the same day, else the later day's
+  const LG = S.ladGet.get(g); if (LG) {
+    const LA = S.ladGet.get(a) || ladZero(a);
+    const trophies = Math.max(LA.trophies, LG.trophies), bestT = Math.max(LA.best_trophies, LG.best_trophies), bestTier = Math.max(LA.best_tier, LG.best_tier);
+    const bestDiv = LA.best_tier === LG.best_tier ? Math.max(LA.best_div, LG.best_div) : LA.best_tier > LG.best_tier ? LA.best_div : LG.best_div;
+    const at = LG.best_tier > LA.best_tier ? LG.best_tier_at : LA.best_tier > LG.best_tier ? LA.best_tier_at : LA.best_tier_at == null ? LG.best_tier_at : LG.best_tier_at == null ? LA.best_tier_at : Math.min(LA.best_tier_at, LG.best_tier_at);
+    const [md, mdAt] = LA.matt_day_at === LG.matt_day_at ? [Math.min(cfg.mattDay, LA.matt_day + LG.matt_day), LA.matt_day_at] : LA.matt_day_at > LG.matt_day_at ? [LA.matt_day, LA.matt_day_at] : [LG.matt_day, LG.matt_day_at];
+    S.ladPut.run(a, trophies, LAD.tierOf(trophies), LAD.divOf(trophies), bestT, bestTier, bestDiv, at, LA.wins + LG.wins, LA.losses + LG.losses, LA.streak, Math.max(LA.best_streak, LG.best_streak),
+      LA.bot_wins + LG.bot_wins, LA.bot_losses + LG.bot_losses, md, mdAt, now);
+  }
 }
 // mergeDevice(devHash, accountId, now) -> 'merged' | 'none' (the table in 2.4; 'linked', which dropped the guest stats past MERGE_MAX, is never returned now). One transaction. Never inserts a row for an unknown device.
 const mergeDevice = guard('none', (devHash, acctId, now) => {
@@ -382,15 +433,16 @@ const recordMatch = guard(null, m => {
   if (bot) { level = Number.isInteger(m.level) ? m.level : Number.isInteger(m.levelRank) ? BOT_ORDER[m.levelRank] : kind === 'tourbot' ? 3 : null;   // never read a rank as a level: rank 2 is Tour (3), rank 3 is Pro (2)
     if (!(level >= 0 && level <= 3)) return null; }
   const secs = Math.round(num(m.secs, 0, 1e7)), ranked = m.ranked ? 1 : 0;
+  const mode = m.mode === 'ladder' ? 'ladder' : 'casual', series = Number.isSafeInteger(m.series) && m.series > 0 ? m.series : null;   // RANKED.md 10.1: the mode and the process-local series id (NULL for casual and for Matt games)
   if (broken || nearFull()) trimLog();                            // size-aware retention, in its OWN transaction first: a SQLITE_FULL rollback of this match must not undo it, and its success clears `broken`
   return tx(() => {
     const seats = [0, 1].map(i => { const s = m.seats[i]; return s && typeof s === 'object' && isId(s.owner) && S.ownerGet.get(s.owner) ? s : null; });   // ownerExists per seat, inside the transaction
-    const out = { logged: false, row: false, capped: false, seats: [{ saved: false }, { saved: false }] };
+    const out = { logged: false, row: false, capped: false, logId: null, seats: [{ saved: false }, { saved: false }] };
     if (!seats[0] && !seats[1]) return out;                     // 5.5: no owner, no row
     out.logged = true;
     const quit = bot && (ending === 'left' || ending === 'dropped');   // leaving Matt: bot_record counts it, no log row (one owner could otherwise loop join, strike, leave into the size cap)
     out.capped = !quit && seats.some(s => s && S.logDay.get(s.owner, s.owner, now - DAY).n >= cfg.logCap);   // LOG_CAP_DAY rows per owner a day
-    if (!quit && !out.capped) { S.logIns.run(now, kind, level, seats[0] ? seats[0].owner : null, seats[1] ? seats[1].owner : null, sc[0], sc[1], winner, ending, ranked, flags, secs); out.row = true; }
+    if (!quit && !out.capped) { out.logId = Number(S.logIns.run(now, kind, level, seats[0] ? seats[0].owner : null, seats[1] ? seats[1].owner : null, sc[0], sc[1], winner, ending, ranked, flags, secs, mode, series).lastInsertRowid); out.row = true; }
     const done = new Set();
     for (const i of [0, 1]) {
       const s = seats[i]; if (!s) continue;
@@ -436,8 +488,53 @@ const addTitle = guard(false, (o, now) => isId(o) && isNow(now) && tx(() => { co
   S.profSet.run(P.played, P.h_wins, P.h_losses, P.h_streak, P.h_best_streak, P.h_points_won, P.h_points_lost, P.tour_titles + 1,
     P.best_rally, P.best_rally_at, P.best_hit, P.best_hit_at, P.best_speed, P.best_speed_at, now, o); S.ownerTouch.run(now, o); return true; }));
 
+// ---- the Ranked ladder (docs/RANKED.md 5, 10.1) ----
+const ladZero = o => ({ owner_id: o, trophies: 0, tier: 1, div: 1, best_trophies: 0, best_tier: 1, best_div: 1, best_tier_at: null, wins: 0, losses: 0, streak: 0, best_streak: 0, bot_wins: 0, bot_losses: 0, matt_day: 0, matt_day_at: 0 });
+const dayOf = now => Math.floor(now / DAY);                      // the UTC day number Matt's daily trophies belong to
+const mattLeft = (r, now) => (r.matt_day_at === dayOf(now) ? Math.max(0, cfg.mattDay - r.matt_day) : cfg.mattDay);
+// ladderTier(ownerId, now) -> { tier, div, trophies, bestTier, bestDiv, dayLeft }: the one cheap read for a seat (a missing row is Bronze I, 0)
+const ladderTier = guard(null, (o, now = Date.now()) => { if (!isId(o)) return null; const r = S.ladTier.get(o) || ladZero(o);
+  return { tier: r.tier, div: r.div, trophies: r.trophies, bestTier: r.best_tier, bestDiv: r.best_div, dayLeft: mattLeft(r, now) }; });
+// ladderOf(ownerId, now) -> the Profile.ladder shape of RANKED.md 10.1 | null (a missing row = tier 1 zeros, never null for a real owner)
+const ladderOf = guard(null, (o, now = Date.now()) => {
+  if (!isId(o) || !S.ownerGet.get(o)) return null;
+  const r = S.ladGet.get(o) || ladZero(o);
+  return { trophies: r.trophies, tier: r.tier, div: r.div, floor: LAD.floorOf(r.tier), divFloor: LAD.divFloorOf(r.tier, r.div), next: LAD.nextFloorOf(r.tier), nextDiv: LAD.nextDivFloorOf(r.tier, r.div),
+    bestTrophies: r.best_trophies, bestTier: r.best_tier, bestDiv: r.best_div, best_tier: r.best_tier, best_div: r.best_div, bestTierAt: r.best_tier_at,   // best_tier / best_div: the DIVISIONS note's spelling, beside the camelCase of 10.1
+    wins: r.wins, losses: r.losses, streak: r.streak, bestStreak: r.best_streak, botWins: r.bot_wins, botLosses: r.bot_losses, mattDayLeft: mattLeft(r, now) };
+});
+// ladderApply({ owner, delta, won, vsBot, seriesId, side, logId, now }) -> { trophies, tier, div, tierWas, divWas, floorHeld, delta (as applied), dayLeft } | null.
+// ONE transaction: the trophies (floors of 5.2 applied), tier, best_*, W/L and streak (vsBot: bot_wins/bot_losses, the day cap and the 1399 ceiling applied
+// HERE, 5.3), and delta_a / delta_b on that side's match_log rows of the series (or on the one Matt game named by logId). null when not open, on a
+// failed write, or for an owner that no longer exists (a deleted player mid-series: the other seat is still written by its own call).
+const ladderApply = guard(null, o => {
+  if (!o || typeof o !== 'object' || !isId(o.owner) || !isNow(o.now) || !Number.isFinite(o.delta)) return null;
+  const now = o.now, day = dayOf(now);
+  return tx(() => {
+    if (!S.ownerGet.get(o.owner)) return null;
+    const r = { ...(S.ladGet.get(o.owner) || ladZero(o.owner)) };
+    if (r.best_tier_at == null) r.best_tier_at = now;             // Bronze was reached with the first row
+    if (r.matt_day_at !== day) { r.matt_day = 0; r.matt_day_at = day; }
+    const was = r.trophies, tierWas = r.tier, divWas = r.div; let delta = Math.round(o.delta);
+    if (o.vsBot) { delta = LAD.mattAward(delta, r.matt_day, cfg.mattDay, r.trophies); r.matt_day += delta; if (o.won) r.bot_wins++; else r.bot_losses++; }
+    else if (o.won) { r.wins++; r.streak++; r.best_streak = Math.max(r.best_streak, r.streak); }
+    else { r.losses++; r.streak = 0; }
+    const raw = r.trophies + delta, t = LAD.applyFloor(r.best_tier, raw);   // the sticky floor (5.2): held = the count would have gone under it
+    r.trophies = t; r.tier = LAD.tierOf(t); r.div = LAD.divOf(t, r.tier); if (t > r.best_trophies) r.best_trophies = t;
+    if (r.tier > r.best_tier) { r.best_tier = r.tier; r.best_div = r.div; r.best_tier_at = now; } else if (r.tier === r.best_tier && r.div > r.best_div) r.best_div = r.div;
+    S.ladPut.run(o.owner, r.trophies, r.tier, r.div, r.best_trophies, r.best_tier, r.best_div, r.best_tier_at, r.wins, r.losses, r.streak, r.best_streak, r.bot_wins, r.bot_losses, r.matt_day, r.matt_day_at, now);
+    S.ownerTouch.run(now, o.owner);
+    const sid = Number.isSafeInteger(o.seriesId) && o.seriesId > 0 ? o.seriesId : null, lid = isId(o.logId) ? o.logId : null;
+    if (sid != null || lid != null) {                            // the change on the requester's side of the rows it belongs to (the export shows it as trophyDelta)
+      if (o.side === 0) S.logDeltaA.run(t - was, o.owner, sid, lid); else if (o.side === 1) S.logDeltaB.run(t - was, o.owner, sid, lid);
+      else { S.logDeltaA.run(t - was, o.owner, sid, lid); S.logDeltaB.run(t - was, o.owner, sid, lid); }   // a Matt game: whichever side the human sat on
+    }
+    return { trophies: t, tier: r.tier, div: r.div, tierWas, divWas, floorHeld: t > raw, delta: t - was, dayLeft: Math.max(0, cfg.mattDay - r.matt_day) };
+  });
+});
+
 // Anti-abuse history (5.2), all from match_log. "o won" = (owner_a = o AND winner = 0) OR (owner_b = o AND winner = 1).
-const recentPairs = guard(0, (a, b, since) => isId(a) && isId(b) ? S.pairs.get(since, a, b, b, a).n : 0);   // R10: ranked human results between the two, either way
+const recentPairs = guard(0, (a, b, since, series = null) => isId(a) && isId(b) ? S.pairs.get(since, a, b, b, a, isId(series) ? series : -1).n : 0);   // R10: ranked human SERIES between the two, either way; series: the one in progress, not counted
 const recentLosses = guard({ losses: 0, wins: 0, topTwoShare: 0 }, (o, since) => {   // R11: over ALL human results, ranked or not
   if (!isId(o)) return { losses: 0, wins: 0, topTwoShare: 0 };
   let losses = 0, wins = 0; const by = new Map();
@@ -450,14 +547,14 @@ const recentLosses = guard({ losses: 0, wins: 0, topTwoShare: 0 }, (o, since) =>
   return { losses, wins, topTwoShare: losses ? two / losses : 0 };
 });
 const recentWins = guard(0, (o, since) => isId(o) ? S.winsOf.get(since, o, o).n : 0);   // R12
-const oneWay = guard({ aOverB: 0, bOverA: 0 }, (a, b, since) => isId(a) && isId(b) ? { aOverB: S.winsOver.get(since, a, b, a, b).n, bOverA: S.winsOver.get(since, b, a, b, a).n } : { aOverB: 0, bOverA: 0 });   // R11b
+const oneWay = guard({ aOverB: 0, bOverA: 0 }, (a, b, since, series = null) => { const x = isId(series) ? series : -1; return isId(a) && isId(b) ? { aOverB: S.winsOver.get(since, a, b, a, b, x).n, bOverA: S.winsOver.get(since, b, a, b, a, x).n } : { aOverB: 0, bOverA: 0 }; });   // R11b; series: the one in progress, not counted
 const established = guard(false, (o, now) => { if (!isId(o)) return false; const w = S.ownerGet.get(o), p = S.profGet.get(o); return !!w && (now - w.created_at >= DAY || (!!p && p.played >= 3)); });   // R11c
 
 // profileOf(ownerId) -> the Profile shape of section 8.2 | null.
 function levelRow(o, lv) { const b = S.botGet.get(o, lv); return { level: lv, name: LEVEL_NAME[lv], wins: b ? b.wins : 0, losses: b ? b.losses : 0, abandons: b ? b.abandons : 0,
   streak: b ? b.streak : 0, bestStreak: b ? b.best_streak : 0, firstWinAt: b ? b.first_win_at : null, bestMargin: b ? b.best_margin : 0 }; }
 function expiresOf(w, p) { return w.kind === 'device' ? w.touched_at + (p.played <= 1 ? cfg.guestOneDays : cfg.guestDays) * DAY : null; }
-const profileOf = guard(null, o => {
+const profileOf = guard(null, (o, now = Date.now()) => {
   if (!isId(o)) return null;
   const w = S.ownerGet.get(o), p = S.profGet.get(o); if (!w || !p) return null;
   return { guest: w.kind === 'device', since: w.created_at, expiresAt: expiresOf(w, p), played: p.played,
@@ -465,7 +562,8 @@ const profileOf = guard(null, o => {
     titles: p.tour_titles, matt: BOT_ORDER.map(lv => levelRow(o, lv)),   // four rungs, easiest first: Rookie, Club, Tour, Pro (every Tour result, tournaments and warm-ups included, is the Tour rung)
     bests: { rally: { v: p.best_rally, at: p.best_rally_at }, hit: { v: p.best_hit, at: p.best_hit_at }, speed: { v: p.best_speed, at: p.best_speed_at } },
     play: { hits: p.hits || 0, returns: p.returns || 0, chances: p.chances || 0, winners: p.winners || 0, aces: p.aces || 0, smashes: p.smashes || 0,   // every match kind (docs/SHARE.md 1)
-      pointsWon: p.pts_won || 0, pointsLost: p.pts_lost || 0, secs: p.secs_played || 0 } };
+      pointsWon: p.pts_won || 0, pointsLost: p.pts_lost || 0, secs: p.secs_played || 0 },
+    ladder: ladderOf(o, now) };                                   // the Ranked ladder (RANKED.md 10.1): tier 1 zeros until a Ranked game is played
 });
 // exportOf(ownerId, now?) -> the section 10.6 export object | null. Matches from the requester's side, opponents never identified.
 const SHARE_URL = 'https://poddleball.com/c/';                   // a share link's public address (server/share.js makes it; locally the page answers on the test host)
@@ -476,10 +574,10 @@ const exportOf = guard(null, (o, now = Date.now()) => {
   const matches = S.logOf.all(o, o, 0).map(r => {                  // every row that still names this owner, whatever its age (the sweep may not have run yet)
     const side = r.owner_a === o ? 0 : 1, bot = r.kind === 'bot' || r.kind === 'tourbot';
     const result = r.winner === side ? 'win' : r.winner === 1 - side ? 'loss' : r.ending === 'left' ? 'loss' : 'abandoned';
-    return { at: iso(r.at), kind: r.kind, mattLevel: bot && r.bot_level != null ? LEVEL_NAME[r.bot_level] : null, result, score: side ? [r.score_b, r.score_a] : [r.score_a, r.score_b],
-      ending: r.ending, counted: r.ranked === 1, reasons: r.flags ? r.flags.split(',') : [], secs: r.secs };
+    return { at: iso(r.at), kind: r.kind, mode: r.mode, mattLevel: bot && r.bot_level != null ? LEVEL_NAME[r.bot_level] : null, result, score: side ? [r.score_b, r.score_a] : [r.score_a, r.score_b],
+      ending: r.ending, counted: r.ranked === 1, reasons: r.flags ? r.flags.split(',') : [], secs: r.secs, trophyDelta: side ? r.delta_b : r.delta_a };   // mode / trophyDelta: RANKED.md 10.1 (export format 2)
   });
-  const x = { format: 'poddle-export-1', exportedAt: iso(now), kind: a ? 'account' : 'guest', account: null, device: null, profile: prof, matches, notes: NOTES };
+  const x = { format: 'poddle-export-2', exportedAt: iso(now), kind: a ? 'account' : 'guest', account: null, device: null, profile: prof, matches, notes: NOTES };
   const sh = S.shareGet.get(o); x.share = sh ? { url: SHARE_URL + sh.slug, created: iso(sh.created_at) } : null;   // the public card link, if one is live
   if (a) {
     x.account = { username: a.username, created: iso(a.created_at), renamed: iso(a.renamed_at), lastActivity: iso(w.touched_at), merges: a.merges, google: 'linked', googleSubject: a.google_sub };
@@ -571,10 +669,10 @@ function cleanBackups(now, dir) {                                // 11.6: /tmp/p
 }
 
 // Operator helpers for admin.js (additions, never reachable over HTTP).
-const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'share'];
+const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share'];
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
 module.exports = { open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
-  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, shareOf, shareOwner, shareMake, shareDrop, usernameOf };
+  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf };

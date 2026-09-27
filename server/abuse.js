@@ -267,13 +267,16 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
     },
     // groups(computerKeys) -> Set of canonical roots (hashed): two seats are one computer when their groups meet (R5, R16)
     groups: keys => groupsOfNodes(nodesFor(keys)),
-    // result(winnerKeys, loserKeys, ranked): remember a human result for R10 / R11 by computer (after the transaction, ranked or not)
-    result(wk, lk, ranked) { hist.push({ w: nodesFor(wk, true), l: nodesFor(lk, true), ranked: !!ranked, at: clock() }); if (hist.length > maxEntries) hist.shift(); },
-    // pair(keysA, keysB) -> ranked results in the last ttl between the two computer groups, either direction (R10 cpuPair24h)
-    pair(ka, kb) {
-      const ga = groupsOfNodes(nodesFor(ka)), gb = groupsOfNodes(nodesFor(kb)), cut = clock() - ttlMs; let n = 0;
-      for (const e of hist) { if (e.at < cut || !e.ranked) continue; const w = groupsOfNodes(e.w), l = groupsOfNodes(e.l);
-        if ((meets(w, ga) && meets(l, gb)) || (meets(w, gb) && meets(l, ga))) n++; }
+    // result(winnerKeys, loserKeys, ranked, series): remember a human result for R10 / R11 by computer (after the transaction, ranked or not).
+    // series: the Ranked series id the game belongs to (RANKED.md 5.6), so pair() counts a best-of-3 once; null for a casual match
+    result(wk, lk, ranked, series) { hist.push({ w: nodesFor(wk, true), l: nodesFor(lk, true), ranked: !!ranked, series: Number.isSafeInteger(series) && series > 0 ? series : null, at: clock() }); if (hist.length > maxEntries) hist.shift(); },
+    // pair(keysA, keysB, series) -> ranked SERIES in the last ttl between the two computer groups, either direction (R10 cpuPair24h); a casual match is its own
+    // series; `series` (the one being played) is left out, so its own first game never caps its second (REVIEW FIX, RANKED.md 5.6)
+    pair(ka, kb, series = null) {
+      const ga = groupsOfNodes(nodesFor(ka)), gb = groupsOfNodes(nodesFor(kb)), cut = clock() - ttlMs, seen = new Set(); let n = 0;
+      hist.forEach((e, i) => { if (e.at < cut || !e.ranked || (e.series != null && e.series === series)) return; const w = groupsOfNodes(e.w), l = groupsOfNodes(e.l);
+        if (!((meets(w, ga) && meets(l, gb)) || (meets(w, gb) && meets(l, ga)))) return;
+        const k = e.series != null ? 's' + e.series : 'i' + i; if (!seen.has(k)) { seen.add(k); n++; } });
       return n;
     },
     // loser(keys) -> { losses, distinctWinnerGroups } of this computer group in the last ttl, all results (R11 cpuLoser24h)
@@ -299,4 +302,4 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
   };
 }
 
-module.exports = { BOT_ORDER, computerKey, rank, config, judge, why, titleCounts, createLinks };
+module.exports = { BOT_ORDER, MATCH_WIDE, computerKey, loopKey, meets, rank, config, judge, why, titleCounts, createLinks };   // MATCH_WIDE, loopKey, meets: read by the Ranked matchmaker and settlement (docs/RANKED.md 3.6, 5.5), never loosened

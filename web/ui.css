@@ -119,6 +119,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 .veil{background:var(--tex-scan), linear-gradient(180deg,rgba(255,255,255,.92),rgba(226,240,248,.88));align-items:center;justify-content:center;z-index:var(--z-veil)}
 #screen-match.is-active{transition:opacity 100ms var(--ease-soft), visibility 0s}      /* in fast: the light sweep crosses a solid card, not a half-faded one. It still leaves at --d-med */
 .veil.is-result{background:repeating-linear-gradient(135deg, rgba(52,190,237,.075) 0 14px, transparent 14px 32px), linear-gradient(180deg,#fff,var(--sky-2))}          /* a results ground, fully opaque */
+.veil.is-night{background:rgba(10,16,30,.86)}      /* the Ranked cards (docs/RANKED.md 7.5): the stadium stays visible, darkened */
 
 /* ==========================================================================================================
    PANEL (glossy card)
@@ -499,6 +500,9 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
   .confetti{display:none}
   .result-flash{display:none} .tally-num::before{display:none} .screen.is-active .tally-num{animation:none!important}      /* no stamp, flash or count: the card is there, numbers and all */
   #screen-match .result-card{animation:panel-in var(--d-slow) var(--ease-out) both!important}      /* no shake */
+  .rank-em.is-pop{animation:none!important}      /* a new rank simply appears at full size */
+  .trophy-n::before{display:none} .screen.is-active .trophy .trophy-n{animation:none!important} .trophy-em .medal-rays.is-on{animation:none!important;scale:1} .pips li.is-now,.score-num.is-pressure::after{animation:none!important;opacity:1} .vs-bar i,#game-bar i{transition-duration:1s!important}      /* the trophy total is final from frame one; the pressure ring and the current pip hold still; the VS and game bars keep their 1 s drain (information) */
+  .rk-bar i{transition-duration:1s!important} .rk-pill .rk-dot{animation:none!important}      /* the bar to the next rank still moves (it is information); the queue dot holds still */
   .medal-rays{animation:none!important;scale:1} .tally-clap g{animation:none!important} .tally-clap .clap-fx{display:none} .stat.is-best::after{display:none}      /* rays still, hands still; the crown and pills land on their last frame */
 }
 @keyframes banner-hold{0%,85%{opacity:1;transform:none}100%{opacity:0;transform:none}}
@@ -558,9 +562,9 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .panel.lobby-view{display:flex;flex-direction:column;align-items:center;gap:var(--s-5);padding:var(--s-6)}
 #screen-lobby[aria-busy="true"] .lobby-view{pointer-events:none;opacity:.6;transition:opacity var(--d-fast) linear 250ms}      /* 250 ms: an answer normally beats it, so no flicker */
 #screen-lobby.is-down .rooms{display:none}
-#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down #btn-watch-code,#screen-lobby.is-down #btn-create,#screen-lobby.is-down #btn-tour,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
+#screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down #btn-watch-code,#screen-lobby.is-down #btn-create,#screen-lobby.is-down #btn-tour,#screen-lobby.is-down #btn-ranked-go,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
 /* first visit, no name yet: the choices are dimmed but still take the click, which sends the player to the name field */
-#screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name #btn-create,#screen-lobby.needs-name #btn-join,#screen-lobby.needs-name #btn-watch-code,#screen-lobby.needs-name .court-state .btn,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
+#screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name #btn-create,#screen-lobby.needs-name #btn-join,#screen-lobby.needs-name #btn-watch-code,#screen-lobby.needs-name #btn-ranked-go,#screen-lobby.needs-name .court-state .btn,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
 #screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;rotate:none;background-position:100% 0,0 0;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
 
 /* name: one field above every lobby view but the share card. Also the look of the name field in the settings panel (.field) */
@@ -602,8 +606,22 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile:active,.tile:nth-child(n):active{transform:scale(.96);rotate:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transition-duration:90ms}      /* the press goes in fast; the 260ms spring plays on release */
 .tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
 .tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
-@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles:has(> .tile:nth-child(4):not([hidden])){display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
+.tile:nth-child(5){animation-delay:280ms}
+@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="4"]{display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
 @keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
+/* Five entries (docs/RANKED.md 1.1): a hero row (Quick play, Ranked: art left of the label) over a utility row (Courts, Play a bot, Your stats: icon left, the narrow-window look).
+   The count is .tiles[data-n], written by ui.tilesFit() from the visible tiles: Ranked and Your stats only show where the server keeps stats, so a positional :has(nth-child) would
+   count a hidden slot. 21.75rem tall in all: fits 1366x500 at the 10px floor and 1280x720 */
+.tiles[data-n="5"]{display:grid;grid-template-columns:repeat(6,1fr);width:min(58rem,92vw);gap:var(--s-4)}
+.tiles[data-n="5"] .tile{width:auto;flex-direction:row;justify-content:flex-start;text-align:left}
+.tiles[data-n="5"] .tile.is-hero{grid-column:span 3;height:12rem;padding:0 var(--s-5);gap:var(--s-4)}
+.tiles[data-n="5"] .tile:not(.is-hero){grid-column:span 2;height:8.5rem;padding:0 var(--s-4);gap:var(--s-3);font-size:var(--t-lg)}
+.tiles[data-n="5"] .tile svg{width:5rem;height:5rem} .tiles[data-n="5"] .tile:not(.is-hero) svg{width:4rem;height:4rem}
+.tile-text{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;min-width:0}      /* Ranked: the label with its line under it. In a column layout both centre */
+.tile-line{display:inline-flex;align-items:center;gap:.35em;max-width:100%;font-size:var(--t-sm);font-weight:700;letter-spacing:0;color:var(--ink-soft);white-space:nowrap} .tile-line > span:last-child{overflow:hidden;text-overflow:ellipsis}
+.tile:not(.is-hero) .tile-text,.tiles:not([data-n="5"]) .tile-text{align-items:center;text-align:center}
+#ranked-n:not(.is-off)::after{content:"";position:absolute;inset:-.1875rem;border-radius:inherit;box-shadow:var(--glow);opacity:.8;pointer-events:none;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}      /* '1 waiting': an opponent exists, and the badge breathes to say so. On a halo, like every other glow-pulse: an ID rule on the badge itself beat .tile-sub.pop (the count's bump never played) and faded the text to .25 */
+@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="5"]{width:min(58rem,94vw)} .tiles[data-n="5"] .tile.is-hero{height:10.5rem} }
 /* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks, Your stats' bars spring up and its tick pops.
    Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
    The hover block comes after the focus one: both match a focused tile under the mouse, and the loop must win */
@@ -616,11 +634,14 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 #btn-courts:focus-visible circle,#btn-courts:focus-visible .art-accent{animation:ic-scan 1800ms var(--ease-soft) 1}
 #btn-bot:focus-visible .art-fill circle{animation:ic-tilt 1800ms var(--ease-soft) 1} #btn-bot:focus-visible g.art-accent{animation:ic-blink 1800ms var(--ease-soft) 1}
 #btn-profile:focus-visible rect{animation:ic-bar 1600ms var(--ease-soft) 1} #btn-profile:focus-visible rect:nth-child(2){animation-delay:110ms} #btn-profile:focus-visible rect:nth-child(3){animation-delay:220ms} #btn-profile:focus-visible .art-accent{animation:ic-tick 1600ms var(--ease-soft) 1}
+#btn-ranked .art-fill,#btn-ranked .art-line{transform-origin:48px 81px} #btn-ranked .art-accent-fill{transform-origin:48px 36px}      /* Ranked: the trophy lifts off its base and the star on it pops */
+#btn-ranked:focus-visible .art-fill,#btn-ranked:focus-visible .art-line{animation:ic-trophy 1600ms var(--ease-soft) 1} #btn-ranked:focus-visible .art-accent-fill{animation:ic-tick 1600ms var(--ease-soft) 1}
 @media (hover:hover){
   #btn-quick:hover .art-accent-fill{animation:ic-play 1400ms var(--ease-soft) infinite} #btn-quick:hover .art-fill{animation:ic-ring 1400ms var(--ease-soft) infinite}
   #btn-courts:hover circle,#btn-courts:hover .art-accent{animation:ic-scan 1800ms var(--ease-soft) infinite}
   #btn-bot:hover .art-fill circle{animation:ic-tilt 1800ms var(--ease-soft) infinite} #btn-bot:hover g.art-accent{animation:ic-blink 1800ms var(--ease-soft) infinite}
   #btn-profile:hover rect{animation:ic-bar 1600ms var(--ease-soft) infinite} #btn-profile:hover rect:nth-child(2){animation-delay:110ms} #btn-profile:hover rect:nth-child(3){animation-delay:220ms} #btn-profile:hover .art-accent{animation:ic-tick 1600ms var(--ease-soft) infinite}
+  #btn-ranked:hover .art-fill,#btn-ranked:hover .art-line{animation:ic-trophy 1600ms var(--ease-soft) infinite} #btn-ranked:hover .art-accent-fill{animation:ic-tick 1600ms var(--ease-soft) infinite}
 }
 #screen-lobby.needs-name .tile svg *,#screen-lobby.is-down .tile svg *{animation:none}      /* a dimmed tile stays still (last: it ties the hover rules) */
 @keyframes ic-play{0%,45%,100%{transform:none}15%{transform:translateX(7px) scale(1.14,.88)}28%{transform:translateX(-2px) scale(.96,1.05)}38%{transform:translateX(2px)}}
@@ -629,6 +650,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 @keyframes ic-bar{0%,48%,100%{transform:none}12%{transform:scaleY(.6)}26%{transform:scaleY(1.14)}36%{transform:scaleY(.96)}}      /* Your stats: the bars dip and spring up left to right, */
 @keyframes ic-tick{0%,40%,100%{transform:none}50%{transform:scale(1.4) rotate(-10deg)}60%{transform:scale(.88) rotate(4deg)}70%{transform:scale(1.05)}}      /* then the tick pops as the last one lands */
 @keyframes ic-tilt{0%,100%{transform:none}22%{transform:rotate(-11deg)}50%{transform:rotate(8deg)}72%{transform:rotate(-3deg)}}
+@keyframes ic-trophy{0%,50%,100%{transform:none}14%{transform:translateY(-5px) rotate(-6deg)}30%{transform:translateY(-2px) rotate(4deg)}40%{transform:translateY(-3px)}}      /* Ranked: the cup is held up */
 @keyframes ic-blink{0%,100%{transform:rotate(0) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}22%{transform:rotate(-11deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}50%{transform:rotate(8deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}56%{transform:rotate(7deg) translate(0,-14.5px) scale(1,.1) translate(0,14.5px)}62%{transform:rotate(6deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}72%{transform:rotate(-3deg) translate(0,-14.5px) scale(1,1) translate(0,14.5px)}}      /* the eyes follow the head's tilt and squash about their own middle (y 35.5, 14.5 above the neck): a blink */
 
 /* open rooms: a compact strip of pills under the tiles */
@@ -701,7 +723,11 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 @media (max-aspect-ratio: 1/1){
   .menu-glass .menu-body{padding:var(--s-4);justify-content:safe center;overflow-y:auto}
   .tiles{display:grid;grid-template-columns:repeat(3,1fr);width:min(56rem,100%);gap:var(--s-3)}             /* three tiles: still three across (60rem wide at the 10px floor) */
-  .tiles:has(> .tile:nth-child(4):not([hidden])){grid-template-columns:repeat(2,1fr);width:min(40rem,100%)}      /* four (Your stats shown): 2x2, never three and a lone fourth */
+  .tiles[data-n="4"]{grid-template-columns:repeat(2,1fr);width:min(40rem,100%)}      /* four (Your stats shown): 2x2, never three and a lone fourth */
+  .tiles[data-n="5"]{grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}      /* five: the two heroes side by side, the three utilities as bars under them */
+  .tiles[data-n="5"] .tile.is-hero{grid-column:span 1;height:12rem;flex-direction:column;justify-content:center;padding:0;gap:var(--s-2);text-align:center}
+  .tiles[data-n="5"] .tile:not(.is-hero){grid-column:span 2;height:6.5rem}
+  .tiles[data-n="5"] .tile-text{align-items:center;text-align:center}
   .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
   .tile svg{width:5.5rem;height:5.5rem}
   .name-row .field{width:14rem}
@@ -1009,8 +1035,9 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   .courts-make{grid-template-columns:1fr 1fr} .tour-note{grid-column:1 / -1}
 }
 @media (max-width:480px){
-  .tiles,.tiles:has(> .tile:nth-child(4):not([hidden])){grid-template-columns:1fr;width:100%}
-  .tile{flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4)} .tile svg{width:4.5rem;height:4.5rem}
+  .tiles,.tiles[data-n="4"],.tiles[data-n="5"]{grid-template-columns:1fr;width:100%}
+  .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg{width:4.5rem;height:4.5rem}
+  .tiles[data-n="5"] .tile-text{align-items:flex-start;text-align:left}
 }
 
 /* the player's card: bottom-left, outside #hud so it survives the settings card, the pause blur and the result card */
@@ -1190,7 +1217,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 /* the stats pop last; the best one shines once */
 .screen.is-active .stat{animation:ov-title-pop 360ms var(--ease-bounce) calc(1100ms + var(--i,0) * 80ms) both}
 .screen.is-active .stat.is-best::after{animation:stat-shine 700ms var(--ease-soft) 1600ms 1}
-#rematch-note.ov-note{animation:ov-note-in 360ms var(--ease-out)}      /* 'Sam wants a rematch' slides up into place */
+#rematch-note.ov-note,#result-note.ov-note{animation:ov-note-in 360ms var(--ease-out)}      /* 'Sam wants a rematch' slides up into place; so does the rank-up's 'Gold I' */
 .rematch-count:not([hidden]){animation:panel-in var(--d-med) var(--ease-out) both} #rematch-left.ov-pop{animation:num-pop 360ms var(--ease-bounce)}      /* the count rises in; each second hops */
 .screen.is-active .notice-icon svg{animation:ov-float 2400ms var(--ease-soft) 600ms infinite}      /* server down / game full: the icon floats while it waits */
 @media (prefers-reduced-motion: reduce){ .settings > *,.serve-ind.on{transition-delay:0s!important} .views::before{transition:none} }      /* the global block clamps durations, not transition delays */
@@ -1273,7 +1300,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 .tour-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:0;font-weight:700;color:var(--ink-strong)} .tour-confirm > span{margin-right:.25rem}
 .tour-view.is-guest .tour-rules{display:block}
 /* ---- the HUD pill (in the corner, in place of the court pill) and the host's Start beside it */
-body[data-tour] #room-menu{display:none!important}
+body[data-tour] #room-menu{display:none!important} body[data-rk] #room-menu{display:none!important}      /* a Ranked court's code is nobody's to share (docs/RANKED.md 3.11) */
 .tour-pill{height:auto;min-height:max(2.75rem,44px);padding:.25rem .625rem .25rem .5rem;gap:.5rem;cursor:pointer;font-family:var(--font);border-color:#fff;text-align:left;white-space:normal}
 .tour-pill:hover,.tour-pill:focus-visible,.tour-pill[aria-expanded="true"]{background:#fff;outline:0;box-shadow:var(--glow)}
 .tour-pill .tour-ic{flex:none;width:1.5rem;height:1.5rem;padding:.1875rem;border-radius:50%;background:linear-gradient(180deg,var(--gold-1),var(--gold-2));stroke:var(--gold-4);stroke-width:2.2;box-shadow:0 0 0 .09375rem var(--gold-3)}
@@ -1476,6 +1503,37 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .br-p:has(> .reg-badge) .br-name,.tour-chip:has(> .reg-badge) .tour-chip-name{flex:0 1 auto} .br-name + .reg-badge,.tour-chip-name + .reg-badge{margin:0 auto 0 0}      /* bracket and chips: the badge hugs the name, the tags and score stay at the end (the flex gap spaces it) */
 .court-who .reg-badge{display:inline-grid;margin-left:.25em} .vs-side > .reg-badge{margin:0}      /* the court list: inline in the nowrap line. The VS card: under the name, in its column */
 
+/* ---------- rank emblems (web/emblems.js) ----------
+   One sprite of <symbol id="rank-1..7"> sits at the start of <body> (installSprite()); every emblem is <svg class="rank-em"><use href="#rank-N"/></svg>.
+   Base 1.5rem beside a name; .is-xs 1.25rem in a list row, .is-md 2.5rem on a score tab, .is-lg 5rem on a card, .is-xl 7.5rem as the hero.
+   .is-pop is a one-shot for a new rank (scale .6 -> 1.12 -> 1 over --d-slow, bounce); the reduced-motion rule below lands it on its last frame. */
+.rank-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.rank-em{width:1.5rem;height:1.5rem;flex:none;vertical-align:middle;overflow:visible}
+.rank-em.is-xs{width:1.25rem;height:1.25rem} .rank-em.is-md{width:2.5rem;height:2.5rem} .rank-em.is-lg{width:5rem;height:5rem} .rank-em.is-xl{width:7.5rem;height:7.5rem}
+.rank-em.is-pop{animation:rank-pop var(--d-slow) var(--ease-bounce) both}
+@keyframes rank-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1);opacity:1}}
+.rank-card-em{display:inline-flex;flex-direction:column;align-items:center;gap:.25rem;--rank-ink:var(--ink-strong)}      /* emblemCard(): the rank name under the badge, in the tier's rim colour */
+.rank-card-em > b{font-size:var(--t-md);font-weight:900;line-height:1;letter-spacing:var(--track-title);color:color-mix(in srgb,var(--rank-ink) 85%,#000);white-space:nowrap}      /* the rim colour, 15% darker as text: Gold and Silver reach 5:1 on white */
+.rank-card-em > .is-xl + b{font-size:var(--t-lg)} .rank-card-em > .is-md + b{font-size:var(--t-xs)}
+.rank-card-em.is-inverse > b{color:color-mix(in srgb,var(--rank-mid,#fff) 80%,#fff)}      /* on the navy stadium ground the rim colour is too dark: the body tone instead, lifted 20% toward white (Champion 5.2:1 on the VS card's navy) */
+.rank-em.is-off{opacity:.55;filter:saturate(.2)}      /* no rank yet: the Bronze emblem, dimmed */
+/* the division (I, II, III): a small roman numeral on a white pill over the emblem's lower edge, in the rank's deep colour, from .is-md up (beside a name only the emblem shows).
+   Drawn from data-div on the wrapper (ui.rankBadge, emblemCard), never as text inside the SVG */
+.rank-card-em{position:relative} .rank-badge{position:relative}
+.rank-card-em[data-div]:has(> .is-md)::after,.rank-card-em[data-div]:has(> .is-lg)::after,.rank-card-em[data-div]:has(> .is-xl)::after,.rank-badge[data-div]:has(> .is-md)::after,.rank-badge[data-div]:has(> .is-lg)::after,.rank-badge[data-div]:has(> .is-xl)::after{
+  position:absolute;left:50%;top:var(--em-h,2.5rem);translate:-50% -62%;display:inline-grid;place-items:center;height:1.1em;min-width:1.5em;padding:0 .35em;border-radius:var(--r-pill);background:#fff;color:color-mix(in srgb,var(--rank-ink,var(--ink-strong)) 85%,#000);
+  font:900 var(--div-fs,.8125rem)/1 var(--font);letter-spacing:.06em;box-shadow:0 .0625rem .1875rem rgba(20,60,90,.35), inset 0 0 0 .0625rem rgba(20,60,90,.12);pointer-events:none;white-space:nowrap}
+[data-div="1"]::after{content:"I";content:"I" / ""} [data-div="2"]::after{content:"II";content:"II" / ""} [data-div="3"]::after{content:"III";content:"III" / ""}      /* empty alt text: the numeral is drawn, never read ('Silver II II' on the VS card). The rank's name is in the label or the aria-label */
+.rank-card-em:has(> .is-md),.rank-badge:has(> .is-md){--em-h:2.5rem;--div-fs:max(.6875rem,11px)} .rank-card-em:has(> .is-lg),.rank-badge:has(> .is-lg){--em-h:5rem;--div-fs:max(.875rem,11px)} .rank-card-em:has(> .is-xl),.rank-badge:has(> .is-xl){--em-h:7.5rem;--div-fs:max(1.0625rem,11px)}      /* never under the 11 px label floor (docs/ui-spec.md) */
+/* the emblem beside a name (docs/RANKED.md 6, ui.rankBadge): its own element after the badge (or the name), never in the name's text */
+.rank-badge{flex:none;display:inline-grid;place-items:center;margin-left:.35em;vertical-align:-.12em;line-height:0}
+.score-who:has(> .reg-badge),.score-who:has(> .rank-badge){display:grid;grid-template-columns:minmax(0,max-content) auto auto;justify-content:start;align-items:center;column-gap:0} .score-who:has(> .reg-badge) small,.score-who:has(> .rank-badge) small{grid-column:1 / -1}      /* the name, its badge and its emblem on one line, the sub-label under all three */
+.score-tab.is-them .score-who:has(> .rank-badge){justify-content:end}
+.tally-side:has(> .rank-badge){display:grid;grid-template-columns:auto auto auto;justify-content:center;justify-items:center;align-items:center;row-gap:.375rem} .tally-side:has(> .rank-badge) .chip{grid-column:1 / -1}
+.vs-side > .rank-badge{margin:0} .view-chip .rank-badge{margin-left:.25em}
+.score-who .rank-badge{margin-left:.25em} .score-who .rank-badge .rank-em{width:1.1em;height:1.1em}      /* the 17.5rem tab: a 12-character name, its badge and the emblem must share one line, so the emblem sits at the badge's height */
+.score-who:has(> .rank-badge) b{font-size:1.1875rem} .score-who:has(> .rank-badge) .reg-badge{min-width:1.25em;padding:0 .2em;margin-left:.25em}      /* with both, each gives a little: the name keeps the most room (a long name still ellipsizes at the 10px floor, as it does with the badge alone) */
+
 /* the result card's line (9.3): what this match did to my record. Quiet, under the tally; it never takes focus */
 .result-save{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:calc(-1 * var(--s-3)) auto var(--s-4);max-width:36rem;text-align:center}
 .result-save p{margin:0}
@@ -1638,3 +1696,201 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 
 /* the home notice (9.9), under the safety one: the same card, a little quieter */
 .name-row #btn-name-change{flex:none;height:max(2.5rem,44px);padding:0 1.125rem}
+
+/* ==========================================================================================================
+   RANKED (docs/RANKED.md 2, 7.5, 8.2): the lobby view (emblem, trophies, the road of seven ranks, Find a match), the queue pill over the
+   warm-up court, and the page's night tint while the stadium is behind the glass. web/ui.js rkView / rkPill / rkCourt draw it.
+   ========================================================================================================== */
+.ranked-view{gap:var(--s-4)!important;padding:var(--s-5) var(--s-6)!important}
+.rk-head{display:flex;align-items:center;justify-content:center;gap:var(--s-5);width:100%;text-align:left}
+.rk-emblem{flex:none;display:grid;place-items:center} .rk-emblem .rank-card-em > b{display:none}      /* the head names the rank in its own heading; the card's label would say it twice */
+.rk-lines{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;min-width:0}
+.rk-tier{margin:0;font-size:var(--t-2xl);font-weight:900;line-height:1.05;letter-spacing:.01em;color:var(--ink-strong)}
+.rk-count{margin:0;font-size:var(--t-lg);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums} .rk-count b{font-size:var(--t-xl);font-weight:900;color:var(--me-ink)}
+.rk-bar{position:relative;width:16rem;max-width:100%;height:.875rem;margin-top:.25rem;border-radius:var(--r-pill);background:var(--sky-3);border:.125rem solid #fff;box-shadow:inset 0 .0625rem .25rem rgba(120,170,200,.3);overflow:hidden}
+.rk-bar i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(var(--p,0));border-radius:inherit;background:linear-gradient(90deg,var(--me),var(--line));transition:transform 1s var(--ease-out)}
+.rk-next{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
+/* the road: seven steps in a row (four and three on a narrow window). Reached steps are lit, the current one ringed and breathing, the rest wait at 45 % */
+.rk-road{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-3) var(--s-2);width:100%;margin:0;padding:0;list-style:none}
+.rk-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;width:6rem;padding:.625rem .25rem .5rem;border-radius:var(--r-lg);border:.125rem solid transparent;opacity:.45;transition:opacity var(--d-med) var(--ease-soft)}
+.rk-step b{font-size:var(--t-xs);font-weight:800;letter-spacing:.04em;color:var(--ink-strong);white-space:nowrap} .rk-step small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.rk-pips{display:inline-flex;gap:.25rem;margin:.125rem 0} .rk-pips i{width:.625rem;height:.625rem;border-radius:50%;background:var(--sky-3);box-shadow:inset 0 0 0 .0625rem rgba(120,170,200,.4)} .rk-pips i.is-lit{background:linear-gradient(180deg,var(--me),var(--me-deep));box-shadow:0 0 0 .0625rem #fff}      /* the three divisions of a rank, lit up to the one you hold */
+.rk-emblem .rank-card-em{--em-h:7.5rem}
+.rk-step.is-done,.rk-step.is-now{opacity:1}
+.rk-step.is-now{border-color:var(--line);background:linear-gradient(180deg,#fff,var(--sky-2));box-shadow:var(--sh-1)} .rk-step.is-now b{color:var(--me-ink)}
+.rk-step.is-now::after{content:"";position:absolute;inset:-.125rem;border-radius:inherit;box-shadow:var(--glow);opacity:.8;pointer-events:none;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+.rk-keep{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);margin:calc(-1 * var(--s-2)) 0 0}
+.rk-status{min-height:1.5em;font-weight:700;transition:color var(--d-med) var(--ease-soft)} .rk-status.is-accent{color:var(--me-ink)} .rk-status.ov-pop{animation:num-pop 450ms var(--ease-bounce)}
+.rk-rules{max-width:40rem;line-height:1.45}
+#btn-ranked-go{min-width:18rem} #btn-ranked-go:disabled{opacity:.5;pointer-events:none}
+@media (max-width:700px){ .rk-head{flex-direction:column;text-align:center} .rk-lines{align-items:center} .rk-step{width:5.5rem} }
+@media (max-aspect-ratio:1/1){ .ranked-view{padding:var(--s-4)!important} .rk-tier{font-size:var(--t-xl)} .rk-emblem .rank-em.is-xl{width:6rem;height:6rem} .rk-emblem .rank-card-em{--em-h:6rem} #btn-ranked-go{width:min(26rem,100%);height:4.75rem;padding:0 2rem;font-size:var(--t-xl)} }      /* 'Find a match' on one line at 600 px */
+@media (max-height:560px){ .ranked-view{gap:var(--s-3)!important;padding:var(--s-4) var(--s-5)!important} .rk-emblem .rank-em.is-xl{width:5.5rem;height:5.5rem} .rk-emblem .rank-card-em{--em-h:5.5rem} .rk-tier{font-size:var(--t-xl)} .rk-step{padding:.375rem .25rem} .rk-step .rank-em.is-md{width:2rem;height:2rem} .rk-rules{display:none} #btn-ranked-go{height:3.25rem} }      /* 1366x500: the head and the road shrink, the rules line goes (Find a match stays a full-size press) */
+/* the queue pill (8.2): bottom centre, above the key hints, in the rally lozenge's dress. Hidden under any overlay like the toast; the dot breathes */
+.rk-pill{position:fixed;left:50%;bottom:calc(var(--edge) + .25rem);translate:-50% 0;z-index:var(--z-hud);display:flex;align-items:center;gap:.625rem;height:2.75rem;padding:0 .875rem 0 .75rem;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.9);border:.125rem solid #fff;box-shadow:var(--sh-hud);color:var(--ink-strong);white-space:nowrap;max-width:calc(100vw - 2 * var(--edge))}
+.rk-pill .rk-dot{flex:none;width:.75rem;height:.75rem;border-radius:50%;background:var(--me);box-shadow:0 0 0 .125rem #fff, 0 0 .5rem rgba(58,160,255,.8);animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+.rk-pill-text{display:flex;flex-direction:column;line-height:1.1;min-width:0} .rk-pill-text b{font-size:var(--t-md);font-weight:800} .rk-pill-text small{font-size:max(.75rem,11px);font-weight:700;letter-spacing:.04em;color:var(--ink-soft)}
+.rk-pill-time{font-size:var(--t-md);font-weight:900;color:var(--me-ink);font-variant-numeric:tabular-nums}
+.rk-pill.ov-pill{animation:rk-pill-in 380ms var(--ease-bounce) both} @keyframes rk-pill-in{from{opacity:.2;transform:translateY(.75rem) scale(.9)}}      /* .2: there from its first frame, like the corner pills */
+body:not([data-screen="hud"]) .rk-pill,body[data-overlay] .rk-pill,body[data-settings] .rk-pill{display:none}
+body.has-toast .rk-pill{bottom:calc(var(--edge) + 3.75rem)}
+/* the stadium behind the glass (7.5): the page goes to night while the Ranked view or one of its courts is up (body[data-venue], set by web/scene.js setVenue).
+   The panels and the tiles stay light cards on the dark ground; only the shell (head, foot, the online count) takes light ink */
+html:has(> body[data-venue="stadium"]),body[data-venue="stadium"]{background:#0b1116}
+body[data-venue="stadium"] .menu-bg{background:var(--tex-vignette), var(--tex-scan), linear-gradient(180deg,#18233a 0%,#111a2c 45%,#0b1116 100%)}
+body[data-venue="stadium"] .glass{background:linear-gradient(180deg,rgba(10,16,30,.55),rgba(14,22,40,.5));-webkit-backdrop-filter:blur(.875rem) saturate(1.1) brightness(.9);backdrop-filter:blur(.875rem) saturate(1.1) brightness(.9)}
+body[data-venue="stadium"] .menu-glass .menu-head,body[data-venue="stadium"] .menu-glass .menu-foot{background:rgba(14,22,40,.9);border-color:rgba(143,214,255,.22);color:#c9d6e6}
+body[data-venue="stadium"] .menu-glass .menu-title,body[data-venue="stadium"] .menu-glass .menu-foot .foot-link,body[data-venue="stadium"] .lobby-online{color:#f2f6fb}
+body[data-venue="stadium"] .menu-glass .menu-foot .keycap{color:var(--ink-strong)}
+body[data-venue="stadium"] .menu-glass .menu-foot .foot-agree,body[data-venue="stadium"] .menu-glass .menu-foot .keyhints-inline{color:#c9d6e6}      /* both set their own light-theme ink (3.6:1 and 2.7:1 on the navy bar): 12:1 */
+body[data-venue="stadium"] .name-row{background:#fff}      /* the 72% white pill over the night glass left its NAME label at 2.7:1; opaque, 5:1 */
+body[data-venue="stadium"] .menu-glass .logo-mark{filter:drop-shadow(0 .05em 0 rgba(255,255,255,.35)) drop-shadow(0 .09em .12em rgba(0,0,0,.5))}
+
+/* ==========================================================================================================
+   RANKED: THE MATCH SHOW (docs/RANKED.md 8.3-8.10): the MATCH FOUND card, series pips and pressure in the HUD, the GAME card between games,
+   the series card's pips / games / trophy roll, and the rank-up ceremony. Every beat is transform / opacity; no backdrop-filter; every
+   count-up is a counter drawn over a number that is final from its first frame (the reduced-motion block at the top clamps the rest).
+   ========================================================================================================== */
+/* ---- series pips: inside the rally lozenge (8.5). One dot per game of the series; each side's row in its colour, a win fills it, the game in play pulses */
+.rally{position:relative}
+.series{display:flex;align-items:center;gap:.5rem;margin-top:.25rem}
+.pips{display:flex;align-items:center;gap:.25rem;list-style:none;margin:0;padding:0}
+.pips li{width:.625rem;height:.625rem;border-radius:50%;border:.125rem solid var(--me);background:transparent;box-sizing:border-box}
+.pips.is-me li.is-won{background:var(--me)} .pips.is-them li{border-color:var(--them-deep)} .pips.is-them li.is-won{background:var(--them-deep)}
+.pips li.is-now{animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+.series.chip-in{animation:chip-in 320ms var(--ease-bounce)}
+/* ---- game point / match point (8.6): the pressing side's score wears a pulsing ring; the lozenge's word swaps for the call, in that side's colour */
+.score-num{position:relative}
+.score-num.is-pressure::after{content:"";position:absolute;inset:-.25rem -.4rem;border:.1875rem solid currentColor;border-radius:.875rem;pointer-events:none;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
+body[data-rk="match"] .rally small{min-width:8.6em;text-align:center}      /* a series court keeps room for MATCH POINT (8.57em measured at 11 and 12.75 px) from its first point: the call never widens the lozenge mid-rally, so the score tabs never jump or shrink */
+@media (max-width:900px){ body[data-rk="match"] .rally small{letter-spacing:.04em;min-width:7.3em} }      /* the tabs share a fixed board here: tighter tracking keeps the reserve small enough that 'You' and a short name still fit */
+.rally small{white-space:nowrap} .rally small.is-pressure{color:var(--me-ink)} .rally small.is-pressure.is-them{color:var(--them-ink)} .rally small.ov-pop{animation:num-pop 360ms var(--ease-bounce)}
+/* ---- the game banner ('Game 2 of 3', 8.4): the point banner's pill in the house cyan */
+.banner-tag.is-info > span{background:linear-gradient(180deg,#2fb6ea,#1284b8);text-shadow:0 .0625rem .125rem rgba(0,40,60,.55)}
+
+/* ---- MATCH FOUND (8.3): the tournament's VS card in navy, over the night veil; the stadium stays under it */
+body[data-overlay="rk-vs"] #screen-tour-vs{z-index:calc(var(--z-screen) + 1);background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(30,60,110,.55),rgba(10,16,30,0) 70%), rgba(10,16,30,.9)}      /* over a set-up screen too (like game-full): the seat follows into the court */
+.vs-card.is-ranked{border-color:var(--line);background:radial-gradient(ellipse 90% 70% at 50% 0%,rgba(52,190,237,.22),rgba(52,190,237,0) 60%), linear-gradient(180deg,#0f1a2c 0%,#14213a 100%);box-shadow:0 0 0 .1875rem rgba(255,255,255,.06), 0 1.5rem 3rem rgba(0,0,0,.55), inset 0 0 0 .0625rem rgba(255,255,255,.08)}
+.vs-card.is-ranked .vs-round{font-size:var(--t-xl);font-weight:900;letter-spacing:.2em;color:#9fe6ff;text-shadow:0 0 1.25rem rgba(52,190,237,.7), 0 .125rem 0 rgba(0,0,0,.5)}
+.vs-card.is-ranked .vs-side b{color:#fff;text-shadow:0 .125rem 0 rgba(0,0,0,.45)}
+.vs-card.is-ranked .vs-mark{color:var(--line)}
+.vs-card.is-ranked .vs-mark::before{color:#fff;-webkit-text-stroke:.28em #fff;filter:drop-shadow(0 .06em .04em rgba(0,0,0,.6))}
+.vs-card.is-ranked .vs-mark::after{background:linear-gradient(180deg,#ffffff 0%,#c8f1ff 40%,var(--line) 52%,#1a9fd0 100%);-webkit-background-clip:text;background-clip:text}
+.vs-card.is-ranked .vs-target{color:#e6f3fb;font-size:var(--t-lg)}
+.vs-card.is-ranked .vs-target.is-friendly{color:var(--gold-2)}
+.vs-em{display:flex;justify-content:center;min-height:0} .vs-em:not([hidden]){min-height:6.5rem}      /* the emblem card's room is kept from the start: the names never jump when it lands */
+.vs-em .rank-card-em > .is-lg + b{font-size:max(var(--t-md),13px)}      /* 'Silver II' under the emblem: never under 12 px at the 10px root */
+.vs-ready{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin-top:calc(var(--s-3) * -1)} .vs-ready .caps{color:#9fe6ff;letter-spacing:.2em;font-size:max(var(--t-sm),12px)}
+.vs-bar{--p:1;width:18rem;background:rgba(255,255,255,.14)} .vs-bar i{background:linear-gradient(90deg,#9fe6ff,var(--line));transition-duration:var(--vs-d,1.5s)}
+.vs-card.is-ranked.go .vs-round{animation:vs-slam 420ms var(--ease-out) both}
+.vs-card.is-ranked.go .vs-side.is-me{animation:vs-in-l 500ms var(--ease-out) 400ms both} .vs-card.is-ranked.go .vs-side.is-them{animation:vs-in-r 500ms var(--ease-out) 400ms both}
+.vs-card.is-ranked.go .vs-mark{animation:vs-mark-pop 700ms var(--ease-bounce) 900ms both}
+.vs-card.is-ranked.go .vs-em .rank-card-em{animation:vs-emblem-in 360ms var(--ease-bounce) 900ms both}
+.vs-card.is-ranked.go .vs-target{animation:ov-title-pop 420ms var(--ease-bounce) 1000ms both}
+.vs-ready:not([hidden]){animation:panel-in var(--d-med) var(--ease-out) both}
+@keyframes vs-slam{0%{opacity:0;scale:2.2}55%{opacity:1;scale:.94}75%{scale:1.03}100%{opacity:1;scale:1}}
+@keyframes vs-mark-pop{0%{opacity:0;scale:.4}60%{opacity:1;scale:1.12}100%{opacity:1;scale:1}}
+@keyframes vs-emblem-in{0%{opacity:0;scale:.6}60%{opacity:1;scale:1.1}100%{opacity:1;scale:1}}
+
+/* ---- the GAME card (8.7): a white card over the darkened stadium, the stamp in the winner's colour, the game's score rolling, two rows of pips, the next game's bar */
+.round-card{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:var(--s-4);width:min(44rem,92vw);padding:var(--s-6) var(--s-6) var(--s-5);text-align:center;border-radius:var(--r-xl);border:.1875rem solid var(--line);
+  background:linear-gradient(180deg,#fff 0%,#fbfdfe 45%,#e9f2f7 100%);box-shadow:0 1.5rem 3rem rgba(0,0,0,.5), inset 0 0 0 .1875rem #fff}
+.round-kicker{margin:0;color:var(--ink-soft);font-size:max(var(--t-xs),11px)}
+.round-card h2{margin:0;font-size:var(--t-2xl);font-weight:900;line-height:1.1;color:var(--me-ink);text-wrap:balance}
+#screen-rk-game[data-beat="lose"] .round-card h2{color:var(--them-ink)} #screen-rk-game.is-watch[data-beat="lose"] .round-card h2{color:var(--them-ink)}      /* the taker's colour: blue for the left side, orange for the right */
+.game-tally{display:flex;align-items:center;justify-content:center;gap:var(--s-4)}
+.game-num{font-size:5rem;min-width:5rem}
+.game-slam{font-size:min(9rem,15vw)}
+.game-rows{display:flex;flex-direction:column;gap:.5rem;width:min(24rem,100%)}
+.pip-row{display:grid;grid-template-columns:1.75rem minmax(0,1fr) auto 1.75rem;align-items:center;gap:.75rem;height:2.75rem;padding:0 .875rem 0 .5rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--line-faint);box-shadow:var(--sh-1)}
+.pip-row b{text-align:left;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;min-width:0}
+.pip-row .pips li{width:1rem;height:1rem;border-width:.1875rem}
+.pip-n{font-size:1.5rem;font-weight:900;color:var(--ink-strong);font-variant-numeric:tabular-nums;text-align:right}
+.pip-row.is-me .pip-n{color:var(--me-ink)} .pip-row.is-them .pip-n{color:var(--them-ink)}
+.pip-row.is-won{border-color:var(--gold-2);background:linear-gradient(180deg,#fffdf3,#fff4c9)}      /* the row that just took the game */
+.game-deciding{margin:0;color:var(--warn-deep);font-size:max(var(--t-md),12px);letter-spacing:.2em}
+#screen-rk-game.is-deciding{background:rgba(38,20,28,.86)}      /* 1-1: the veil a shade warmer */
+.game-next{display:flex;flex-direction:column;align-items:center;gap:.375rem} .game-next small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .game-next small:empty{display:none}
+.game-count{animation:none}
+#screen-rk-game.is-active .round-card h2{animation:ov-title-pop 560ms var(--ease-bounce) 380ms both}
+#screen-rk-game.is-active .pip-row{animation:ov-title-pop 360ms var(--ease-bounce) 700ms both} #screen-rk-game.is-active .pip-row.is-them{animation-delay:780ms}
+#screen-rk-game.is-active .pips li{animation:ov-pip-in 320ms var(--ease-bounce) calc(760ms + var(--i,0) * 80ms) both}
+#screen-rk-game.is-active .pips li.is-new{animation:ov-pip-in 320ms var(--ease-bounce) calc(760ms + var(--i,0) * 80ms) both, num-pop 420ms var(--ease-bounce) 1000ms}
+#screen-rk-game.is-active .game-next{animation:ov-title-pop 360ms var(--ease-bounce) 1100ms both}
+#screen-rk-game.is-active .game-slam.go{animation:ov-slam 380ms linear both} #screen-rk-game.is-active[data-beat="lose"] .game-slam.go{animation:ov-slam-soft 380ms var(--ease-out) both}
+@keyframes ov-pip-in{0%{opacity:0;scale:.3}60%{opacity:1;scale:1.2}100%{opacity:1;scale:1}}
+
+/* ---- the series card (8.8): the final pips over the tally, the games as the big numbers, the per-game scores under them; Play again / Leave */
+.result-pips{display:flex;justify-content:center;align-items:center;gap:1rem;margin:calc(var(--s-3) * -1) 0 var(--s-3)}
+.result-pips .pips li{width:.875rem;height:.875rem;border-width:.1875rem}
+.tally-games{display:block;margin:calc(var(--s-4) * -1) 0 var(--s-4);font-size:var(--t-md);font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.result-card.is-rk{padding-top:7.25rem} .result-card.is-rk h2{font-size:3.25rem;margin-inline:calc(-1 * var(--s-5));text-wrap:balance} .result-card.is-rk.is-lose h2{font-size:3rem}      /* 'Priyanka wins the match' on one line: the title may use the card's padding, and the card stays inside 900 px with its extra rows */
+.rk-acts .btn{min-width:11rem}
+.result-note-sub{display:block;margin-top:.25rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}      /* under 'Gold I': what the rank means */
+.screen.is-active .result-pips{animation:ov-title-pop 360ms var(--ease-bounce) 480ms both}
+.screen.is-active .tally-games{animation:ov-title-pop 360ms var(--ease-bounce) 1000ms both}
+/* ---- the trophy roll (8.9): the emblem, the new total counted up over 900 ms from 1100 ms, the change as a pill; a small line says why when nothing changed */
+.trophy{display:flex;flex-direction:column;align-items:center;gap:.25rem;margin:calc(var(--s-3) * -1) auto var(--s-4)}
+.trophy-row{display:flex;align-items:center;justify-content:center;gap:.875rem}
+.trophy-em{position:relative;display:inline-grid;place-items:center;isolation:isolate}
+.trophy-em .rank-em{position:relative;z-index:1}
+.trophy-em .medal-rays{bottom:50%;width:12rem;height:12rem;margin:0 0 -6rem -6rem;z-index:0}
+.trophy-em .rank-em.is-down{animation:rank-down 300ms var(--ease-soft) both}
+.trophy-n{position:relative;font-size:2.75rem;font-weight:900;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums;min-width:2.5ch;text-align:center}
+.trophy-n::before{content:counter(n);counter-reset:n var(--n);position:absolute;inset:0;text-align:center;color:var(--ink-strong);opacity:0;pointer-events:none}
+.trophy-n small{font-size:var(--t-sm);font-weight:800;color:var(--ink-soft);margin-left:.25em;letter-spacing:.04em}
+.trophy-d{display:inline-flex;align-items:center;height:2.125rem;padding:0 .875rem;border-radius:var(--r-pill);font-size:var(--t-lg);font-weight:900;font-variant-numeric:tabular-nums;background:var(--sky-2);color:var(--ink-soft);border:.125rem solid var(--line-faint)}
+.trophy-d.is-up{background:#e6f9ee;color:var(--good-deep);border-color:#bfeccf} .trophy-d.is-down{background:#fdecec;color:var(--bad-deep);border-color:#f7c8c8} .trophy-d.is-off{font-size:var(--t-md)}
+.trophy-note{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .trophy-note:empty{display:none}
+.screen.is-active .trophy.is-roll .trophy-n{animation:ov-ink 2000ms linear}      /* no fill: the real glyphs come back the moment the counter lands */ .screen.is-active .trophy.is-roll .trophy-n::before{animation:ov-trophy-count 900ms var(--ease-out) 1100ms both}
+.screen.is-active .trophy-row{animation:ov-title-pop 360ms var(--ease-bounce) 900ms both} .screen.is-active .trophy-d{animation:ov-trophy-pop 420ms var(--ease-bounce) 1000ms both} .screen.is-active .trophy-note{animation:ov-title-pop 360ms var(--ease-bounce) 1100ms both}
+@keyframes ov-trophy-count{from{--n:var(--from,0);opacity:1}99.9%{opacity:1}to{--n:var(--to,0);opacity:0}}
+@keyframes ov-trophy-pop{0%{opacity:0;scale:.4}60%{opacity:1;scale:1.15}100%{opacity:1;scale:1}}
+@keyframes rank-down{0%{transform:scale(1)}100%{transform:scale(.9)}}
+/* ---- rank up (8.10): the stamp in the rank's colour, rays behind the new emblem */
+.result-slam.is-rank{color:var(--rank-c,var(--gold-2));text-shadow:0 .5rem 0 var(--rank-deep,#8a5200);font-size:min(8rem,11vw)}
+.trophy-em .medal-rays.is-on{animation:ov-rays-in 420ms var(--ease-bounce) both, ov-spin 8s linear 420ms infinite;background:repeating-conic-gradient(var(--rank-ray,rgba(255,211,74,.55)) 0 7deg,transparent 7deg 20deg)}
+@media (max-width:700px){ .rk-acts .btn{min-height:44px} .round-card{padding:var(--s-5) var(--s-4)} .game-num{font-size:4rem;min-width:4rem} .round-card h2{font-size:var(--t-xl)} .pip-row b,.game-next small,.trophy-note,.tally-games,.result-note-sub{font-size:max(var(--t-sm),12px)} .vs-card.is-ranked .vs-round{font-size:var(--t-lg)} .vs-bar{width:14rem} .result-card.is-rk h2{font-size:3rem} }
+@media (max-height:560px){ .round-card{gap:var(--s-3);padding:var(--s-4) var(--s-5)} .game-num{font-size:3.5rem} .vs-em:not([hidden]){min-height:4rem} }
+
+/* ---------- Your stats: the crest wears the Ranked emblem (docs/RANKED.md 2: one rank per player; profile.js drawRoad -> ui.rankCrest) ---------- */
+.st-crest.is-rk .st-disc{display:none}      /* the metal medal of NOTES 107 made way for the ladder's own emblem */
+.st-em{position:relative;display:grid;place-items:center;--em-h:5rem;--div-fs:max(.875rem,11px)}
+.st-em .rank-em{width:5.25rem;height:5.25rem;filter:drop-shadow(0 .25rem .5rem rgba(20,60,90,.25))}
+.st-em[data-div]::after{position:absolute;left:50%;top:var(--em-h);translate:-50% -62%;display:inline-grid;place-items:center;height:1.1em;min-width:1.5em;padding:0 .35em;border-radius:var(--r-pill);background:#fff;color:color-mix(in srgb,var(--rank-ink,var(--ink-strong)) 85%,#000);
+  font:900 var(--div-fs)/1 var(--font);letter-spacing:.06em;box-shadow:0 .0625rem .1875rem rgba(20,60,90,.35), inset 0 0 0 .0625rem rgba(20,60,90,.12);pointer-events:none;white-space:nowrap}
+@media (max-width:900px){ .st-em .rank-em{width:4.5rem;height:4.5rem} .st-em{--em-h:4.25rem} }
+
+/* ---------- The Ranks page (#lobby-ranks): every medal to win. Opened from the crest on Your stats, the Ranked view's emblem or See all ranks ---------- */
+.ranks-view{gap:var(--s-3)!important;padding:var(--s-5) var(--s-6)!important;max-height:calc(100dvh - 11rem);overflow-y:auto;overscroll-behavior:contain}
+.rkx-lead{margin:0;text-align:center;color:var(--ink-soft);font-weight:700}
+.rkx-grid{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-3)}
+.rkx-card{position:relative;width:13.25rem;display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:var(--s-3) var(--s-3) var(--s-4);border-radius:var(--r-lg);
+  background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-faint);box-shadow:var(--sh-1);animation:hm-tile 520ms var(--ease-bounce) backwards}
+.rkx-card:nth-child(2){animation-delay:50ms} .rkx-card:nth-child(3){animation-delay:100ms} .rkx-card:nth-child(4){animation-delay:150ms} .rkx-card:nth-child(5){animation-delay:200ms} .rkx-card:nth-child(6){animation-delay:250ms} .rkx-card:nth-child(7){animation-delay:300ms}
+.rkx-card .rank-em{width:5.25rem;height:5.25rem;filter:drop-shadow(0 .25rem .45rem rgba(20,60,90,.22))}
+.rkx-name{font-size:var(--t-lg);font-weight:900;color:color-mix(in srgb,var(--rank-ink,var(--ink-strong)) 85%,#000);line-height:1.1}
+.rkx-from{color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
+.rkx-divs{display:flex;gap:.25rem;margin-top:.15rem}
+.rkx-div{padding:.1rem .45rem;border-radius:var(--r-pill);font:800 max(var(--t-xs),11px)/1.4 var(--font);font-variant-numeric:tabular-nums;color:var(--ink-soft);background:var(--sky-2);white-space:nowrap}
+.rkx-div.is-on{background:color-mix(in srgb,var(--rank-ink,var(--line-deep)) 85%,#000);color:#fff}      /* white on the darkened rim colour: 5:1 and up for every rank */
+.rkx-tag{margin-top:.2rem;padding:.15rem .6rem;border-radius:var(--r-pill);font:800 max(var(--t-xs),11px)/1.4 var(--font);letter-spacing:.04em;background:var(--sky-2);color:var(--ink-soft)}
+.rkx-tag.is-keep{background:var(--good-deep);color:#fff;opacity:.85} .rkx-tag.is-now{background:color-mix(in srgb,var(--rank-ink,var(--line-deep)) 85%,#000);color:#fff}
+.rkx-card.is-now{border-color:var(--rank-ink,var(--line));box-shadow:var(--sh-2),0 0 0 .25rem color-mix(in srgb,var(--rank-mid,var(--line)) 35%,transparent);transform:translateY(-.25rem)}
+.rkx-card.is-done{border-color:var(--line-soft)}
+.rkx-note{margin:0;text-align:center}
+.rkx-go{align-self:center}
+@media (max-width:900px){ .rkx-card{width:calc(50% - var(--s-3) / 2)} .rkx-card .rank-em{width:4.25rem;height:4.25rem} .ranks-view{padding:var(--s-4)!important} }
+@media (prefers-reduced-motion: reduce){ .rkx-card{animation:none} .rkx-card.is-now{transform:none} }
+/* the medal is a link to the Ranks page: a pointer, a small lift on hover, the focus halo on the keyboard */
+.st-crest.is-link,.rk-emblem.is-link{cursor:pointer;border-radius:var(--r-lg);transition:scale var(--d-fast) var(--ease-bounce)}
+@media (hover:hover){ .st-crest.is-link:hover,.rk-emblem.is-link:hover{scale:1.05} }
+.st-crest.is-link:active,.rk-emblem.is-link:active{scale:.96} .st-crest.is-link:focus-visible,.rk-emblem.is-link:focus-visible{outline:none;box-shadow:var(--glow)}
+
+.rk-keep-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;column-gap:var(--s-3);row-gap:var(--s-1);margin-top:calc(-1 * var(--s-2))} .rk-keep-row .rk-keep{margin:0}      /* See all ranks sits on the keep line: the view fits 1280x720 with it */
+
+/* the rank-up's words (no stamp since NOTES 104): a caps pill beside the trophy delta on the series card */
+.rank-kicker{display:inline-grid;place-items:center;height:1.9rem;padding:0 .75rem;margin-left:.5rem;border-radius:var(--r-pill);font:900 max(var(--t-sm),12px)/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--rank-c,var(--gold-4));box-shadow:var(--sh-1);vertical-align:middle;white-space:nowrap}
+.rank-kicker.ov-pop{animation:num-pop 450ms var(--ease-bounce)}
+@media (prefers-reduced-motion: reduce){ .rank-kicker.ov-pop{animation:none} }
