@@ -152,7 +152,7 @@ export function matchResult(o, me, them, name) {
   $('result').classList.toggle('is-rk', SERIES); resultRkReset();
   $('medal').className = 'medal ' + (lost ? 'is-silver' : 'is-gold');
   const winner = won ? nameMe : nameThem;
-  $('result-title').textContent = SERIES ? (watching ? `${winner} wins the match` : won ? 'You win the match' : `${nameThem} wins the match`) : MATT ? (won ? 'You beat Matt' : 'Matt wins') : watching ? `${winner} wins` : won ? 'You win!' : `${nameThem} wins`;
+  $('result-title').textContent = won && !watching ? 'Victory!' : SERIES ? (watching ? `${winner} wins the match` : `${nameThem} wins the match`) : MATT ? 'Matt wins' : watching ? `${winner} wins` : `${nameThem} wins`;      // every win of your own reads Victory! (a Ranked series, Matt, a person: the owner, NOTES 119); losses and watching keep the winner's name
   setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : '');
   const games = SERIES && Array.isArray(RK.games) ? [RK.games[0] | 0, RK.games[1] | 0] : null, bestOf = SERIES ? Math.max(1, RK.bestOf | 0) || 3 : 0;
   const L = games ? games[0] : o.me ?? 0, R = games ? games[1] : o.them ?? 0;      // the series card tallies games; every other card the points

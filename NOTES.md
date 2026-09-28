@@ -2390,3 +2390,10 @@ The owner: "Think you can return my serve?" was corny, and the card should not p
 - CARD_V 5: every card URL changes, so chat apps fetch the new picture. Privacy (the six stats, zeros included), terms,
   changelog, ropa and CLAUDE.md say "the same six stats"; the pages were already dated 2026-09-28. test/share.test.mjs checks
   the fixed six on weak, fresh and losing profiles and the '-' rule.
+
+## 119. A win reads Victory!
+
+The owner found the win titles cheesy ("You win the match" after a Ranked series, "You beat Matt", "You win!"). Every win of
+your own now reads **Victory!** on the result card (web/ui.js matchResult). Losses and spectators keep the winner's name
+("Matt wins", "Ann wins", "Bo wins the match"), and the tournament champion card is unchanged. Tests that read the title
+(ui-next, fixes-e2e, rooms-e2e, spectate-e2e, ranked-e2e, ui-shots/verify) now expect "Victory!".

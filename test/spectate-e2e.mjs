@@ -182,8 +182,8 @@ u = await st(c); ok(u.phase === 'watch' && u.room === CODE && !u.hold, 'Cat is s
 // =====================================================================================================================
 rest('b');                                         // Ben stops swinging: Ann wins the points
 [s, t, u] = await Promise.all([until(a, s => s.result, 200000, 'the match ends for Ann'), until(b, s => s.result, 200000, 'for Ben'), until(c, s => s.result, 200000, 'for Cat')]);
-const annWon = s.result.title === 'You win!', W = annWon ? 'Ann' : 'Ben';
-ok((annWon ? t.result.title === 'Ann wins' : t.result.title === 'You win!' && s.result.title === 'Ben wins') && u.result.title === `${W} wins`, `result: Ann "${s.result.title}", Ben "${t.result.title}", Cat "${u.result.title}"`);
+const annWon = s.result.title === 'Victory!', W = annWon ? 'Ann' : 'Ben';
+ok((annWon ? t.result.title === 'Ann wins' : t.result.title === 'Victory!' && s.result.title === 'Ben wins') && u.result.title === `${W} wins`, `result: Ann "${s.result.title}", Ben "${t.result.title}", Cat "${u.result.title}"`);
 ok(s.result.btns && t.result.btns && !u.result.btns && u.result.rnote === 'Waiting for a rematch' && u.result.me === 'Ann' && u.result.them === 'Ben' && s.result.them === 'Ben' && /^\d+$/.test(s.result.left), `result: players vote, Cat reads "${u.result.rnote}", ${s.result.left} s left`);
 await shot(a, '15-result', BOTH); await shot(c, '15-result-spectator', BOTH);
 await a.click('#btn-rematch'); [s, t] = await Promise.all([until(a, s => s.result && s.result.rnote, 3000, 'a voted'), until(b, s => s.result && s.result.rnote, 3000, 'b hears of it')]);
@@ -207,7 +207,7 @@ await c.click(`#room-list .room-row[data-code="${PUB}"]`); u = await until(c, s 
 const tDrop = Date.now(); b.cutting = true; await b.evaluate(() => window.__cut(true));
 s = await until(a, s => s.hold, 4000, 'hold again'); ok(/^Waiting for Ben/.test(s.hold), `hold: "${s.hold}"`);
 [s, u] = await Promise.all([until(a, s => s.result, (HOLD + 6) * 1000, 'the forfeit'), until(c, s => s.result, (HOLD + 6) * 1000, 'the forfeit, for Cat')]); const took = (Date.now() - tDrop) / 1000;
-ok(s.result.title === 'You win!' && s.result.note === 'Ben left' && u.result.title === 'Ann wins' && u.result.note === 'Ben left' && took > HOLD - 1.5 && !s.hold, `not back in ${HOLD} s: forfeit after ${took.toFixed(1)} s. Ann "${s.result.title}" / "${s.result.note}", Cat "${u.result.title}" / "${u.result.note}"`);
+ok(s.result.title === 'Victory!' && s.result.note === 'Ben left' && u.result.title === 'Ann wins' && u.result.note === 'Ben left' && took > HOLD - 1.5 && !s.hold, `not back in ${HOLD} s: forfeit after ${took.toFixed(1)} s. Ann "${s.result.title}" / "${s.result.note}", Cat "${u.result.title}" / "${u.result.note}"`);
 await sleep(300); /* focus lands 60 ms after the card opens */ u = await a.evaluate(() => ({ re: document.getElementById('btn-rematch').disabled, focus: document.activeElement.id })); ok(s.result.rnote === '' && u.re && u.focus === 'btn-leave', `after a forfeit: said once (second note "${s.result.rnote}"), Rematch off (${u.re}), focus on ${u.focus}`); await shot(a, '18-result-forfeit', BOTH);
 await a.click('#btn-leave'); [s, u] = await Promise.all([a, c].map(pg => until(pg, s => s.screen === 'lobby' && !s.room, 6000, `${pg.tag}: lobby after the forfeit`))); ok(u.toast === 'No rematch' && !s.overlay && !u.overlay, `after the forfeit: lobby for both (Cat "${u.toast}")`);
 

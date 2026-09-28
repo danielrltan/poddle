@@ -98,7 +98,7 @@ if (s.game) { await sleep(800); await shot(a, '04-game'); ok(/^(You|Ben) takes? 
   const gb = await until(b, s => !!s.game || !!s.result || s.rk.series && s.rk.series.game >= 2, 8000, 'the GAME card (Ben)'); if (gb.game) ok(/takes? game 1$/.test(gb.game.title) && gb.game.pips === s.game.pips.split('-').reverse().join('-'), `Ben's game card: ${JSON.stringify(gb.game)}`);
   s = await until(a, s => !s.game, 8000, 'rkgo closes the card'); ok(s.rk.series.game === 2 && /^2:[01],2:[01]$/.test(s.pips) && s.word === 'Rally', `game 2: series ${JSON.stringify(s.rk.series)}, pips ${s.pips}`); }
 const res = await Promise.all([a, b].map(pg => until(pg, s => s.result && s.result.rk, 300000, 'the series card')));
-const wi = res.findIndex(r => r.result.title === 'You win the match'), W = [a, b][wi], L = [a, b][1 - wi], rw = res[wi], rl = res[1 - wi];
+const wi = res.findIndex(r => r.result.title === 'Victory!'), W = [a, b][wi], L = [a, b][1 - wi], rw = res[wi], rl = res[1 - wi];
 ok(wi >= 0 && rl.result.title === `${W.tag === 'a' ? 'Ann' : 'Ben'} wins the match` && rw.result.rk && rl.result.rk, `series over: ${res.map(r => r.result.title).join(' ; ')}`);
 ok(res.every(r => r.result.again && r.result.leave && !r.result.vote && /^Back in \d+$/.test(r.result.left) && /^\d-\d( · \d-\d)*$/.test(r.result.games) && /^\d-\d$/.test(r.result.tally) && r.result.pips >= 2 && /^\d-\d$/.test(r.result.note) && r.rk.series.done === true),
   `both cards: Play again + Leave, no vote, "${rw.result.left}", games "${rw.result.games}", tally ${rw.result.tally}, note "${rw.result.note}", __stats.rk.series ${JSON.stringify(rw.rk.series)}`);

@@ -96,7 +96,7 @@ ok(s.pill === CODE && s.meSub === 'Near side', `a is back in ${s.pill} on the ${
 await until(a, s => s.hits > 0, 30000, 'a ball is struck after the reloads');
 await b.keyboard.press('KeyQ'); s = await until(b, s => s.toast, 2000, 'b first Q'); ok(s.toast === 'Press Q again to forfeit' && s.screen === 'hud', `b first Q only asks, and says what leaving costs mid-match: "${s.toast}"`); await shot(b, '9-leave-ask');
 await b.keyboard.press('KeyQ');
-s = await until(a, s => s.result, 3000, 'a gets the result'); ok(s.result === 'You win! / Bo left', `a after b left: "${s.result}"`); await shot(a, '9-opponent-left');
+s = await until(a, s => s.result, 3000, 'a gets the result'); ok(s.result === 'Victory! / Bo left', `a after b left: "${s.result}"`); await shot(a, '9-opponent-left');
 s = await until(b, s => s.screen === 'lobby' && s.view === 'home', 2000, 'b back in the lobby'); ok(s.pill === null && !/(court|room)=/.test(s.search) && s.toast === null, `b is in the lobby, no court pill, clean address bar, no stale toast`);
 await a.click('#btn-leave'); s = await until(a, s => s.screen === 'lobby' && s.pill === null, 4000, 'a leaves the result for the lobby'); ok(!s.result, 'a is in the lobby');
 await c.click('#btn-join'); s = await until(c, s => s.err, 4000, 'c tries the code again'); ok(s.err === 'Court not found' && s.screen === 'lobby', `the court is gone: "${s.err}"`);
