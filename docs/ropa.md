@@ -4,7 +4,7 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-27 (Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
+Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOTES 115; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
 
 ## Recipients common to every activity
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`
@@ -36,11 +36,14 @@ Last reviewed: 2026-09-27 (Ranked mode, NOTES 112-113; play counters and share c
   seconds played); Matt ladder (four rungs Rookie, Club, Tour, Pro: W/L, abandons, streaks, first win date, best margin);
   Ranked ladder (`ladder` table, docs/RANKED.md 10.1: trophies, rank tier and division, best rank/division and when,
   Ranked W/L and streaks, Matt queue W/L, Matt trophies awarded today; `match_log.mode`, `series`, `delta_a/b`).
-- Basis: legitimate interests (Art. 6(1)(f)): giving players a record of their progress; switchable off on the privacy page
-  (Save my stats; off, nothing is recorded, signed in or not, except that turning it off during a started Ranked series
-  is that seat's forfeit: the loss is written to the ladder and the series' match_log rows, and the owner's touched_at moves; Ranked needs it on), with self-serve download and deletion. Canada: consent by saving statistics,
-  withdrawn by turning them off or deleting. Consent is not the GDPR basis (Art. 8 would need verified parental
-  consent under 16).
+- Basis: legitimate interests (Art. 6(1)(f)): giving every player a record of their progress. Recorded for every player who
+  plays (a guest by the random device id, a signed-in player by the account); there is NO off switch (Save my stats REMOVED
+  2026-09-28, NOTES 115; the client deletes a leftover `poddle.stats.on`). Safeguards: self-serve download and deletion
+  (privacy page, Your data), the right to object by email (hello@danielrltan.com), private by default, short guest
+  retention. A player who deletes and plays again is recorded again under a new id. Canada: implied consent by playing,
+  withdrawn by deleting and no longer playing, or by writing to us. Consent is not the GDPR basis (Art. 8 would need
+  verified parental consent under 16). The server still honours a `nostats` frame from a tab loaded before the removal
+  (that socket stays anonymous) for compatibility only.
 - Recipients: only the owner (stats are never shown to other players; no leaderboards); Fly.io. Exception, Ranked mode:
   the rank emblem (the rank and its division, e.g. Gold II; never trophies or record) beside the name, to the opponent and to spectators
   of that court (VS card, scoreboard, result card). Basis for that: contract (Art. 6(1)(b)), the mode the player entered.
@@ -62,7 +65,7 @@ Last reviewed: 2026-09-27 (Ranked mode, NOTES 112-113; play counters and share c
   crawlers: iMessage, WhatsApp, Discord, Slack, X, LinkedIn and so on), which may keep their own preview copy; Fly.io.
 - Retention: until Stop sharing, or deleted with the profile (cascade: Delete my data, the guest 90 d / account 24 month
   sweeps). A guest->account merge deletes the guest's link. Responses are `Cache-Control: public, max-age=300`. A guest
-  who turns stats off without deleting, or clears storage, can no longer reach Stop sharing: the link lives until the
+  who clears storage can no longer reach Stop sharing: the link lives until the
   guest sweep or an emailed request (the privacy page says so). The operator stops a link with `node server/admin.js
   unshare <link or code>` (sending the link is enough: it grants nothing more than itself) or `unshare-user <username>`
   (an offensive username, Terms 5). Stop sharing while signed in also stops the browser's unmerged guest link (the caps).
@@ -76,8 +79,8 @@ Last reviewed: 2026-09-27 (Ranked mode, NOTES 112-113; play counters and share c
   address linked to device-id hashes, cids, accounts and recent results (link map); in the database, `match_log`:
   time, kind, Matt level, the two owner ids (never names), score, winner, ending, counted flag (`ranked`), rule reasons, length.
   Ranked mode: R10 (repeated pairs) counts series, not games. A series with a game that fails a fair-play rule awards
-  no trophies to the player who stayed; a player who leaves a Ranked series (Leave, a seat held past its time, or Save my
-  stats switched off mid-series) always takes the full loss; a win over a player who is not yet established
+  no trophies to the player who stayed; a player who leaves a Ranked series (Leave, or a seat held past its time; before
+  2026-09-28 also Save my stats switched off mid-series) always takes the full loss; a win over a player who is not yet established
   (new_opponent) is halved, never under 8; a friendly series awards none. The players are told why with the same words as today.
 - Basis: legitimate interests (keeping statistics fair; must run whatever an individual player would choose).
 - Automated decision: whether a match counts toward statistics. Effect limited to the player's own statistics; no

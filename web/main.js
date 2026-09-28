@@ -233,7 +233,7 @@ function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); s
 function recenter() { model.recenter(); if (body) body.center(); say('Recentred'); }
 const rkQuit = () => { if (rkKind === 'match' && !spec() && !(rkSeries && rkSeries.done)) { rkLeft = performance.now() + 5000; setTimeout(redialDue, 5100); } };      // leaving a Ranked series under way is my forfeit: its rkres reaches me in the lobby (onRkRes says 'Forfeit: 20 trophies'). A waiting redial holds for it: a socket closed before that frame is read would lose it
 function leave() { if (!LOBBY || !room) return; rkQuit(); game.send({ type: 'leave' }); toLobby(); }
-// The socket opens again so the server hears who this is now (docs/ACCOUNTS.md 6.2, 9.6, 9.7): signed in or out, stats switched, data
+// The socket opens again so the server hears who this is now (docs/ACCOUNTS.md 6.2, 9.7): signed in or out, storage cleared, data
 // deleted. It keeps the device of a socket's first hello and reads the cookie at the upgrade, so a new socket is the only way. Never
 // in the middle of a match or on its result card (a drop there is a hold, a forfeit or 'No rematch' for the other player): then it
 // waits for the court to be left, or for the rematch to begin (rematchon, before its first ball: nothing of it is recorded yet).
@@ -338,10 +338,10 @@ const tourOn = () => !!tour && tour.phase !== 'done';      // still running: a f
 // ---------- Ranked (docs/RANKED.md 3.10, 8, 9): the server runs the queue and the series; this keeps where I am in it ----------
 // rkKind: 'warm' | 'match' while in one of its courts (from the room tag). rkQueued: in the queue (a warm-up, or the VS card). rkMoving: the VS card is up, the series seat is on its way.
 // rkSeries: { bestOf, game, games, done } of the series I am in. rkYou: my tier and trophies as the server last said. Nothing of the ladder is kept in the browser.
-let rkKind = null, rkQueued = false, rkMoving = false, rkSeries = null, rkYou = { tier: null, div: null, trophies: null }, rkPhase = 'off', rkQueuedN = 0, rkSinceP = 0, rkHang = 0, rkNoteHold = 0, rkVsT = 0, rkUpT = 0, rkRes = null, rkWait = false, rkNoteText = '', rkWalk = false, rkLeft = 0;      // rkRes: a settlement heard while its card still waits behind a set-up screen (drawn with the card). rkWait: a reconnect with &rk=1 waits for its answer (rkHang runs). rkNoteText: the view's held line. rkWalk: the series card's matchover was a forfeit (the stayer's Walkover). rkLeft: until when this seat's own forfeit (Leave, Q Q, Save my stats off) waits for its rkres
+let rkKind = null, rkQueued = false, rkMoving = false, rkSeries = null, rkYou = { tier: null, div: null, trophies: null }, rkPhase = 'off', rkQueuedN = 0, rkSinceP = 0, rkHang = 0, rkNoteHold = 0, rkVsT = 0, rkUpT = 0, rkRes = null, rkWait = false, rkNoteText = '', rkWalk = false, rkLeft = 0;      // rkRes: a settlement heard while its card still waits behind a set-up screen (drawn with the card). rkWait: a reconnect with &rk=1 waits for its answer (rkHang runs). rkNoteText: the view's held line. rkWalk: the series card's matchover was a forfeit (the stayer's Walkover). rkLeft: until when this seat's own forfeit (Leave, Q Q) waits for its rkres
 const rkOn = () => rkQueued || !!rkKind;
-const RK_FAIL = { nocid: 'Reload and try again', busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', addr: 'Two players on your network are already in the queue', nostats: 'Turn on Save my stats on the privacy page to play Ranked', intour: 'Leave your tournament first' };
-const RK_VIEW_NOTE = { busy: 'Courts are full right now. Try again in a moment', full: 'Courts are full right now. Try again in a moment', intour: 'Leave your tournament first', nostats: 'Turn on Save my stats on the privacy page to play Ranked' };
+const RK_FAIL = { nocid: 'Reload and try again', busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', addr: 'Two players on your network are already in the queue', nostats: 'Ranked couldn’t save your trophies. Reload and try again', intour: 'Leave your tournament first' };      // nostats: the queue heard no hello from this socket (storage refused the device id, RANKED.md 3.9)
+const RK_VIEW_NOTE = { busy: 'Courts are full right now. Try again in a moment', full: 'Courts are full right now. Try again in a moment', intour: 'Leave your tournament first' };
 const onRankedView = () => phase === 'lobby' && !room && ui.currentScreen() === 'lobby' && ['ranked', 'ranks'].includes(ui.lobbyView());      // the Ranks page stands in the stadium too
 const THEME = { park: '#dfeef6', stadium: '#0b1116' };
 function setVenue(name) {                          // the scene's venue (web/scene.js setVenue, body[data-venue]) and the browser's own colour bar with it
@@ -351,7 +351,7 @@ const rkTile = () => ui.rkTile?.({ tier: rkYou.tier, div: rkYou.div, trophies: r
 const rkViewNote = (text, ms = 4000) => { rkNoteHold = performance.now() + ms; rkNoteText = text; if (onRankedView()) ui.rkNote?.(text); };      // a line under Find a match, held over the lobby's own 'Someone is waiting' for a while
 const rkNoteHeld = () => performance.now() < rkNoteHold ? rkNoteText : '';      // and over the view's own redraws (profile.showRanked draws it twice as it opens): rkView gets it as s.hold
 const RK_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'];      // web/emblems.js RANKS, by tier
-const rkLeaver = m => m.won === false && (performance.now() < rkLeft || rkWait || Array.isArray(m.why) && m.why.includes('left_early'));      // my own forfeit: I left (or turned stats off), my held seat ran out while I was away (rkWait: nothing else ends a series while a socket is down), or the server says I left early
+const rkLeaver = m => m.won === false && (performance.now() < rkLeft || rkWait || Array.isArray(m.why) && m.why.includes('left_early'));      // my own forfeit: I left, my held seat ran out while I was away (rkWait: nothing else ends a series while a socket is down), or the server says I left early
 function rkResNote(m) {                            // my side of a settlement as one line on the Ranked view (docs/RANKED.md 8.8): the change as applied first, 'didn’t count' only when nothing moved
   const d = m.delta | 0, left = rkLeaver(m), r = rankRef(m), rank = m.floorHeld === true && r ? RK_NAMES[r.tier - 1] : '';      // floorHeld: the loss stopped at the rank's floor
   if (m.void === true) return 'Void: no trophies changed';
@@ -373,9 +373,8 @@ function onRk(m) {                                 // the queue snapshot { phase
 }
 function onRkFail(why) {                           // the queue said no: a toast, and the reason under Find a match while the view is up
   if (pending && pending.type === 'rk') settle(); ui.rkSearch?.(false); rkSinceP = 0;
-  if (why === 'nostats') rkQuit();                 // Save my stats off mid-series: that is my forfeit (docs/RANKED.md 3.9), the rkres that follows says what it cost
   if (RK_VIEW_NOTE[why]) rkViewNote(RK_VIEW_NOTE[why]);      // held first: the Ranked view that toLobby opens draws it
-  if (room && rkKind && !spec()) toLobby();         // every rkfail on a Ranked court comes after the server took the seat away (Play again on the series card, stats off, no hello): no 'closed' follows, so leave the dead court now (toLobby first: it clears toasts)
+  if (room && rkKind && !spec()) toLobby();         // every rkfail on a Ranked court comes after the server took the seat away (Play again on the series card, no hello): no 'closed' follows, so leave the dead court now (toLobby first: it clears toasts)
   say(RK_FAIL[why] || 'Couldn’t join Ranked. Try again.', null, 3200); redialDue();
 }
 function endRk(why) {                              // rkend: restart | gone (and 'late': an rkres answered the reconnect). Only ever an answer to a reconnect with &rk=1, which left this socket in the lobby: nothing is revived (docs/RANKED.md 3.10)
@@ -465,7 +464,7 @@ function toLobby(msg) {                            // out of a room, back to the
   tourKind = null; tourMoving = false; ui.tourCourt(null);
   const wasRk = rkKind; rkKind = null; rkSeries = null; ranks = [null, null]; if (!rkMoving) { rkQueued = false; rkSinceP = 0; if (rkPhase === 'match' || rkPhase === 'vs') rkPhase = 'off'; }      /* a settled series took its entry with it: nothing of the queue is left */ ui.rkCourt?.(null); ui.rkPill?.({ on: false }); ui.setSeries?.(null); ui.setPressure?.(null); clearTimeout(rkUpT); syncSettings();      // out of a Ranked court: the queue went with it (unless the VS card holds my place while the series seat comes)
   if (parked) rkViewNote(rkResNote(parked), 8000);      // held before the view opens: its redraws keep it
-  redialDue(); if (wasRk) ui.lobbyView('ranked'); else if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // redialDue: off the court, the socket may open again (stats switched, signed in or out). A Ranked court closing lands on the Ranked view. In a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
+  redialDue(); if (wasRk) ui.lobbyView('ranked'); else if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // redialDue: off the court, the socket may open again (signed in or out). A Ranked court closing lands on the Ranked view. In a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
   venueSync(); padPhase();
 }
 function back() {                                  // Back button / Esc, wherever it is
@@ -821,7 +820,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   bot: playBot,
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
   profile: () => profile.showProfile(),      // Your stats: web/profile.js fetches and draws it
-  ranked: () => { if (pending || room) return; if (!profile.statsOn()) { say(RK_FAIL.nostats, null, 3200); rkViewNote(RK_VIEW_NOTE.nostats); return; } ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1). It settles on room (a warm-up), rk (a partner at once) or rkfail
+  ranked: () => { if (pending || room) return; ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1). It settles on room (a warm-up), rk (a partner at once) or rkfail
   rankedOpen: () => { venueSync(); profile.showRanked(); }, ranksOpen: () => profile.showRanked(), view: v => { route(v); venueSync(); } });      // every view change re-picks the venue: the Ranks page stands in the stadium whichever way it was opened      // the Ranked view opened: the stadium builds behind the glass, the head and the road come from /api/stats
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js

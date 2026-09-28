@@ -4,7 +4,7 @@
 // stubs ui.js with a fixed list of names, so main.js hands in the few ui calls this needs (init).
 // Every string from the server or the player goes in as textContent. Nothing here logs an id, a name or a token.
 const $ = id => document.getElementById(id);
-const DEV_KEY = 'poddle.device', ON_KEY = 'poddle.stats.on', GSI = 'https://accounts.google.com/gsi/client';
+const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', GSI = 'https://accounts.google.com/gsi/client';
 const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];
 const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^[0-9a-f]{32}$/;      // the server's own check (3.1): anything else is no device id
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
@@ -22,20 +22,19 @@ let me = { enabled: false, clientId: null, account: null, db: false };      // G
 let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
 // ---------- the device id (3.1): made at the first seat, never at load. A bearer secret for the guest profile: never in a URL or a log ----------
-export const statsOn = () => ls.get(ON_KEY) !== '0';      // Save my stats on this device: ON unless turned off (Q5)
 export const deviceId = () => { const v = ls.get(DEV_KEY); return v && DEV_OK.test(v) ? v : ''; };
 function newId() {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();      // not there on plain-http LAN pages: 16 random bytes in hex instead, never Math.random
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
 }
-export const hello = () => { if (!on) return null; if (!statsOn()) return { type: 'nostats' }; const dev = deviceId(); return dev ? { type: 'hello', dev, v: 1 } : null; };      // stats off: the server is told, so a signed-in socket records nothing either
+export const hello = () => { if (!on) return null; const dev = deviceId(); return dev ? { type: 'hello', dev, v: 1 } : null; };      // stats are always kept (NOTES 115: the Save my stats switch is gone)
 export function opened() { const m = hello(); sockHello = !!m; return m; }      // the socket's open handler sends this FIRST (9.2); null = say nothing
 export function seated() {                                  // a 'welcome' with a seat of my own: the id is made now if there is none, and its hello follows at once
-  if (!on || !statsOn()) return;
+  if (!on) return;
   let dev = deviceId(); if (!dev) { dev = newId(); ls.set(DEV_KEY, dev); if (deviceId() !== dev) return; }      // storage refused it: a new guest every load is worse than none
   if (!sockHello) { sockHello = true; h.send({ type: 'hello', dev, v: 1 }); }      // the server keeps a socket's first hello and ignores the rest
 }
-const forgetDevice = () => { ls.del(DEV_KEY); saved = null; };      // rotated (3.1): sign-out, Delete my data, stats off. A fresh one is made at the next seat
+const forgetDevice = () => { ls.del(DEV_KEY); saved = null; };      // rotated (3.1): sign-out, Delete my data (the privacy page removes it). A fresh one is made at the next seat
 
 // ---------- /api (8): same origin, JSON, the session cookie rides along by itself ----------
 async function api(path, method = 'GET', body) {
@@ -70,14 +69,14 @@ export function result(p) {                                 // the 'profile' mes
   if (p.saved === true && p.guest === true) saved = true;
   const lv = Number.isInteger(p.level) && LEVEL[p.level] ? LEVEL[p.level] : '', why = Array.isArray(p.why) ? p.why.filter(w => typeof w === 'string') : [], bests = Array.isArray(p.bests) ? p.bests.filter(b => b && BEST[b.what] && Number.isFinite(b.v)) : [];
   let line = '';
-  if (p.saved === true) {                                  // saved:false (no database, stats off, anonymous, the new-guest cap): nothing to say
+  if (p.saved === true) {                                  // saved:false (no database, anonymous, the new-guest cap): nothing to say
     if (p.first === true) line = lv ? `First win against ${lv} Matt!` : 'Your first win!';
     else if (bests.length) { const b = bests[0], prev = Number.isFinite(b.prev) && b.prev > 0 ? b.prev : 0; const shown = v => (b.what === 'speed' ? degs(v) + '°/s' : String(Math.round(v))), was = prev ? shown(prev) : ''; line = `New best: ${BEST[b.what](b.what === 'speed' ? b.v : Math.round(b.v))}` + (was && was !== shown(b.v) ? ` (was ${was})` : ''); }      // a gain below the rounding step would read '1330°/s (was 1330°/s)': the old value is left out then
     else if (num(p.streak) >= 2) line = `${num(p.streak)} wins in a row`;
     else if (p.ranked === false) { const w = why.find(x => WHY[x]); if (w) line = WHY[w]; }
     else if (why.includes('level')) line = 'Counted at the easiest level you played';      // R13: a level changed mid-match
   }
-  const notice = p.created === true && statsOn(), nudge = p.nudge === true && !tour && me.enabled && !me.account && (p.first === true || !nudged);      // a win only (the server decides), never for a signed-in player; not after every win
+  const notice = p.created === true, nudge = p.nudge === true && !tour && me.enabled && !me.account && (p.first === true || !nudged);      // a win only (the server decides), never for a signed-in player; not after every win
   if (nudge) nudged = true; { const el = $('result-save-text'); if (el) el.classList.toggle('is-first', p.first === true && !!line); }
   text('result-save-text', line); show('result-save-text', !!line); show('result-notice', notice); show('btn-save-signin', nudge);
   show('result-save', !!(line || notice || nudge));      // no focus is taken: the rematch buttons keep it
@@ -158,8 +157,8 @@ function drawPlay(p) {
 function drawHead(p) {
   const n = $('pf-name'), name = me.account && me.account.username, typed = (($('name-input') || {}).value || '').trim().slice(0, 12);      // the lobby's name field holds the cleaned display name
   if (n) { n.textContent = name || typed || (me.account ? 'Signed in' : 'Guest'); h.badge(n, !!name); }
-  text('pf-sub', !statsOn() ? 'Stats are off' : me.account ? 'Stats saved to your account' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
-  show('pf-notice', !!(p && p.guest === true && statsOn() && !me.account));      // the one-time notice (9.3) for everyone, always here: a player who left or forfeited never gets the result card's copy
+  text('pf-sub', me.account ? 'Stats saved to your account' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
+  show('pf-notice', !!(p && p.guest === true && !me.account));      // the one-time notice (9.3) for everyone, always here: a player who left or forfeited never gets the result card's copy
 }
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available). Guest or signed in changes only the header: every stat draws the same way
   shareable = !!p && typeof p === 'object' && 'share' in p; share = shareable ? shareOf(p.share) : null;      // fresh at every draw: the image's ?v= changes with the stats
@@ -183,11 +182,11 @@ function ladderOf(p) {                                      // p.ladder as the s
 }
 let rkGen = 0;
 export async function showRanked() {                       // the Ranked view opened: what is known at once, then /api/stats. Off (no stats server): a fresh Bronze, so the view still reads
-  const g = ++rkGen, off = on && !statsOn(), base = { tier: 1, div: 1, trophies: 0, best: 1, queued: h.queued(), statsOff: off };
+  const g = ++rkGen, base = { tier: 1, div: 1, trophies: 0, best: 1, queued: h.queued() };
   h.rkView(base); if (!on) return;
   const p = await fetchProfile(); if (g !== rkGen || !['ranked', 'ranks'].includes(h.view())) return;      // the Ranks page draws from the same answer
   if (p === undefined) { h.rkView({ ...base, note: 'Stats aren’t available right now. The game still works' }); return; }
-  const L = ladderOf(p); h.rkView({ ...base, ...(L || {}), queued: h.queued(), statsOff: off }); if (L) h.ladder(L);      // an older server (no ladder) or nothing saved yet: Bronze, 0. The home tile's line follows what was fetched
+  const L = ladderOf(p); h.rkView({ ...base, ...(L || {}), queued: h.queued() }); if (L) h.ladder(L);      // an older server (no ladder) or nothing saved yet: Bronze, 0. The home tile's line follows what was fetched
 }
 
 // ---------- the account cards (9.5, 9.7): over everything, one at a time. Escape closes; game keys never reach main.js behind them ----------
@@ -353,14 +352,8 @@ function drawAcct() {
   show('btn-profile', on); show('btn-ranked', on && me.db); h.tiles();      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
 }
 
-// ---------- Save my stats lives on the privacy page (web/data-tools.js, NOTES 108). This tab hears the key change through the storage event ----------
-function statsChanged() {
-  if (!on) return;
-  if (statsOn()) { drawAcct(); h.redial(); return; }        // on again: a NEW id at the next seat (3.1), and the socket opens again after the match so that hello is its first
-  forgetDevice(); sockHello = true;                        // no hello goes out on this socket any more, even at a seat
-  h.send({ type: 'nostats' });                              // and the server stops recording this socket now, the match under way and a signed-in account included
-  drawAcct(); h.redial();                                   // the server keeps the device of a socket's first hello: the next match is on a new socket
-}
+// ---------- the site's storage cleared in another tab: the device id went with it. Its socket keeps the old hello, so the next match is on a new one (3.1) ----------
+function storageCleared() { if (!on) return; saved = null; drawAcct(); h.redial(); }
 
 // ---------- wiring: main.js calls init() once, while it loads (before the first socket opens) ----------
 // hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), ranked(), tiles(), rkView(s), queued(), ladder(L) }. on: this page's server keeps stats
@@ -372,6 +365,7 @@ export function init(hooks) {
   h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop };
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
+  ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 115): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
   wire(); drawAcct(); if (on) mePromise = loadMe();
 }
 function wire() {
@@ -379,7 +373,7 @@ function wire() {
   for (const id of ['btn-pf-signout', 'btn-set-signout']) click(id, () => signOut());
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
 
-  addEventListener('storage', e => { if (e.key === ON_KEY || e.key === null) statsChanged(); });      // the privacy page (another tab) flipped Save my stats, or the site's storage was cleared
+  addEventListener('storage', e => { if (e.key === null) storageCleared(); });      // the site's storage was cleared in another tab
   click('btn-signin-close', () => closeCard()); wireShare();
   click('btn-claim-skip', () => closeCard());
   const f = $('name-claim'); if (f) f.addEventListener('submit', e => { e.preventDefault(); claimName(($('claim-input') || {}).value); });

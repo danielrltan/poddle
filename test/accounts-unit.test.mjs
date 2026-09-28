@@ -699,7 +699,7 @@ console.log('stats');
   ok(r && m3.done && r.msgs[0] && r.msgs[0].saved === false && r.msgs[1] === null && stats.onEnd(m3, { kind: 'bot', winner: 1, ending: 'won', score: [0, 2] }) === null, 'onEnd with no database open: saved:false, Matt gets no message, and it runs once only');
   stats.forget({ devHash: devA, deleted: true }); ok(m.seats[0].gone && !m2.seats[0].gone && m2.seats[0].ident.devHash.equals(devB), 'forget (deletion): a live seat frozen on that device is gone; a newer match seeded from the socket\'s current device is not');
   const m5 = stats.newMatch({ rank: 0, seats: [pa, pb] }); stats.identify(m5, pa, ws(devA)); stats.optOut(m5, pa, ws(devA, { statsOff: true }));
-  ok(m5.seats[0].ident && m5.seats[0].gone && pa.sockIdent.anon && stats.identOf({ acct: { accountId: 7, ownerId: 9 }, tokenHash: null, statsOff: true }).anon, 'optOut (Save my stats off): the seat under way is gone (no owner), and the socket is anonymous even when signed in');
+  ok(m5.seats[0].ident && m5.seats[0].gone && pa.sockIdent.anon && stats.identOf({ acct: { accountId: 7, ownerId: 9 }, tokenHash: null, statsOff: true }).anon, 'optOut (an old tab\'s nostats, NOTES 115): the seat under way is gone (no owner), and the socket is anonymous even when signed in');
   for (const x of [m, m2, m5]) stats.drop(x);
 }
 

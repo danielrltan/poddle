@@ -1496,7 +1496,7 @@ function rkQueue(ws) {                                         // rk from the lo
   ws.rk = null;
   if (!ws.cid) return tell(ws, { type: 'rkfail', why: 'nocid' });
   if (tourActive(ws)) return tell(ws, { type: 'rkfail', why: 'intour' });
-  if (ws.statsOff) return tell(ws, { type: 'rkfail', why: 'nostats' });   // trophies need stats; a first-ever visitor has no device id yet and is not refused (its hello follows the seat; until it comes the entry is never paired, rkPick)
+  if (ws.statsOff) return tell(ws, { type: 'rkfail', why: 'nostats' });   // an old tab's nostats only (NOTES 115). Trophies need stats; a first-ever visitor has no device id yet and is not refused (its hello follows the seat; until it comes the entry is never paired, rkPick)
   if (ws.rkCool && Date.now() < ws.rkCool) return tell(ws, { type: 'rkfail', why: 'busy' });   // just left the queue: RK_COOL_S before the next entry
   if (!loopback(ws)) { let n = 0; for (const q of rkQ.values()) if (q.ws && q.ws.computer === ws.computer) n++; if (n >= RK_ADDR) return tell(ws, { type: 'rkfail', why: 'addr' }); }   // per COMPUTER key (an IPv6 /64, docs/ACCOUNTS.md 3.5), the way abuse.js keys addresses: privacy extensions gave one /64 a fresh address per socket (REVIEW FIX)
   if (rkQ.size >= RK_CAP) return tell(ws, { type: 'rkfail', why: 'full' });
@@ -1759,7 +1759,8 @@ function helloMsg(ws, m) {
   const mem = tmember(ws); if (mem) stats.member(mem, ws);
   rkHello(ws);                                                   // a queued guest whose owner was unknown until now: its rank and emblem (RANKED.md 6)
 }
-// Save my stats switched off (docs/ACCOUNTS.md 9.6): the client says so first on every socket while it is off, and at once on the current
+// COMPATIBILITY ONLY (NOTES 115: the Save my stats switch was removed from the client; stats are always kept). Kept so a tab still open
+// from before that change behaves as it promised its player until it reloads. Save my stats switched off (docs/ACCOUNTS.md 9.6): the client said so first on every socket while it is off, and at once on the current
 // one when it is turned off mid-match. From then on this socket is anonymous for stats, signed in or not (stats.identOf); the account stays
 // on the socket for its name and badge. Sticky for the socket: turning stats on again opens a new one.
 function noStats(ws) {
@@ -1786,7 +1787,7 @@ wss.on('connection', (ws, req) => {
     const m = JSON.parse(raw);
     if (!m || typeof m !== 'object') return;
     if (m.type === 'hello') return helloMsg(ws, m);              // player stats: the device id, first thing on the socket (docs/ACCOUNTS.md 3.2)
-    if (m.type === 'nostats') return noStats(ws);                // ...or that stats are off in this browser (9.6)
+    if (m.type === 'nostats') return noStats(ws);                // compatibility only: a tab loaded before Save my stats was removed (NOTES 115) may still say it; today's client never does
     if (ws.pad && m.type !== 'ping') return padMessage(ws, m);
     if (m.type === 'ping') return tell(ws, { type: 'pong', c: Number.isFinite(m.c) ? m.c : 0, t: ws.room ? ws.room.time() : clock });   // the client times the round trip itself (in the lobby too). c is echoed only as a number
     if (m.type === 'net') return void (ws.every = num(m.hz, 60) <= 30 ? 2 : 1);   // a struggling link asks for half the state packets; it is the link's, so it follows the socket from room to room
