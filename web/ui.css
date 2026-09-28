@@ -1894,3 +1894,11 @@ body[data-overlay="rk-vs"] #screen-tour-vs{z-index:calc(var(--z-screen) + 1);bac
 .rank-kicker{display:inline-grid;place-items:center;height:1.9rem;padding:0 .75rem;margin-left:.5rem;border-radius:var(--r-pill);font:900 max(var(--t-sm),12px)/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--rank-c,var(--gold-4));box-shadow:var(--sh-1);vertical-align:middle;white-space:nowrap}
 .rank-kicker.ov-pop{animation:num-pop 450ms var(--ease-bounce)}
 @media (prefers-reduced-motion: reduce){ .rank-kicker.ov-pop{animation:none} }
+
+/* the Ranks page's way in from the Ranked view: a small info circle beside the keep line (the owner: no See all ranks pill). The visible
+   circle is small; the button keeps a 44 px target and gives the room back with negative margins */
+.rk-info{flex:none;display:inline-grid;place-items:center;width:max(2.75rem,44px);height:max(2.75rem,44px);margin:calc(-1 * max(.7rem,11px)) calc(-1 * max(.55rem,9px));padding:0;border:0;border-radius:50%;background:none;color:var(--line-deep);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rk-info svg{width:1.3rem;height:1.3rem;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;transition:scale var(--d-fast) var(--ease-bounce)} .rk-info .rk-info-dot{fill:currentColor;stroke:none}
+@media (hover:hover){ .rk-info:hover svg{scale:1.15} .rk-info:hover{color:var(--me-ink)} } .rk-info:active svg{scale:.9}
+.rk-info:focus-visible{outline:none} .rk-info:focus-visible svg{border-radius:50%;box-shadow:var(--glow)}
+.rk-keep-row{column-gap:.35rem}
