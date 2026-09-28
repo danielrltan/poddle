@@ -46,15 +46,15 @@ export const LIGHT = { sun: 3.35, hemi: 1.35, fogNear: 45, fogFar: 270 };   // c
 export const PAL_STADIUM = {
   night: true,
   skyZenith: '#04071a', sky40: '#080f2c', sky12: '#101c40', sky4: '#1a2a50', horizon: '#26365a', fog: '#0b1222', glow: '#1c2a4a', star: '#d8e2ff',
-  sunLight: '#dfe8ff', hemiSky: '#55699a', hemiGround: '#151a26',
-  concourse: '#14181f', spill: '#2e3f5c',
-  stand: '#2c3443', standAlt: '#303948', parapet: '#3a4354', backWall: '#1c2230', roof: '#232a38', cornerBlock: '#1f2633',
+  sunLight: '#f2f6ff', hemiSky: '#b4c6ea', hemiGround: '#4a5468',
+  concourse: '#1d2531', spill: '#3a4f72',
+  stand: '#3a4456', standAlt: '#3f4a5c', parapet: '#4a5468', backWall: '#252c3c', roof: '#2c3444', cornerBlock: '#283040',
   seat: '#161c2a', seatAlt: '#171e2d', crowdBody: ['#1c2338', '#33202b', '#22262e', '#1a2b2b', '#261f32', '#1d2a38', '#2d241c'],
   crowdHead: ['#6b6259', '#5a524c', '#5f5a68', '#786a5c', '#4e4842', '#66606c', '#574f48', '#736b64'],   // mid-dark: the far stand is the ball's backdrop
   hoarding: '#0c1526', hoardingEdge: '#1b2740', led: '#8fd6ff', ledDim: '#2b6e9c',
   mast: '#3b4352', lampFrame: '#20262f', lamp: '#f1f6ff', beam: '#7f9dff',
 };
-export const LIGHT_STADIUM = { sun: 1.75, hemi: 1.15, fogNear: 24, fogFar: 150 };   // faint: the far stand (32-40 m) takes 5-10 % of fog, the court none
+export const LIGHT_STADIUM = { sun: 3.4, hemi: 1.9, fogNear: 34, fogFar: 190 };      // floodlit to park brightness (the players must read at a glance); scene.js VENUE.stadium matches   // faint: the far stand (32-40 m) takes 5-10 % of fog, the court none
 export const VENUES = { park: { pal: PAL, light: LIGHT }, stadium: { pal: PAL_STADIUM, light: LIGHT_STADIUM } };
 export const WORLD = { keepX: 9, keepZ: 14.6, tallX: 9, tallZ: 18, domeR: 440, farR: [250, 400], maxR: 420 };   // camera.far is 500
 

@@ -71,7 +71,7 @@ console.log('fallback (no scenery)');
   const r = await page.evaluate(() => { const d = __scene._dbg; __scene.setVenue('stadium'); for (let i = 1; i <= 4; i++) __scene.render(1e7 + i * 40);
     return { venue: __scene.venue(), scenery: !!window.__scenery, fog: '#' + d.scene.fog.color.getHexString(), sun: d.scene.children.find(o => o.isDirectionalLight).intensity, body: document.body.dataset.venue }; });
   await page.screenshot({ path: out + 'venue-stadium-fallback.png' });
-  ok(r.venue === 'stadium' && !r.scenery && r.fog === '#0b1222' && r.sun < 2 && r.body === 'stadium', `no scenery: setVenue('stadium') still gives the night plain look (fog ${r.fog}, sun ${r.sun}, body ${r.body})`);
+  ok(r.venue === 'stadium' && !r.scenery && r.fog === '#0b1222' && r.sun > 3 && r.body === 'stadium', `no scenery: setVenue('stadium') still gives the night plain look, floodlit (fog ${r.fog}, sun ${r.sun}, body ${r.body})`);
   await page.close(); }
 const bad = errs.filter(e => !/favicon|ERR_CONNECTION|WebSocket|ws:|net::|Autoplay|AudioContext/i.test(e));
 ok(bad.length === 0, bad.length ? 'console errors: ' + bad.slice(0, 5).join(' | ') : 'no console errors');

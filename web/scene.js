@@ -86,8 +86,8 @@ const COL = {
 const VENUE = {
   park: { sky: [COL.skyTop, COL.skyMid, COL.horizon], fog: [COL.horizon, 38, 160], sun: [0xfff0d2, 3.3], hemi: [0xd6e9ff, 0x4f7a4a, 1.35], clouds: true, trees: true,
     grass: COL.grass, apron: COL.apron, court: COL.court, kitchen: COL.kitchen, line: COL.line, screen: COL.screen, rail: 0xd9dde3 },
-  stadium: { sky: ['#04071a', '#0d1a3a', '#0b1222'], fog: ['#0b1222', 24, 150], sun: [0xdfe8ff, 1.75], hemi: [0x55699a, 0x151a26, 1.15], clouds: false, trees: false,
-    grass: 0x14181f, apron: 0x263650, court: 0x1a4a8c, kitchen: 0x2f6fbf, line: 0xffffff, screen: 0x0c1526, rail: 0x59627a },
+  stadium: { sky: ['#04071a', '#0d1a3a', '#0b1222'], fog: ['#0b1222', 34, 190], sun: [0xf2f6ff, 3.4], hemi: [0xb4c6ea, 0x4a5468, 1.9], clouds: false, trees: false,      // floodlit: the players as bright as in the park (the owner: too dark to see the opponent), the sky still night
+    grass: 0x1d2531, apron: 0x33476a, court: 0x2160ad, kitchen: 0x3d86d6, line: 0xffffff, screen: 0x13203a, rail: 0x6b7590 },
 };
 
 // Kinematic-arm fallback, replaced by motion.js's armOffset when that module loads.
