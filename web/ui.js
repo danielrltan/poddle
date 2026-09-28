@@ -174,6 +174,7 @@ export function matchResult(o, me, them, name) {
   $('result-note').classList.toggle('is-quiet', SERIES && !o.forfeit);      // '2-1' is already the pips and the tally: read out, not drawn a third time. 'Priyanka left' stays in sight
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
+  { const st = $('result-slam'); if (st) { st.textContent = won && !watching && !o.forfeit ? 'VICTORY!' : ''; if (st.textContent) restart(st, 'go'); } }      // the stamp on a win of your own only (NOTES 122): gone by 380 ms, before the title pops
   $('tally-sc-me').style.setProperty('--to', L | 0); $('tally-sc-them').style.setProperty('--to', R | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame (no stamp: NOTES 104)
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
@@ -1093,6 +1094,7 @@ function brPick(k) { brTab = k; drawBracket(); $('br-tabs').querySelector('[aria
 export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
+  { const st = $('result-slam'); if (st) st.textContent = ''; }      // the champion's card has no stamp: the final's VICTORY! goes with its card
   $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won', 'is-rk'); resultStats(null, card); resultRkReset();      // the final's own card is replaced at once: its stats, beat and any Ranked rows go with it
   setText($('result-title'), me ? 'You’re the champion' : `${name} is the champion`); setText($('result-note'), me ? 'Your tournament matches' : `${name}’s tournament matches`);
   const road = $('result-road'); road.textContent = '';

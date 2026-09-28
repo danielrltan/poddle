@@ -242,11 +242,11 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
   await ev(pg, () => __ui.matchResult(false, 3, 11, 'Pro Bot')); r = await res(); ok(r.title === 'Pro Bot wins' && r.lose, `${tag} old positional loss: "${r.title}"`);
   // the result beat (a light sweep, no stamp), the count-up and the stats row (ui.js matchResult / champion, ui.css data-beat)
   r = await ev(pg, async () => { __ui.showOverlay(null); __ui.matchResult({ won: true, me: 11, them: 8, nameThem: 'Matt', stats: { rally: 14, smashes: 3, run: 5 } }); __ui.rematch({ left: 20, name: 'Matt' });
-    const sl = T.$('result-flash'), a = { sc: T.$('tally-sc-me').textContent + '-' + T.$('tally-sc-them').textContent, beat: T.$('screen-match').dataset.beat, slam: String(!!T.$('result-slam')), aria: sl.getAttribute('aria-hidden') };      // no wait: the numbers are final from the first frame
+    const sl = T.$('result-flash'), a = { sc: T.$('tally-sc-me').textContent + '-' + T.$('tally-sc-them').textContent, beat: T.$('screen-match').dataset.beat, slam: T.$('result-slam') ? T.$('result-slam').textContent + '/' + T.$('result-slam').getAttribute('aria-hidden') : 'none', aria: sl.getAttribute('aria-hidden') };      // no wait: the numbers are final from the first frame
     await new Promise(r => setTimeout(r, 100)); const b = T.$('btn-rematch').getBoundingClientRect(); a.hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)?.closest('button')?.id;
     a.pe = getComputedStyle(sl).pointerEvents;
     const li = [...T.$('result-stats').children]; a.stats = T.seen('result-stats') ? li.map(l => l.textContent + (l.classList.contains('is-best') ? '*' : '')).join('|') : ''; a.has = T.$('result').classList.contains('has-stats'); return a; });
-  ok(r.sc === '11-8' && r.beat === 'win' && r.slam === 'false' && r.aria === 'true', `${tag} the result's numbers are final at once (${r.sc}), beat ${r.beat}, no stamp (${r.slam}), the sweep is hidden from readers (${r.aria})`);
+  ok(r.sc === '11-8' && r.beat === 'win' && r.slam === 'VICTORY!/true' && r.aria === 'true', `${tag} the result's numbers are final at once (${r.sc}), beat ${r.beat}, the VICTORY! stamp, hidden from readers (${r.slam}), the sweep is hidden from readers (${r.aria})`);
   ok(r.hit === 'btn-rematch' && r.pe === 'none', `${tag} Rematch takes a click at 100 ms under the sweep (${r.hit}; pointer-events ${r.pe})`);
   ok(r.stats === '14Longest rally*|3Smashes|5Best run' && r.has, `${tag} stats row: ${r.stats}`);
   await sleep(800); r = await res(); ok(r.fit && r.focus === 'btn-rematch', `${tag} with 3 stats the card still fits (${r.fit}), focus ${r.focus}`);

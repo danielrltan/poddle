@@ -393,6 +393,12 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
 .tally-side.is-winner .chip{box-shadow:0 0 0 .1875rem var(--gold-2), 0 .125rem .5rem rgba(120,80,0,.35)}
 /* the result beat (ui.js matchResult sets #screen-match[data-beat] = win | lose | forfeit | watch | champ): one soft band of light crosses the card as it lands. No stamp, no shake: the medal and the title carry it. Never in the way of a click */
 .result-flash{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;background:linear-gradient(105deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.85) 50%,rgba(255,255,255,0) 65%) no-repeat;background-size:250% 100%}
+/* the VICTORY! stamp (NOTES 104's GAME! stamp brought back with the owner's word): on a win of your own only, never a loss, a forfeit, watching
+   or the champion. It slams in and is gone by 380 ms, before the title pops; no screen shake, and never in the way of a click */
+.result-slam{position:absolute;inset:0;margin:auto;height:fit-content;z-index:3;pointer-events:none;opacity:0;text-align:center;
+  font-size:min(9rem,13vw);font-weight:900;font-style:italic;line-height:1;letter-spacing:.02em;color:var(--me);
+  -webkit-text-stroke:.25rem #fff;paint-order:stroke fill;text-shadow:0 .5rem 0 var(--me-deep)}
+.result-slam:empty{display:none}
 /* the count-up: a CSS counter drawn over the real number, whose glyphs stay transparent until it lands (the same digits, so no jump). textContent is final from the first frame */
 @property --n{syntax:'<integer>';inherits:false;initial-value:0}
 .tally-num{position:relative}
@@ -497,7 +503,7 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
   .callout.go{animation:banner-hold var(--d-callout) linear both!important}
   .rematch-bar i{transition-duration:1s!important}                   /* a countdown is information, not decoration */
   .confetti{display:none}
-  .result-flash{display:none} .tally-num::before{display:none} .screen.is-active .tally-num{animation:none!important}      /* no stamp, flash or count: the card is there, numbers and all */
+  .result-flash,.result-slam{display:none} .tally-num::before{display:none} .screen.is-active .tally-num{animation:none!important}      /* no stamp, flash or count: the card is there, numbers and all */
   #screen-match .result-card{animation:panel-in var(--d-slow) var(--ease-out) both!important}      /* no shake */
   .rank-em.is-pop{animation:none!important}      /* a new rank simply appears at full size */
   .trophy-n::before{display:none} .screen.is-active .trophy .trophy-n{animation:none!important} .trophy-em .medal-rays.is-on{animation:none!important;scale:1} .pips li.is-now,.score-num.is-pressure::after{animation:none!important;opacity:1} .vs-bar i,#game-bar i{transition-duration:1s!important}      /* the trophy total is final from frame one; the pressure ring and the current pip hold still; the VS and game bars keep their 1 s drain (information) */
@@ -1203,6 +1209,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 /* the impact (win / watch / champion only; a loss gets the soft stamp and no flash or shake) */
 #screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-card{animation:panel-in var(--d-slow) var(--ease-out) both}
 #screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-flash{animation:ov-shine 900ms var(--ease-soft) 260ms both}
+#screen-match.is-active .result-slam.go{animation:ov-slam 380ms linear both}
 /* rays open as the medal lands, then turn: slow for a loss, fast for the champion */
 .screen.is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 14s linear 940ms infinite}
 [data-beat="lose"].is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 28s linear 940ms infinite}
@@ -1231,6 +1238,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 @keyframes ov-blink{50%{scale:1 .15}}
 @keyframes ov-title-pop{from{opacity:0;scale:.6}}
 @keyframes ov-winner-bob{0%,100%{translate:0 0}50%{translate:0 -.375rem}}
+@keyframes ov-slam{0%{opacity:0;scale:2.4}30%{opacity:1;scale:.92}42%{scale:1}62%{opacity:1;scale:1}100%{opacity:0;scale:1.3}}
 @keyframes ov-shine{0%{opacity:1;background-position:100% 0}80%{opacity:1}100%{opacity:0;background-position:-50% 0}}      /* left to right across the card, once */
 @keyframes ov-rays-in{0%{scale:0}70%{scale:1.15}100%{scale:1}}
 @keyframes ov-spin{to{rotate:360deg}}

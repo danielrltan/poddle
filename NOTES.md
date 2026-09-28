@@ -2495,3 +2495,14 @@ ranked-e2e-08-title-bar-*.png.
   "The game didn't respond. Try again."; "Recentre" -> "Recenter" (US English); level blurbs Club "Medium pace, some mistakes", Tour
   "Quick, few mistakes"; "Toughest Matt beaten" -> "Hardest level beaten".
 - The tests that pin strings follow (menu, ui-next, profile-ui, ranked-e2e, verify, the e2e harnesses, ui-mock).
+
+## 122. The VICTORY! stamp is back on a win
+
+The owner wanted the old stamp that slammed onto the win screen back, reading VICTORY! (the reverted "Victory!" title, commit
+2d8dfc5, was not it). NOTES 104 removed the GAME! stamp (#result-slam, commit 1b590e3); it returns with the owner's word:
+- **VICTORY!** slams onto the result card (big italic blue, white stroke, ov-slam: in at 2.4x, settles, gone by 380 ms, before
+  the title pops) on a win of your own only: a match against Matt or a person, a Ranked series. Never on a loss, a forfeit win,
+  while watching, or on the champion card. aria-hidden; reduced motion hides it. The screen shake and the white flash of
+  section 97 stay gone; the light sweep of NOTES 104 still crosses the card.
+- The result title is unchanged ("You win", "You beat Matt", "You win the match" as NOTES 121's plainer copy has them).
+- test/ui-next.mjs checks the stamp's text on a win (it asserted no stamp since NOTES 104).
