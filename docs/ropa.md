@@ -83,8 +83,8 @@ Last reviewed: 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks
   time, kind, Matt level, the two owner ids (never names), score, winner, ending, counted flag (`ranked`), rule reasons, length.
   Ranked mode: R10 (repeated pairs) counts series, not games. A series with a game that fails a fair-play rule awards
   no trophies to the player who stayed; a player who leaves a Ranked series (Leave, or a seat held past its time; before
-  2026-09-28 also Save my stats switched off mid-series) always takes the full loss; a win over a player who is not yet established
-  (new_opponent) is halved, never under 8; a friendly series awards none. The players are told why with the same words as today.
+  2026-09-28 also Save my stats switched off mid-series) always takes the full loss; a friendly series awards none. R11c (a win over a player who is not yet
+  established withheld, and halved in Ranked) is OFF since 2026-09-28 (NOTES 129, the owner's choice): it can be turned back on with STATS_ESTABLISHED=1. The players are told why with the same words as today.
 - Basis: legitimate interests (keeping statistics fair; must run whatever an individual player would choose).
 - Automated decision: whether a match counts toward statistics. Effect limited to the player's own statistics; no
   legal or similarly significant effect (Art. 22 not engaged). Players can contact the operator to contest.

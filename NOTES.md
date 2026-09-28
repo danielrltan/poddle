@@ -2610,3 +2610,16 @@ warm-up still starts at the rank's level (ladder.js mattLevel).
   trophy card says "Practice · Trophies need Club Matt or harder". Without the gate a Master could farm Rookie Matt.
 - test/ranked.test.mjs: the warm-up accepts a level change (it asserted the refusal), and a Gold player who drops Matt to
   Rookie and wins gets no trophies (easy, need Club). how-to-play and the changelog say so.
+
+## 129. Wins over new players count again (R11c off)
+- The owner: "i dont think any of my stats are being saved. can you look into that and why??" The production log showed a Ranked
+  series settle "(+17/0)" while both of its games logged "match recorded: human unranked". +17 is half of a 2-0 sweep's 33: R11c
+  (docs/ACCOUNTS.md 5.2, abuse.js) had flagged the loser as not yet established (an owner under 24 h old with fewer than 3 recorded
+  matches). R11c withholds the WINNER's whole record for that game (win, streak, rally best, play counters; the card says "didn't
+  count") and Ranked halves the trophies. With a handful of players nearly every opponent is new, so the owner's wins never saved.
+  His two Matt courts saved nothing either: one he left after 12 s, the other (a Ranked warm-up, 5-0) was closed by the match found.
+- Asked what the winner should keep against a new opponent, the owner chose "Count everything": R11c is now OFF everywhere unless
+  STATS_ESTABLISHED=1 (it used to be forced on in production). No new_opponent flag, no halving. The rule's code stays for that switch.
+- Tests: accounts-unit checks the default is off (dev and production), keeps its R11c cases with the switch on, and adds "a new loser
+  is an ordinary loser". ranked.test sets STATS_ESTABLISHED explicitly on every server, so it is unchanged. docs/ropa.md follows.
+  The privacy page and terms never described R11c, so they do not change.

@@ -65,7 +65,7 @@ function config(env = process.env) {
     pairDay: n('STATS_PAIR_DAY', 3, 0, 1e4),                                       // R10
     afkMin: prod && afk === 0 ? 2 : afk,                                           // R9 floor; 0 disables R9 (tests only)
     teleportMs: prod && tele === 0 ? 12 : tele,                                    // R18 (stats.js samples with it); 0 disables. 12 m/s: the recordings under data/ hold motion only, no paddle positions (Q16)
-    established: prod ? true : env.STATS_ESTABLISHED !== '0',                      // R11c
+    established: env.STATS_ESTABLISHED === '1',                                    // R11c: OFF everywhere unless STATS_ESTABLISHED=1 (NOTES 129: the owner dropped it; with few players every opponent was 'new' and no win ever counted)
     establishedMs: DAY, establishedMatches: 3,                                     // R11c: an owner is established at 24 h old OR 3 recorded matches (db computes it)
     newGuestDay: n('NEW_GUEST_DAY', 30, 0, 1e6), newGuestHour: n('NEW_GUEST_HOUR', 600, 0, 1e7),   // 5.5
     feederLosses: 6, feederShare: 0.8, feederWinShare: 0.2, feederWinners: 2,      // R11

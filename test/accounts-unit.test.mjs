@@ -209,8 +209,8 @@ console.log('abuse: computerKey, rank, config');
   ok(K(K('2001:db8:1:2::5')) === K('2001:db8:1:2::5') && K(K('1.2.3.4')) === '1.2.3.4', 'idempotent on its own output');
   const r = abuse.rank; ok(r(0) < r(1) && r(1) < r(3) && r(3) < r(2) && r(7) === -1, 'rank: Rookie < Club < Tour < Pro (by BOT_ORDER, not the wire index)');
   const dev0 = abuse.config({}), prod = abuse.config({ NODE_ENV: 'production', STATS_SAME_IP: '0', STATS_AFK_MIN: '0', STATS_TELEPORT_MS: '0', STATS_ESTABLISHED: '0', STATS_FORFEIT_MIN: '1', WIN_AT: '11' });
-  ok(dev0.sameIp && dev0.minPointS === 2.5 && dev0.forfeitMin === 6 && dev0.pairDay === 3 && dev0.afkMin === 2 && dev0.teleportMs === 12 && dev0.established && dev0.newGuestDay === 30 && dev0.newGuestHour === 600, 'config defaults (5.3)');
-  ok(prod.sameIp && prod.afkMin === 2 && prod.teleportMs === 12 && prod.established && prod.forfeitMin === 6, 'production ignores STATS_SAME_IP=0, AFK_MIN=0, TELEPORT_MS=0, ESTABLISHED=0 and STATS_FORFEIT_MIN');
+  ok(dev0.sameIp && dev0.minPointS === 2.5 && dev0.forfeitMin === 6 && dev0.pairDay === 3 && dev0.afkMin === 2 && dev0.teleportMs === 12 && !dev0.established && dev0.newGuestDay === 30 && dev0.newGuestHour === 600, 'config defaults (5.3)');
+  ok(prod.sameIp && prod.afkMin === 2 && prod.teleportMs === 12 && !prod.established && abuse.config({ NODE_ENV: 'production', STATS_ESTABLISHED: '1' }).established && prod.forfeitMin === 6, 'production ignores STATS_SAME_IP=0, AFK_MIN=0, TELEPORT_MS=0 and STATS_FORFEIT_MIN; R11c is off unless STATS_ESTABLISHED=1 (NOTES 129)');
   const test = abuse.config({ STATS_SAME_IP: '0', STATS_AFK_MIN: '0', STATS_TELEPORT_MS: '0', STATS_ESTABLISHED: '0', STATS_FORFEIT_MIN: '1', STATS_MIN_POINT_S: 'junk' });
   ok(!test.sameIp && test.afkMin === 0 && test.teleportMs === 0 && !test.established && test.forfeitMin === 1 && test.minPointS === 2.5 && Object.isFrozen(test), 'test knobs honoured off production; junk -> default; frozen');
 }
@@ -277,8 +277,10 @@ const has = (v, ...ids) => ids.every(i => v.flags.includes(i));
   v = J(human(), { oneWay30d: { aOverB: 5, bOverA: 0 } }); ok(!v.ranked && has(v, 'one_way'), 'R11b after 5 one-way ranked wins');
   v = J(human(), { oneWay30d: { aOverB: 5, bOverA: 1 } }); ok(v.ranked, 'R11b: one win back is a rivalry');
   v = J(human(), { oneWay30d: { aOverB: 4, bOverA: 0 } }); ok(v.ranked, 'R11b: 4 wins is fine');
-  v = J(human({}, {}, { established: false })); ok(!v.ranked && has(v, 'new_opponent') && rec(v) === '-- RB', 'R11c new loser: winner credit withheld, loss (and the loser\'s own bests) recorded');
-  v = J(human({}, { established: false })); ok(v.ranked && !has(v, 'new_opponent'), 'R11c looks only at the LOSER');
+  const R11 = abuse.config({ WIN_AT: '11', STATS_ESTABLISHED: '1' });      // R11c is off by default since NOTES 129: these check the rule itself, switched on
+  v = J(human({}, {}, { established: false }), {}, R11); ok(!v.ranked && has(v, 'new_opponent') && rec(v) === '-- RB', 'R11c new loser: winner credit withheld, loss (and the loser\'s own bests) recorded');
+  v = J(human({}, { established: false }), {}, R11); ok(v.ranked && !has(v, 'new_opponent'), 'R11c looks only at the LOSER');
+  v = J(human({}, {}, { established: false })); ok(v.ranked && !has(v, 'new_opponent'), 'by default (NOTES 129) a new loser is an ordinary loser: the win counts');
   v = J(human({}, {}, { established: false }), {}, abuse.config({ STATS_ESTABLISHED: '0' })); ok(v.ranked, 'STATS_ESTABLISHED=0 disables R11c');
   v = J(human(), { winnerWins24h: 30 }); ok(!v.ranked && has(v, 'daily_cap'), 'R12 daily_cap at 30 wins');
   v = J(human(), { winnerWins24h: 29 }); ok(v.ranked, 'R12: 29 is fine');
