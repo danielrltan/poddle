@@ -198,20 +198,21 @@ ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your s
   ok(!bad.length, `Your stats fits at ${SIZES.length} window sizes, nothing clipped${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
   await pg.setViewport({ width: 1280, height: 720 }); await sleep(250); }
 
-// ---------- Save my stats lives on the privacy page: Delete my data there carries the id, then the switch off drops the id and sets the key ----------
+// ---------- Save my stats is gone (NOTES 115): no switch on the privacy page, Delete my data there carries the id; a browser that had turned stats off loses the dead key and says hello again ----------
 { const s = await ev(pg, () => ({ tog: !!document.getElementById('tog-save-stats'), row: !!document.getElementById('btn-set-stats') })); ok(!s.tog && !s.row, 'Settings has no Save my stats switch and no Your stats row'); }
 await pg.goto(`http://127.0.0.1:${W}/web/privacy.html#your-data`); await sleep(900);
+{ const s = await ev(pg, () => ({ tog: !!document.getElementById('tog-stats'), sw: !!document.querySelector('.data-switch'), exp: !!document.getElementById('btn-export'), del: !!document.getElementById('btn-delete'), txt: document.getElementById('your-data').textContent }));
+  ok(!s.tog && !s.sw && s.exp && s.del && !/Save my stats/.test(s.txt), `privacy page Your data: no Save my stats switch, Download a copy and Delete my data still there (${J({ tog: s.tog, sw: s.sw, exp: s.exp, del: s.del })})`); }
 const n0 = API.log.length; await ev(pg, () => document.getElementById('btn-delete').click()); await sleep(200); await ev(pg, () => document.getElementById('btn-delete-yes').click()); await sleep(900);
 { const del = API.log.slice(n0).find(l => l[0] === 'DELETE' && l[1] === '/api/account'), d = await dev(pg);
   ok(!!del && del[2] && del[2].dev === id0 && d === null, `privacy page Delete: DELETE /api/account with the old id (${J(del && del[2])}), then no poddle.device (${d})`); }
-await ev(pg, () => { const t = document.getElementById('tog-stats'); t.checked = false; t.dispatchEvent(new Event('change')); }); await sleep(200);
-{ const on = await ev(pg, () => localStorage.getItem('poddle.stats.on')), st = await ev(pg, () => document.getElementById('data-status').textContent); ok(on === '0' && /Stats are off/.test(st), `the switch off: stats.on '${on}', "${st.slice(0, 40)}"`); }
-await pg.goto(URL0); await sleep(2200);
-{ // stats off: a new seat makes no id and sends no hello, not even on a new socket
-  await ev(pg, () => window.__ui.showScreen('title')); await sleep(200); await pg.click('#btn-start').catch(() => {}); await sleep(800); const n = socks.length; await pg.reload(); await sleep(2400); await pg.click('#btn-start').catch(() => {}); await sleep(800);
-  await pg.click('#btn-quick').catch(() => {}); await sleep(1400); const f = socks.slice(n).flatMap(s => s.frames);
-  ok(f.some(x => x.type === 'quick' || x.type === 'join') && !f.some(x => x.type === 'hello') && await dev(pg) === null, `stats off: a seat after a reload sends no hello and makes no id (${J(f.map(x => x.type))})`);
-  ok(socks.slice(n).every(s => s.frames[0] && s.frames[0].type === 'nostats'), `stats off: every new socket says nostats first, so a signed-in socket records nothing either (${J(socks.slice(n).map(s => s.frames[0] && s.frames[0].type))})`); }
+await ev(pg, () => localStorage.setItem('poddle.stats.on', '0'));      // a browser that turned stats off before the switch was removed
+{ const n = socks.length; await pg.goto(URL0); await sleep(2200);
+  const k = await ev(pg, () => localStorage.getItem('poddle.stats.on')); ok(k === null, `the old poddle.stats.on '0' is deleted at load (${k})`);
+  await pg.click('#btn-start').catch(() => {}); await sleep(800); await pg.click('#btn-quick').catch(() => {}); await sleep(1400);
+  const f = socks.slice(n).flatMap(s => s.frames), d = await dev(pg);
+  ok(f.some(x => x.type === 'quick' || x.type === 'join') && UUID4.test(d || '') && d !== id0 && f.some(x => x.type === 'hello' && x.dev === d), `after it: a seat makes a new id and sends its hello (${J(f.map(x => x.type))}, ${d})`);
+  ok(!f.some(x => x.type === 'nostats'), `and no socket ever says nostats (${J(socks.slice(n).map(s => s.frames[0] && s.frames[0].type))})`); }
 await pg.close();
 
 // ---------- C. sign-in ON: nothing goes to Google until the age box is ticked; then gsi/client (aborted here) and the failure text ----------
@@ -238,7 +239,7 @@ await pg.close();
 { const SHOTS = path.join(root, 'test/ui-shots/accounts'), DL = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-dl-')), ID = '0b1e7c52-4d1a-4f3e-9a6b-2c8d5e7f9a10';
   fs.mkdirSync(SHOTS, { recursive: true }); API.signin = false; API.profile = FIXTURE; API.delClears = true;
   const pg = await page('saved'); const cdp = await pg.createCDPSession(); await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL });
-  await pg.evaluateOnNewDocument(id => { try { if (!sessionStorage.getItem('t.d')) { sessionStorage.setItem('t.d', '1'); localStorage.clear(); localStorage.setItem('poddle.device', id); localStorage.setItem('poddle.stats.on', '1'); } localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} }, ID);
+  await pg.evaluateOnNewDocument(id => { try { if (!sessionStorage.getItem('t.d')) { sessionStorage.setItem('t.d', '1'); localStorage.clear(); localStorage.setItem('poddle.device', id); } localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} }, ID);
   await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
   const openStats = async () => { await ev(pg, () => document.getElementById('btn-profile').click()); await sleep(1500); };
   const panel = () => ev(pg, () => ({ view: !document.getElementById('lobby-profile').hidden, msg: document.getElementById('pf-msg').hidden ? '' : document.getElementById('pf-msg').textContent,

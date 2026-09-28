@@ -110,7 +110,7 @@ console.log('1. queue alone: a private warm-up vs Matt, unlisted, unjoinable, th
   ok(str.got('closed', m => m.reason === 'empty').length === 1, 'its spectator heard closed empty');
   bye(a, look, str); }
 
-console.log('2. Matt games while queued: a loss pays 0, a win pays the bounty; the next game starts by itself; nostats and addr refusals');
+console.log('2. Matt games while queued: a loss pays 0, a win pays the bounty; the next game starts by itself; nostats (an old tab, NOTES 115) and addr refusals');
 { const a = await lobbied(); still(a); await queue(a, 'Ann'); await until(() => inWarm(a));
   ok(await until(() => a.n('matchover') >= 1, 20000), 'a point against Matt ends a game (RK_WIN 1)');
   const mo = a.last('matchover'); ok(mo.rk && mo.rk.matt === true && typeof mo.rk.next === 'number' && mo.tour === undefined && Array.isArray(mo.rank) && !a.got('rematch').length, `matchover { rk: { matt, next } }, no tour, no vote (${JSON.stringify(mo.rk)})`);
@@ -127,7 +127,7 @@ console.log('2. Matt games while queued: a loss pays 0, a win pays the bounty; t
   ok(/match recorded: bot Rookie ranked/.test(logs.get(PORT)), 'the Matt game was recorded as a bot game (the Beat Matt ladder)');
   a.bail(); await until(() => a.lobby && !a.room);
   const ns = await lobbied('', PORT, { nostats: true }); await queue(ns, 'Off');
-  ok(ns.fail && ns.fail.type === 'rkfail' && ns.fail.why === 'nostats' && !ns.room, 'a socket with stats off: rkfail nostats');
+  ok(ns.fail && ns.fail.type === 'rkfail' && ns.fail.why === 'nostats' && !ns.room, 'an old tab\'s nostats socket: rkfail nostats');
   const one = { addr: ip() }, x1 = await lobbied('', P_ADDR, one), x2 = await lobbied('', P_ADDR, one); await queue(x1, 'X1'); await until(() => inWarm(x1)); await queue(x2, 'X2');
   ok(x2.fail && x2.fail.why === 'addr' && !x2.room, `RK_ADDR 1: a second entry from one address: rkfail addr (${JSON.stringify(x2.fail)})`);
   bye(x1, x2); await until(async () => (await status(P_ADDR)).rk.queued === 0);   // nobody waiting on P_ADDR: the next entry warms up instead of being paired

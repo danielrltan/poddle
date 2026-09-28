@@ -2272,3 +2272,58 @@ onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
 - **Operator reset:** `node server/admin.js reset-stats <username>` (db.resetStats): the account's profile back to fresh, its Matt
   record and Ranked ladder removed, the owner unlinked from match_log (R10/R11 history starts again); the account, username, devices,
   sessions and share link stay. Run on the machine as the other admin commands, after `backup`.
+
+## 116. Save my stats removed: stats are always recorded
+
+The owner (2026-09-28): "remove the save stats option, thats stupid." Stats are now recorded for every player who plays
+(a guest by the random device id in `poddle.device`, a signed-in player by the account). There is no switch anywhere.
+Download a copy and Delete my data stay exactly as they were in the privacy page's Your data box.
+
+**Client.** `web/profile.js`: `statsOn()` is gone; `hello()` always sends the device hello and `seated()` always makes the
+id; `init()` deletes a leftover `poddle.stats.on` on every load (a player who had turned it off would otherwise keep a
+dead key); the storage listener for that key and `statsChanged()` are gone. The `key === null` case (site storage cleared
+in another tab) keeps what it did: `drawAcct()` and a redial so the next match's hello is a new socket's first. The
+'Stats are off' line and the statsOn gates on the result-card notice and `pf-notice` are gone; both notices now read "Delete
+them any time on the Privacy Policy page" (was "You can turn this off on the Privacy Policy page"; kept as short, since a
+longer line pushed Your stats' Sign in / Share card row under the name at 1280x800, which profile-ui caught). `web/data-tools.js` loses the
+`tog-stats` handler, `web/privacy.html` the switch paragraph, `web/how-to-play.css` its `.data-switch` rule. Ranked:
+`main.js` no longer gates Find a match on stats, no longer calls `rkQuit` on `rkfail nostats`, and drops the view note;
+`ui.js` rkView loses `statsOff` (Find a match is never disabled; `go.disabled = false` so an old state cannot stick).
+`RK_FAIL.nostats` stays with new copy, "Ranked couldn’t save your trophies. Reload and try again": the server's
+`rkTick` still sends it to an entry that never said hello within `RK_ARRIVE_S` (storage refused the device id, a bad
+Origin), which a current client can still reach.
+
+**Server: kept, as compatibility.** `game.js` still accepts `{type:'nostats'}` (`noStats`, `rkOptOut`, the `ws.statsOff`
+refusal in `rkQueue` and `rkSeat`, `stats.optOut` / `identOf`), commented as for a tab loaded before this change only.
+Such a tab keeps doing what it promised its player (records nothing) until it reloads; after the reload the key is
+deleted and it records. Removing the path would have been no simpler and would let an old stats-off tab start recording a
+signed-in account silently. The server tests of that path (auth 9c, ranked's nostats refusals and forfeit,
+accounts-unit optOut) stay, relabelled as old-tab compatibility.
+
+**Legal (same commit).** Privacy: Summary ("Statistics are recorded for every player and are private ... There is no
+setting to turn statistics off. You may download them or delete them, and your account, at any time in section 9 of
+this page, and you may object to them by emailing us."), section 2 (the device-id row no longer says "while statistics
+are switched on"; the statistics paragraph now says they are recorded for every player, no off switch, nothing saved if
+storage is refused and not signed in, download/delete any time, object by email, and that a match played after a
+deletion is saved again under a new id; statistics leave the "optional" list), section 5 (`poddle.device` rotates on
+sign-out and delete only; `poddle.stats.on` row: "No longer used ... The game deletes it if it finds it"; the "feature
+that you may switch off" and "switch it off with Save my stats" sentences replaced by Delete my data), section 7 (share
+links: the stats-off clause removed), section 9 (take action yourself: "download or delete your statistics in the box
+below"; the switch paragraph removed from Your data), section 13 (PIPEDA: implied consent by playing, withdrawal by
+deleting, signing out or writing to us, and that play afterward is recorded again; GDPR row: legitimate interests Art.
+6(1)(f), "You may object at any time by emailing hello@danielrltan.com, and you may delete these statistics yourself at
+any time with Delete my data"; no consent is claimed), section 15 (a dated line for September 28, 2026). Terms 5: "for
+every player who plays ... There is no setting to turn this off; you may download or delete your statistics at any
+time", and the "Ranked can be played only with Save my stats on" sentence removed. Both pages, their ld+json and the
+sitemap (and changelog.html, which gains a September 28 entry, "Your stats are always saved; delete them any time on
+the privacy page") are dated 2026-09-28. CLAUDE.md's data flows, docs/ropa.md (basis, share links, Ranked leavers),
+docs/ACCOUNTS.md (3.1, 9.6, the test plan, Q5, the section 10 drafts), docs/RANKED.md and docs/ui-spec.md mark the switch
+REMOVED 2026-09-28. The Sept 25 changelog entry ("you can turn this off") is left as history. Not done: a home-page
+notice (privacy 15 promises one for important changes); the changelog entry and the new result-card / Your stats notice
+copy are what ships. Risk carried (ACCOUNTS.md Q5): the strict EU/Quebec reading of ePrivacy 5(3) / Law 25 privacy by
+default is no longer mitigated by any switch.
+
+**Tests.** `test/profile-ui.mjs`: the switch test becomes a regression for a player who had it off: the privacy page has
+no `#tog-stats` / `.data-switch` and Download / Delete are still there, Delete still carries the id, a stored
+`poddle.stats.on='0'` is gone after the next load, the seat after it makes a new id and sends its hello, and no socket
+says `nostats`; section D no longer seeds the key. `test/ui-mock.html` rkView loses `statsOff`.

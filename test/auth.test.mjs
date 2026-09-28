@@ -68,7 +68,7 @@ const me = (port, cookie) => api(port, 'GET', '/api/me', undefined, { cookie, or
 function tab({ port = PORT, addr = ip(), d, cid = cidN(), q = 'lobby=1', origin, cookie, off } = {}) {
   const headers = { 'fly-client-ip': addr }; if (origin) headers.origin = origin; if (cookie) headers.cookie = cookie;
   const ws = new WebSocket(`ws://localhost:${port}/?${q}&cid=${cid}`, { headers }), c = { ws, cid, d, addr, log: [], side: null, play: null };
-  ws.on('open', () => { if (off) ws.send(JSON.stringify({ type: 'nostats' })); if (d) ws.send(JSON.stringify({ type: 'hello', dev: d, v: 1 })); });   // off: Save my stats is off in that browser
+  ws.on('open', () => { if (off) ws.send(JSON.stringify({ type: 'nostats' })); if (d) ws.send(JSON.stringify({ type: 'hello', dev: d, v: 1 })); });   // off: an old tab from before Save my stats was removed (NOTES 115): the server still honours its nostats
   ws.on('message', raw => { const m = JSON.parse(raw); if (m.type === 'state') { c.st = m; if (c.play) c.play(m); return; } c.log.push(m); if (m.type === 'welcome') { c.side = m.side; c.welcome = m; } if (m.type === 'room') c.room = m; });
   ws.on('error', () => {});
   c.send = o => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
@@ -222,13 +222,13 @@ console.log('9b. deleting an account mid-match, from the browser whose guest pro
   ok(p && p.saved === false && p2 && p2.saved === false && (await api(PORT, 'POST', '/api/stats', { dev: D }, { addr: ip() })).json.profile === null, 'that match and the rematch save nothing: no guest profile is re-created for the device');
 }
 
-console.log('9c. Save my stats off while signed in: nothing is recorded to the account, from the first frame or mid-match');
+console.log('9c. (old-tab compatibility, NOTES 115) nostats while signed in: nothing is recorded to the account, from the first frame or mid-match');
 {
   const sc = await signIn(PORT, 'sub-off'); RAWS.push(sc.raw);
   const a = await vsMatt({ cookie: sc.cookie, origin: ORIGIN, off: true }, lose); await over(a); const pa = await prof(a); bye(a);
   const b = await vsMatt({ cookie: sc.cookie, origin: ORIGIN }, lose); await until(() => b.n('hit') >= 1, 15000); b.send({ type: 'nostats' }); await over(b); const pb = await prof(b); bye(b);
   const st = await api(PORT, 'POST', '/api/stats', {}, { cookie: sc.cookie });
-  ok(pa && pa.saved === false && pb && pb.saved === false && st.json.profile && st.json.profile.played === 0, `stats off on a signed-in socket (first frame, and mid-match): saved false, the account still has played 0 (${st.json.profile && st.json.profile.played})`);
+  ok(pa && pa.saved === false && pb && pb.saved === false && st.json.profile && st.json.profile.played === 0, `an old tab's nostats on a signed-in socket (first frame, and mid-match): saved false, the account still has played 0 (${st.json.profile && st.json.profile.played})`);
   const c = await vsMatt({ cookie: sc.cookie, origin: ORIGIN }, lose); await over(c); const pc = await prof(c); bye(c);
   ok(pc && pc.saved === true && (await api(PORT, 'POST', '/api/stats', {}, { cookie: sc.cookie })).json.profile.played === 1, 'a socket without it still records to the account');
 }

@@ -1163,7 +1163,7 @@ export function rkTile(o = {}) {
   setText($('ranked-line-text'), tier ? `${rankLabel(tier, divIn(n, tier, o.div))} · ${n}` : 'Play your first match');
   const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
 }
-// the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, statsOff, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
+// the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
 // The head ('Gold II'), the bar through the rank's three divisions, the seven-step road with its division pips, Find a match and its status line.
 let rkQueuedSaid = false;
 // The Ranks page: all seven medals, each with where it starts and its three divisions; the player's own rank ringed, the ones reached marked
@@ -1196,8 +1196,8 @@ export function rkView(s) {
       const at = known && t === best && Number.isFinite(s.bestAt) && s.bestAt > 0 ? new Date(s.bestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
       const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? `, your rank, division ${romanOf(div)}` : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
       road.append(li); }); }
-  const go = $('btn-ranked-go'); if (go) { setText(go, 'Find a match'); go.disabled = !!(known && s.statsOff); }
-  rkNote(known && s.hold ? s.hold : known && s.statsOff ? 'Turn on Save my stats on the privacy page to play Ranked' : known && s.note ? s.note : known && s.queued > 0 ? 'Someone is waiting to play' : '', known && !s.hold && !s.statsOff && !s.note && s.queued > 0);      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
+  const go = $('btn-ranked-go'); if (go) { setText(go, 'Find a match'); go.disabled = false; }
+  rkNote(known && s.hold ? s.hold : known && s.note ? s.note : known && s.queued > 0 ? 'Someone is waiting to play' : '', known && !s.hold && !s.note && s.queued > 0);      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
 }
 // the status line under Find a match: '' = the default line. accent: someone is waiting (the line takes the accent colour and pops once per wait)
 export function rkNote(text, accent = false) {

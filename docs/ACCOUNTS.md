@@ -209,8 +209,8 @@ Notes on the model:
   `profile`, `bot_record` and its `devices`/`accounts` row, and nulls it out of `match_log`.
 - `devices.owner_id` is NULL after a merge; the device row is then kept only as "this browser was merged into account
   N" so it can never merge twice. The row is deleted with the account.
-- A Matt seat is never an owner. `owner_a/owner_b` is NULL for Matt and for an anonymous human (stats switched off,
-  an old client, a seat with no `hello`).
+- A Matt seat is never an owner. `owner_a/owner_b` is NULL for Matt and for an anonymous human (an old tab with stats
+  switched off, an old client, a seat with no `hello`).
 - Tour-level Matt is stored as level 3 (its wire index). Its DIFFICULTY sits between Club and Pro (`BOTS` comment at
   server/game.js:140; `BOT_ORDER = [0, 1, 3, 2]` at :142). Every "easier/harder" comparison uses
   `rank(level) = BOT_ORDER.indexOf(level)`, NEVER the index itself.
@@ -277,11 +277,11 @@ guest profile and never writes into the account.
 ### 3.1 Device id
 - Created lazily on the client, NEVER on page load: the first time this browser takes a SEAT to play (the `welcome`
   message with `side` 0 or 1 in a lobby court, not as a spectator, not on the title screen, not in the LOCAL room)
-  while stats are on (Settings "Save my stats on this device", default ON, section 9.6). It is created at seat time,
+  (the "while stats are on" condition is gone: Save my stats was REMOVED 2026-09-28, NOTES 115). It is created at seat time,
   not at match end, because the server must know the seat before the match is judged (a seat with no identity is
   anonymous, R3); the `hello` is sent at once on the open socket and `helloMsg` identifies the already-seated player.
   Just-in-time notice: the result card of the match that first STORES data for this id shows, once, "Your stats are
-  saved on this device. You can turn this off in Settings. Privacy Policy": the server sets `created: true` in the
+  saved on this device. You can turn this off in Settings. Privacy Policy" (that copy REMOVED 2026-09-28, NOTES 115: today "Delete them any time on the Privacy Policy page"): the server sets `created: true` in the
   `profile` message when `ownerForDevice` created the owner in that call (8.3, 9.3). No storage key is needed, and
   the notice appears exactly when data is first stored, whichever page load that is. Q5 asks whether EU/UK/Quebec traffic needs a
   one-tap "Save my stats" opt-in instead (then the id is created on that tap and match one is not saved).
@@ -294,9 +294,10 @@ guest profile and never writes into the account.
   - it NEVER goes in a URL (the WS URL at web/main.js:383 and `backTo()` :377-378 are logged by Fly);
   - the server stores only `SHA-256(device id)` (32 bytes) and keeps the raw value only on the socket object in memory;
   - it is not a cookie (no cookie is needed for guests; this keeps step A cookie-free).
-- Rotated (a fresh one generated and the old key removed) on: sign-out, "Delete my data", turning stats off then on.
-- Turning "Save my stats" off removes `poddle.device` and stops sending `hello.dev` (and offers to delete what was
-  saved first, section 9.6).
+- Rotated (a fresh one generated and the old key removed) on: sign-out, "Delete my data". (Turning stats off then on
+  also rotated it until the switch was REMOVED 2026-09-28, NOTES 115.)
+- **REMOVED 2026-09-28 (NOTES 116):** turning "Save my stats" off removed `poddle.device` and stopped sending `hello.dev` (section 9.6). Stats are now
+  recorded for every player; the client deletes a leftover `poddle.stats.on` at load.
 - Its uses are closed: saving the player's own statistics and the fair-play checks inside Poddle. Never advertising,
   analytics, profiling or sharing (the privacy page says so, and COPPA's internal-operations exception depends on it).
 
@@ -1094,7 +1095,7 @@ builder at :383 and `backTo()` :377-378 are NOT changed.
     say something about the opponent), `self` "Matches against yourself don’t count", `restart` "Matches brought back
     after an update don’t count", `too_short` "Too short to count"; `saved:false` → nothing is shown.
   - One-time save notice (3.1): when the `profile` message has `created: true`, a second line: "Your stats are saved
-    on this device. You can turn this off in Settings." + a "Privacy Policy" link (`/privacy.html#storage`, same
+    on this device. You can turn this off in Settings." (REMOVED 2026-09-28, NOTES 115: now "Delete them any time on the Privacy Policy page.") + a "Privacy Policy" link (`/privacy.html#storage`, same
     stopPropagation guard as 9.9). The server sends `created: true` exactly once per guest owner.
   - `nudge` → `#btn-save-signin` visible (win only; never on a loss, never for a signed-in player).
 - The button opens `#signin-card` (9.5), which is NOT part of the result overlay, so it survives the card closing
@@ -1155,7 +1156,11 @@ builder at :383 and `backTo()` :377-378 are NOT changed.
   `keepName`/`nameGate` (:336-358) treat a username as a name.
 
 ### 9.6 Settings > You (web/index.html:173-175, `#grp-you`)
-- New switch row `<button class="set-row set-switch" id="tog-save-stats" role="switch">Save my stats on this device</button>`.
+- **REMOVED 2026-09-28 (NOTES 116):** the Save my stats switch (which moved to the privacy page's Your data box, NOTES 108) is gone; stats are always
+  recorded, and download / Delete my data stay on the privacy page. `profile.js` deletes a leftover `poddle.stats.on` at
+  load, sends the device hello on every socket and has no storage listener for that key. The server keeps `noStats`
+  (game.js) only for a tab loaded before the removal. The two bullets below are history.
+- (History) New switch row `<button class="set-row set-switch" id="tog-save-stats" role="switch">Save my stats on this device</button>`.
   Default ON (Q5). Off, when a device id exists and the server has a guest profile for it (`POST /api/stats` said
   so, or it is unknown because the request failed): a small confirm "Also delete the stats saved so far?" with
   "Delete" (`.btn-danger`) and "Keep" (focused). Delete → `DELETE /api/account {dev, confirm:'delete'}` BEFORE the id
@@ -1190,7 +1195,7 @@ court list (`drawCourts`) and the bracket (`drawTour`).
 ### 9.9 Home-page notice (title screen)
 A sibling of `#safety` (web/index.html:229-235): `<div class="panel panel-sm notice" id="news" data-fit>` with
 "New: your stats are saved. Beat Matt at every level and track your best rally. Stats are saved with a random
-identifier in this browser, and you can turn this off in Settings. Privacy Policy updated {Month D, YYYY}." The "Privacy Policy" link carries `onpointerdown="event.stopPropagation()"` and the `onkeydown` Enter guard
+identifier in this browser, and you can turn this off in Settings. Privacy Policy updated {Month D, YYYY}." (the turn-off wording REMOVED 2026-09-28, NOTES 115; no #news element ships today) The "Privacy Policy" link carries `onpointerdown="event.stopPropagation()"` and the `onkeydown` Enter guard
 (the title screen starts the game on any pointerdown, main.js:654; test/seo.test.mjs:102-103 checks this pattern).
 Removed ~60 days after launch.
 
@@ -1201,7 +1206,9 @@ Removed ~60 days after launch.
 All in the SAME commit as the code they describe (CLAUDE.md). Formal register, NO contractions, in privacy.html and
 terms.html. Step A and step B each bump both pages ("Last updated", `dateModified`, sitemap `<lastmod>`). The quoted
 text below is the text to use (adjust only line numbers and dates); "(step A)" text ships with step A and stays unless
-step B replaces it; "(step B)" text ships only when `GOOGLE_CLIENT_ID` goes live.
+step B replaces it; "(step B)" text ships only when `GOOGLE_CLIENT_ID` goes live. **REMOVED 2026-09-28 (NOTES 116):** every quoted line below
+about turning statistics off or Save my stats (and the `poddle.stats.on` storage row) is history: the live pages say
+stats are recorded for every player, with download, deletion and objection by email (NOTES 116).
 
 ### 10.1 web/privacy.html (section numbers as today)
 
@@ -1777,7 +1784,7 @@ tmp/jwks.json, COOKIE_SECURE: '1', RENAME_DAYS: '0', WIN_AT: '2', STATS_*: as 12
   text node.
 - With sign-in enabled: pressing "Sign in with Google" makes NO request to `accounts.google.com` until `#signin-age`
   is ticked.
-- Turning "Save my stats" off with a saved profile shows the delete-or-keep choice; Delete sends `DELETE
+- **REMOVED 2026-09-28 (NOTES 116):** (history) Turning "Save my stats" off with a saved profile shows the delete-or-keep choice; Delete sends `DELETE
   /api/account` before `poddle.device` is removed; with Keep, the socket reconnects after the current match and a
   match that starts after the toggle sends no `hello` (fake server: the new socket's first frame is not a hello).
 - The `#news` Privacy link stops propagation (a click opens the link, not the game).
@@ -1899,7 +1906,9 @@ includes its legal pages; step B another. Work only in /Users/danieltan/poddle-a
   id lazily at the first seat, shows a just-in-time notice on the first result card, and keeps "Save my stats"
   default ON with a switch. The strictest EU/Quebec reading (ePrivacy Art. 5(3) as read by EDPB Guidelines 2/2023;
   Quebec Law 25 s. 9.1 privacy by default) may require default OFF with a one-tap "Save my stats" opt-in on the first
-  result card, in which case that first match is not saved. [Lazy + notice + default ON.]
+  result card, in which case that first match is not saved. [Lazy + notice + default ON.] **REMOVED 2026-09-28 (NOTES 116):** the owner removed the
+  switch ("remove the save stats option, thats stupid"): no opt-out in the product; the basis stays legitimate interests
+  with the right to object by email and self-serve deletion. The strict reading above is now unmitigated by a switch.
 - **Q6 Snapshots (gate).** Confirm `--snapshot-retention 5` took effect (`fly volumes snapshots list poddle_data`)
   and where snapshots are stored. The privacy page states 5 days and "elsewhere in Canada or the United States".
   [Daily, 5 days.]
