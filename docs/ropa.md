@@ -44,7 +44,10 @@ Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOT
   withdrawn by deleting and no longer playing, or by writing to us. Consent is not the GDPR basis (Art. 8 would need
   verified parental consent under 16). The server still honours a `nostats` frame from a tab loaded before the removal
   (that socket stays anonymous) for compatibility only.
-- Recipients: only the owner (stats are never shown to other players; no leaderboards); Fly.io. Exception, Ranked mode:
+- Recipients: only the owner; Fly.io. Exception, the global leaderboard (NOTES 126, 2026-09-28): anyone sees the top 100 of three
+  boards (Ranked trophies, best rally, best win streak vs people) with username, value, place and rank emblem, for signed-in accounts
+  WITH a username only (never guests); on by default, the account's Show me on the global leaderboard switch (accounts.lb_hidden)
+  removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, Ranked mode:
   the rank emblem (the rank and its division, e.g. Gold II; never trophies or record) beside the name, to the opponent and to spectators
   of that court (VS card, scoreboard, result card). Basis for that: contract (Art. 6(1)(b)), the mode the player entered.
 - Retention: guest statistics 90 days after the last recorded match, 7 days if only one match was ever recorded;

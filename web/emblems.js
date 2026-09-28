@@ -9,9 +9,11 @@ export const DIV_W = 50;
 const ROMAN = ['', 'I', 'II', 'III'];
 export const romanOf = div => ROMAN[div === 2 ? 2 : div === 3 ? 3 : 1];
 /** The division (1..3) of a trophy count inside its rank (tier 1..7; unknown = the count's own rank). */
-export function divOf(trophies, tier) { const t = +trophies || 0, k = tier >= 1 && tier <= 7 ? tier | 0 : rankOf(t).id; return 1 + Math.min(2, Math.max(0, Math.floor((t - THRESHOLDS[k - 1]) / DIV_W))); }
-/** The player-facing rank string: 'Gold II'. tier 1..7, div 1..3 (a missing div reads as I). */
-export function rankLabel(tier, div) { const r = RANKS[(tier | 0) - 1]; return r ? `${r.name} ${romanOf(div)}` : ''; }
+export function divOf(trophies, tier) { const t = +trophies || 0, k = tier >= 1 && tier <= 7 ? tier | 0 : rankOf(t).id; return k === 7 ? 1 : 1 + Math.min(2, Math.max(0, Math.floor((t - THRESHOLDS[k - 1]) / DIV_W))); }
+/** Pro (tier 7) has no divisions (NOTES 126): its players are told apart by their global leaderboard place, 'Pro #12'. */
+export const hasDivs = tier => (tier | 0) >= 1 && (tier | 0) < 7;
+/** The player-facing rank string: 'Gold II', and plain 'Pro'. tier 1..7, div 1..3 (a missing div reads as I). */
+export function rankLabel(tier, div) { const r = RANKS[(tier | 0) - 1]; return r ? (hasDivs(tier) ? `${r.name} ${romanOf(div)}` : r.name) : ''; }
 
 /** The seven tiers, low to high. `colour.deep` is the frame's dark rim (label ink), `colour.mid` its body tone. */
 export const RANKS = [
@@ -62,7 +64,7 @@ export function setEmblem(el, rank) {
     `div` 1..3 puts the division's roman numeral in the label ('Gold II') and on the wrapper as data-div, which ui.css draws as a small tag
     over the emblem's lower edge at .is-md and larger (a CSS overlay, never text inside the SVG). */
 export function emblemCard(rank, cls = 'is-lg', div = 0) {
-  const id = idOf(rank), r = id ? RANKS[id - 1] : null, el = document.createElement('div'), b = document.createElement('b'), d = div >= 1 && div <= 3 ? div | 0 : 0;
+  const id = idOf(rank), r = id ? RANKS[id - 1] : null, el = document.createElement('div'), b = document.createElement('b'), d = div >= 1 && div <= 3 && hasDivs(id) ? div | 0 : 0;
   el.className = 'rank-card-em'; el.appendChild(emblemEl(id, cls)); b.textContent = r ? (d ? rankLabel(id, d) : r.name) : ''; el.appendChild(b);
   if (r) { el.style.setProperty('--rank-ink', r.colour.deep); el.style.setProperty('--rank-mid', r.colour.mid); if (d) el.dataset.div = String(d); } else el.setAttribute('hidden', '');
   return el;

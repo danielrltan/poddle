@@ -148,12 +148,16 @@ CREATE TABLE IF NOT EXISTS share (
   owner_id    INTEGER PRIMARY KEY REFERENCES owners(id) ON DELETE CASCADE,
   slug        TEXT    NOT NULL UNIQUE CHECK (length(slug) = 10),
   created_at  INTEGER NOT NULL
-);`;
+);
+CREATE INDEX IF NOT EXISTS ladder_trophies ON ladder(trophies);
+CREATE INDEX IF NOT EXISTS profile_rally ON profile(best_rally);
+CREATE INDEX IF NOT EXISTS profile_hstreak ON profile(h_best_streak);`;   // the global leaderboards (NOTES 126): each board reads one column, highest first
 function extra() {
-  const have = new Set(D.prepare('PRAGMA table_info(profile)').all().map(c => c.name));
+  const have = new Set(D.prepare('PRAGMA table_info(profile)').all().map(c => c.name)), acct = new Set(D.prepare('PRAGMA table_info(accounts)').all().map(c => c.name));
   D.exec('BEGIN IMMEDIATE');
   try {
     for (const c of PLAY_COLS) if (!have.has(c)) D.exec(`ALTER TABLE profile ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // c is a constant from PLAY_COLS, never input
+    if (!acct.has('lb_hidden')) D.exec('ALTER TABLE accounts ADD COLUMN lb_hidden INTEGER NOT NULL DEFAULT 0');   // NOTES 126: 1 = the owner turned off Show me on the global leaderboard
     D.exec(EXTRA); D.exec('COMMIT');
   } catch (e) { if (D.isTransaction) D.exec('ROLLBACK'); throw e; }
 }
@@ -229,6 +233,16 @@ const ok = () => !!D && !broken;                                 // open and the
 const nearFull = guard(false, () => S.pageCount.get().page_count - S.freePages.get().freelist_count >= 0.95 * cfg.maxPages);   // 95% of the cap in USED pages (free pages are reused): no new guest owners until sweep frees space (2.1)
 const isNow = t => Number.isSafeInteger(t) && t > 0;             // every write takes the caller's clock; a missing one would fail NOT NULL deep inside
 
+// The global leaderboards (NOTES 126). Only counted results feed them (the swing figures are reported by the phone, so they stay off: docs/ACCOUNTS.md Q14).
+// col/from/min are constants spliced into prepare()'s SQL, never input. Everyone on a board is an account with a username that did not turn the board off
+const BOARDS = Object.freeze({
+  trophies: { col: 'l.trophies', min: 1, from: 'ladder l JOIN accounts a ON a.owner_id = l.owner_id' },
+  rally:    { col: 'p.best_rally', min: 3, from: 'profile p JOIN accounts a ON a.owner_id = p.owner_id LEFT JOIN ladder l ON l.owner_id = p.owner_id' },
+  streak:   { col: 'p.h_best_streak', min: 1, from: 'profile p JOIN accounts a ON a.owner_id = p.owner_id LEFT JOIN ladder l ON l.owner_id = p.owner_id' },
+});
+const LB_WHO = 'a.username IS NOT NULL AND a.lb_hidden = 0';
+const LB_MAX = 100;
+
 function prepare() {                                             // every statement, once (2.1)
   const q = sql => D.prepare(sql);
   S = {
@@ -256,7 +270,7 @@ function prepare() {                                             // every statem
     acctIns: q('INSERT INTO accounts (owner_id, google_sub, created_at) VALUES (?, ?, ?)'),
     acctBySub: q('SELECT id, owner_id, username, renamed_at FROM accounts WHERE google_sub = ?'),
     acctById: q('SELECT id, owner_id, username, username_key, renamed_at, created_at, merges, google_sub FROM accounts WHERE id = ?'),
-    acctByOwner: q('SELECT id, owner_id, username, username_key, renamed_at, created_at, merges, google_sub FROM accounts WHERE owner_id = ?'),
+    acctByOwner: q('SELECT id, owner_id, username, username_key, renamed_at, created_at, merges, google_sub, lb_hidden FROM accounts WHERE owner_id = ?'),
     acctByKey: q('SELECT id, owner_id, username, renamed_at FROM accounts WHERE username_key = ?'),
     acctMerges: q('UPDATE accounts SET merges = merges + 1 WHERE id = ?'),
     acctName: q('UPDATE accounts SET username = ?, username_key = ?, renamed_at = ? WHERE id = ?'),
@@ -307,6 +321,14 @@ function prepare() {                                             // every statem
     shareBySlug: q('SELECT owner_id FROM share WHERE slug = ?'),
     shareIns: q('INSERT OR IGNORE INTO share (owner_id, slug, created_at) VALUES (?, ?, ?)'),
     shareDel: q('DELETE FROM share WHERE owner_id = ?'),
+    // the global leaderboards (NOTES 126): accounts with a username that did not hide themselves; one query for the top of a board, one for a place
+    ...Object.fromEntries(Object.entries(BOARDS).map(([b, B]) => [
+      ['lbTop_' + b, q(`SELECT a.username AS name, ${B.col} AS v, l.tier AS tier, l.div AS div FROM ${B.from} WHERE ${LB_WHO} AND ${B.col} >= ${B.min} ORDER BY ${B.col} DESC, a.username_key LIMIT ?`)],
+      ['lbAbove_' + b, q(`SELECT count(*) AS n FROM ${B.from} WHERE ${LB_WHO} AND ${B.col} > ?`)],
+      ['lbCount_' + b, q(`SELECT count(*) AS n FROM ${B.from} WHERE ${LB_WHO} AND ${B.col} >= ${B.min}`)],
+    ]).flat()),
+    lbMe: q(`SELECT a.username, a.lb_hidden, l.trophies, p.best_rally, p.h_best_streak FROM accounts a JOIN profile p ON p.owner_id = a.owner_id LEFT JOIN ladder l ON l.owner_id = a.owner_id WHERE a.owner_id = ?`),
+    lbHide: q('UPDATE accounts SET lb_hidden = ? WHERE owner_id = ?'),
   };
 }
 
@@ -493,12 +515,13 @@ const ladZero = o => ({ owner_id: o, trophies: 0, tier: 1, div: 1, best_trophies
 const dayOf = now => Math.floor(now / DAY);                      // the UTC day number Matt's daily trophies belong to
 const mattLeft = (r, now) => (r.matt_day_at === dayOf(now) ? Math.max(0, cfg.mattDay - r.matt_day) : cfg.mattDay);
 // ladderTier(ownerId, now) -> { tier, div, trophies, bestTier, bestDiv, dayLeft }: the one cheap read for a seat (a missing row is Bronze I, 0)
-const ladderTier = guard(null, (o, now = Date.now()) => { if (!isId(o)) return null; const r = S.ladTier.get(o) || ladZero(o);
+const proDiv = r => { if (r.tier === LAD.TOP) r.div = 1; if (r.best_tier === LAD.TOP) r.best_div = 1; return r; };   // a Pro row written before Pro lost its divisions (NOTES 126) reads as plain Pro
+const ladderTier = guard(null, (o, now = Date.now()) => { if (!isId(o)) return null; const r = proDiv({ ...(S.ladTier.get(o) || ladZero(o)) });
   return { tier: r.tier, div: r.div, trophies: r.trophies, bestTier: r.best_tier, bestDiv: r.best_div, dayLeft: mattLeft(r, now) }; });
 // ladderOf(ownerId, now) -> the Profile.ladder shape of RANKED.md 10.1 | null (a missing row = tier 1 zeros, never null for a real owner)
 const ladderOf = guard(null, (o, now = Date.now()) => {
   if (!isId(o) || !S.ownerGet.get(o)) return null;
-  const r = S.ladGet.get(o) || ladZero(o);
+  const r = proDiv({ ...(S.ladGet.get(o) || ladZero(o)) });
   return { trophies: r.trophies, tier: r.tier, div: r.div, floor: LAD.floorOf(r.tier), divFloor: LAD.divFloorOf(r.tier, r.div), next: LAD.nextFloorOf(r.tier), nextDiv: LAD.nextDivFloorOf(r.tier, r.div),
     bestTrophies: r.best_trophies, bestTier: r.best_tier, bestDiv: r.best_div, best_tier: r.best_tier, best_div: r.best_div, bestTierAt: r.best_tier_at,   // best_tier / best_div: the DIVISIONS note's spelling, beside the camelCase of 10.1
     wins: r.wins, losses: r.losses, streak: r.streak, bestStreak: r.best_streak, botWins: r.bot_wins, botLosses: r.bot_losses, mattDayLeft: mattLeft(r, now) };
@@ -512,7 +535,7 @@ const ladderApply = guard(null, o => {
   const now = o.now, day = dayOf(now);
   return tx(() => {
     if (!S.ownerGet.get(o.owner)) return null;
-    const r = { ...(S.ladGet.get(o.owner) || ladZero(o.owner)) };
+    const r = proDiv({ ...(S.ladGet.get(o.owner) || ladZero(o.owner)) });
     if (r.best_tier_at == null) r.best_tier_at = now;             // Bronze was reached with the first row
     if (r.matt_day_at !== day) { r.matt_day = 0; r.matt_day_at = day; }
     const was = r.trophies, tierWas = r.tier, divWas = r.div; let delta = Math.round(o.delta);
@@ -580,7 +603,8 @@ const exportOf = guard(null, (o, now = Date.now()) => {
   const x = { format: 'poddle-export-2', exportedAt: iso(now), kind: a ? 'account' : 'guest', account: null, device: null, profile: prof, matches, notes: NOTES };
   const sh = S.shareGet.get(o); x.share = sh ? { url: SHARE_URL + sh.slug, created: iso(sh.created_at) } : null;   // the public card link, if one is live
   if (a) {
-    x.account = { username: a.username, created: iso(a.created_at), renamed: iso(a.renamed_at), lastActivity: iso(w.touched_at), merges: a.merges, google: 'linked', googleSubject: a.google_sub };
+    x.account = { username: a.username, created: iso(a.created_at), renamed: iso(a.renamed_at), lastActivity: iso(w.touched_at), merges: a.merges, google: 'linked', googleSubject: a.google_sub,
+      globalLeaderboard: a.lb_hidden === 1 ? 'hidden' : 'shown' };   // NOTES 126: the Show me on the global leaderboard switch
     x.sessions = S.sesOfAcct.all(a.id).map(s => ({ created: iso(s.created_at), expires: iso(s.expires_at), lastUsed: iso(s.seen_at) }));
     x.mergedDevices = S.devsOfAcct.all(a.id).map(v => ({ created: iso(v.created_at), merged: iso(v.merged_at) }));
   } else x.device = { created: iso(d ? d.created_at : w.created_at), lastPlayed: iso(w.touched_at), deletedAfter: iso(prof.expiresAt) };
@@ -600,6 +624,35 @@ const shareMake = guard(null, (o, slug, now) => {
 });
 const shareDrop = guard(false, o => isId(o) && tx(() => S.shareDel.run(o).changes > 0));
 const usernameOf = guard(null, o => { if (!isId(o)) return null; const a = S.acctByOwner.get(o); return a && a.username ? a.username : null; });   // the account's username, null for a guest or an account without one
+
+// ---- the global leaderboards (NOTES 126) ----
+// leaderboard(board, limit) -> { board, rows: [{ rank, name, v, tier, div }], total } | null. rank: 1 + everyone listed above (a tie shares its number).
+// Never an owner id: a row is what any visitor may see. tier/div: the Ranked emblem, null for a player who has never played Ranked
+const leaderboard = guard(null, (b, limit = LB_MAX) => {
+  if (!Object.prototype.hasOwnProperty.call(BOARDS, b)) return null;
+  const n = Math.max(1, Math.min(LB_MAX, Math.floor(Number(limit)) || LB_MAX)), rows = [];
+  let prev = null, rank = 0;
+  S['lbTop_' + b].all(n).forEach((r, i) => { if (r.v !== prev) { rank = i + 1; prev = r.v; } rows.push({ rank, name: r.name, v: r.v, tier: r.tier == null ? null : r.tier, div: r.div == null ? null : r.tier === LAD.TOP ? 1 : r.div }); });
+  return { board: b, rows, total: S['lbCount_' + b].get().n };
+});
+// leaderPlaces(ownerId) -> { listed, why, hidden, trophies, rally, streak } | null. listed false: why 'guest' | 'noname' | 'hidden' and no places.
+// Each place is { rank, v } on the same population and order as leaderboard(), or null under the board's minimum
+const leaderPlaces = guard(null, o => {
+  if (!isId(o)) return null;
+  const w = S.ownerGet.get(o); if (!w) return null;
+  const out = { listed: false, why: null, hidden: false, trophies: null, rally: null, streak: null };
+  if (w.kind !== 'account') { out.why = 'guest'; return out; }
+  const r = S.lbMe.get(o); if (!r) return null;
+  out.hidden = r.lb_hidden === 1;
+  if (!r.username) { out.why = 'noname'; return out; }
+  if (out.hidden) { out.why = 'hidden'; return out; }
+  out.listed = true;
+  const v = { trophies: r.trophies || 0, rally: r.best_rally || 0, streak: r.h_best_streak || 0 };
+  for (const b of Object.keys(BOARDS)) if (v[b] >= BOARDS[b].min) out[b] = { rank: S['lbAbove_' + b].get(v[b]).n + 1, v: v[b] };
+  return out;
+});
+// leaderHide(ownerId, hidden) -> true when the account's switch was written (a guest has no switch: false)
+const leaderHide = guard(false, (o, hidden) => isId(o) && S.lbHide.run(hidden ? 1 : 0, o).changes > 0);
 
 // deleteOwner(ownerId, now) -> true when something was deleted. Cascades (profile, bot_record, device/account, sessions, merged device rows),
 // nulls match_log, holds an account's username key for 90 days, then checkpoints the WAL (10.6; secure_delete zeroes the rows).
@@ -688,4 +741,5 @@ const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp
 
 module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
-  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf };
+  established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
+  leaderboard, leaderPlaces, leaderHide, BOARDS: Object.keys(BOARDS) };

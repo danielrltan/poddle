@@ -70,14 +70,14 @@ ok(fresh.big[0].value === '-' && fresh.big[2].value === '-' && fresh.big[1].valu
 // ---- the rank is the Ranked ladder's, drawn with web/emblems.js's own emblem (docs/SHARE.md 2; one rank per player, as on Your stats) ----
 const E = await import('../web/emblems.js'), L7 = require('../server/ladder.js');
 const silver = card.dataOf({ ladder: { tier: 2, div: 2, trophies: 240 } }, 'x'), none = card.dataOf({ played: 3 }, 'x'), top7 = card.dataOf({ ladder: { tier: 7, div: 3, trophies: 1046 } }, 'x');
-ok(silver.rank === 'Silver II' && silver.tier === 2 && silver.div === 2 && silver.trophies === 240 && top7.rank === 'Pro III' && top7.trophies === 1046, "the rank is profile.ladder's: 'Silver II', 240 trophies; 'Pro III', 1046");
+ok(silver.rank === 'Silver II' && silver.tier === 2 && silver.div === 2 && silver.trophies === 240 && top7.rank === 'Pro' && top7.div === 1 && top7.trophies === 1046, "the rank is profile.ladder's: 'Silver II', 240 trophies; plain 'Pro' (no divisions, NOTES 126), 1046");
 ok(none.rank === 'Bronze I' && none.tier === 1 && none.div === 1 && none.trophies === 0, 'no Ranked games (no ladder): Bronze I with 0 trophies, as Your stats reads it');
-ok(card.CARD_V === 5 && /^[0-9a-f]{8}$/.test(silver.em) && card.hashOf(silver) !== card.hashOf({ ...silver, v: 3 }) && card.hashOf(silver) !== card.hashOf({ ...silver, em: '00000000' }), 'CARD_V 5 and the emblem artwork are in the hash: a new look is a new ?v=');
+ok(card.CARD_V === 6 && /^[0-9a-f]{8}$/.test(silver.em) && card.hashOf(silver) !== card.hashOf({ ...silver, v: 3 }) && card.hashOf(silver) !== card.hashOf({ ...silver, em: '00000000' }), 'CARD_V 6 and the emblem artwork are in the hash: a new look is a new ?v=');
 { const sv = card.svgOf(silver), pv = card.svgOf(top7), nv = card.svgOf(none);
   const sprite = E.SPRITE.replace(/\bid="([^"]+)"/g, 'id="em-$1"').replace(/href="#([^"]+)"/g, 'href="#em-$1"').replace(/url\(#([^)]+)\)/g, 'url(#em-$1)'), sym = n => sprite.match(new RegExp(`<symbol id="em-rank-${n}" viewBox="0 0 64 64">([\\s\\S]*?)</symbol>`))[1];
   ok(sv.includes(sym(2)) && pv.includes(sym(7)) && nv.includes(sym(1)) && !sv.includes(sym(7)) && /id="em-pb2"/.test(sv) && sv.includes('href="#em-pb2"') && pv.includes('href="#em-pb7"') && /id="em-g7"/.test(pv), "each card inlines its rank's symbol from web/emblems.js's sprite (Silver, Pro, Bronze), never a redrawn lookalike");
   ok(!/href="#(?!em-)/.test(sv.replace(/<\/defs>[\s\S]*$/, '').split('<defs>')[1] || 'x') && !/href="#sh"/.test(sv) && /id="sh"/.test(sv) && /id="em-sh"/.test(sv), "the sprite's ids are prefixed (its sheen `sh` would otherwise be the card's drop-shadow filter)");
-  ok(/>II<\/text>/.test(sv) && />III<\/text>/.test(pv) && />I<\/text>/.test(nv) && />SILVER II<\/text>/.test(sv) && />PRO III<\/text>/.test(pv) && />240 trophies<\/text>/.test(sv) && />0 trophies<\/text>/.test(nv), 'the division on its pill, the rank in capitals, the trophies (0 too: every card lays out the same)'); }
+  ok(/>II<\/text>/.test(sv) && !/>III<\/text>/.test(pv) && />I<\/text>/.test(nv) && />SILVER II<\/text>/.test(sv) && />PRO<\/text>/.test(pv) && />240 trophies<\/text>/.test(sv) && />0 trophies<\/text>/.test(nv), 'the division on its pill (none for Pro, NOTES 126), the rank in capitals, the trophies (0 too: every card lays out the same)'); }
 ok(E.RANKS.every(r => r.name === L7.NAMES[r.id - 1]), 'web/emblems.js and server/ladder.js name the ranks alike');
 // ---- create / get: one link per owner ----
 const a1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieA });

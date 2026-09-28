@@ -5,7 +5,7 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 5;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 6;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
@@ -39,7 +39,7 @@ const beaten = r => Number.isFinite(r.firstWinAt) && r.firstWinAt > 0;
 const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b ? v : a;
 function rankOf(p) {
   const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : {}, tier = int(L.tier, 1, 7), div = int(L.div, 1, 3), E = emblems();
-  return { name: E ? E.label(tier, div) : `${RANK_NAME[tier - 1]} ${ROMAN[div]}`, tier, div, trophies: num(L.trophies) };
+  return { name: E ? E.label(tier, div) : tier === 7 ? RANK_NAME[6] : `${RANK_NAME[tier - 1]} ${ROMAN[div]}`, tier, div: tier === 7 ? 1 : div, trophies: num(L.trophies) };
 }
 const mattOf = p => rows(p).map(beaten).lastIndexOf(true);      // the toughest Matt beaten, in difficulty order (0 Rookie .. 3 Pro), -1 for none
 
@@ -117,6 +117,7 @@ function emblem(cx, top, S, tier, div) {                         // the rank's e
   if (tier >= 4) { const n = 18, R2 = S * 0.74; for (let i = 0; i < n; i++) { const a0 = (i / n) * 2 * Math.PI - Math.PI / 2, a1 = a0 + Math.PI / n * 0.8;
     rays += `M${r2(cx)} ${r2(cy)}L${r2(cx + R2 * Math.cos(a0))} ${r2(cy + R2 * Math.sin(a0))}L${r2(cx + R2 * Math.cos(a1))} ${r2(cy + R2 * Math.sin(a1))}Z`; } }
   const art = E ? `<g transform="translate(${r2(cx - S / 2)} ${r2(top)}) scale(${r2(S / 64)})" filter="url(#emsh)">${E.sym[tier - 1]}</g>` : '';
+  if (tier === 7) return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(S * 0.72)}" fill="url(#glow)"/>` + (rays ? `<clipPath id="rays"><rect x="0" y="${r2(top - 2)}" width="${r2(2 * cx)}" height="${r2(S + 60)}"/></clipPath><path d="${rays}" fill="#ffffff" opacity=".45" clip-path="url(#rays)"/>` : '') + art;   // Pro has no divisions (NOTES 126): no pill
   const R = ROMAN[div] || 'I', fs = 30, pw = Math.max(52, measure(R, 900, fs, 2) + 30), ph = 42, py = top + S * 0.86 - ph / 2;   // .st-em[data-div]: a white pill over the lower edge, the numeral in the rank's ink
   return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(S * 0.72)}" fill="url(#glow)"/>` +
     (rays ? `<clipPath id="rays"><rect x="0" y="${r2(top - 2)}" width="${r2(2 * cx)}" height="${r2(S + 60)}"/></clipPath><path d="${rays}" fill="#ffffff" opacity=".45" clip-path="url(#rays)"/>` : '') + art +   // the rays stop under the PICKLEBALL tagline and above the rank's name

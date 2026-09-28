@@ -611,7 +611,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile:active,.tile:nth-child(n):active{transform:scale(.96);rotate:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transition-duration:90ms}      /* the press goes in fast; the 260ms spring plays on release */
 .tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
 .tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
-.tile:nth-child(5){animation-delay:280ms}
+.tile:nth-child(5){animation-delay:280ms} .tile:nth-child(6){animation-delay:350ms}
 @media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="4"]{display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
 @keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
 /* Five entries (docs/RANKED.md 1.1): a hero row (Quick play, Ranked: art left of the label) over a utility row (Courts, Play a bot, Your stats: icon left, the narrow-window look).
@@ -627,6 +627,14 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile:not(.is-hero) .tile-text,.tiles:not([data-n="5"]) .tile-text{align-items:center;text-align:center}
 #ranked-n:not(.is-off)::after{content:"";position:absolute;inset:-.1875rem;border-radius:inherit;box-shadow:var(--glow);opacity:.8;pointer-events:none;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}      /* '1 waiting': an opponent exists, and the badge breathes to say so. On a halo, like every other glow-pulse: an ID rule on the badge itself beat .tile-sub.pop (the count's bump never played) and faded the text to .25 */
 @media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="5"]{width:min(58rem,94vw)} .tiles[data-n="5"] .tile.is-hero{height:10.5rem} }
+/* Six entries (NOTES 126: + Leaderboard): the same hero row over FOUR utilities, each an icon over its label (four across are too narrow for icon-left) */
+.tiles[data-n="6"]{display:grid;grid-template-columns:repeat(4,1fr);width:min(58rem,92vw);gap:var(--s-4)}
+.tiles[data-n="6"] .tile{width:auto}
+.tiles[data-n="6"] .tile.is-hero{grid-column:span 2;height:12rem;flex-direction:row;justify-content:flex-start;text-align:left;padding:0 var(--s-5);gap:var(--s-4)}
+.tiles[data-n="6"] .tile:not(.is-hero){grid-column:span 1;height:8.75rem;padding:0 var(--s-2);gap:var(--s-2);font-size:var(--t-lg)}
+.tiles[data-n="6"] .tile svg{width:5rem;height:5rem} .tiles[data-n="6"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
+.tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
+@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="6"]{width:min(58rem,94vw)} .tiles[data-n="6"] .tile.is-hero{height:10.5rem} }
 /* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks, Your stats' bars spring up and its tick pops.
    Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
    The hover block comes after the focus one: both match a focused tile under the mouse, and the loop must win */
@@ -733,6 +741,11 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
   .tiles[data-n="5"] .tile.is-hero{grid-column:span 1;height:12rem;flex-direction:column;justify-content:center;padding:0;gap:var(--s-2);text-align:center}
   .tiles[data-n="5"] .tile:not(.is-hero){grid-column:span 2;height:6.5rem}
   .tiles[data-n="5"] .tile-text{align-items:center;text-align:center}
+  .tiles[data-n="6"]{grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}      /* six: the two heroes side by side, the four utilities two by two as bars */
+  .tiles[data-n="6"] .tile.is-hero{grid-column:span 1;height:12rem;flex-direction:column;justify-content:center;padding:0;gap:var(--s-2);text-align:center}
+  .tiles[data-n="6"] .tile.is-hero .tile-text{align-items:center;text-align:center}
+  .tiles[data-n="6"] .tile:not(.is-hero){grid-column:span 1;height:6.5rem;flex-direction:row;justify-content:flex-start;padding:0 var(--s-4);gap:var(--s-3);text-align:left}
+  .tiles[data-n="6"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
   .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
   .tile svg{width:5.5rem;height:5.5rem}
   .name-row .field{width:14rem}
@@ -1040,9 +1053,9 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   .courts-make{grid-template-columns:1fr 1fr} .tour-note{grid-column:1 / -1}
 }
 @media (max-width:480px){
-  .tiles,.tiles[data-n="4"],.tiles[data-n="5"]{grid-template-columns:1fr;width:100%}
-  .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg{width:4.5rem;height:4.5rem}
-  .tiles[data-n="5"] .tile-text{align-items:flex-start;text-align:left}
+  .tiles,.tiles[data-n="4"],.tiles[data-n="5"],.tiles[data-n="6"]{grid-template-columns:1fr;width:100%}
+  .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero),.tiles[data-n="6"] .tile,.tiles[data-n="6"] .tile.is-hero,.tiles[data-n="6"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg,.tiles[data-n="6"] .tile svg,.tiles[data-n="6"] .tile:not(.is-hero) svg{width:4.5rem;height:4.5rem}
+  .tiles[data-n="5"] .tile-text,.tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
 }
 
 /* the player's card: bottom-left, outside #hud so it survives the settings card, the pause blur and the result card */
@@ -2008,3 +2021,35 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
   body.is-rk-search #screen-lobby .menu-body{padding-top:calc(var(--s-4) + 44px + 3.25rem)}      /* the bar's height: the line, the actions, the gaps */
 }
 @media (prefers-reduced-motion: reduce){ .rk-search{animation:none} }
+
+/* ---------- the global leaderboard (NOTES 126): a Global line, three tabs, the top 100 in a scrolling list, the You bar, the show-me switch ---------- */
+.lb-view{gap:var(--s-3)!important;padding:var(--s-5) var(--s-6)!important;max-height:calc(100dvh - 11rem);min-height:0;align-items:center}
+.lb-scope{margin:0;display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .9rem .3rem .5rem;border-radius:var(--r-pill);background:var(--sky-2);color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
+.lb-scope b{color:var(--line-deep);font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.lb-globe,.st-place svg{width:1.35rem;height:1.35rem;flex:none;fill:none;stroke:var(--line-deep);stroke-width:2;stroke-linecap:round}
+.lb-tabs{align-self:center;margin:0 auto} .lb-tabs .seg-opt{min-width:0;padding:0 1.5rem}
+.lb-what{margin:0;color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
+.lb-wrap{position:relative;width:min(40rem,100%);flex:1 1 auto;min-height:8rem;display:flex;flex-direction:column}
+.lb-list{list-style:none;margin:0;padding:.25rem;display:flex;flex-direction:column;gap:.375rem;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:0;max-height:24rem}
+.lb-row,.lb-you{display:grid;grid-template-columns:3.25rem minmax(0,1fr) auto;align-items:center;gap:.75rem;min-height:3.25rem;padding:.25rem 1rem .25rem .5rem;border-radius:var(--r-lg);background:#fff;border:.125rem solid var(--line-faint);box-shadow:var(--sh-1)}
+.lb-row{animation:lb-in 360ms var(--ease-out) backwards} .lb-row:nth-child(2){animation-delay:30ms} .lb-row:nth-child(3){animation-delay:60ms} .lb-row:nth-child(n+4){animation-delay:90ms}
+@keyframes lb-in{from{opacity:0;translate:0 .5rem}}
+.lb-rank{justify-self:center;min-width:2.25rem;height:2.25rem;padding:0 .4rem;display:grid;place-items:center;border-radius:var(--r-pill);font:900 var(--t-md)/1 var(--font);font-variant-numeric:tabular-nums;color:var(--ink-soft);background:var(--sky-2)}
+.lb-row.is-top1 .lb-rank{background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 55%,var(--gold-3));color:var(--warn-deep);box-shadow:0 .125rem 0 rgba(201,127,8,.3)}
+.lb-row.is-top2 .lb-rank{background:linear-gradient(180deg,#fff,var(--silver-2) 55%,var(--silver-3));color:var(--silver-4)}
+.lb-row.is-top3 .lb-rank{background:linear-gradient(180deg,#f6c39a,#d98a4e 55%,#b8662a);color:#fff}
+.lb-row.is-top1{border-color:var(--gold-2)}
+.lb-who{display:flex;align-items:center;gap:.4rem;min-width:0}
+.lb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;color:var(--ink-strong)}
+.lb-v{white-space:nowrap;color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)} .lb-v b{font-size:var(--t-lg);font-weight:900;color:var(--ink-strong);font-variant-numeric:tabular-nums}
+.lb-row.is-me,.lb-you.is-on{border-color:var(--line);background:linear-gradient(180deg,#fff,#eef7fc);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 30%,transparent)}
+.lb-state{position:absolute;inset:0;margin:0;display:grid;place-items:center;text-align:center;color:var(--ink-soft);font-weight:700}
+.lb-you{width:min(40rem,100%);grid-template-columns:auto minmax(0,1fr) auto auto}
+.lb-you .lb-rank{min-width:3.25rem;color:var(--line-deep)} .lb-you .lb-rank:empty{display:none}
+.lb-you-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0} .lb-you-text small{color:var(--ink-soft);font-weight:700;font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis}
+.lb-you:not(.is-on) .lb-you-text{grid-column:1 / 3}
+.lb-show{width:min(40rem,100%);border-radius:var(--r-lg)}
+.st-rank-row{display:flex;align-items:center;gap:.625rem;min-width:0}
+.st-place{flex:none;display:inline-flex;align-items:center;gap:.3rem;height:2.25rem;padding:0 .75rem 0 .5rem;border-radius:var(--r-pill);border:.125rem solid var(--line-faint);background:#fff;box-shadow:var(--sh-1);color:var(--line-deep);font:900 var(--t-lg)/1 var(--font);font-variant-numeric:tabular-nums;cursor:pointer;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}
+.st-place:hover,.st-place:focus-visible{border-color:var(--line);box-shadow:var(--glow);transform:translateY(-.0625rem)}
+@media (max-width:480px){ .lb-view{padding:var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row,.lb-you{padding-right:.625rem;gap:.5rem} }

@@ -2520,3 +2520,39 @@ card URLs refresh.
 The owner: the line reads as if the other ranks were not won against people. The Ranks page note now ends at "Diamond and
 above can drop." (The rule behind it, that queue wins against Matt stop paying at 899 trophies, is unchanged.) Numbered 125
 because 124 is taken by the eighth-rank work in progress (docs/RANK8.md).
+## 126. A global leaderboard, and Pro has no divisions
+- The owner: "add a poddle leaderboard page to the main menu ... most interesting kind of stats e.g. longest rally ... one for the
+  trophy count ... on ur stats, you will have a leaderboard number (Champion #301) ... 3 tabs ... ensure that players know that
+  they're looking at global leaderboard". Then, mid-build: "pro wont have divisions, you just go right on the leaderboard ... think
+  about like valorant immortal rank".
+- A sixth home tile, Leaderboard (a podium), shown where the server has its database (like Ranked). The page (/leaderboard, title
+  "Global leaderboard", a GLOBAL "All signed-in players, every country" pill) has three tabs: Trophies (Ranked `ladder.trophies`),
+  Longest rally (`profile.best_rally`, counted by the server, 3 and up) and Win streak (`profile.h_best_streak`, counted matches
+  against people). Fastest swing and hardest hit are left off: the phone reports them (docs/ACCOUNTS.md Q14). Top 100 per board, a
+  tie shares its number (1 + everyone above), gold / silver / bronze numbers for the top three, the DEV pill and the rank emblem
+  beside each name, my own row outlined, and a You bar under the list ("#6 Your global rank", or why not: sign in, pick a username,
+  hidden, or the board's first step).
+- Who is on a board: accounts WITH a username only (guests have no stored name and never appear), minus anyone who turned off
+  "Show me on the global leaderboard" (new `accounts.lb_hidden`, added in db.js extra(); on by default). The switch sits on the page
+  for a signed-in player with a username; hiding, renaming and deleting clear the 30 s list cache so a name leaves at once.
+- Server: `db.leaderboard(board)`, `db.leaderPlaces(owner)` (the same population and order, so "#N" on Your stats is the row's number),
+  `db.leaderHide`; indexes on ladder(trophies), profile(best_rally), profile(h_best_streak). Routes: GET /api/leaderboard?b=trophies|rally|streak
+  (public, 60 a minute, rows are rank/name/value/tier/div, never an owner id), POST /api/leaderboard/hide {hidden} (signed in).
+  /api/stats and /api/me carry `places`. The export says `globalLeaderboard: shown|hidden`.
+- Your stats: a globe pill beside the rank name with the trophy place ("Champion II #6"), a button to the leaderboard; hidden for a
+  guest, a player without a username, a hidden one, or 0 trophies.
+- Pro has no divisions (the owner, like Valorant's top ranks): ladder.js / emblems.js `divOf` is 1 at Pro, `hasDivs(7)` false,
+  `rankName` / `rankLabel` say plain "Pro", `nextDivFloorOf` is null in Pro; old rows with div 2/3 read as Pro through `proDiv` in db.js.
+  A Pro player's own rank reads "Pro #12" (the trophy place) on the Ranked tile, the Ranked view head and the Ranks page; Your stats
+  says "Pro" with the #12 pill. No numeral pill on the Pro emblem (ui.css data-div is removed for Pro), no pips on its road step, and
+  the Ranks page's Pro card says "By leaderboard place". The share card draws Pro with no pill (CARD_V 6). Other players still see
+  only the Pro emblem in a court (the place is not on the wire).
+- Legal (same commit): privacy sections 1 (summary), teens, 3 (table: the switch; Ranked purpose), 4 (Statistics no longer says "We
+  do not publish leaderboards"; a Global leaderboard item; Usernames), 5 (new `poddle.lbSeen`), the legal-basis table (legitimate
+  interests with the switch and objection), 15 (a dated paragraph); terms 5; changelog; docs/ropa.md; CLAUDE.md data flows. Home
+  notice: a one-time toast for a signed-in player with a username ("Your username can now appear on the global leaderboard. You can
+  turn this off on the Leaderboard page"), shown once the lobby is up (opening the lobby clears toasts) and only then remembered in `poddle.lbSeen`. Pages were already dated 2026-09-28.
+- Tests: test/leaderboard.test.mjs (new: population, minimums, order, ties, places equal rows, hiding, export, the routes, no ids);
+  ladder.test (Pro), share.test (CARD_V 6, PRO with no pill), menu and profile-ui (six tiles: 2 over 4, 2 / 2 / 2, one column).
+- Decisions made without the owner (reversible): the three boards; on by default with a switch (existing accounts signed up under "no
+  leaderboards"); accounts only; top 100; a guest sees "Sign in to get on the global leaderboard", no number.

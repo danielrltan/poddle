@@ -12,7 +12,7 @@ const swapText = (el, t, cls) => { if (!el || el.textContent === t) return false
   const done = e => { const c = OV[e.animationName], el = c && e.target.closest?.('.' + c); if (el && (e.type === 'animationend' || !el.getClientRects().length)) el.classList.remove(c); };      // a cancel: only when its card or the HUD was hidden mid-way (restart() itself cancels too)
   document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
 const on2 = (id, type, fn) => { const el = $(id); if (el) el.addEventListener(type, fn); };      // every new element is optional (older markup, a test page)
-import { RANKS, THRESHOLDS, DIV_W, divOf, romanOf, rankLabel, emblemEl, setEmblem, emblemCard, installSprite } from './emblems.js';      // the rank emblems (docs/RANKED.md 6): one sprite at the start of <body>, drawn here and nowhere else
+import { RANKS, THRESHOLDS, DIV_W, divOf, hasDivs, romanOf, rankLabel, emblemEl, setEmblem, emblemCard, installSprite } from './emblems.js';      // the rank emblems (docs/RANKED.md 6): one sprite at the start of <body>, drawn here and nowhere else
 installSprite();
 
 // Shot names for the hit callout. Add new kinds here; an unknown kind falls back to its own name, capitalised.
@@ -75,16 +75,17 @@ const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r, div
 export function rankCrest(crest, r) {
   if (!crest) return; r = rankRef(r) || { tier: 1, div: 1 }; lastRank = { tier: r.tier, div: r.div, best: Math.max(r.tier, lastRank && lastRank.best || 1) }; let w = crest.querySelector('.st-em');
   if (!w) { w = document.createElement('span'); w.className = 'st-em'; w.append(emblemEl(r.tier, 'is-lg')); crest.append(w); } else setEmblem(w.firstElementChild, r.tier);
-  w.dataset.div = String(r.div); w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep); w.setAttribute('role', 'img'); w.setAttribute('aria-label', `Rank: ${rankLabel(r.tier, r.div)}`);
+  setDiv(w, r); w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep); w.setAttribute('role', 'img'); w.setAttribute('aria-label', `Rank: ${rankLabel(r.tier, r.div)}`);
 }
+const setDiv = (el, r) => { if (hasDivs(r.tier)) el.dataset.div = String(r.div); else delete el.dataset.div; };      // Pro has no divisions (NOTES 126): no numeral pill on its emblem
 export function rankBadge(nameEl, r, cls = 'is-xs') {
   if (!nameEl) return; r = rankRef(r);
   let after = nameEl; if (after.nextElementSibling && after.nextElementSibling.classList.contains('reg-badge')) after = after.nextElementSibling;
   const next = after.nextElementSibling, has = !!next && next.classList.contains('rank-badge');
   if (!r) { if (has) next.remove(); return; }
   const name = rankLabel(r.tier, r.div), label = `Rank: ${name}`, ink = RANKS[r.tier - 1].colour.deep;
-  if (has) { if (next.title !== name) { setEmblem(next.firstElementChild, r.tier); next.setAttribute('aria-label', label); next.title = name; next.dataset.div = String(r.div); next.style.setProperty('--rank-ink', ink); } return; }
-  const b = document.createElement('span'); b.className = 'rank-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', label); b.title = name; b.dataset.div = String(r.div); b.style.setProperty('--rank-ink', ink); b.append(emblemEl(r.tier, cls)); after.after(b);
+  if (has) { if (next.title !== name) { setEmblem(next.firstElementChild, r.tier); next.setAttribute('aria-label', label); next.title = name; setDiv(next, r); next.style.setProperty('--rank-ink', ink); } return; }
+  const b = document.createElement('span'); b.className = 'rank-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', label); b.title = name; setDiv(b, r); b.style.setProperty('--rank-ink', ink); b.append(emblemEl(r.tier, cls)); after.after(b);
 }
 export function setScore(me, them) {
   for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); if (+v > 0) { const t = el.closest('.score-tab'); if (t) restart(t, 'ov-scored'); } } }      // the tab that scored gets a sweep of its colour (not the 0-0 reset)
@@ -195,7 +196,7 @@ function trophyReset() {
 function trophyCard(tier, div) {
   const em = $('trophy-em'); if (!em) return null; let c = em.querySelector('.rank-card-em');
   if (!c) { c = emblemCard(tier, 'is-lg', div); em.append(c); return c; }
-  const R = RANKS[tier - 1]; setEmblem(c.querySelector('.rank-em'), tier); setText(c.querySelector('b'), rankLabel(tier, div)); c.dataset.div = String(div); c.style.setProperty('--rank-ink', R.colour.deep); c.style.setProperty('--rank-mid', R.colour.mid); c.hidden = false; return c;
+  const R = RANKS[tier - 1]; setEmblem(c.querySelector('.rank-em'), tier); setText(c.querySelector('b'), rankLabel(tier, div)); setDiv(c, { tier, div }); c.style.setProperty('--rank-ink', R.colour.deep); c.style.setProperty('--rank-mid', R.colour.mid); c.hidden = false; return c;
 }
 // bestOf dots as a row of pips: won of them filled, the one at `now` pulsing (the game in play), the one at `fresh` popping (the game just won)
 function drawPips(ol, n, won, now, fresh = -1) {
@@ -442,7 +443,7 @@ function keepName(from) {                                  // typing in one fiel
 }
 function nameGate() {                                      // first visit: the choices are dimmed (and say so to a screen reader) until the name has a letter
   const need = !playerName(); $('screen-lobby')?.classList.toggle('needs-name', need); $('name-row')?.classList.remove('is-bad');
-  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile)')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats seats nobody: it needs no name
+  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile):not(#btn-leaderboard)')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats and the leaderboard seat nobody: they need no name
 }
 function needName() {                                      // a seat was asked for with no name: the field says so, nothing is sent
   if (playerName()) return false;
@@ -637,10 +638,10 @@ on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'Ar
 // main.js owns the socket; this only draws and reports what was chosen. Handlers carry no name: main.js reads playerName().
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
 export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
-const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats', ranked: 'Ranked', ranks: 'Ranks' };
-const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, ranked: 1, ranks: 2, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
+const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats', ranked: 'Ranked', ranks: 'Ranks', leaderboard: 'Global leaderboard' };      // the board's title says Global: it is everyone, not friends or a region (NOTES 126)
+const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, ranked: 1, leaderboard: 1, ranks: 2, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
 const VIEW_PARENT = { create: 'courts', share: 'courts', tour: 'courts', bracket: 'courts' };      // Back from these goes to Courts, not home (a tournament lives on: T brings it back)
-const NO_NAME = ['share', 'tour', 'bracket', 'profile', 'ranks'];                                 // views with no name row above them
+const NO_NAME = ['share', 'tour', 'bracket', 'profile', 'ranks', 'leaderboard'];                                 // views with no name row above them
 export const viewParent = v => (v === 'ranks' ? ranksFrom : VIEW_PARENT[v] || null);      // Ranks goes back to where it was opened from (Your stats or Ranked)
 const boxes = () => [...$('code-boxes').children];
 let view = 'home', roomsKey = '', on = {}, deep = null, ranksFrom = 'ranked', lastRank = null;      // lastRank: { tier, div, best } from the last rkView / rankCrest, for the Ranks page                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
@@ -656,6 +657,7 @@ export function lobbyView(name, { code, watch } = {}) {
   { const t = $('lobby-title'), tt = view === 'bracket' && ts ? `Tournament ${ts.code}` : VIEW_TITLE[view]; if (t.textContent !== tt) { setText(t, tt); restart(t, 'swap'); } } codeError(''); show('name-row', !NO_NAME.includes(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
   if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour(); else if (view === 'profile' && was !== 'profile' && on.profile) on.profile();      // Your stats: main.js asks web/profile.js to fetch and draw it
   else if (view === 'ranked' && was !== 'ranked' && on.rankedOpen) on.rankedOpen();
+  else if (view === 'leaderboard' && was !== 'leaderboard' && on.leaderboard) on.leaderboard();      // the global leaderboard: web/profile.js fetches and draws it (NOTES 126)
   else if (view === 'ranks') { if (was !== 'ranks' && was !== 'home') ranksFrom = was === 'profile' ? 'profile' : 'ranked'; drawRanks(); if (!lastRank && on.ranksOpen) on.ranksOpen(); }      // a reload on /ranks knows no rank yet: main.js fetches it      // Ranked: the same, and the stadium behind the glass (docs/RANKED.md 2)
   deep = null; for (const b of [$('btn-join'), $('btn-watch-code')]) b?.classList.remove('is-focus');
   if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
@@ -675,7 +677,7 @@ const vis = el => !!el && !el.hidden && !!el.offsetParent;
 const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
-const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('btn-rkx-go') }[view] || $('btn-quick'));
+const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('btn-rkx-go'), leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]') }[view] || $('btn-quick'));
 // The home tiles: how many show (Ranked and Your stats only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
 // tile in DOM slot 2 would make the visible fourth the 4th child. Called on every view change and by web/profile.js when it shows or hides a tile
 export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll('.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }
@@ -837,6 +839,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('btn-watch-code', 'click', () => { const c = getCode(); if (c.length === 4 && !needName() && on.watch) on.watch(c); });
   on2('btn-bot', 'click', () => { if (!needName()) lobbyView('bot'); });
   on2('btn-profile', 'click', () => lobbyView('profile'));      // no name needed: nobody is seated
+  on2('btn-leaderboard', 'click', () => lobbyView('leaderboard')); on2('st-place', 'click', () => lobbyView('leaderboard'));      // the global leaderboard, from its tile or from the #301 beside the rank on Your stats
   on2('btn-ranked', 'click', () => { if (!needName()) lobbyView('ranked'); });      // Ranked seats you: it needs a name, like Quick play
   on2('btn-ranked-go', 'click', () => { if (!needName() && on.ranked) on.ranked(); });
   on2('btn-rk-warm', 'click', () => { if (on.rkWarm) on.rkWarm(); }); on2('btn-rk-cancel', 'click', () => { if (on.rkCancel) on.rkCancel(); });      // the search bar (OPTIONAL WARM-UP): its two actions
@@ -1165,13 +1168,14 @@ export function tourEnded(why, asToast = false) {                               
 // Everything here draws from what main.js / web/profile.js hand in; nothing is fetched. Every string is textContent. Rank names come from
 // web/emblems.js RANKS; a tier is 1..7, anything else = not known.
 const rankName = t => (tierOf(t) ? RANKS[t - 1].name : '');
+const proLabel = (tier, div, place) => (tier === 7 && Number.isInteger(place) && place > 0 ? `Pro #${place.toLocaleString('en-US')}` : rankLabel(tier, div));      // Pro is told apart by the global leaderboard place: 'Pro #12' (NOTES 126)
 const divIn = (n, tier, div) => (div === 2 || div === 3 ? div : div === 1 ? 1 : divOf(n, tier));      // the division as sent, else from the count
 // the tile: { tier, div, trophies, queued }. A tier draws the small emblem beside 'Gold II · 372'; none = the Bronze emblem, dimmed, and 'Play your first match'.
 // queued > 0 lights the corner badge '1 waiting' (the strongest lever on a small player base: the home screen says an opponent exists)
 export function rkTile(o = {}) {
   const em = $('ranked-em'), tier = tierOf(o.tier), n = Math.max(0, o.trophies | 0);
   if (em) { let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs'); em.append(e); } setEmblem(e, tier || 1); e.classList.toggle('is-off', !tier); }
-  setText($('ranked-line-text'), tier ? `${rankLabel(tier, divIn(n, tier, o.div))} · ${n}` : 'Play your first match');
+  setText($('ranked-line-text'), tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n}` : 'Play your first match');
   const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
 }
 // the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
@@ -1184,28 +1188,30 @@ function drawRanks() {
     const t = i + 1, now = !!me && t === me.tier, done = !!me && !now && t <= Math.max(me.tier, me.best || 1), floor = THRESHOLDS[i];
     const li = mk('li', 'rkx-card' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t); li.style.setProperty('--rank-ink', r.colour.deep); li.style.setProperty('--rank-mid', r.colour.mid);
     const em = emblemEl(t, 'is-xl'); if (now) em.classList.add('is-pop');
-    const divs = mk('span', 'rkx-divs'); [0, 1, 2].forEach(d => { const at = floor + d * DIV_W, pip = mk('span', 'rkx-div' + (now && d + 1 <= me.div || done ? ' is-on' : ''), `${romanOf(d + 1)} ${at}${t === 7 && d === 2 ? '+' : ''}`); divs.append(pip); });
-    const tag = now ? mk('span', 'rkx-tag is-now', `You · ${rankLabel(t, me.div)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Never lost') : null;
+    const divs = mk('span', 'rkx-divs'); if (hasDivs(t)) [0, 1, 2].forEach(d => { const at = floor + d * DIV_W, pip = mk('span', 'rkx-div' + (now && d + 1 <= me.div || done ? ' is-on' : ''), `${romanOf(d + 1)} ${at}`); divs.append(pip); });
+    else divs.append(mk('span', 'rkx-div' + (now || done ? ' is-on' : ''), 'By leaderboard place'));      // Pro: no divisions, the global leaderboard tells its players apart
+    const tag = now ? mk('span', 'rkx-tag is-now', `You · ${proLabel(t, me.div, me.place)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Never lost') : null;
     li.append(em, mk('b', 'rkx-name', r.name), mk('small', 'rkx-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`), divs); if (tag) li.append(tag);
     li.setAttribute('aria-label', `${r.name}, from ${floor} trophies${now ? `, your rank, ${rankLabel(t, me.div)}` : done ? ', reached' : ''}`); g.append(li);
   });
 }
 export function rkView(s) {
   const known = !!(s && typeof s === 'object'), tier = known ? tierOf(s.tier) || 1 : 1, n = known ? Math.max(0, s.trophies | 0) : 0, best = known ? Math.max(tier, tierOf(s.best)) : 1, div = known ? divIn(n, tier, s.div) : 1;
-  if (known) { lastRank = { tier, div, best }; if (view === 'ranks') drawRanks(); }
-  const floor = THRESHOLDS[tier - 1] || 0, span = DIV_W * 3, p = Math.max(0, Math.min(1, (n - floor) / span));      // the bar: through the rank (three divisions of 50); Pro III fills it and stays full
+  const place = known && Number.isInteger(s.place) && s.place > 0 ? s.place : null;
+  if (known) { lastRank = { tier, div, best, place }; if (view === 'ranks') drawRanks(); }
+  const floor = THRESHOLDS[tier - 1] || 0, span = DIV_W * 3, p = tier === 7 ? 1 : Math.max(0, Math.min(1, (n - floor) / span));      // Pro fills it and it stays full      // the bar: through the rank (three divisions of 50); Pro III fills it and stays full
   const head = $('rk-emblem'); if (head) { head.replaceChildren(emblemCard(tier, 'is-xl', known ? div : 0)); head.querySelector('.rank-em')?.classList.toggle('is-off', !known); }
-  setText($('rk-tier'), known ? rankLabel(tier, div) : 'No rank yet');
+  setText($('rk-tier'), known ? proLabel(tier, div, place) : 'No rank yet');
   setText($('rk-trophies'), String(n)); setText($('rk-count-word'), n === 1 ? ' trophy' : ' trophies');
   { const b = $('rk-bar'); if (b) { b.style.setProperty('--p', p.toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round(p * 100))); } }
-  const nextAt = div < 3 ? floor + div * DIV_W : THRESHOLDS[tier], nextName = div < 3 ? rankLabel(tier, div + 1) : tier < 7 ? rankLabel(tier + 1, 1) : '';      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
-  setText($('rk-next'), !known ? 'Play Ranked for your first trophies' : !nextName ? 'Top rank' : `${Math.max(1, nextAt - n)} to ${nextName}`);
+  const nextAt = div < 3 ? floor + div * DIV_W : THRESHOLDS[tier], nextName = tier === 7 ? '' : div < 3 ? rankLabel(tier, div + 1) : rankLabel(tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
+  setText($('rk-next'), !known ? 'Play Ranked for your first trophies' : !nextName ? (place ? 'Top rank · your place on the global leaderboard' : 'Top rank · ranked by global leaderboard place') : `${Math.max(1, nextAt - n)} to ${nextName}`);
   const road = $('rk-road'); if (road) { road.textContent = '';
     RANKS.forEach((r, i) => { const t = i + 1, now = t === tier && known, done = !now && (t < tier || t <= best && known), li = mk('li', 'rk-step' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t);
-      const pips = mk('span', 'rk-pips'), lit = now ? div : done ? 3 : 0; for (let k = 1; k <= 3; k++) pips.append(mk('i', k <= lit ? 'is-lit' : '')); pips.setAttribute('aria-hidden', 'true');      // three divisions, filled up to the current one
+      const pips = mk('span', 'rk-pips'), lit = now ? div : done ? 3 : 0; for (let k = 1; k <= (hasDivs(t) ? 3 : 0); k++) pips.append(mk('i', k <= lit ? 'is-lit' : '')); pips.setAttribute('aria-hidden', 'true');      // three divisions, filled up to the current one
       li.append(emblemEl(t, 'is-md'), mk('b', '', r.name), pips, mk('small', '', String(THRESHOLDS[i])));
       const at = known && t === best && Number.isFinite(s.bestAt) && s.bestAt > 0 ? new Date(s.bestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
-      const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? `, your rank, division ${romanOf(div)}` : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
+      const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? (hasDivs(t) ? `, your rank, division ${romanOf(div)}` : ', your rank') : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
       road.append(li); }); }
   const go = $('btn-ranked-go'); if (go) { setText(go, 'Find a match'); go.disabled = rkInQueue; }
   rkNote(known && s.hold ? s.hold : known && s.note ? s.note : known && s.queued > 0 && !rkInQueue ? 'Someone is waiting to play' : '', known && !s.hold && !s.note && s.queued > 0 && !rkInQueue);      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it

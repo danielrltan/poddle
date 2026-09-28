@@ -24,15 +24,15 @@ console.log('tierOf / divOf / floorOf / nextFloorOf');
 ok(L.tierOf(0) === 1 && L.tierOf(149) === 1 && L.tierOf(150) === 2 && L.tierOf(299) === 2 && L.tierOf(300) === 3 && L.tierOf(449) === 3 && L.tierOf(450) === 4 && L.tierOf(599) === 4 && L.tierOf(600) === 5 && L.tierOf(749) === 5 && L.tierOf(750) === 6 && L.tierOf(899) === 6 && L.tierOf(900) === 7 && L.tierOf(9999) === 7, 'tierOf at every rank floor and just under it');
 ok(L.tierOf(-5) === 1 && L.tierOf(NaN) === 1 && L.tierOf('abc') === 1 && L.tierOf(null) === 1 && L.tierOf('300') === 3, 'tierOf: junk and negatives are Bronze, a numeric string counts');
 ok(L.divOf(0) === 1 && L.divOf(49) === 1 && L.divOf(50) === 2 && L.divOf(99) === 2 && L.divOf(100) === 3 && L.divOf(149) === 3 && L.divOf(150) === 1 && L.divOf(200) === 2 && L.divOf(250) === 3 && L.divOf(299) === 3, 'divOf: Bronze I 0, II 50, III 100; Silver I 150, II 200, III 250');
-ok(L.divOf(900) === 1 && L.divOf(950) === 2 && L.divOf(1000) === 3 && L.divOf(5000) === 3, 'Pro I 900, II 950, III 1000 and up (no cap)');
+ok(L.divOf(900) === 1 && L.divOf(950) === 1 && L.divOf(1000) === 1 && L.divOf(5000) === 1 && !L.hasDivs(7) && L.hasDivs(6) && E.divOf(1000) === 1 && !E.hasDivs(7) && E.rankLabel(7, 3) === 'Pro', 'Pro has no divisions (NOTES 126): 900 and up is plain Pro, on both sides of the wire');
 ok(L.divOf(157, 2) === 1 && L.divOf(157, 1) === 3 && L.divOf(-9) === 1 && L.divOf('x') === 1, 'divOf with a tier given, clamped; junk is I');
-{ let bad = 0; for (let t = 0; t <= 1200; t++) { const tier = L.tierOf(t), d = L.divOf(t, tier), want = 1 + Math.min(2, Math.floor((t - L.floorOf(tier)) / 50)); if (d !== want || L.divFloorOf(tier, d) > t || (d < 3 && L.nextDivFloorOf(tier, d) !== L.divFloorOf(tier, d + 1)) || (d === 3 && L.nextDivFloorOf(tier, d) !== L.nextFloorOf(tier))) bad++; }
-  ok(bad === 0, `every count 0..1200: divOf is 1 + min(2, floor((t - floor) / 50)), divFloorOf <= t, nextDivFloorOf chains into the next rank (${bad} off)`); }
+{ let bad = 0; for (let t = 0; t < 900; t++) { const tier = L.tierOf(t), d = L.divOf(t, tier), want = 1 + Math.min(2, Math.floor((t - L.floorOf(tier)) / 50)); if (d !== want || L.divFloorOf(tier, d) > t || (d < 3 && L.nextDivFloorOf(tier, d) !== L.divFloorOf(tier, d + 1)) || (d === 3 && L.nextDivFloorOf(tier, d) !== L.nextFloorOf(tier))) bad++; }
+  ok(bad === 0, `every count 0..899: divOf is 1 + min(2, floor((t - floor) / 50)), divFloorOf <= t, nextDivFloorOf chains into the next rank (${bad} off)`); }
 ok(L.romanOf(1) === 'I' && L.romanOf(2) === 'II' && L.romanOf(3) === 'III' && L.romanOf(0) === 'I' && L.romanOf(9) === 'III', 'romanOf: I, II, III, clamped');
-ok(L.rankName(3, 2) === 'Gold II' && L.rankName(1, 1) === 'Bronze I' && L.rankName(7, 3) === 'Pro III' && L.rankName(4) === 'Platinum', 'rankName: "Gold II"; the rank alone without a division');
+ok(L.rankName(3, 2) === 'Gold II' && L.rankName(1, 1) === 'Bronze I' && L.rankName(7, 3) === 'Pro' && L.rankName(4) === 'Platinum', 'rankName: "Gold II"; the rank alone without a division');
 ok([1, 2, 3, 4, 5, 6, 7].every(t => L.floorOf(t) === L.FLOORS[t - 1]) && L.floorOf(0) === 0 && L.floorOf(99) === 900, 'floorOf per tier, clamped outside 1..7');
 ok(L.divFloorOf(2, 1) === 150 && L.divFloorOf(2, 2) === 200 && L.divFloorOf(2, 3) === 250 && L.divFloorOf(7, 3) === 1000, 'divFloorOf');
-ok(L.nextFloorOf(1) === 150 && L.nextFloorOf(6) === 900 && L.nextFloorOf(7) === null && L.nextDivFloorOf(1, 3) === 150 && L.nextDivFloorOf(7, 3) === null && L.nextDivFloorOf(7, 2) === 1000, 'nextFloorOf / nextDivFloorOf: the next floor, null at Pro III');
+ok(L.nextFloorOf(1) === 150 && L.nextFloorOf(6) === 900 && L.nextFloorOf(7) === null && L.nextDivFloorOf(1, 3) === 150 && L.nextDivFloorOf(7, 3) === null && L.nextDivFloorOf(7, 1) === null && L.nextDivFloorOf(6, 3) === 900, 'nextFloorOf / nextDivFloorOf: the next floor, null in Pro');
 ok(E.rankOf(240).id === 2 && E.rankOf(900).id === 7 && E.rankOf(0).id === 1 && E.rankOf(149).id === 1, 'emblems.rankOf agrees with tierOf on both sides of a floor');
 
 console.log('floors: sticky per RANK through Platinum (divisions inside can be lost), demotion above, never below 450');

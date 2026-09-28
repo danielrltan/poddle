@@ -27,7 +27,7 @@ const V = {
   'champion-3': [prof({ ladder: lad(868), played: 140, human: { wins: 52, losses: 30, streak: 3, bestStreak: 9 }, titles: 3, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 33 }, hit: { v: 85 }, speed: { v: 30 } },
     play: { hits: 5200, returns: 3300, chances: 4100, winners: 610, aces: 120, smashes: 300 } }), 'Chloe_C'],   // the longest rank name: CHAMPION III
   'pro-top': [prof({ ladder: lad(1046), played: 410, human: { wins: 160, losses: 44, streak: 11, bestStreak: 17 }, titles: 9, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 58 }, hit: { v: 95 }, speed: { v: 36 } },
-    play: { hits: 16000, returns: 11800, chances: 12600, winners: 2300, aces: 540, smashes: 1300 } }), 'TopSpin'],   // the top of the ladder: Pro III
+    play: { hits: 16000, returns: 11800, chances: 12600, winners: 2300, aces: 540, smashes: 1300 } }), 'TopSpin'],   // the top of the ladder: Pro (no divisions, NOTES 126)
 };
 for (const [name, [p, user]] of Object.entries(V)) {
   const d = card.dataOf(p, user), svg = card.svgOf(d), t = Date.now();

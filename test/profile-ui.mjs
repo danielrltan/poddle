@@ -152,8 +152,8 @@ const SIZES = [[1920, 1080], [1280, 720], [1024, 768], [900, 700], [760, 600], [
 const rows = () => ev(pg, () => { const t = [...document.querySelectorAll('#lobby-home .tile')].filter(e => !e.hidden).map(e => e.offsetTop), m = new Map();      // offsetTop: the focused or hovered tile is lifted by a transform
   for (const y of t) m.set(y, (m.get(y) || 0) + 1); return { n: t.length, rows: [...m.values()], over: document.querySelector('#lobby-home .tiles').scrollWidth > innerWidth, dn: document.querySelector('#lobby-home .tiles').dataset.n }; });
 { const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250); const r = await rows();
-    if (r.n !== 5 || r.dn !== '5' || !['2,3', '2,1,1,1', '1,1,1,1,1'].includes(r.rows.join()) || r.over) bad.push(`${w}x${h}: ${J(r)}`); }
-  ok(!bad.length, `home tiles: 5 as 2 over 3, 2 / 1 / 1 / 1 or one column at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
+    if (r.n !== 6 || r.dn !== '6' || !['2,4', '2,2,2', '1,1,1,1,1,1'].includes(r.rows.join()) || r.over) bad.push(`${w}x${h}: ${J(r)}`); }
+  ok(!bad.length, `home tiles (NOTES 126: six with the Leaderboard): 2 over 4, 2 / 2 / 2 or one column at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 await pg.setViewport({ width: 1280, height: 720 }); await sleep(250);
 r = await ev(pg, () => ({ tile: !document.getElementById('btn-ranked').hidden, line: document.getElementById('ranked-line-text').textContent, noRow: !document.getElementById('btn-set-ranked') }));
 ok(r.tile && r.noRow, `with a database the Ranked tile shows; Settings has no Ranked row (NOTES 109: stats rows left Settings) (tile ${r.tile}, no row ${r.noRow})`);

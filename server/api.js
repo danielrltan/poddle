@@ -21,7 +21,7 @@ function init({ env = process.env } = {}) {
   hosted = !!env.FLY_APP_NAME;
   verifier = auth.verifierFromEnv(env);                          // logs 'auth: GOOGLE_JWKS_FILE ignored in production' when it applies
   clientId = verifier ? String(env.GOOGLE_CLIENT_ID).trim() : null;
-  limiter = auth.createRateLimiter(); salt = crypto.randomBytes(32); saltAt = Date.now(); nonces.clear();
+  limiter = auth.createRateLimiter(); salt = crypto.randomBytes(32); saltAt = Date.now(); nonces.clear(); lbCache.clear();
   const r = Math.floor(Number(env.RENAME_DAYS)); renameDays = env.RENAME_DAYS !== undefined && env.RENAME_DAYS !== '' && Number.isFinite(r) ? Math.min(3650, Math.max(0, r)) : 30;
 }
 const signinOn = () => !!verifier;
@@ -73,13 +73,31 @@ const deviceOf = (b, req) => {                                    // the body's 
 // ---- the routes (8.2) ----
 async function me(req, res) {
   const s = db.isOpen() ? session(req) : null;                   // a failed write elsewhere (a full disk) does not sign anyone out
-  send(res, 200, { signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok(), ladder: s ? db.ladderOf(s.ownerId, Date.now()) : null });   // ladder (docs/RANKED.md 10.1): the signed-in account's rank for the home tile; a guest reads it from /api/stats with its device id
+  send(res, 200, { signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok(), ladder: s ? db.ladderOf(s.ownerId, Date.now()) : null, places: s ? db.leaderPlaces(s.ownerId) : null });   // places (NOTES 126): the home tile's 'Pro #12' from the first screen   // ladder (docs/RANKED.md 10.1): the signed-in account's rank for the home tile; a guest reads it from /api/stats with its device id
 }
 const withShare = (p, o, req) => (p ? Object.assign(p, { share: share.linkOf(o, req) }) : p);   // the live share link ({ url, image } | null): the page knows it before any click (docs/SHARE.md 2)
+const withPlaces = (p, o) => (p ? Object.assign(p, { places: db.leaderPlaces(o) }) : p);   // the global leaderboard places (NOTES 126): Your stats shows 'Champion #301'. Not in profileOf: the export and the card stay as they are
 async function statsRoute(req, res, b) {
-  const s = session(req); if (s) return send(res, 200, { profile: withShare(db.profileOf(s.ownerId), s.ownerId, req) });
+  const s = session(req); if (s) return send(res, 200, { profile: withPlaces(withShare(db.profileOf(s.ownerId), s.ownerId, req), s.ownerId) });
   const h = deviceOf(b, req), o = h ? db.guestOwner(h) : null;   // a merged device reads nothing: account data needs the cookie (8.1)
-  send(res, 200, { profile: o != null ? withShare(db.profileOf(o), o, req) : null });
+  send(res, 200, { profile: o != null ? withPlaces(withShare(db.profileOf(o), o, req), o) : null });
+}
+// the global leaderboards (NOTES 126): the top 100 of one board, the same for every visitor, kept LB_MS in memory (a new match shows within a minute)
+const LB_MS = 30e3, lbCache = new Map();                          // board -> { at, body }
+async function leaderRoute(req, res) {
+  const q = new URL(String(req.url || ''), 'http://x').searchParams.get('b') || 'trophies';
+  if (!db.BOARDS.includes(q)) return fail(res, 400, 'bad_request');
+  const t = Date.now(), c = lbCache.get(q);
+  if (c && t - c.at < LB_MS) return send(res, 200, c.body);
+  const L = db.leaderboard(q); if (!L) return fail(res, 503, 'db_unavailable');
+  const body = { board: q, total: L.total, at: t, rows: L.rows };
+  lbCache.set(q, { at: t, body }); send(res, 200, body);
+}
+async function leaderHide(req, res, b) {                         // Show me on the global leaderboard (signed in only: a guest is never on it)
+  const s = session(req); if (!s) return fail(res, 401, 'signin');
+  const v = own(b, 'hidden'); if (typeof v !== 'boolean') return fail(res, 400, 'bad_request');
+  if (!db.leaderHide(s.ownerId, v)) return fail(res, 503, 'db_unavailable');
+  lbCache.clear(); send(res, 200, { hidden: v, places: db.leaderPlaces(s.ownerId) });   // hiding takes the name off every board at once, not after the cache
 }
 async function nonce(req, res) {
   const n = auth.newNonce(); nonceIssue(n, Date.now());          // kept, so a token can only be used with a nonce this server handed out, once
@@ -111,7 +129,7 @@ async function username(req, res, b) {
   if (!names) return fail(res, 503, 'db_unavailable');
   const v = names.validate(own(b, 'username')); if (!v.ok) return fail(res, 422, 'invalid', undefined, { reason: v.reason });
   const now = Date.now(), r = db.claimUsername(s.accountId, v.name, v.key, now);
-  if (r === 'ok') return send(res, 200, { username: v.name, renameAt: now + renameDays * DAY });
+  if (r === 'ok') { lbCache.clear(); return send(res, 200, { username: v.name, renameAt: now + renameDays * DAY }); }   // a new name shows on the boards at once
   if (r === 'taken' || r === 'held') return fail(res, 409, 'taken');   // never says which
   if (r === 'cooldown') { const a = db.accountById(s.accountId); return fail(res, 423, 'cooldown', undefined, { until: a && a.renamed_at != null ? a.renamed_at + renameDays * DAY : now }); }
   fail(res, 503, 'db_unavailable');
@@ -124,7 +142,7 @@ async function del(req, res, b) {
   if (s || g != null) stats.forget({ accountId: s ? s.accountId : null, devHash: g != null || merged ? h : null, deleted: true });   // first: no live seat or socket frozen on this account or device may write it again (3.3)
   if (s) { share.forget(s.ownerId); out.account = db.deleteOwner(s.ownerId, now); }   // forget: the card pictures in memory go with the link
   if (g != null) { share.forget(g); out.device = db.deleteOwner(g, now); }
-  send(res, 200, { deleted: out }, { 'Set-Cookie': auth.clearSessionCookie() });
+  lbCache.clear(); send(res, 200, { deleted: out }, { 'Set-Cookie': auth.clearSessionCookie() });   // a deleted account leaves the boards at once, not after the cache
 }
 async function exportRoute(req, res, b) {
   const s = session(req), h = auth.deviceHash(own(b, 'dev')), g = h ? db.guestOwner(h) : null, o = s ? s.ownerId : g;
@@ -161,6 +179,8 @@ const ROUTES = {
   '/api/account': { DELETE: [del, 5, HOUR, false, true] },
   '/api/export': { POST: [exportRoute, 10, HOUR, false, true] },
   '/api/share': { POST: [shareMake, 20, MIN, false, true], DELETE: [shareStop, 20, MIN, false, true] },
+  '/api/leaderboard': { GET: [leaderRoute, 60, MIN, false, true] },
+  '/api/leaderboard/hide': { POST: [leaderHide, 20, MIN, true, true] },
 };
 
 // handle(req, res) -> Promise that never rejects. game.js: api.handle(req, res).catch(() => {})

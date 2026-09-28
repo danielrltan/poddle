@@ -30,7 +30,7 @@ Important changes also need a notice on the home page. Open questions for the op
   until evicted or a restart, the last 64 card PNGs.
 - Server database (SQLite `node:sqlite` at PODDLE_DB=/data/poddle.db on the Fly volume poddle_data; server/db.js,
   docs/ACCOUNTS.md 2.2): owners (kind, created, last match/sign-in); devices (SHA-256 of the device id, merge date);
-  accounts (Google `sub` only, username + confusable-folded key, created, renamed, merge count; NO email, name or
+  accounts (Google `sub` only, username + confusable-folded key, created, renamed, merge count, lb_hidden (Show me on the global leaderboard off); NO email, name or
   picture from Google); sessions (SHA-256 of the cookie token, created, expires 180 d, last seen hourly; max 10);
   profile + bot_record (W/L, streaks, points, titles, best rally/hit/speed + dates, four Matt rungs: wire 0,1,3,2;
   play totals over counted matches: hits, returns, chances, winners, aces, smashes, points won/lost, seconds played);
@@ -47,13 +47,15 @@ Important changes also need a notice on the home page. Open questions for the op
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
   (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a DEV pill
   and in orange. In Ranked courts the rank emblem (the rank's tier and division only, never trophies or record) beside a
-  name, to the opponent and spectators (VS card, scoreboard, result card). Stats are otherwise private to their owner (no
-  leaderboards) unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
+  name, to the opponent and spectators (VS card, scoreboard, result card). The global leaderboard (NOTES 126; GET /api/leaderboard, public, no sign-in): the top 100 of three boards (Ranked
+  trophies, best rally, best win streak vs people), each row place + username + value + rank emblem (tier/div), accounts WITH a
+  username only, never guests, never an owner id; accounts.lb_hidden = 1 (Show me on the global leaderboard off) takes a name off
+  at once. A player's own places ride on /api/stats and /api/me. Stats are otherwise private to their owner unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
   (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), Ranked rank + ladder trophies and its
   emblem, toughest Matt beaten, the same six card stats for everyone (return rate, rally, swing, record vs people, best streak, winners), also in the og tags; the apps it is pasted into fetch it for
   previews and may keep them. Both players are told when a match did not count.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen (the one-time global leaderboard notice was shown), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat or Ranked queue entry; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`

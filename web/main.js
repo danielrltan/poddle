@@ -318,7 +318,7 @@ function request(m) {                               // one lobby request at a ti
 }
 // the menu's address (NOTES 108): each lobby view has a path the server answers with this same page, so a reload lands back on it instead of the title.
 // replaceState only: the browser's Back button still leaves the site as before. A court keeps '/' with its ?court=CODE (the invite).
-const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', ranked: '/ranked', ranks: '/ranks', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile', '/ranked': 'ranked', '/ranks': 'ranks' };
+const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', ranked: '/ranked', ranks: '/ranks', leaderboard: '/leaderboard', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile', '/ranked': 'ranked', '/ranks': 'ranks', '/leaderboard': 'leaderboard' };
 let routing = false;      // off until the reload's view is back (the boot's title screen must not wipe /stats first)
 function route() { if (!LOBBY || !routing) return; const p = room ? '/' : ui.currentScreen() === 'lobby' ? VIEW_PATH[ui.lobbyView()] || '/play' : ui.currentScreen() === 'title' ? '/' : null;
   if (p && p !== location.pathname && (location.pathname === '/' || PATH_VIEW[location.pathname])) history.replaceState(null, '', p + location.search + location.hash); }      // only ever swaps one of our own paths (a local copy served from /web/index.html keeps its path)
@@ -355,7 +355,7 @@ const THEME = { park: '#dfeef6', stadium: '#0b1116' };
 function setVenue(name) {                          // the scene's venue (web/scene.js setVenue, body[data-venue]) and the browser's own colour bar with it
   if (scene.setVenue) scene.setVenue(name); const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', THEME[name] || THEME.park); }
 const venueSync = () => setVenue(rkOn() || onRankedView() ? 'stadium' : 'park');      // the stadium behind the Ranked view (built behind the glass, never on court) and in its courts; the park everywhere else
-const rkTile = () => ui.rkTile?.({ tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, queued: rkOthers() });
+const rkTile = () => ui.rkTile?.({ tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, place: rkYou.place, queued: rkOthers() });      // place: the trophy leaderboard place, 'Pro #12' on the tile (NOTES 126)
 const rkViewNote = (text, ms = 4000) => { rkNoteHold = performance.now() + ms; rkNoteText = text; if (onRankedView()) ui.rkNote?.(text); };      // a line under Find a match, held over the lobby's own 'Someone is waiting' for a while
 const rkNoteHeld = () => performance.now() < rkNoteHold ? rkNoteText : '';      // and over the view's own redraws (profile.showRanked draws it twice as it opens): rkView gets it as s.hold
 const RK_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'];      // web/emblems.js RANKS, by tier
@@ -371,7 +371,7 @@ function rkResNote(m) {                            // my side of a settlement as
 function onRk(m) {                                 // the queue snapshot { phase, you, queued, place, since }: on entry, on change, 'off' when the entry ends
   clearTimeout(rkHang); rkWait = false; if (pending && pending.type === 'rk') settle();
   rkPhase = ['queue', 'vs', 'match', 'off'].includes(m.phase) ? m.phase : 'off'; rkQueued = rkPhase !== 'off'; rkWarmNow = m.warm === true; if (!rkQueued) rkSinceP = 0;      // the entry ended: the next one's pill starts from its own clock
-  if (m.you && typeof m.you === 'object') { const r = rankRef(m.you); rkYou = { tier: r ? r.tier : rkYou.tier, div: r ? r.div : rkYou.div, trophies: Number.isInteger(m.you.trophies) ? m.you.trophies : rkYou.trophies }; }
+  if (m.you && typeof m.you === 'object') { const r = rankRef(m.you); rkYou = { tier: r ? r.tier : rkYou.tier, div: r ? r.div : rkYou.div, trophies: Number.isInteger(m.you.trophies) ? m.you.trophies : rkYou.trophies, place: rkYou.place }; }
   if (Number.isFinite(m.since) && m.since > 0) rkSinceP = performance.now() - Math.max(0, Date.now() - m.since);
   if (Number.isInteger(m.queued)) rkQueuedN = Math.max(0, m.queued); rkTile();
   if (rkKind === 'warm') ui.rkPill?.({ on: rkQueued, since: rkSinceP, queued: rkOthers() });      // the snapshot's count includes me: the pill says whether SOMEONE ELSE is waiting
@@ -834,6 +834,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   bot: playBot,
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
   profile: () => profile.showProfile(),      // Your stats: web/profile.js fetches and draws it
+  leaderboard: () => profile.showBoard(),      // the global leaderboard (NOTES 126): web/profile.js too
   ranked: () => { if (pending || room || rkQueued) return; profile.seated(); ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1), waiting in the lobby. It settles on rk (queued, or a partner at once) or rkfail. profile.seated(): a first visit's device id is made now and its hello goes first, or the entry could never be paired
   rkWarm: () => { if (pending || room || !rkLobbyQ()) return; if (phase === 'title') play(); request({ type: 'rkwarm' }); rkBarSync(); },      // the search bar's Warm up with Matt: the warm-up court (settles on room, or rkfail busy { warm })
   rkCancel: () => { if (!rkLobbyQ()) return; if (pending && pending.type === 'rkwarm') settle(); game.send({ type: 'rkleave' }); },      // the search bar's Cancel: out of the queue (the server answers rk { phase: off })
@@ -841,7 +842,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
 profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
-  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0 }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
+  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), board: () => { if (!room) ui.lobbyView('leaderboard'); }, rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0, place: Number.isInteger(L.place) ? L.place : rkYou.place }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 rkTile();                                          // the Ranked tile's line before anything is known: the dimmed Bronze emblem and 'Play your first match'
 { const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats, /ranked...: straight back to that view (after profile.init: Your stats fetches through it)

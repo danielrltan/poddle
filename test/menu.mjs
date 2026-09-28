@@ -159,7 +159,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   const shot = async n => { await sleep(450); await pg.screenshot({ path: `${root}test/ui-shots/menu-${n}-${w}x${h}.png` }); const c = (await st(pg)).clipped; ok(!c.length, `${tag} ${n}: nothing clipped ${c}`); };
   await pg.click('#btn-start'); await sleep(900); s = await st(pg);
   const tiles = await pg.evaluate(() => ({ b: [...document.querySelectorAll('#lobby-home .tile:not([hidden])')].map(b => b.querySelector('b').textContent.trim()), n: document.querySelector('#lobby-home .tiles').dataset.n, line: document.getElementById('ranked-line-text').textContent, em: !!document.querySelector('#ranked-em .rank-em:not([hidden])'), venue: document.body.dataset.venue }));
-  ok(tiles.b.join('|') === 'Quick play|Ranked|Courts|Play a bot|Your stats' && tiles.n === '5' && s.focus === 'btn-quick', `${tag} five tiles in order, data-n=5, Quick play focused (${tiles.b.join(' | ')}, n=${tiles.n}, ${s.focus})`);
+  ok(tiles.b.join('|') === 'Quick play|Ranked|Courts|Play a bot|Your stats|Leaderboard' && tiles.n === '6' && s.focus === 'btn-quick', `${tag} six tiles in order (NOTES 126: + Leaderboard), data-n=6, Quick play focused (${tiles.b.join(' | ')}, n=${tiles.n}, ${s.focus})`);
   ok(tiles.line === 'Play your first match' && tiles.em && tiles.venue !== 'stadium', `${tag} the Ranked tile says "${tiles.line}" with a dimmed emblem before a rank is known; the park behind the home (${tiles.venue})`);
   await shot('11-home-five');
   await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-ranked', `${tag} Right from Quick play is Ranked`); await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-courts', `${tag} then Courts`); await pg.keyboard.press('ArrowLeft');
