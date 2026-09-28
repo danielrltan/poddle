@@ -2514,3 +2514,9 @@ The owner asked for the Platinum rank to read more aqua. web/emblems.js RANKS[3]
 family. It stays greener and paler than Diamond's sky blue. Everything that reads RANKS (the Ranks page cards, the rank pills
 and emblems, Your stats, the RANK UP beat, the share card's emblem and ink) follows; the share card's emblem digest changes, so
 card URLs refresh.
+
+## 125. The Ranks page drops "Pro is won only against people"
+
+The owner: the line reads as if the other ranks were not won against people. The Ranks page note now ends at "Diamond and
+above can drop." (The rule behind it, that queue wins against Matt stop paying at 899 trophies, is unchanged.) Numbered 125
+because 124 is taken by the eighth-rank work in progress (docs/RANK8.md).
