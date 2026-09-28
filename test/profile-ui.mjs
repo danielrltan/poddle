@@ -227,7 +227,7 @@ r = await ev(pg, () => ({ card: !document.getElementById('acct-layer').hidden &&
 ok(r.card && !r.age && google.some(u => u.startsWith('https://accounts.google.com/gsi/client')) && /could not load/.test(r.err), `the sign-in card opens (no age box) and only then is gsi/client requested (${google[0]}), aborted -> "${r.err}"`);
 // the nudge shows only with sign-in on, for a guest, after a win outside a tournament
 await ev(pg, () => document.getElementById('btn-signin-close').click()); await sleep(300); await ev(pg, () => window.__ui.settings(false)); await sleep(200);
-await pg.click('#btn-start').catch(() => {}); await sleep(800); await pg.click('#btn-quick').catch(() => {}); await sleep(1400);
+await pg.click('#btn-start').catch(() => {}); await sleep(800); await ev(pg, () => window.__ui.lobbyView('home')); await sleep(300); await pg.click('#btn-quick').catch(() => {}); await sleep(1400);
 push({ type: 'matchover', winner: 0, score: [11, 5], forfeit: false, rematchBy: 20, reg: [false, false] }); await sleep(150);
 push({ type: 'profile', saved: true, guest: true, ranked: true, first: true, level: 0, nudge: true, bests: [], why: [] }); await sleep(400);
 r = await ev(pg, () => { const b = document.getElementById('btn-save-signin'); return { shown: !b.hidden, text: b.textContent, focus: document.activeElement?.id || '' }; });
