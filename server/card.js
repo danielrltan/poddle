@@ -27,7 +27,7 @@ function emblems() {
   return EMB;
 }
 const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'];   // server/ladder.js NAMES; used only if web/emblems.js did not load
-const INK = ['#7e4512', '#6d7f8c', '#b8720a', '#3f6f8f', '#0f7fae', '#4f23a8', '#4a2f8a'];   // web/emblems.js RANKS colour.deep, the same fallback
+const INK = ['#7e4512', '#6d7f8c', '#b8720a', '#1f7a86', '#0f7fae', '#4f23a8', '#4a2f8a'];   // web/emblems.js RANKS colour.deep, the same fallback
 
 const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/s rounded to 10, as Your stats shows it

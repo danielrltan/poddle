@@ -2506,3 +2506,11 @@ The owner wanted the old stamp that slammed onto the win screen back, reading VI
   section 97 stay gone; the light sweep of NOTES 104 still crosses the card.
 - The result title is unchanged ("You win", "You beat Matt", "You win the match" as NOTES 121's plainer copy has them).
 - test/ui-next.mjs checks the stamp's text on a win (it asserted no stamp since NOTES 104).
+
+## 123. Platinum is tinted aqua
+
+The owner asked for the Platinum rank to read more aqua. web/emblems.js RANKS[3].colour is deep #1f7a86 / mid #a8ece8 (was
+#3f6f8f / #cfe3ef, a silver-blue close to Silver), and the octagon's gradient g8, inner ring and pickleball use the same aqua
+family. It stays greener and paler than Diamond's sky blue. Everything that reads RANKS (the Ranks page cards, the rank pills
+and emblems, Your stats, the RANK UP beat, the share card's emblem and ink) follows; the share card's emblem digest changes, so
+card URLs refresh.
