@@ -54,9 +54,10 @@ function allowRender(req) {                                      // -> { wait (s
   b.n++; return { wait: 0, b };
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-function blurb(d) {                                              // og:description: one line of the best of the card, then where to play
-  const bits = [`${d.rank} rank`, ...d.big.slice(0, 2).map(b => b.label === 'Return rate' ? `${b.value} return rate` : b.label === 'Longest rally' ? `${b.value}-hit rally`
-    : b.label === 'Fastest swing' ? `${b.value}°/s swing` : `${b.value} ${b.label.toLowerCase()}`), d.matt ? `beat the ${d.matt} bot` : null].filter(Boolean);
+function blurb(d) {                                              // og:description: the same figures for everyone (no picking the flattering ones), then where to play
+  const f = k => d.big.find(b => b.label === k) || { value: '-' };
+  const v = (k, s) => (f(k).value === '-' ? null : s(f(k).value));   // no data yet: left out of the sentence (the picture shows '-')
+  const bits = [`${d.rank} rank`, v('Return rate', x => `${x} return rate`), v('Longest rally', x => `${x}-hit rally`), v('Record vs people', x => `${x} vs people`), d.matt ? `beat ${d.matt} Matt (the bot)` : null].filter(Boolean);
   return bits.join(' · ') + '. Pickleball with your phone as the paddle. Play free at poddleball.com';   // what the game is: most people who see the preview never open the page
 }
 function html(d, url, image, img) {

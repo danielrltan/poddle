@@ -60,24 +60,24 @@ ok(!!db.ladderApply({ owner: A.owner_id, delta: 240, won: true, now }) && db.pro
 console.log('servers: ' + PORT + ' (SHARE_RENDERS 2), ' + P_NORES + ' (no resvg), ' + P_HOST + ' (hosted), ' + P_BUSY + ' (SHARE_RENDERS 24)');
 await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS: `--require ${root}test/no-resvg.cjs` }), up(P_HOST, { FLY_APP_NAME: 'poddle-test' }), up(P_BUSY, { SHARE_RENDERS: '24' })]);
 
-// ---- what a card leads with: only figures that flatter (a weak start shows no 5% and no 3-hit rally) ----
-const weak = card.dataOf({ played: 6, bests: { rally: { v: 3 }, speed: { v: 5.06 } }, play: { chances: 60, returns: 3 } }, 'x'), fair = card.dataOf({ bests: { rally: { v: 8 } }, play: { chances: 20, returns: 10 } }, 'x');
-ok(weak.big.map(b => b.label).join() === 'Fastest swing' && weak.chips.join() === '6 matches' && fair.big[0].label === 'Return rate' && fair.big[0].value === '50%' && fair.big[1].label === 'Longest rally',
-  'the return rate is a tile only from 20 chances at 50%+, the rally from 5 hits, matches played only as a chip; otherwise the next figures move up');
-const lose = card.dataOf({ human: { wins: 1, losses: 14 }, played: 15, bests: { speed: { v: 5 } } }, 'sam', { chances: 30, returns: 9, winners: 2, smashes: 1 }), even = card.dataOf({ human: { wins: 9, losses: 9 } }, 'x'), win3 = card.dataOf({ human: { wins: 3, losses: 1, bestStreak: 2 }, bests: { speed: { v: 20 } } }, 'x');
-ok(!lose.big.some(b => b.label === 'Vs people' || /Match/.test(b.label)) && !lose.chips.some(c => /vs people|winner|smash/.test(c)) && !even.big.length && !even.chips.length && win3.big.map(b => b.label).join() === 'Vs people,Best streak,Fastest swing' && win3.big[0].value === '3-1',
-  'a losing or even record is neither a tile nor a chip (nor 1-2 winners or smashes); from 3 wins and more wins than losses it leads the swing');
+// ---- every card shows the same six figures in the same order, zeros included (the owner: no selective stats, cards compare at a glance) ----
+const J = JSON.stringify, SIX = 'Return rate,Longest rally,Fastest swing,Record vs people,Best streak,Winners';
+const weak = card.dataOf({ played: 6, bests: { rally: { v: 3 }, speed: { v: 5.06 } }, play: { chances: 60, returns: 3 } }, 'x'), fresh = card.dataOf({}, 'x');
+const lose = card.dataOf({ human: { wins: 1, losses: 14 }, played: 15, bests: { speed: { v: 5 } } }, 'sam', { chances: 30, returns: 9, winners: 2, smashes: 1 });
+ok([weak, fresh, lose].every(d => d.big.map(b => b.label).join() === SIX) && J(weak.big.map(b => b.value)) === J(['5%', '3', '290', '0-0', '0', '0']) && J(lose.big.map(b => b.value)) === J(['30%', '0', '290', '1-14', '0', '2']),
+  `the same six figures on every card, weak and losing values included (${J(weak.big.map(b => b.value))} | ${J(lose.big.map(b => b.value))})`);
+ok(fresh.big[0].value === '-' && fresh.big[2].value === '-' && fresh.big[1].value === '0' && fresh.big[3].value === '0-0', `no data at all reads '-' (no ball to return yet, no measured swing), a real zero reads 0 (${J(fresh.big.map(b => b.value))})`);
 // ---- the rank is the Ranked ladder's, drawn with web/emblems.js's own emblem (docs/SHARE.md 2; one rank per player, as on Your stats) ----
 const E = await import('../web/emblems.js'), L7 = require('../server/ladder.js');
 const silver = card.dataOf({ ladder: { tier: 2, div: 2, trophies: 240 } }, 'x'), none = card.dataOf({ played: 3 }, 'x'), top7 = card.dataOf({ ladder: { tier: 7, div: 3, trophies: 1046 } }, 'x');
 ok(silver.rank === 'Silver II' && silver.tier === 2 && silver.div === 2 && silver.trophies === 240 && top7.rank === 'Pro III' && top7.trophies === 1046, "the rank is profile.ladder's: 'Silver II', 240 trophies; 'Pro III', 1046");
 ok(none.rank === 'Bronze I' && none.tier === 1 && none.div === 1 && none.trophies === 0, 'no Ranked games (no ladder): Bronze I with 0 trophies, as Your stats reads it');
-ok(card.CARD_V === 4 && /^[0-9a-f]{8}$/.test(silver.em) && card.hashOf(silver) !== card.hashOf({ ...silver, v: 3 }) && card.hashOf(silver) !== card.hashOf({ ...silver, em: '00000000' }), 'CARD_V 4 and the emblem artwork are in the hash: a new look is a new ?v=');
+ok(card.CARD_V === 5 && /^[0-9a-f]{8}$/.test(silver.em) && card.hashOf(silver) !== card.hashOf({ ...silver, v: 3 }) && card.hashOf(silver) !== card.hashOf({ ...silver, em: '00000000' }), 'CARD_V 5 and the emblem artwork are in the hash: a new look is a new ?v=');
 { const sv = card.svgOf(silver), pv = card.svgOf(top7), nv = card.svgOf(none);
   const sprite = E.SPRITE.replace(/\bid="([^"]+)"/g, 'id="em-$1"').replace(/href="#([^"]+)"/g, 'href="#em-$1"').replace(/url\(#([^)]+)\)/g, 'url(#em-$1)'), sym = n => sprite.match(new RegExp(`<symbol id="em-rank-${n}" viewBox="0 0 64 64">([\\s\\S]*?)</symbol>`))[1];
   ok(sv.includes(sym(2)) && pv.includes(sym(7)) && nv.includes(sym(1)) && !sv.includes(sym(7)) && /id="em-pb2"/.test(sv) && sv.includes('href="#em-pb2"') && pv.includes('href="#em-pb7"') && /id="em-g7"/.test(pv), "each card inlines its rank's symbol from web/emblems.js's sprite (Silver, Pro, Bronze), never a redrawn lookalike");
   ok(!/href="#(?!em-)/.test(sv.replace(/<\/defs>[\s\S]*$/, '').split('<defs>')[1] || 'x') && !/href="#sh"/.test(sv) && /id="sh"/.test(sv) && /id="em-sh"/.test(sv), "the sprite's ids are prefixed (its sheen `sh` would otherwise be the card's drop-shadow filter)");
-  ok(/>II<\/text>/.test(sv) && />III<\/text>/.test(pv) && />I<\/text>/.test(nv) && />SILVER II<\/text>/.test(sv) && />PRO III<\/text>/.test(pv) && />240 trophies<\/text>/.test(sv) && !/trophies<\/text>/.test(nv), 'the division on its pill, the rank in capitals, the trophies (none drawn at 0)'); }
+  ok(/>II<\/text>/.test(sv) && />III<\/text>/.test(pv) && />I<\/text>/.test(nv) && />SILVER II<\/text>/.test(sv) && />PRO III<\/text>/.test(pv) && />240 trophies<\/text>/.test(sv) && />0 trophies<\/text>/.test(nv), 'the division on its pill, the rank in capitals, the trophies (0 too: every card lays out the same)'); }
 ok(E.RANKS.every(r => r.name === L7.NAMES[r.id - 1]), 'web/emblems.js and server/ladder.js name the ranks alike');
 // ---- create / get: one link per owner ----
 const a1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieA });
@@ -155,7 +155,7 @@ ok(a3.status === 200 && slug3 && slug3 !== slug && (await req(PORT, 'GET', `/c/$
 // ---- an account with no username, a guest: "Poddle player" ----
 const b1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieB }), pb = b1.status === 200 ? await req(PORT, 'GET', `/c/${slugOf(b1.json.url)}`) : { body: '' };
 ok(b1.status === 200 && /Poddle player/.test(meta(pb.body, 'og:image:alt') || '') && meta(pb.body, 'og:title') === 'A player on Poddle', 'an account with no username (and no matches): a card for "Poddle player"');
-ok((meta(pb.body, 'og:image:alt') || '') === 'A Poddle player card: Bronze I rank' && (meta(pb.body, 'og:description') || '').startsWith('Bronze I rank. '), '...never played Ranked: Bronze I, no trophy count');
+ok((meta(pb.body, 'og:image:alt') || '').startsWith('A Poddle player card: Bronze I rank') && /^Bronze I rank( · |\. )/.test(meta(pb.body, 'og:description') || ''), '...never played Ranked: Bronze I, no trophy count');
 const g1 = await req(PORT, 'POST', '/api/share', { dev: G }), gSlug = slugOf(g1.json && g1.json.url);
 ok(g1.status === 200 && gSlug && (await req(PORT, 'GET', `/c/${gSlug}.png`)).status === 200, 'a guest (device id in the body) gets a link and a card');
 

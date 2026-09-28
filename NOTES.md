@@ -2377,7 +2377,28 @@ The owner wanted "lots of emphasis on the ranked match experience" (Brawl Stars 
   - `ranked-e2e`: 30/30 PASS.
   - Before and after stills are in test/ui-shots/rk-before/ and rk-after/ (not committed).
 
-## 118. Ranked: the Matt warm-up is optional (queue in the lobby, a search bar at the top)
+## 118. Share card: no taunt line, the same six stats on every card
+
+The owner: "Think you can return my serve?" was corny, and the card should not pick flattering stats, so cards compare.
+- **Call to action** (server/card.js): "Play free at poddleball.com" over "Pickleball in your browser · your phone is the paddle".
+- **Fixed figures**: every card draws the same six tiles in two rows, in one order: return rate (with its bar), longest
+  rally (hits), fastest swing (°/s), record vs people, best streak, winners. Zeros are drawn; '-' only where there is no
+  data at all (no ball to return yet, no measured swing). No chips, no thresholds (NOTES 114's 20-chance / 50% / winning-record
+  rules are gone). One figure size for all six. The trophies pill (0 too) and the bot badge ("No bot beaten yet") always show,
+  so the left column is laid out the same on every card. The name moved up so its descenders clear the tiles.
+- og:description names the same figures (return rate, rally, record vs people), leaving out a '-'.
+- CARD_V 5: every card URL changes, so chat apps fetch the new picture. Privacy (the six stats, zeros included), terms,
+  changelog, ropa and CLAUDE.md say "the same six stats"; the pages were already dated 2026-09-28. test/share.test.mjs checks
+  the fixed six on weak, fresh and losing profiles and the '-' rule.
+
+## 119. A win reads Victory!
+
+The owner found the win titles cheesy ("You win the match" after a Ranked series, "You beat Matt", "You win!"). Every win of
+your own now reads **Victory!** on the result card (web/ui.js matchResult). Losses and spectators keep the winner's name
+("Matt wins", "Ann wins", "Bo wins the match"), and the tournament champion card is unchanged. Tests that read the title
+(ui-next, fixes-e2e, rooms-e2e, spectate-e2e, ranked-e2e, ui-shots/verify) now expect "Victory!".
+
+## 120. Ranked: the Matt warm-up is optional (queue in the lobby, a search bar at the top)
 
 The owner: "make matt warm ups optional before queueing ... queue -> dropdown to warm up appears -> stays there until match is found / player
 decides to warm up" (the Overwatch search pill). docs/RANKED.md 3.1, 3.3-3.6, 3.10, 8.1, 8.2 and 9 are marked OPTIONAL WARM-UP 2026-09-28.
@@ -2447,7 +2468,7 @@ ranked-e2e-08-title-bar-*.png.
 - The refused Warm up toast (no court free, or the 1 s cooldown after a warm-up closed, which Back then Enter can hit since focus lands on
   the button) says `Can’t start a warm-up right now. Try again in a moment. You’re still in the queue`: true in both cases.
 
-## 119. Plainer copy across the site
+## 121. Plainer copy across the site
 - The owner: "'matt keeps u warm' wtf is this copy writing, i need u to do an ultracode sweep across the entire website and get rid of bs
   like this". Six readers went through every player-facing string (the game page, ui.js, main.js, profile.js, How to play, What's new,
   404, the phone page, the share card and page, and the legal pages for fluff only); an editor merged them into one list under one
