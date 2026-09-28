@@ -487,11 +487,11 @@ export function setSettings(o = {}) {
   if ('spectator' in o) $('settings')?.classList.toggle('is-spectator', !!o.spectator);
   if ('paddle' in o) { show('set-paddle', !!o.paddle); for (const b of $('paddle-seg2')?.children || []) b.setAttribute('aria-checked', String(b.dataset.paddle === o.paddle)); }      // null: only an AirPod can be the paddle here, nothing to pick
 }
-// forfeit: mid-match against a person (or any Ranked / tournament match), leaving is a forfeit and the button says so. rkWarm: the Ranked warm-up (Leave queue; Matt is fixed).
+// forfeit: mid-match against a person (or any Ranked / tournament match), leaving is a forfeit and the button says so. rkWarm: the Ranked warm-up (Stop warm-up: you stay queued; Matt is fixed).
 // canPause false: the note says why (a tournament match, a Ranked match, or any online game against a person)
 const setNote = { forfeit: false, canPause: true, tourMatch: false, rkMatch: false, rkWarm: false };
 function drawNote() {
-  const b = $('btn-leave-room'), t = setNote.forfeit ? 'Forfeit' : setNote.rkWarm ? 'Leave queue' : 'Leave court';
+  const b = $('btn-leave-room'), t = setNote.forfeit ? 'Forfeit' : setNote.rkWarm ? 'Stop warm-up' : 'Leave court';
   if (b && swapText(b, t) && setOpen && !b.hidden) restart(b, 'ov-nudge');
   const n = $('set-note'); if (!n) return;
   setText(n, setNote.rkMatch ? 'Ranked matches can’t pause' : setNote.tourMatch ? 'Tournament matches can’t pause' : setNote.canPause ? 'Ranked: Matt is fixed while you wait' : 'Online games can’t pause');
@@ -666,7 +666,7 @@ const vis = el => !!el && !el.hidden && !!el.offsetParent;
 const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
-const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('btn-rkx-go') }[view] || $('btn-quick'));
+const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('btn-rkx-go') }[view] || $('btn-quick'));
 // The home tiles: how many show (Ranked and Your stats only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
 // tile in DOM slot 2 would make the visible fourth the 4th child. Called on every view change and by web/profile.js when it shows or hides a tile
 export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll('.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }
@@ -830,6 +830,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('btn-profile', 'click', () => lobbyView('profile'));      // no name needed: nobody is seated
   on2('btn-ranked', 'click', () => { if (!needName()) lobbyView('ranked'); });      // Ranked seats you: it needs a name, like Quick play
   on2('btn-ranked-go', 'click', () => { if (!needName() && on.ranked) on.ranked(); });
+  on2('btn-rk-warm', 'click', () => { if (on.rkWarm) on.rkWarm(); }); on2('btn-rk-cancel', 'click', () => { if (on.rkCancel) on.rkCancel(); });      // the search bar (OPTIONAL WARM-UP): its two actions
   on2('btn-rk-all', 'click', () => lobbyView('ranks')); on2('btn-rkx-go', 'click', () => lobbyView('ranked'));      // the Ranks page, and back into Ranked from it
   for (const id of ['st-crest', 'rk-emblem']) { const el = $(id); if (!el) continue;      // the medal itself opens the Ranks page: a button in all but tag
     el.setAttribute('role', 'button'); el.tabIndex = 0; el.title = 'See all ranks'; el.setAttribute('aria-label', 'See all ranks'); el.classList.add('is-link');
@@ -1196,12 +1197,14 @@ export function rkView(s) {
       const at = known && t === best && Number.isFinite(s.bestAt) && s.bestAt > 0 ? new Date(s.bestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
       const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? `, your rank, division ${romanOf(div)}` : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
       road.append(li); }); }
-  const go = $('btn-ranked-go'); if (go) { setText(go, 'Find a match'); go.disabled = !!(known && s.statsOff); }
-  rkNote(known && s.hold ? s.hold : known && s.statsOff ? 'Turn on Save my stats on the privacy page to play Ranked' : known && s.note ? s.note : known && s.queued > 0 ? 'Someone is waiting to play' : '', known && !s.hold && !s.statsOff && !s.note && s.queued > 0);      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
+  goStatsOff = !!(known && s.statsOff); const go = $('btn-ranked-go'); if (go) { setText(go, 'Find a match'); go.disabled = goStatsOff || rkInQueue; }
+  rkNote(known && s.hold ? s.hold : known && s.statsOff ? 'Turn on Save my stats on the privacy page to play Ranked' : known && s.note ? s.note : known && s.queued > 0 && !rkInQueue ? 'Someone is waiting to play' : '', known && !s.hold && !s.statsOff && !s.note && s.queued > 0 && !rkInQueue);      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
 }
-// the status line under Find a match: '' = the default line. accent: someone is waiting (the line takes the accent colour and pops once per wait)
+// the status line under Find a match: '' = the default line (in the queue: where its two actions are). accent: someone is waiting (the line takes the accent colour and pops once per wait)
+let rkInQueue = false, goStatsOff = false, noteNow = ['', false];
 export function rkNote(text, accent = false) {
-  const el = $('rk-status'); if (!el) return; const t = text || 'You play Matt while it looks for someone';
+  noteNow = [text || '', !!accent];
+  const el = $('rk-status'); if (!el) return; const t = text || (rkInQueue ? 'In the queue. Warm up with Matt or cancel from the bar at the top' : 'You can warm up with Matt while it searches');
   el.classList.toggle('is-accent', !!accent); if (swapText(el, t, accent && !rkQueuedSaid ? 'ov-pop' : '') && accent) rkQueuedSaid = true; if (!accent) rkQueuedSaid = false;
 }
 // the court: kind = 'warm' | 'match' | null. body[data-rk] hides the court pill's invite menu (an rk court is never shared) and themes the HUD
@@ -1214,8 +1217,32 @@ export function rkPill(o = {}) {
   const on = !!o.on, since = Number.isFinite(o.since) && o.since > 0 ? o.since : 0;      // 0: not known yet (a new entry's warm-up room comes before its snapshot)
   if (on !== pillOn) { pillOn = on; el.hidden = !on; clearInterval(pillT); pillT = 0; pillHops = 0; if (on) { pillSince = since || performance.now(); restart(el, 'ov-pill'); pillT = setInterval(tickPill, 1000); tickPill(); } }
   else if (on && since && since !== pillSince) { pillSince = since; pillHops = Math.floor(Math.max(0, performance.now() - since) / 30000); tickPill(); }      // the snapshot's clock: the 30 s hops count from it
-  if (on && 'queued' in o) setText($('rk-pill-sub'), o.queued > 0 ? 'Someone is waiting. Matching you' : 'Matt keeps you warm');
+  if (on && 'queued' in o) setText($('rk-pill-sub'), o.queued > 0 ? 'Someone is waiting. Matching you' : 'You stay queued if you leave');
 }
+// the search bar (docs/RANKED.md 8.1, OPTIONAL WARM-UP): { on, since (performance.now clock), tier, div, busy }. On while queued and off court: it hangs from the top of the title
+// and of every lobby view (ui.css hides it anywhere else). Its timer is textContent once a second; Warm up with Matt is disabled while that request is out (busy).
+// Find a match is disabled while it is up, and the line under it says where the two actions are
+let barT = 0, barSince = 0, barOn = false;
+export function rkBanner(o = {}) {
+  const el = $('rk-search'); if (!el) return;
+  const on = !!o.on, since = Number.isFinite(o.since) && o.since !== 0 ? o.since : 0;      // below 0 is fine: a wait older than this page
+  if (on !== barOn) {
+    const had = el.contains(document.activeElement);
+    barOn = on; rkInQueue = on; el.hidden = !on; clearInterval(barT); barT = 0; document.body.classList.toggle('is-rk-search', on);
+    if (on) { barSince = since || performance.now(); barT = setInterval(tickBar, 1000); tickBar(); }
+    const go = $('btn-ranked-go'); if (go) go.disabled = goStatsOff || on;
+    rkNote(...noteNow);
+    const a = document.activeElement;
+    if (on && (!a || a === document.body || a === go)) $('btn-rk-warm')?.focus({ preventScroll: true });      // Find a match just went grey under the focus: the bar's first action takes it
+    else if (!on && had && slots.menu === 'lobby') viewFocus()?.focus({ preventScroll: true });      // Cancel pressed: back to the view
+  } else if (on && since && since !== barSince) { barSince = since; tickBar(); }
+  if (!on) return;
+  const t = tierOf(o.tier), em = $('rk-search-em');
+  if (em) { let e = em.firstElementChild; if (!e) { e = emblemEl(t || 1, 'is-md'); em.append(e); } setEmblem(e, t || 1); e.classList.toggle('is-off', !t); }
+  setText($('rk-search-sub'), t ? `Ranked · ${rankLabel(t, o.div)}` : 'Ranked');
+  const w = $('btn-rk-warm'); if (w) w.disabled = !!o.busy;
+}
+function tickBar() { const s = Math.max(0, Math.floor((performance.now() - barSince) / 1000)); setText($('rk-search-time'), `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); }
 function tickPill() { const s = Math.max(0, Math.floor((performance.now() - pillSince) / 1000)), t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; setText($('rk-pill-time'), t);
   const hop = Math.floor(s / 30); if (hop > pillHops) { pillHops = hop; restart($('rk-pill-text'), 'ov-pop'); } }
 // Find a match was pressed: the button says Searching (and dips) until the queue answers with a court, a snapshot or a refusal

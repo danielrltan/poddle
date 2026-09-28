@@ -34,7 +34,7 @@ const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, scree
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
 else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
-const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get rk() { return { phase: rkPhase, on: rkOn(), queued: rkQueued, kind: rkKind, tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, series: rkSeries, waiting: rkQueuedN, ranks: [...ranks] }; }, get cam() { return body ? { ready: body.ready, error: body.error, errorName: body.errorName, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, get camView() { return phase === 'camera' ? camView : ''; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
+const stats = window.__stats = { get phase() { return phase; }, get role() { return role; }, get room() { return room; }, get tour() { return tour ? { code: tour.code, phase: tour.phase, kind: tourKind, n: (tour.players || []).length, host: !!(tour.you && tour.you.host), out: !!(tour.you && tour.you.out), champ: tour.champ ? tour.champ.name : null } : null; }, get rk() { return { phase: rkPhase, on: rkOn(), queued: rkQueued, kind: rkKind, tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, series: rkSeries, waiting: rkQueuedN, warm: rkWarmNow, bar: rkLobbyQ(), ranks: [...ranks] }; }, get cam() { return body ? { ready: body.ready, error: body.error, errorName: body.errorName, seen: body.seen(), fps: Math.round(body.fps), via: body.via } : null; }, get camView() { return phase === 'camera' ? camView : ''; }, hits: 0, myHits: 0, whiffs: 0, swings: 0, errors: 0, paddlePath: 0, calibrated: false, events: {} };
 
 let regs = [false, false];                     // a registered username in that seat (docs/ACCOUNTS.md 7.5): the badge beside the name, never text
 let ranks = [null, null];                      // the rank tier (1..7) in that seat in a Ranked court (docs/RANKED.md 6): the emblem beside the name, never text. null = none
@@ -308,9 +308,11 @@ function begin() {                                 // seated: the camera primer 
 function goOn() { if (stats.calibrated && airpodLive()) { phase = 'play'; openCourt(); } else if (airpodLive()) startCal(); else { screen('connect'); padPhase(); } }
 function enterWatch() { phase = 'watch'; openCourt(); }      // a spectator: no AirPod, no bridge, no calibration, no camera. Lobby -> court.
 let pendT = 0;
-function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
+function settle() { const was = pending; pending = null; clearTimeout(pendT); ui.lobbyBusy(false); if (was && was.type === 'rkwarm') rkBarSync(); }
+const RK_ELSEWHERE = new Set(['quick', 'create', 'join', 'watch', 'tcreate']);      // another court while queued for Ranked: the server refuses it (joinfail inrk), so it is never sent
 function request(m) {                               // one lobby request at a time, each carrying the player's name. Not connected right now: it goes out when the socket opens
-  if (pending) return; const n = myName(); m.name = sentName = n; if (n && !profile.username()) ls.set('poddle.name', n);
+  if (pending) return; if (rkLobbyQ() && RK_ELSEWHERE.has(m.type)) { botWant = null; say(RK_IN_QUEUE, null, 3200); return; }
+  const n = myName(); m.name = sentName = n; if (n && !profile.username()) ls.set('poddle.name', n);
   pending = m; ui.lobbyBusy(true); game.send(m);
   pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (m.type === 'rk') ui.rkSearch?.(false); if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // Find a match stops saying Searching too      // an old server never answers: do not leave the lobby dimmed for good
 }
@@ -340,6 +342,12 @@ const tourOn = () => !!tour && tour.phase !== 'done';      // still running: a f
 // rkSeries: { bestOf, game, games, done } of the series I am in. rkYou: my tier and trophies as the server last said. Nothing of the ladder is kept in the browser.
 let rkKind = null, rkQueued = false, rkMoving = false, rkSeries = null, rkYou = { tier: null, div: null, trophies: null }, rkPhase = 'off', rkQueuedN = 0, rkSinceP = 0, rkHang = 0, rkNoteHold = 0, rkVsT = 0, rkUpT = 0, rkRes = null, rkWait = false, rkNoteText = '', rkWalk = false, rkLeft = 0;      // rkRes: a settlement heard while its card still waits behind a set-up screen (drawn with the card). rkWait: a reconnect with &rk=1 waits for its answer (rkHang runs). rkNoteText: the view's held line. rkWalk: the series card's matchover was a forfeit (the stayer's Walkover). rkLeft: until when this seat's own forfeit (Leave, Q Q, Save my stats off) waits for its rkres
 const rkOn = () => rkQueued || !!rkKind;
+// OPTIONAL WARM-UP (docs/RANKED.md 8.1): queued and off court = waiting in the lobby, with the search bar at the top of the title and every lobby view. rkWarmNow: the last snapshot said warm
+let rkWarmNow = false;
+const rkLobbyQ = () => rkQueued && rkPhase === 'queue' && !rkKind && !rkMoving && !spec();
+const rkOthers = () => Math.max(0, rkQueuedN - (rkQueued && rkPhase === 'queue' ? 1 : 0));      // the counts include my own entry: the tile, the pill and the view say whether SOMEONE ELSE waits
+const RK_IN_QUEUE = 'You’re in the Ranked queue. Cancel it to play something else';
+function rkBarSync() { ui.rkBanner?.({ on: rkLobbyQ(), since: rkSinceP, tier: rkYou.tier, div: rkYou.div, busy: !!pending && pending.type === 'rkwarm' }); }
 const RK_FAIL = { nocid: 'Reload and try again', busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', addr: 'Two players on your network are already in the queue', nostats: 'Turn on Save my stats on the privacy page to play Ranked', intour: 'Leave your tournament first' };
 const RK_VIEW_NOTE = { busy: 'Courts are full right now. Try again in a moment', full: 'Courts are full right now. Try again in a moment', intour: 'Leave your tournament first', nostats: 'Turn on Save my stats on the privacy page to play Ranked' };
 const onRankedView = () => phase === 'lobby' && !room && ui.currentScreen() === 'lobby' && ['ranked', 'ranks'].includes(ui.lobbyView());      // the Ranks page stands in the stadium too
@@ -347,7 +355,7 @@ const THEME = { park: '#dfeef6', stadium: '#0b1116' };
 function setVenue(name) {                          // the scene's venue (web/scene.js setVenue, body[data-venue]) and the browser's own colour bar with it
   if (scene.setVenue) scene.setVenue(name); const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', THEME[name] || THEME.park); }
 const venueSync = () => setVenue(rkOn() || onRankedView() ? 'stadium' : 'park');      // the stadium behind the Ranked view (built behind the glass, never on court) and in its courts; the park everywhere else
-const rkTile = () => ui.rkTile?.({ tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, queued: rkQueuedN });
+const rkTile = () => ui.rkTile?.({ tier: rkYou.tier, div: rkYou.div, trophies: rkYou.trophies, queued: rkOthers() });
 const rkViewNote = (text, ms = 4000) => { rkNoteHold = performance.now() + ms; rkNoteText = text; if (onRankedView()) ui.rkNote?.(text); };      // a line under Find a match, held over the lobby's own 'Someone is waiting' for a while
 const rkNoteHeld = () => performance.now() < rkNoteHold ? rkNoteText : '';      // and over the view's own redraws (profile.showRanked draws it twice as it opens): rkView gets it as s.hold
 const RK_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'];      // web/emblems.js RANKS, by tier
@@ -362,24 +370,27 @@ function rkResNote(m) {                            // my side of a settlement as
 }
 function onRk(m) {                                 // the queue snapshot { phase, you, queued, place, since }: on entry, on change, 'off' when the entry ends
   clearTimeout(rkHang); rkWait = false; if (pending && pending.type === 'rk') settle();
-  rkPhase = ['queue', 'vs', 'match', 'off'].includes(m.phase) ? m.phase : 'off'; rkQueued = rkPhase !== 'off'; if (!rkQueued) rkSinceP = 0;      // the entry ended: the next one's pill starts from its own clock
+  rkPhase = ['queue', 'vs', 'match', 'off'].includes(m.phase) ? m.phase : 'off'; rkQueued = rkPhase !== 'off'; rkWarmNow = m.warm === true; if (!rkQueued) rkSinceP = 0;      // the entry ended: the next one's pill starts from its own clock
   if (m.you && typeof m.you === 'object') { const r = rankRef(m.you); rkYou = { tier: r ? r.tier : rkYou.tier, div: r ? r.div : rkYou.div, trophies: Number.isInteger(m.you.trophies) ? m.you.trophies : rkYou.trophies }; }
   if (Number.isFinite(m.since) && m.since > 0) rkSinceP = performance.now() - Math.max(0, Date.now() - m.since);
   if (Number.isInteger(m.queued)) rkQueuedN = Math.max(0, m.queued); rkTile();
-  if (rkKind === 'warm') ui.rkPill?.({ on: rkQueued, since: rkSinceP, queued: Math.max(0, rkQueuedN - (rkQueued ? 1 : 0)) });      // the snapshot's count includes me: the pill says whether SOMEONE ELSE is waiting
+  if (rkKind === 'warm') ui.rkPill?.({ on: rkQueued, since: rkSinceP, queued: rkOthers() });      // the snapshot's count includes me: the pill says whether SOMEONE ELSE is waiting
   if (rkPhase === 'off' && rkKind === 'warm' && room && !spec()) { toLobby(); return; }      // the entry ended under a warm-up (it closed without a 'closed' to me: e.g. Leave pressed on the series card just after Play again): off that dead court
+  if (rkPhase === 'queue' && rkKind === 'match' && room && !spec()) { toLobby(); rkQueued = true; rkPhase = 'queue'; rkBarSync(); venueSync(); return; }      // Play again on the series card: the server took me off it and queued me in the lobby (no room, no closed): the Ranked view with the search bar
   if (rkPhase === 'off' && !rkKind) { venueSync(); redialDue(); }      // out of Ranked in the lobby: a sign-in made meanwhile opens its socket now
-  ui.rkSearch?.(false);
+  if (rkPhase === 'queue' && !rkKind && onRankedView()) ui.rkNote?.('');      // the view's line: in the queue, where the two actions are
+  ui.rkSearch?.(false); rkBarSync();
 }
-function onRkFail(why) {                           // the queue said no: a toast, and the reason under Find a match while the view is up
-  if (pending && pending.type === 'rk') settle(); ui.rkSearch?.(false); rkSinceP = 0;
+function onRkFail(why, warm) {                     // the queue said no: a toast, and the reason under Find a match while the view is up
+  if (warm) { if (pending && pending.type === 'rkwarm') settle(); rkBarSync(); say('No court free for a warm-up right now. Try again in a moment', null, 3200); return; }      // Warm up with Matt refused (no court, or one just closed): still queued, in the lobby
+  if (pending && (pending.type === 'rk' || pending.type === 'rkwarm')) settle(); ui.rkSearch?.(false); rkSinceP = 0; rkQueued = false; rkWarmNow = false; if (!rkKind || rkKind === 'warm') rkPhase = 'off';      // every other rkfail means no entry (refused, or ended: stats off, no hello)
   if (why === 'nostats') rkQuit();                 // Save my stats off mid-series: that is my forfeit (docs/RANKED.md 3.9), the rkres that follows says what it cost
   if (RK_VIEW_NOTE[why]) rkViewNote(RK_VIEW_NOTE[why]);      // held first: the Ranked view that toLobby opens draws it
   if (room && rkKind && !spec()) toLobby();         // every rkfail on a Ranked court comes after the server took the seat away (Play again on the series card, stats off, no hello): no 'closed' follows, so leave the dead court now (toLobby first: it clears toasts)
-  say(RK_FAIL[why] || 'Couldn’t join Ranked. Try again.', null, 3200); redialDue();
+  say(RK_FAIL[why] || 'Couldn’t join Ranked. Try again.', null, 3200); rkBarSync(); redialDue();
 }
 function endRk(why) {                              // rkend: restart | gone (and 'late': an rkres answered the reconnect). Only ever an answer to a reconnect with &rk=1, which left this socket in the lobby: nothing is revived (docs/RANKED.md 3.10)
-  clearTimeout(rkHang); clearTimeout(rkVsT); rkWait = false; rkLeft = 0; rkSinceP = 0; rkQueued = false; rkMoving = false; rkPhase = 'off'; rkSeries = null; ui.rkSearch?.(false); ui.setSeries?.(null);
+  clearTimeout(rkHang); clearTimeout(rkVsT); rkWait = false; rkLeft = 0; rkSinceP = 0; rkQueued = false; rkMoving = false; rkPhase = 'off'; rkWarmNow = false; rkSeries = null; ui.rkSearch?.(false); ui.setSeries?.(null); rkBarSync();
   if (['tour-vs', 'rk-vs'].includes(ui.currentOverlay())) ui.showOverlay(null);
   if (room) toLobby(); else { if (phase === 'lobby' && ui.currentScreen() !== 'lobby') screen('lobby'); if (phase === 'lobby') ui.lobbyView('ranked'); }
   if (why === 'restart') say('Updating. The Ranked match is void, no trophies changed.', null, 4000); venueSync(); redialDue();
@@ -404,8 +415,9 @@ function rkCeremony(m) {                            // the roll's ticks (8.9) an
 }
 function drawSeries() { const S = rkSeries, L = spec() ? 0 : side; ui.setSeries?.(S ? { bestOf: S.bestOf, games: [S.games[L] | 0, S.games[1 - L] | 0], done: S.done } : null); }      // the pips in the rally lozenge, from my side (a spectator: side 0 left)
 function rkMove(m) {                               // rkvs: an opponent is found (docs/RANKED.md 8.3): the MATCH FOUND card now, the series seat in m.at s (the tourMove recipe)
-  clearTimeout(rkHang); rkWait = false; rkLeft = 0; rkMoving = true; rkQueued = true; rkPhase = 'vs'; if (pending && pending.type === 'rk') settle(); ui.rkSearch?.(false);
-  ui.settings(false); ui.tourCard(false); if (ui.currentScreen() === 'lobby') screen(null);
+  clearTimeout(rkHang); rkWait = false; rkLeft = 0; rkMoving = true; rkQueued = true; rkPhase = 'vs'; if (pending && (pending.type === 'rk' || pending.type === 'rkwarm')) settle(); ui.rkSearch?.(false); rkBarSync();
+  if (phase === 'title') phase = 'lobby';           // found while waiting on the title (OPTIONAL WARM-UP): the seat that follows goes through the set-up screens like a lobby one
+  ui.settings(false); ui.tourCard(false); if (['lobby', 'title'].includes(ui.currentScreen())) screen(null);
   ui.confettiOff(); ui.toastOff();                  // the warm-up point's confetti and any toast sit above the veil: MATCH FOUND opens on a clean screen
   scene.setFrozen(true); scene.jingle('found'); padFx('found'); ui.rkPill?.({ on: false }); ui.rkVs?.(m); clearTimeout(rkVsT);
   rkVsT = setTimeout(() => { if (ui.currentOverlay() !== 'rk-vs') return; ui.rkVs?.(null); rkMoving = false; if (room && rkKind === 'warm') { toLobby(); return; } if (!rkKind) { rkQueued = false; rkSinceP = 0; if (phase === 'lobby' && !room) { screen('lobby'); ui.lobbyView('ranked'); } venueSync(); redialDue(); } }, ((+m.at || 5) + 10) * 1000);      // the seat never came (from a warm-up: that court was closed under me with no 'closed', so off it)
@@ -463,10 +475,10 @@ function toLobby(msg) {                            // out of a room, back to the
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
   tourKind = null; tourMoving = false; ui.tourCourt(null);
-  const wasRk = rkKind; rkKind = null; rkSeries = null; ranks = [null, null]; if (!rkMoving) { rkQueued = false; rkSinceP = 0; if (rkPhase === 'match' || rkPhase === 'vs') rkPhase = 'off'; }      /* a settled series took its entry with it: nothing of the queue is left */ ui.rkCourt?.(null); ui.rkPill?.({ on: false }); ui.setSeries?.(null); ui.setPressure?.(null); clearTimeout(rkUpT); syncSettings();      // out of a Ranked court: the queue went with it (unless the VS card holds my place while the series seat comes)
+  const wasRk = rkKind; rkKind = null; rkSeries = null; ranks = [null, null]; if (!rkMoving && (wasRk === 'match' || rkPhase !== 'queue' || spec())) { rkQueued = false; rkWarmNow = false; rkSinceP = 0; if (rkPhase === 'match' || rkPhase === 'vs') rkPhase = 'off'; }      /* a settled series took its entry with it: nothing of the queue is left. Off a warm-up (OPTIONAL WARM-UP) the entry stays: the search bar is back */ ui.rkCourt?.(null); ui.rkPill?.({ on: false }); ui.setSeries?.(null); ui.setPressure?.(null); clearTimeout(rkUpT); syncSettings();      // out of a Ranked court: the queue went with it (unless the VS card holds my place while the series seat comes)
   if (parked) rkViewNote(rkResNote(parked), 8000);      // held before the view opens: its redraws keep it
   redialDue(); if (wasRk) ui.lobbyView('ranked'); else if (tourOn()) { tourScreen(true); setUrl(tour.code, !!(tour.you && tour.you.viewer)); }      // redialDue: off the court, the socket may open again (stats switched, signed in or out). A Ranked court closing lands on the Ranked view. In a tournament, out of any court means its screen: the code while it signs up, the bracket once it runs. The address bar keeps its code, so a reload comes back to it
-  venueSync(); padPhase();
+  venueSync(); padPhase(); rkWarmNow = false; rkBarSync();
 }
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
@@ -633,12 +645,12 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'tourend') { clearTimeout(tourHang); if (tour) endTour(m.why); return; }      // before joinfail and closed (docs/COURTS-TOURNEY.md 4.5)
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
   if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online, m.tours); const q = m.rk && typeof m.rk === 'object' ? Math.max(0, m.rk.queued | 0) : 0;      // rk.queued: how many are waiting for an opponent (a count, no names): the home tile's '1 waiting' and the view's line
-    if (q !== rkQueuedN) { rkQueuedN = q; rkTile(); if (onRankedView() && performance.now() > rkNoteHold) ui.rkNote?.(q > 0 ? 'Someone is waiting to play' : '', q > 0); } return; }
+    if (q !== rkQueuedN) { rkQueuedN = q; rkTile(); const o = rkOthers(); if (onRankedView() && performance.now() > rkNoteHold) ui.rkNote?.(o > 0 && !rkQueued ? 'Someone is waiting to play' : '', o > 0 && !rkQueued); } return; }      // my own entry is in the count: only someone ELSE lights it, and never while I am queued myself
   if (m.type === 'tour') { if (m.code && typeof m.code === 'string') onTour(m); return; }      // above the guard: between rounds nobody is in a court
   if (m.type === 'tmove') { tourMove(m); return; }
   if (m.type === 'tourfail') { say(m.why === 'busy' ? 'Courts are full right now. Try Start again in a moment.' : `Needs at least 4 players · ${m.n | 0} here now`, null, 3200); return; }
   if (m.type === 'rk') { onRk(m); return; }                 // Ranked (docs/RANKED.md 9), above the guard: the queue outlives any one court
-  if (m.type === 'rkfail') { onRkFail(String(m.why || '')); return; }
+  if (m.type === 'rkfail') { onRkFail(String(m.why || ''), m.warm === true); return; }      // warm: Warm up with Matt was refused, the entry stands
   if (m.type === 'rkend') { endRk(m.why === 'restart' ? 'restart' : 'gone'); return; }
   if (m.type === 'rkres') { onRkRes(m && typeof m === 'object' ? m : {}); return; }
   if (m.type === 'rkvs') { if (m && typeof m === 'object') rkMove(m); return; }      // MATCH FOUND (docs/RANKED.md 8.3): from the lobby or the warm-up court
@@ -649,7 +661,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     askedFor = !!m.asked;                                                                     // a join into Matt's court landed in the stands: the player is being asked
     const made = pending && pending.type === 'create' && botWant == null, again = room === m.code; settle(); room = m.code; role = m.role === 'spectator' ? 'spectator' : 'player'; wantRoom = ''; wantWatch = false;
     tourKind = tk; ui.tourCourt(tk); if (tk) noBot = true;      // Matt comes by himself in a tournament's court, at Tour
-    clearTimeout(rkHang); rkWait = false; rkKind = rkk; ui.rkCourt?.(rkk); if (rkk) { noBot = true; rkMoving = false; clearTimeout(rkVsT); if (rkk === 'warm') { rkSeries = null; ui.setSeries?.(null); if (!spec()) { rkQueued = true; if (rkPhase === 'off') rkPhase = 'queue'; ui.rkPill?.({ on: true, since: rkSinceP, queued: Math.max(0, rkQueuedN - 1) }); } } else rkSeries = rkSeries || { bestOf: 3, game: 1, games: [0, 0], done: false }; } else { rkSeries = null; ui.setSeries?.(null); } ui.setPressure?.(null); syncSettings();      // a Ranked court (docs/RANKED.md 9): Matt is the queue's, at your rank's level; the warm-up shows the queue pill
+    clearTimeout(rkHang); rkWait = false; rkKind = rkk; ui.rkCourt?.(rkk); if (rkk) { noBot = true; rkMoving = false; clearTimeout(rkVsT); if (rkk === 'warm') { rkSeries = null; ui.setSeries?.(null); if (!spec()) { rkQueued = true; rkWarmNow = true; if (rkPhase === 'off') rkPhase = 'queue'; ui.rkPill?.({ on: true, since: rkSinceP, queued: rkOthers() }); } } else rkSeries = rkSeries || { bestOf: 3, game: 1, games: [0, 0], done: false }; } else { rkSeries = null; ui.setSeries?.(null); } ui.setPressure?.(null); syncSettings();      // a Ranked court (docs/RANKED.md 9): Matt is the queue's, at your rank's level; the warm-up shows the queue pill
+    rkBarSync();      // on a Ranked court the search bar gives way (the warm-up's pill says the same)
     const shown = tk ? m.tour : rkk ? null : room; ui.askWatch(null); ui.setRoom(shown, shareLink(shown)); setUrl(shown, spec()); scene.stopAttract();      // the menu's rally ends the moment a room is joined. A tournament's court shows (and copies) the tournament's code, never the private court's; a Ranked court's code is nobody's to share
     if (moved) { clearFar(); ui.hold(null); over = null; ui.setSpectator(false); ui.askPlay(null); ui.showAsk(false); if (ui.currentOverlay() === 'match') ui.showOverlay(null); phase = 'lobby'; }      // from watching (or another court) straight to my match
     if (phase === 'lobby' && !again) { if (spec()) enterWatch(); else if (made) ui.lobbyView('share'); else begin(); }        // again: a reconnect got the seat back, the player stays where they were. Play a bot skips the share view
@@ -657,6 +670,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'joinfail') {
     const was = pending, watching = !!was && was.type === 'watch'; settle(); wantRoom = ''; wantWatch = false; botWant = null;
+    if (m.reason === 'inrk') { say(RK_IN_QUEUE, null, 3200); return; }      // queued for Ranked: the server keeps every other court from me meanwhile (docs/RANKED.md 9)
     if (room) { toLobby('Court closed'); return; }                                            // a reconnect found the room gone
     if (tourOn()) setUrl(tour.code, !!(tour.you && tour.you.viewer)); else setUrl(null);
     const tcode = ui.cleanCode(typeof m.code === 'string' ? m.code : was && was.code);
@@ -814,19 +828,21 @@ let unlocked = false;
 // since been unplugged rejects: drop it rather than let the panel name a speaker nothing is playing out of.
 const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That output is gone: back to the system default'); }); } };
 scene.audio.onDevicesChanged(loadSinks);           // an AirPod connecting mid-match changes the list under the open card
-addEventListener('pointerdown', () => { unlock(); play(); });
+addEventListener('pointerdown', e => { unlock(); if (!e.target?.closest?.('#rk-search')) play(); });      // the Ranked search bar over the title is not a press of Play (its Cancel stays on the title)
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: playBot,
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
   profile: () => profile.showProfile(),      // Your stats: web/profile.js fetches and draws it
-  ranked: () => { if (pending || room) return; if (!profile.statsOn()) { say(RK_FAIL.nostats, null, 3200); rkViewNote(RK_VIEW_NOTE.nostats); return; } ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1). It settles on room (a warm-up), rk (a partner at once) or rkfail
+  ranked: () => { if (pending || room || rkQueued) return; if (!profile.statsOn()) { say(RK_FAIL.nostats, null, 3200); rkViewNote(RK_VIEW_NOTE.nostats); return; } profile.seated(); ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1), waiting in the lobby. It settles on rk (queued, or a partner at once) or rkfail. profile.seated(): a first visit's device id is made now and its hello goes first, or the entry could never be paired
+  rkWarm: () => { if (pending || room || !rkLobbyQ()) return; if (phase === 'title') play(); request({ type: 'rkwarm' }); rkBarSync(); },      // the search bar's Warm up with Matt: the warm-up court (settles on room, or rkfail busy { warm })
+  rkCancel: () => { if (!rkLobbyQ()) return; if (pending && pending.type === 'rkwarm') settle(); game.send({ type: 'rkleave' }); },      // the search bar's Cancel: out of the queue (the server answers rk { phase: off })
   rankedOpen: () => { venueSync(); profile.showRanked(); }, ranksOpen: () => profile.showRanked(), view: v => { route(v); venueSync(); } });      // every view change re-picks the venue: the Ranks page stands in the stadium whichever way it was opened      // the Ranked view opened: the stadium builds behind the glass, the head and the road come from /api/stats
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
 profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
-  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkQueuedN, ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0 }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
+  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0 }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 rkTile();                                          // the Ranked tile's line before anything is known: the dimmed Bronze emblem and 'Play your first match'
 { const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats, /ranked...: straight back to that view (after profile.init: Your stats fetches through it)

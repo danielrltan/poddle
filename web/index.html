@@ -125,7 +125,7 @@
   <!-- the count into a match: 3, 2, 1 over the court, so a serve never arrives before the paddle is up (ui.countdown) -->
   <div class="countdown" id="count" role="status" data-fit hidden><b id="count-n" data-text=""></b><span>Get ready</span></div>
   <!-- Ranked queue (docs/RANKED.md 8.2): the pill above the key hints while the warm-up looks for an opponent (ui.rkPill). Hidden under any overlay, like the toast -->
-  <div class="rk-pill" id="rk-pill" role="status" aria-atomic="false" data-fit hidden><i class="rk-dot" aria-hidden="true"></i><span class="rk-pill-text"><b id="rk-pill-text">Finding an opponent</b><small id="rk-pill-sub">Matt keeps you warm</small></span><b class="rk-pill-time" id="rk-pill-time" aria-hidden="true">0:00</b></div>
+  <div class="rk-pill" id="rk-pill" role="status" aria-atomic="false" data-fit hidden><i class="rk-dot" aria-hidden="true"></i><span class="rk-pill-text"><b id="rk-pill-text">Finding an opponent</b><small id="rk-pill-sub">You stay queued if you leave</small></span><b class="rk-pill-time" id="rk-pill-time" aria-hidden="true">0:00</b></div>
 
   <!-- bottom-right: the keys worth a hint. C always; 1 2 3 4 only while the other seat is Matt (ui.setBot). Every other key still works and says nothing. -->
   <div class="keyhints" id="keys" data-fit>
@@ -248,6 +248,15 @@
     </div>
   </div>
 </div>
+
+<!-- Ranked search bar (docs/RANKED.md 8.1, OPTIONAL WARM-UP): queued and not on a court, it hangs from the top of the title and every lobby view
+     (ui.rkBanner). Outside #hud: it shows over the menus, never on the court (the warm-up has #rk-pill). Warm up with Matt takes the warm-up court;
+     Cancel leaves the queue. The timer is aria-hidden -->
+<section class="rk-search" id="rk-search" aria-label="Ranked search" data-fit hidden>
+  <span class="rk-search-em" id="rk-search-em" aria-hidden="true"></span>
+  <p class="rk-search-text" role="status"><b><span id="rk-search-title">Finding a match</span> <span class="rk-search-time" id="rk-search-time" aria-hidden="true">0:00</span></b><small id="rk-search-sub">Ranked</small></p>
+  <div class="rk-search-acts"><button class="btn btn-sm" id="btn-rk-warm">Warm up with Matt</button><button class="btn btn-sm btn-quiet" id="btn-rk-cancel">Cancel</button></div>
+</section>
 
 <!-- ============================================== TITLE ============================================== -->
 <section class="screen menu-glass" id="screen-title" data-screen="title" hidden>
@@ -413,8 +422,8 @@
         <button class="rk-info" id="btn-rk-all" aria-label="See all ranks" title="See all ranks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M12 11.25v5.5"/><circle class="rk-info-dot" cx="12" cy="7.6" r="1.35"/></svg></button>
       </div>
       <button class="btn btn-xl" id="btn-ranked-go">Find a match</button>
-      <p class="t-note rk-status" id="rk-status" role="status">You play Matt while it looks for someone</p>
-      <p class="t-note rk-rules" id="rk-rules">Best of 3, first to 7, win by 2. Matt warms you up while you wait. Leaving counts as a loss. Your rank emblem is shown to your opponent and anyone watching.</p>
+      <p class="t-note rk-status" id="rk-status" role="status">You can warm up with Matt while it searches</p>
+      <p class="t-note rk-rules" id="rk-rules">Best of 3, first to 7, win by 2. The warm-up with Matt is optional. Leaving counts as a loss. Your rank emblem is shown to your opponent and anyone watching.</p>
     </div>
 
     <!-- Ranks: every medal there is to win, drawn by ui.js drawRanks from the last rank the page knows. Opened from the crest on Your stats, the emblem on the
