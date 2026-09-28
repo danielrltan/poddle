@@ -1971,3 +1971,32 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 @media (hover:hover){ .rk-info:hover svg{scale:1.15} .rk-info:hover{color:var(--me-ink)} } .rk-info:active svg{scale:.9}
 .rk-info:focus-visible{outline:none} .rk-info:focus-visible svg{border-radius:50%;box-shadow:var(--glow)}
 .rk-keep-row{column-gap:.35rem}
+
+/* ==========================================================================================================
+   RANKED SEARCH BAR (docs/RANKED.md 8.1, OPTIONAL WARM-UP 2026-09-28): queued and not on a court, a bar hangs from the top edge of the title and
+   of every lobby view, over the header's title (Back and the online count stay clear): the emblem, Finding a match and the wait, then Warm up with
+   Matt and Cancel. It drops in once each time it appears. Gone under any overlay (MATCH FOUND) and on every other screen (the court has #rk-pill)
+   ========================================================================================================== */
+.rk-search{position:fixed;top:0;left:50%;translate:-50% 0;z-index:calc(var(--z-screen) + 1);display:flex;align-items:center;gap:.875rem;width:max-content;max-width:calc(100vw - 2 * max(var(--edge), 16px));
+  padding:.5rem .625rem .5rem .875rem;border:.125rem solid var(--line);border-top:0;border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--tex-diag), linear-gradient(180deg,#fff,var(--sky-2));
+  box-shadow:var(--sh-3);color:var(--ink-strong);animation:rk-search-in 420ms var(--ease-out) both}
+@keyframes rk-search-in{from{transform:translateY(-110%)}}      /* from above the window: the bar is there, it just slides down */
+.rk-search[hidden],body:not([data-screen="lobby"]):not([data-screen="title"]) .rk-search,body[data-overlay] .rk-search{display:none}
+.rk-search-em{flex:none;line-height:0} .rk-search-em .rank-em.is-md{width:2.5rem;height:2.5rem}
+.rk-search-text{display:flex;flex-direction:column;gap:.125rem;margin:0;min-width:0;line-height:1.15;white-space:nowrap}
+.rk-search-text b{font-size:max(var(--t-md), 14px);font-weight:800}
+.rk-search-time{margin-left:.375rem;color:var(--me-ink);font-weight:900;font-variant-numeric:tabular-nums}
+.rk-search-text small{font-size:max(.8125rem, 12px);font-weight:700;color:var(--ink-soft)}
+.rk-search-acts{display:flex;gap:.5rem;flex:none}
+.rk-search-acts .btn{height:max(2.75rem, 44px);min-width:44px;padding:0 max(1.25rem, 14px);font-size:max(var(--t-md), 14px)}
+.rk-search-acts .btn[disabled]{opacity:.55;cursor:default}
+/* narrow (a phone): the bar sits under the header instead of over it, the two actions on their own row, and the lobby's content moves down to make room */
+@media (max-width:560px){
+  .rk-search-em .rank-em.is-md{width:1.75rem;height:1.75rem}
+  .rk-search{top:calc(5rem + .375rem);flex-wrap:wrap;row-gap:.5rem;padding:.375rem .5rem .375rem .75rem;width:calc(100vw - 2 * max(var(--edge), 16px));border-top:.125rem solid var(--line);border-radius:var(--r-lg)}
+  body[data-screen="title"] .rk-search{top:max(var(--edge), 16px)}
+  .rk-search-text{flex:1;flex-direction:row;align-items:baseline;gap:.5rem;overflow:hidden} .rk-search-text small{min-width:0;overflow:hidden;text-overflow:ellipsis}      /* one line: the bar stays as short as it can */
+  .rk-search-acts{width:100%} .rk-search-acts .btn{flex:1;padding:0 .5rem}
+  body.is-rk-search #screen-lobby .menu-body{padding-top:calc(var(--s-4) + 44px + 3.25rem)}      /* the bar's height: the line, the actions, the gaps */
+}
+@media (prefers-reduced-motion: reduce){ .rk-search{animation:none} }

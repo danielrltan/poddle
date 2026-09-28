@@ -1448,8 +1448,9 @@ function tourTick(ms) {
 }
 
 // ---------- Ranked (docs/RANKED.md 3-5): the queue, the warm-up vs Matt, best-of-3 series, trophies ----------
-// Being in the queue == being seated on a private warm-up court against Matt (or, when a partner is already waiting, straight into the VS card).
-// Leaving the court leaves the queue; the one exception is the VS card, when the entry is held by its series. Two queued players are paired into ONE
+// OPTIONAL WARM-UP (2026-09-28): rk queues the socket where it is, in the lobby (it keeps its lobby pushes). rkwarm seats a queued player on a private
+// warm-up court against Matt at their rank's level; leaving that court (leave, Back, a 'closed away') puts the socket back in the lobby STILL QUEUED.
+// Only rkleave, a stats switch-off, a missing hello or the socket closing (after RK_BACK_S) end an entry. Two queued players are paired into ONE
 // private MATCH room that plays a best-of-RK_BEST series (createRoom's SERIES); every game is judged and logged like any other (kind human, mode
 // ladder); trophies are settled once per series in rkResult. Nothing of it survives a restart (rkend restart, the series void, no trophies changed).
 const LAD = require('./ladder');
@@ -1457,14 +1458,16 @@ const envNum = (k, d) => (process.env[k] != null && process.env[k] !== '' && Num
 const RK_WIN = +process.env.RK_WIN || 7, RK_BEST = +process.env.RK_BEST || 3, RK_GOLD = +process.env.RK_GOLD || 11;   // a game: first to 7, win by WIN_BY, golden point at 11; a series: best of 3
 const RK_VS_S = envNum('RK_VS_S', 5), RK_GAME_GAP_S = envNum('RK_GAME_GAP_S', 6), RK_DONE_S = envNum('RK_DONE_S', 12), RK_ARRIVE_S = envNum('RK_ARRIVE_S', 30);   // s: the VS card; the card between games; the series card; to sit down after the VS card
 const RK_WINDOW_S = envNum('RK_WINDOW_S', 15), RK_CAP = +process.env.RK_CAP || 12, RK_ADDR = +process.env.RK_ADDR || 2, RK_MATT_DAY = +process.env.RK_MATT_DAY || 40;   // the trophy window widens every RK_WINDOW_S; entries at once; per address; Matt trophies per owner per UTC day (db.js applies it)
-const RK_MSGS = new Set(['rk', 'rkleave']);                    // heard from a Ranked socket wherever it is (the TOUR_MSGS pattern)
-const rkQ = new Map();                                         // cid -> Q { cid, ws, name, reg, on, since, warm: code|null, ident, owner, tier, trophies, bestTier, dayLeft, series: code|null, seatAt, dirty, sentAt }
+const RK_MSGS = new Set(['rk', 'rkleave', 'rkwarm']);          // heard from a Ranked socket wherever it is (the TOUR_MSGS pattern)
+const rkQ = new Map();                                         // cid -> Q { cid, ws, name, reg, on, offAt, since, warm: code|null, ident, owner, tier, trophies, bestTier, dayLeft, series: code|null, seatAt, dirty, sentAt }
 const rkSeries = new Map();                                    // code -> X { id, code, r, a: Q, b: Q, games, scores, verdicts, friendly, done, arriveAt, readyBy }
 let rkSeq = Math.floor(BOOT / 1000) * 1e6;                     // REVIEW FIX: series ids are unique across restarts (boot second x 1e6 + n, a safe integer): match_log.series and its trophy deltas are keyed by them, and R10 counts them
 const rkLate = new Map();                                      // cid -> { res, until }: a settled series' rkres kept for a seat whose socket was down (held) when it settled, replayed on its &rk=1 return (REVIEW FIX)
 const RK_BAD = new Set([...abuse.MATCH_WIDE, 'anon', 'pad', 'origin_bad', 'too_fast', 'afk', 'paddle_teleport', 'ident_changed']);   // a game with any of these leaves the series uncounted (RANKED.md 5.5 rule 3); new_opponent halves instead
 const RK_CUT = new Set(['early_forfeit', 'leaver_ahead', 'afk', 'too_fast']);   // what a forfeit itself puts on the game it cut short (nobody struck, too few points): never held against the stayer (REVIEW FIX, RANKED.md 5.4)
 const RK_COOL_S = envNum('RK_COOL_S', 2);                        // s after leaving the queue before the same socket may queue again (rkfail busy meanwhile): rk / rkleave churn made and tore down a court per message (REVIEW FIX)
+const RK_WARM_COOL_S = envNum('RK_WARM_COOL_S', 1);              // s after a warm-up court closes before the same socket may ask for another (rkfail busy, warm:true): the same churn through rkwarm / leave
+const RK_BACK_S = envNum('RK_BACK_S', HOLD_S);                   // s an entry whose socket closed is kept for its &rk=1 return (not paired, not counted meanwhile); an open socket's entry is never swept
 const DAY_MS = 24 * 3600e3;
 function rkQueued() { let n = 0; for (const q of rkQ.values()) if (q.on && !q.series) n++; return n; }
 const rkShown = q => (q.reg ? q.name : safeName(q.name, 'Player'));   // a name as the other side sees it (a guest passing as Matt or staff is 'Player', 7.3)
@@ -1472,7 +1475,7 @@ const rkYou = q => { const T = LAD.TIERS[q.tier - 1]; return { tier: q.tier, div
 function rkPhase(q) { if (!q.series) return 'queue'; const X = rkSeries.get(q.series); return X && !X.done && q.ws && q.ws.room === X.r && q.ws.pl ? 'match' : 'vs'; }
 // the snapshot (RANKED.md 3.4): never a cid, never an owner id, never the other side's count
 function rkSnap(q, phase) { const w = [...rkQ.values()].filter(x => x.on && !x.series).sort((a, b) => a.since - b.since);
-  return { type: 'rk', phase: phase || rkPhase(q), you: rkYou(q), queued: w.length, place: Math.max(0, w.indexOf(q)) + 1, since: q.since }; }
+  return { type: 'rk', phase: phase || rkPhase(q), warm: !!(q.warm && rooms.has(q.warm)), you: rkYou(q), queued: w.length, place: Math.max(0, w.indexOf(q)) + 1, since: q.since }; }   // warm: on its warm-up court now (false: waiting in the lobby)
 function rkSend(q, phase) { q.dirty = false; q.sentAt = Date.now(); tell(q.ws, rkSnap(q, phase)); }
 function rkDirty() { for (const q of rkQ.values()) q.dirty = true; }   // the count changed: everyone queued hears it on the next flush (<= 4 Hz)
 // rkOwnerOfId(ident) -> the owner this identity resolves to NOW: an account's owner row, or the device's (its own guest owner, or the account it was merged
@@ -1498,24 +1501,29 @@ function rkQueue(ws) {                                         // rk from the lo
   if (tourActive(ws)) return tell(ws, { type: 'rkfail', why: 'intour' });
   if (ws.statsOff) return tell(ws, { type: 'rkfail', why: 'nostats' });   // an old tab's nostats only (NOTES 116). Trophies need stats; a first-ever visitor has no device id yet and is not refused (its hello follows the seat; until it comes the entry is never paired, rkPick)
   if (ws.rkCool && Date.now() < ws.rkCool) return tell(ws, { type: 'rkfail', why: 'busy' });   // just left the queue: RK_COOL_S before the next entry
-  if (!loopback(ws)) { let n = 0; for (const q of rkQ.values()) if (q.ws && q.ws.computer === ws.computer) n++; if (n >= RK_ADDR) return tell(ws, { type: 'rkfail', why: 'addr' }); }   // per COMPUTER key (an IPv6 /64, docs/ACCOUNTS.md 3.5), the way abuse.js keys addresses: privacy extensions gave one /64 a fresh address per socket (REVIEW FIX)
+  if (!loopback(ws)) { let n = 0; for (const q of rkQ.values()) if (q.on && q.cid !== ws.cid && q.ws && q.ws.computer === ws.computer) n++; if (n >= RK_ADDR) return tell(ws, { type: 'rkfail', why: 'addr' }); }   // per COMPUTER key (an IPv6 /64, docs/ACCOUNTS.md 3.5), the way abuse.js keys addresses: privacy extensions gave one /64 a fresh address per socket (REVIEW FIX). Its own entry kept for a return (a reload) is not another player
   if (rkQ.size >= RK_CAP) return tell(ws, { type: 'rkfail', why: 'full' });
   if (ws.room) return;                                         // never from a seat or the stands (the finished-card case comes through rkMsg, which quits first)
   const now = Date.now(), ident = stats.identOf(ws);
-  const q = { cid: ws.cid, ws, name: ws.acct && ws.acct.username ? ws.acct.username : ws.name, reg: !!(ws.acct && ws.acct.username), on: true, since: now, warm: null, ident, owner: rkOwnerOf(ws),
+  const q = { cid: ws.cid, ws, name: ws.acct && ws.acct.username ? ws.acct.username : ws.name, reg: !!(ws.acct && ws.acct.username), on: true, offAt: 0, since: now, warm: null, ident, owner: rkOwnerOf(ws),
     tier: 1, div: 1, trophies: 0, bestTier: 1, bestDiv: 1, dayLeft: RK_MATT_DAY, series: null, seatAt: 0, dirty: false, sentAt: 0 };
   rkRead(q);
   const p = rkPick(q);
-  if (!p && rooms.size + tourKeep() >= ROOM_CAP - TOUR_RESERVE) return tell(ws, { type: 'rkfail', why: 'busy' });   // no partner at once and no warm-up court free
-  rkQ.set(q.cid, q); ws.rk = q; lobbyChanged(); rkDirty();
-  if (p) { rkSend(q, 'vs'); return rkPair(p.c, q, p.friendly); }   // a partner is already waiting: no warm-up, straight to the VS card (the snapshot settles the client's request)
+  rkQ.set(q.cid, q); ws.rk = q; lobbyChanged(); rkDirty();       // OPTIONAL WARM-UP: no court is needed to wait (rkPick checks there is one for the series), so a full server still queues
+  if (p) { rkSend(q, 'vs'); return rkPair(p.c, q, p.friendly); }   // a partner is already waiting: straight to the VS card (the snapshot settles the client's request)
+  rkSend(q, 'queue');                                           // waiting in the lobby; rkwarm puts them on a warm-up court if they want one
+}
+function rkWarmMsg(ws, q) {                                    // rkwarm: a queued socket waiting in the lobby asks for its warm-up court. Anything else (in a series, already on it, elsewhere) is ignored
+  if (!q || rkQ.get(ws.cid) !== q || q.series || q.warm && rooms.has(q.warm)) return;
+  if (ws.room || !lobby.has(ws)) return;
+  if (ws.rkWarmCool && Date.now() < ws.rkWarmCool) return tell(ws, { type: 'rkfail', why: 'busy', warm: true });   // a warm-up just closed: RK_WARM_COOL_S before the next (the entry stays)
   rkWarm(q);
 }
-function rkWarm(q) {                                           // a private court against Matt at the rank's level (the tourWarm recipe): the queue place is this court
-  if (rooms.size + tourKeep() >= ROOM_CAP - TOUR_RESERVE) { rkDrop(q, 'busy'); return tell(q.ws, { type: 'rkfail', why: 'busy' }); }
+function rkWarm(q) {                                           // a private court against Matt at the rank's level (the tourWarm recipe). The entry does not depend on it: the court closing leaves the player queued
+  if (rooms.size + tourKeep() >= ROOM_CAP - TOUR_RESERVE) { q.warm = null; return tell(q.ws, { type: 'rkfail', why: 'busy', warm: true }); }   // no court free: still queued, in the lobby
   const code = newCode(), r = createRoom(code, false, { rk: q, kind: 'warm', only: cid => !!cid && cid === q.cid, botLevel: LAD.mattLevel(q.tier), winAt: RK_WIN, gold: RK_GOLD,
     onGame: (w, sc, rec, f) => rkMatt(q, w, sc, rec, f),
-    onClose: () => { if (q.warm === code) { q.warm = null; if (rkQ.get(q.cid) === q && !q.series) rkDrop(q, 'left'); } } });   // the court went (leave, drop, TTL): out of the queue, unless a series is taking them
+    onClose: () => { if (q.warm === code) { q.warm = null; q.dirty = true; if (q.ws && !q.series) q.ws.rkWarmCool = Date.now() + RK_WARM_COOL_S * 1000; } } });   // the court went (leave, a drop, away): the entry stays queued; a series taking them closes it too
   r.by = null; r.tag = { rk: true, kind: 'warm' }; rooms.set(code, r); q.warm = code;   // by null: never counted by ADDR_ROOMS (RK_ADDR is the address cap instead)
   if (!seat(q.ws, r)) r.close('empty'); else rkSend(q, 'queue');
 }
@@ -1604,7 +1612,7 @@ function rkResult(X, winner, games, forfeit, why, info) {     // once per series
     gone.series = null; gone.seatAt = 0; if (rkQ.get(gone.cid) === gone) rkQ.delete(gone.cid); if (gone.ws && gone.ws.rk === gone) gone.ws.rk = null;
     stay.series = null; stay.seatAt = 0;
     if (!X.r.dead) X.r.close('round');                         // the seated one leaves the dead series court and goes straight back to a warm-up
-    if (stay.on && stay.ws && stay.ws.readyState === 1 && stay.ws.rk === stay && rkQ.get(stay.cid) === stay) rkWarm(stay); else rkDrop(stay, 'left');
+    if (stay.on && stay.ws && stay.ws.readyState === 1 && stay.ws.rk === stay && rkQ.get(stay.cid) === stay) rkSend(stay, 'queue'); else rkDrop(stay, 'left');   // still queued, in the lobby (close() put the socket there first)
     lobbyChanged(); rkDirty(); console.log(`[${X.code}] ranked series void: no-show`); return;
   }
   const played = X.verdicts.filter(Boolean);
@@ -1660,20 +1668,20 @@ function rkDrop(q, why) {                                      // the entry ends
   if (had) { lobbyChanged(); rkDirty(); }
 }
 function rkLeave(ws, why) { const q = ws.rk; if (!q) return; if (q.series && rkSeries.has(q.series) && !rkSeries.get(q.series).done) return; rkDrop(q, why); }   // never mid-series: leave is the forfeit
-function rkGone(ws) { const q = ws.rk; if (q && q.ws === ws) q.on = false; }   // its socket closed: the warm-up closes with it (the entry goes), a series holds the seat (HOLD_S)
+function rkGone(ws) { const q = ws.rk; if (q && q.ws === ws) { q.on = false; q.offAt = Date.now(); rkDirty(); } }   // its socket closed: kept RK_BACK_S for an &rk=1 return (never paired meanwhile); a series holds the seat (HOLD_S)
 function rkHello(ws) {                                         // a hello on a queued socket: a guest's identity, owner and rank may be known only now (REVIEW FIX: the ident is taken too, so the entry becomes pairable)
   const q = ws.rk; if (!q || rkQ.get(ws.cid) !== q || q.series) return;
   rkIdent(q, ws);
   if (ws.pl && ws.room && ws.room.setTier) ws.room.setTier(ws.pl, q.tier, q.div);
 }
-function rkRebind(ws, e, q) {                                  // a socket back with &rk=1 (a reload, a reconnect): its series seat, its warm-up, or a new warm-up
+function rkRebind(ws, e, q) {                                  // a socket back with &rk=1 (a reload, a reconnect): its series seat, its warm-up, or its place in the lobby
   if (e.ws && e.ws !== ws && e.ws.rk === e) e.ws.rk = null;
-  e.ws = ws; ws.rk = e; e.on = true;
+  e.ws = ws; ws.rk = e; e.on = true; e.offAt = 0; rkDirty();
   const X = e.series && rkSeries.get(e.series);
   if (X && !X.done) { if (e.seatAt) return rkSend(e, 'vs'); rkSeat(e, X); return rkSend(e); }   // the VS card: the seat tick seats them; a live or held series: the seat back (the point is replayed)
   rkIdent(e, ws);                                              // the new socket may carry a sign-in the old one did not (REVIEW FIX)
   const rc = String(q.get('room') || '').trim().toUpperCase(), w = e.warm && rooms.get(e.warm);
-  if (w && !w.dead && rc === e.warm) joinCode(ws, rc); else if (!ws.room) rkWarm(e);   // the same warm-up if it still stands (a retake), else a new one
+  if (w && !w.dead && rc === e.warm) joinCode(ws, rc); else if (rc && !ws.room) rkWarm(e);   // was warming up (the client names its court): the same one if it still stands (a retake), else a new one. No court named: waiting in the lobby, and still is
   if (ws.rk === e) rkSend(e);
 }
 // Save my stats switched off on a Ranked socket (noStats): trophies need stats (RANKED.md 3.4), so the entry ends where it stands. A warm-up is left
@@ -1685,12 +1693,13 @@ function rkOptOut(ws) {
   const r = ws.room, X = q.series && rkSeries.get(q.series);
   tell(ws, { type: 'rkfail', why: 'nostats' });
   if (X && !X.done) { if (r === X.r && ws.pl) { quit(ws); enterLobby(ws); } else q.on = false; return; }   // seated: the forfeit (the room settles it); not yet: the seat tick skips a stats-off socket
-  if (r && r.tag && r.tag.rk && r.kind === 'warm' && ws.pl) { quit(ws); enterLobby(ws); }   // the warm-up closes with the seat: onClose drops the entry
+  if (r && r.tag && r.tag.rk && r.kind === 'warm' && ws.pl) { quit(ws); enterLobby(ws); }   // the warm-up closes with the seat; the entry ends just below
   rkLeave(ws, 'left');
 }
 function rkMsg(ws, m) {
   const q = ws.rk, r = ws.room;
   if (m.type === 'rkleave') { if (r && r.tag && r.tag.rk && r.kind === 'match' && ws.pl) return; if (r && r.tag && r.tag.rk && r.kind === 'warm' && ws.pl) { quit(ws); enterLobby(ws); } return rkLeave(ws, 'left'); }   // from the lobby or a warm-up: out; on a series court, live or finished: ignored (leave forfeits, rk is Play again; REVIEW FIX: it used to clear ws.rk on the finished card and kill Play again)
+  if (m.type === 'rkwarm') return rkWarmMsg(ws, q);            // OPTIONAL WARM-UP: the queued player takes the warm-up court (ignored anywhere but the lobby, and in a series)
   if (r && r.tag && r.tag.rk && r.kind === 'match' && ws.pl) { if (!r.isOver()) return; quit(ws); enterLobby(ws); ws.rk = null; return rkQueue(ws); }   // Play again from the finished series card
   if (r) { if (rkQ.get(ws.cid) === q) return rkSend(q); return; }   // on a warm-up: a fresh snapshot; anywhere else: nothing
   if (rkQ.get(ws.cid) === q) return rkSend(q);
@@ -1708,7 +1717,7 @@ function rkTick(ms) {
     if (X.readyBy && ms >= X.readyBy) { X.readyBy = 0; const u = X.r.unready(); if (u.length) X.r.force(u.length === 1 ? 1 - u[0] : 0); }   // never got a paddle ready (unready() is empty from game 2 on: slowSeat's CAL_S grace applies there)
   }
   for (const q of [...rkQ.values()]) {
-    if (!q.on && !q.series && !(q.warm && rooms.has(q.warm))) rkDrop(q, 'left');
+    if (!q.on && !q.series && !(q.warm && rooms.has(q.warm)) && ms - q.offAt >= RK_BACK_S * 1000) rkDrop(q, 'left');   // its socket closed and it did not come back in RK_BACK_S: out. An open socket's entry is never swept, however long it waits
     else if (!q.series && (!q.ident || q.ident.anon) && ms - q.since >= RK_ARRIVE_S * 1000) {   // never said hello (a crafted client, a bad Origin): nobody to write trophies for, out (REVIEW FIX)
       if (q.ws && q.ws.readyState === 1) { tell(q.ws, { type: 'rkfail', why: 'nostats' }); if (q.ws.room && q.ws.pl && q.ws.room.tag && q.ws.room.tag.rk) { quit(q.ws); enterLobby(q.ws); } }
       rkDrop(q, 'left');
@@ -1797,11 +1806,12 @@ wss.on('connection', (ws, req) => {
     if (ws.tour && TOUR_MSGS.has(m.type)) return tourMsg(ws, m);   // a tournament's own, wherever its socket is
     if (ws.rk && RK_MSGS.has(m.type)) return rkMsg(ws, m);       // the Ranked queue's own, wherever its socket is (RANKED.md 3.3)
     if (ws.room) {
-      if (m.type === 'leave' && ws.viaLobby) { quit(ws); enterLobby(ws); if (ws.rk && !ws.rk.series) rkLeave(ws, 'left'); }   // leaving a Ranked warm-up leaves the queue
+      if (m.type === 'leave' && ws.viaLobby) { quit(ws); enterLobby(ws); const q = ws.rk; if (q && !q.series && rkQ.get(ws.cid) === q) rkSend(q, 'queue'); }   // leaving a Ranked warm-up keeps the queue place (OPTIONAL WARM-UP): back in the lobby, warm:false
       else if (ws.pl) ws.room.onMessage(ws.pl, m);               // a spectator is heard saying ping, net, leave, emote (and its name, shown on its emotes): nothing else
       else if (m.type === 'emote') ws.room.emote(ws, m.e);
       else if (m.type === 'ask') ws.room.ask(ws);                // a spectator asks for Matt's seat
     } else if (lobby.has(ws)) {
+      if (ws.rk && rkQ.get(ws.cid) === ws.rk && ['quick', 'create', 'join', 'watch', 'tcreate'].includes(m.type)) return tell(ws, { type: 'joinfail', reason: 'inrk' });   // queued for Ranked: no other court meanwhile (the VS card's seat would quit it: a forfeit or a Matt loss there). rkwarm is the one court
       if (m.type === 'quick') quick(ws); else if (m.type === 'create') create(ws, m.public === true); else if (m.type === 'join') joinCode(ws, m.code); else if (m.type === 'watch') watchCode(ws, m.code);
       else if (m.type === 'tcreate') tourCreate(ws);
       else if (m.type === 'rk') rkQueue(ws);                     // Ranked: into the queue (RANKED.md 3.4)

@@ -2376,3 +2376,73 @@ The owner wanted "lots of emphasis on the ranked match experience" (Brawl Stars 
   - `verify.mjs` has only the 3 known main failures (lobby-courts 44 px, tourney-banner 12 px x2). All Ranked checks pass, including the contrast of the warm deciding card (5.72:1) and the gold row (7.25:1).
   - `ranked-e2e`: 30/30 PASS.
   - Before and after stills are in test/ui-shots/rk-before/ and rk-after/ (not committed).
+
+## 118. Ranked: the Matt warm-up is optional (queue in the lobby, a search bar at the top)
+
+The owner: "make matt warm ups optional before queueing ... queue -> dropdown to warm up appears -> stays there until match is found / player
+decides to warm up" (the Overwatch search pill). docs/RANKED.md 3.1, 3.3-3.6, 3.10, 8.1, 8.2 and 9 are marked OPTIONAL WARM-UP 2026-09-28.
+
+**Server (server/game.js)**
+- `rk` queues the socket where it is, in the lobby: no court, it stays in the lobby set (lobby pushes keep coming) and hears
+  `rk { phase:'queue', warm:false }`. The court-capacity `busy` at entry is gone (waiting needs no court; `rkPick` still checks there is a
+  court for the series). `full`, `addr`, `nostats`, `intour`, `nocid` and the `RK_COOL_S` cooldown are unchanged; the `addr` count skips
+  the socket's own cid and entries whose socket closed (a reload is not a second player).
+- New `rkwarm {}` (in `RK_MSGS`): only while queued, in the lobby, not in a series and not already warming up; anything else is ignored.
+  It seats the player on the private warm-up court exactly as before (Matt at the rank's level, the bounty, pause, the Beat Matt ladder)
+  and the snapshot says `warm:true`. No court free, or within `RK_WARM_COOL_S` (1 s) of the last warm-up closing: `rkfail { why:'busy',
+  warm:true }` and the entry stays (the same court churn `RK_COOL_S` stops for `rk` / `rkleave`).
+- The warm-up court's `onClose` no longer ends the entry. `leave` from it (Back, Q Q, Stop warm-up) is `quit` + `enterLobby` + a fresh
+  `rk { queue, warm:false }`; a `closed away` lands the same way. Only `rkleave`, stats off, no hello in `RK_ARRIVE_S`, or the socket
+  closing end an entry.
+- A closed socket's entry is kept `RK_BACK_S` (default `HOLD_S`, 15 s) for its `&rk=1` return, never counted or paired meanwhile. A return
+  with `&room=` (it was warming up; that court closed with the drop) gets a new warm-up; one without is re-queued in the lobby; both keep
+  `since`. An open socket's entry is never swept, however long it waits (tested past ROOM_TTL, RK_ARRIVE_S and HOLD_S).
+- While queued in the lobby, `quick | create | join | watch | tcreate` answer `joinfail { reason:'inrk' }`: the VS card's seat would
+  `quit()` whatever court they were on (a forfeit or a Matt loss in someone else's room).
+- Pairing is unchanged: a warming player is pulled off Matt with nothing recorded, a lobby player goes straight to MATCH FOUND. The
+  no-show's stayer is re-queued in the lobby (`rk { queue, warm:false }` after `closed round`) instead of a new warm-up; Play again on
+  the series card queues in the lobby too.
+
+**Client (web/main.js, web/ui.js, web/index.html, web/ui.css)**
+- Find a match stays on the Ranked view: nothing is seated, no camera / connect / calibrate. It first calls `profile.seated()`: a first
+  visit has no device id until a seat, and without a hello the entry could never be paired (the server drops it after `RK_ARRIVE_S`).
+- `#rk-search` (`ui.rkBanner({ on, since, tier, div, busy })`), outside `#hud`, fixed top-centre above the screens: while queued and off
+  court it hangs from the top edge of the title and of every lobby view (over the header's title; Back and the online count stay clear),
+  dropping in (420 ms, none under reduced motion): the rank emblem, `Finding a match` and the wait (m:ss, textContent once a second,
+  aria-hidden), `Ranked · Silver II`, then `Warm up with Matt` (rkwarm through `request()`, disabled while it is out; the normal set-up
+  screens to the warm-up court, where the bar gives way to the pill) and `Cancel` (rkleave). At 560 px and under it sits below the header
+  on two rows (one text line) and the lobby's content moves down 44 px + 3.25rem. Focus goes to Warm up with Matt when Find a match turns
+  grey under it, and back to the view on Cancel. 44 px targets, the 12 px text floor, no backdrop-filter.
+- Leaving the warm-up (Back, Esc on the set-up screens, Q Q, Stop warm-up, `closed away`) keeps `rkQueued` in `toLobby` and lands on the
+  Ranked view with the bar. MATCH FOUND can come from any lobby view or the title (the title's phase becomes lobby so the seat's set-up
+  screens follow the VS card). Play again's snapshot on the series card takes the player off it to the Ranked view, queued.
+- While queued the client never asks for another court: `You’re in the Ranked queue. Cancel it to play something else` (also the
+  `joinfail inrk` toast). The lobby's and the snapshot's `queued` include my own entry: the tile, the pill and the view now count only
+  someone ELSE, and the view never says `Someone is waiting to play` while I am queued.
+- Copy: the view's line is `You can warm up with Matt while it searches` (queued: `In the queue. Warm up with Matt or cancel from the bar
+  at the top`); the rules line says `The warm-up with Matt is optional`; the warm-up's Leave button is `Stop warm-up`; the pill's small
+  line is `You stay queued if you leave`. Gone: `You play Matt while it looks for someone`, `Matt warms you up while you wait`, `Matt
+  keeps you warm`, `Leave queue`.
+
+**Legal**: the device id is now also made when a first visit joins the Ranked queue (before, only at a first seat): privacy.html's
+statistics table and the section 5 `poddle.device` row say so; Last updated / dateModified 2026-09-28, sitemap lastmod. CLAUDE.md's
+data-flow line ("made at first seat") is left for the lead to update with the merge. Nothing new is sent, stored or shown.
+
+**Tests**: test/ranked.test.mjs (section 1 rewritten: the lobby entry, the refusals while queued, the idle case, rkwarm, leave keeps the
+place, the warm cooldown, rkwarm ignored when not queued and in a series; section 3: two lobby entries pair; section 17: reconnect in the
+lobby and on the warm-up, a warming player pulled into MATCH FOUND, the RK_BACK_S grace; every other section warms up explicitly or
+checks the lobby state), test/ranked-e2e.mjs (Ann queues, sees the bar, presses Warm up with Matt and plays; Ben queues from the lobby;
+MATCH FOUND for both; Play again queues the winner in the lobby, the bar over the title, Cancel), test/menu.mjs (the fake knows rkwarm and
+the lobby-queued state; Part A and B7 walk the new flow; a first visit's hello goes before rk), test/ui-mock.html + shoot.mjs
+(`rk-search`, `&over=home|courts|title`, `&busy=1`; overlap pairs against Back, the online count, the name row, the title's Play and
+logo), verify.mjs (the bar at 1440, 600 and 390 wide).
+- A press on the bar over the title is not a press of Play (main.js's pointerdown skips `#rk-search`): Cancel stays on the title, Warm up
+  with Matt goes to the lobby itself. A paddle swing on the title still means Play.
+
+Results (this worktree, run one at a time): ranked.test PASS; ranked-e2e PASS 40/40; menu: only the 7 known failures (kept, lob gate, panel
+rows x2, Sensitivity +, spin, V H keys; one run also saw a flaky Part A "Esc: pause twice", clean on the rerun); profile-ui 82/83, the one
+failure ("nudge ... focus not taken") is the same on a clean HEAD; ui-next the known 8; seo STRICT=1 PASS; verify the known 3 plus 9 new
+ok checks for the bar. Shots: test/ui-shots/rk-search*-{1440x900,1280x720,600x900,390x844}.png, ranked-e2e-00-queued-*.png,
+ranked-e2e-08-title-bar-*.png.
+- The refused Warm up toast (no court free, or the 1 s cooldown after a warm-up closed, which Back then Enter can hit since focus lands on
+  the button) says `Can’t start a warm-up right now. Try again in a moment. You’re still in the queue`: true in both cases.

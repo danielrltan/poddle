@@ -1,7 +1,8 @@
 // Ranked end to end (docs/RANKED.md 8, 11.12): the real client against the real server/game.js, fake AirPods, TWO headless Chromes and a seeded
-// ladder. Ann presses Ranked, Find a match, and warms up against Matt in the stadium with the queue pill; Ben queues; both see MATCH FOUND with
-// the emblems, the series court with the pips, a game, the GAME card, then the series card with the trophy roll and, from 140 trophies, a rank-up
-// for the winner; Play again seats the winner in a fresh warm-up, the loser lands on the Ranked view. Codes only in the server log.
+// ladder. Ann presses Ranked, Find a match: she stays on the Ranked view with the search bar at the top (OPTIONAL WARM-UP), presses Warm up with Matt
+// and plays him in the stadium with the queue pill; Ben queues from the lobby and never warms up; both see MATCH FOUND with the emblems, the series
+// court with the pips, a game, the GAME card, then the series card with the trophy roll and, from 140 trophies, a rank-up for the winner; Play again
+// queues the winner in the lobby (the bar again, on the title too), the loser lands on the Ranked view. Codes only in the server log.
 // Usage: node test/ranked-e2e.mjs      RANKED_E2E_PORT=<base> moves the ports (default 8625: game + page, 8626: AirPods, 8627: nothing)
 // Screenshots land in test/ui-shots/ranked-e2e-*.png. Takes 2-5 minutes: run it in the background.
 import { spawn } from 'child_process'; import fs from 'fs'; import os from 'os'; import path from 'path';
@@ -40,7 +41,8 @@ const st = pg => pg.evaluate(() => { const t = id => document.getElementById(id)
     tx = id => t(id) ? t(id).textContent.trim() : null, s = window.__stats, d = document.body.dataset;
   return { screen: d.screen, overlay: d.overlay || null, venue: d.venue || null, rkBody: d.rk || null, phase: s.phase, role: s.role, room: s.room, rk: s.rk, calibrated: s.calibrated, errors: s.errors, search: location.search,
     lview: [...document.querySelectorAll('#screen-lobby .lobby-view')].find(e => !e.hidden)?.dataset.view, title: tx('lobby-title'), toast: t('toast').classList.contains('on') ? tx('toast') : null,
-    tile: vis('btn-ranked'), tileLine: tx('ranked-line-text'), head: tx('rk-tier'), headN: tx('rk-trophies'), go: tx('btn-ranked-go'), status: tx('rk-status'),
+    tile: vis('btn-ranked'), tileLine: tx('ranked-line-text'), head: tx('rk-tier'), headN: tx('rk-trophies'), go: tx('btn-ranked-go'), goOff: !!t('btn-ranked-go')?.disabled, status: tx('rk-status'),
+    bar: vis('rk-search') ? tx('rk-search-title') + ' ' + tx('rk-search-time') + ' | ' + tx('rk-search-sub') : null, focus: document.activeElement?.id || '',
     pill: vis('rk-pill') ? tx('rk-pill-text') + ' | ' + tx('rk-pill-sub') : null, roomPill: vis('room-pill'), leaveBtn: tx('btn-leave-room'), note: t('set-note') && !t('set-note').hidden ? tx('set-note') : '',
     names: tx('name-me') + ' / ' + tx('name-them'), emblems: document.querySelectorAll('#board .rank-badge .rank-em:not([hidden])').length, pips: vis('series') ? [...document.querySelectorAll('#series .pips')].map(o => o.querySelectorAll('li').length + ':' + o.querySelectorAll('.is-won').length).join(',') : null,
     banner: t('banner').classList.contains('show') ? tx('banner-text') : null, word: tx('rally-word'), keys: [...document.querySelectorAll('#keys li')].filter(e => !e.hidden).map(e => e.textContent.trim()).join(' | '),
@@ -70,21 +72,27 @@ const findMatch = async pg => { s = await until(pg, s => s.tile, 6000, 'the Rank
 // =====================================================================================================================
 const a = await open('a', 'Ann'); let s;
 await toLobby(a); s = await findMatch(a);
-ok(s.head === 'Bronze III' && s.venue === 'stadium' && s.go === 'Find a match' && /You play Matt while it looks/.test(s.status), `Ann's Ranked view: "${s.head}", ${s.headN} trophies, the stadium behind the glass, "${s.status}"`);
+ok(s.head === 'Bronze III' && s.venue === 'stadium' && s.go === 'Find a match' && s.status === 'You can warm up with Matt while it searches', `Ann's Ranked view: "${s.head}", ${s.headN} trophies, the stadium behind the glass, "${s.status}"`);
+s = await until(a, s => s.bar && s.rk.queued, 6000, 'queued in the lobby, the search bar up');
+ok(s.screen === 'lobby' && s.lview === 'ranked' && !s.room && /^Finding a match \d:\d\d \| Ranked · Bronze III$/.test(s.bar) && s.goOff && /^In the queue/.test(s.status) && s.focus === 'btn-rk-warm' && s.rk.phase === 'queue' && s.rk.warm === false && s.rk.kind === null,
+  `Ann queued and still on the Ranked view: bar "${s.bar}", Find a match off, "${s.status}", focus ${s.focus}, __stats.rk ${JSON.stringify(s.rk)}`);
+await sleep(600); await shot(a, '00-queued', [...SIZES, [390, 844]]);
+await a.click('#btn-rk-warm');
 await toCourt(a);
 s = await until(a, s => s.pill && s.rk.kind === 'warm', 10000, 'the warm-up court');
-ok(s.rkBody === 'warm' && s.venue === 'stadium' && /Finding an opponent \| Matt keeps you warm/.test(s.pill) && !s.roomPill && s.leaveBtn === 'Leave queue' && s.rk.queued === true && s.rk.tier === 1 && s.rk.div === 3 && s.emblems === 1 && !/1234/.test(s.keys.replace(/\s/g, '')) && !s.pips,
-  `Ann warms up against Matt: pill "${s.pill}", no court pill, Leave reads "${s.leaveBtn}", __stats.rk ${JSON.stringify(s.rk)}, her emblem in the tab, no 1 2 3 4, no series pips`);
+ok(s.rkBody === 'warm' && s.venue === 'stadium' && /Finding an opponent \| You stay queued if you leave/.test(s.pill) && !s.bar && !s.roomPill && s.leaveBtn === 'Stop warm-up' && s.rk.queued === true && s.rk.warm === true && s.rk.tier === 1 && s.rk.div === 3 && s.emblems === 1 && !/1234/.test(s.keys.replace(/\s/g, '')) && !s.pips,
+  `Warm up with Matt: Ann plays him: pill "${s.pill}", no bar, no court pill, Leave reads "${s.leaveBtn}", __stats.rk ${JSON.stringify(s.rk)}, her emblem in the tab, no 1 2 3 4, no series pips`);
 await sleep(1200); await shot(a, '01-warmup', SIZES);      // the calibration card's 'All set' has faded
 
 // =====================================================================================================================
 // 2. Ben queues: MATCH FOUND for both, with the emblems; then the series court
 // =====================================================================================================================
-const b = await open('b', 'Ben'); await toLobby(b); await findMatch(b);
+const b = await open('b', 'Ben'); await toLobby(b); await findMatch(b);      // Ben queues from the lobby (Ann is waiting: paired at once, he never warms up)
 s = await until(a, s => !!s.vs, 8000, 'MATCH FOUND (Ann)'); if (s.vs) { await sleep(1100); await shot(a, '02-found'); }      // the sides and the emblems have landed (the card is up for RK_VS_S = 2 s)
 const vsA = s, vsB = await until(b, s => !!s.vs || s.rk.kind === 'match', 8000, 'MATCH FOUND (Ben)');
 ok(!!vsA.vs && vsA.vs.round === 'MATCH FOUND' && vsA.vs.ranked && vsA.vs.them === 'Ben' && vsA.vs.ems === 'Bronze III,Bronze III' && /^Ranked · Best of 3 · First to 2, win by 2$/.test(vsA.vs.target) && vsA.rk.phase === 'vs', `Ann's card: ${JSON.stringify(vsA.vs)}`);
 ok(!vsB.vs || vsB.vs.them === 'Ann' && vsB.vs.ems === 'Bronze III,Bronze III', `Ben's card: ${JSON.stringify(vsB.vs)}`);
+ok(!vsB.bar && vsB.rk.kind !== 'warm' && !(vsA.bar), `neither shows the search bar under MATCH FOUND; Ben came from the lobby with no warm-up (${JSON.stringify(vsB.rk)})`);
 for (const pg of [a, b]) await toCourt(pg);
 s = await until(a, s => s.rk.kind === 'match' && s.rk.series && !s.overlay, 30000, 'the series court');
 ok(s.venue === 'stadium' && s.rkBody === 'match' && s.pips === '2:0,2:0' && s.emblems === 2 && s.leaveBtn === 'Forfeit' && s.names === 'You / Ben' && !s.roomPill && s.rk.series.bestOf === 3, `the series court: stadium, pips ${s.pips}, both emblems, Leave reads "${s.leaveBtn}", "${s.names}", series ${JSON.stringify(s.rk.series)}`);
@@ -111,11 +119,16 @@ ok(s.confetti > 0, `confetti for the rank-up (${s.confetti})`);
 await shot(W, '05-series-win', SIZES); await shot(L, '06-series-lose');
 
 // =====================================================================================================================
-// 4. Play again seats the winner in a fresh warm-up; the loser's card closes by itself onto the Ranked view
+// 4. Play again queues the winner in the lobby (the search bar on the Ranked view and the title); the loser's card closes by itself onto the Ranked view
 // =====================================================================================================================
 await W.click('#btn-rk-again');
-s = await until(W, s => s.rk.kind === 'warm' && s.pill && !s.overlay, 12000, 'Play again: a new warm-up');
-ok(s.rkBody === 'warm' && s.rk.queued === true && s.rk.series === null && !s.pips && s.rk.tier === 2, `Play again: the winner warms up again (${JSON.stringify(s.rk)}, pill "${s.pill}")`);
+s = await until(W, s => s.screen === 'lobby' && s.lview === 'ranked' && s.bar && !s.overlay && !s.room, 12000, 'Play again: queued, on the Ranked view with the bar');
+ok(s.rk.queued === true && s.rk.phase === 'queue' && s.rk.kind === null && s.rk.series === null && !s.pips && s.rk.tier === 2 && /Ranked · Silver I$/.test(s.bar) && !s.pill, `Play again: the winner is queued in the lobby (${JSON.stringify(s.rk)}, bar "${s.bar}")`);
+rest(W.tag); await sleep(1500);      // the AirPod lies still: a swing on the title is a press of Play
+await W.keyboard.press('Escape'); await sleep(500); await W.keyboard.press('Escape'); s = await until(W, s => s.screen === 'title', 4000, 'Esc Esc: the title');
+ok(!!s.bar && s.rk.queued === true, `the bar hangs over the title too, still queued ("${s.bar}")`); await sleep(500); await shot(W, '08-title-bar', [[1280, 720], [390, 844]]);
+await W.click('#btn-rk-cancel'); s = await until(W, s => !s.bar && !s.rk.on, 4000, 'Cancel: out of the queue');
+ok(s.rk.phase === 'off' && s.screen === 'title', `Cancel on the bar: out of the queue, the bar gone, still on the title (${s.screen}, ${JSON.stringify(s.rk)})`);
 s = await until(L, s => s.screen === 'lobby' && s.lview === 'ranked' && !s.room && s.headN !== '0', 12000, 'the loser lands on the Ranked view (the view draws Bronze 0 at once, then /api/stats answers)');
 ok(s.rk.on === false && s.rk.phase === 'off' && /^Bronze (II|III)$/.test(s.head) && +s.headN < 140 && +s.headN >= 100, `the loser: the Ranked view, "${s.head}" ${s.headN} (out of the queue: ${s.rk.on === false}, phase ${s.rk.phase})`);
 await shot(L, '07-view-after');
