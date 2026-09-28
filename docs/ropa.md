@@ -4,7 +4,7 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOTES 115; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
+Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
 
 ## Recipients common to every activity
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`
@@ -38,7 +38,7 @@ Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOT
   Ranked W/L and streaks, Matt queue W/L, Matt trophies awarded today; `match_log.mode`, `series`, `delta_a/b`).
 - Basis: legitimate interests (Art. 6(1)(f)): giving every player a record of their progress. Recorded for every player who
   plays (a guest by the random device id, a signed-in player by the account); there is NO off switch (Save my stats REMOVED
-  2026-09-28, NOTES 115; the client deletes a leftover `poddle.stats.on`). Safeguards: self-serve download and deletion
+  2026-09-28, NOTES 116; the client deletes a leftover `poddle.stats.on`). Safeguards: self-serve download and deletion
   (privacy page, Your data), the right to object by email (hello@danielrltan.com), private by default, short guest
   retention. A player who deletes and plays again is recorded again under a new id. Canada: implied consent by playing,
   withdrawn by deleting and no longer playing, or by writing to us. Consent is not the GDPR basis (Art. 8 would need

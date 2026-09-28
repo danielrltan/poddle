@@ -198,7 +198,7 @@ ok(API.log.some(l => l[1] === '/api/stats' && l[2] && l[2].dev === id0), 'Your s
   ok(!bad.length, `Your stats fits at ${SIZES.length} window sizes, nothing clipped${bad.length ? ' (' + bad.join('; ') + ')' : ''}`);
   await pg.setViewport({ width: 1280, height: 720 }); await sleep(250); }
 
-// ---------- Save my stats is gone (NOTES 115): no switch on the privacy page, Delete my data there carries the id; a browser that had turned stats off loses the dead key and says hello again ----------
+// ---------- Save my stats is gone (NOTES 116): no switch on the privacy page, Delete my data there carries the id; a browser that had turned stats off loses the dead key and says hello again ----------
 { const s = await ev(pg, () => ({ tog: !!document.getElementById('tog-save-stats'), row: !!document.getElementById('btn-set-stats') })); ok(!s.tog && !s.row, 'Settings has no Save my stats switch and no Your stats row'); }
 await pg.goto(`http://127.0.0.1:${W}/web/privacy.html#your-data`); await sleep(900);
 { const s = await ev(pg, () => ({ tog: !!document.getElementById('tog-stats'), sw: !!document.querySelector('.data-switch'), exp: !!document.getElementById('btn-export'), del: !!document.getElementById('btn-delete'), txt: document.getElementById('your-data').textContent }));

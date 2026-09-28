@@ -56,7 +56,7 @@ Important changes also need a notice on the home page. Open questions for the op
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
-  NOTES 115; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
+  NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
   (session, HttpOnly, 180 d), `__Host-poddle_n` (sign-in nonce, 10 min).
 - Third parties: Fly.io (host, logs ~7 days, the database volume + 5-day snapshots), Cloudflare (cdnjs three.js
   fallback; email forwarding for hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click),

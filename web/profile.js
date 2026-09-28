@@ -27,7 +27,7 @@ function newId() {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();      // not there on plain-http LAN pages: 16 random bytes in hex instead, never Math.random
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
 }
-export const hello = () => { if (!on) return null; const dev = deviceId(); return dev ? { type: 'hello', dev, v: 1 } : null; };      // stats are always kept (NOTES 115: the Save my stats switch is gone)
+export const hello = () => { if (!on) return null; const dev = deviceId(); return dev ? { type: 'hello', dev, v: 1 } : null; };      // stats are always kept (NOTES 116: the Save my stats switch is gone)
 export function opened() { const m = hello(); sockHello = !!m; return m; }      // the socket's open handler sends this FIRST (9.2); null = say nothing
 export function seated() {                                  // a 'welcome' with a seat of my own: the id is made now if there is none, and its hello follows at once
   if (!on) return;

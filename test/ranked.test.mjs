@@ -110,7 +110,7 @@ console.log('1. queue alone: a private warm-up vs Matt, unlisted, unjoinable, th
   ok(str.got('closed', m => m.reason === 'empty').length === 1, 'its spectator heard closed empty');
   bye(a, look, str); }
 
-console.log('2. Matt games while queued: a loss pays 0, a win pays the bounty; the next game starts by itself; nostats (an old tab, NOTES 115) and addr refusals');
+console.log('2. Matt games while queued: a loss pays 0, a win pays the bounty; the next game starts by itself; nostats (an old tab, NOTES 116) and addr refusals');
 { const a = await lobbied(); still(a); await queue(a, 'Ann'); await until(() => inWarm(a));
   ok(await until(() => a.n('matchover') >= 1, 20000), 'a point against Matt ends a game (RK_WIN 1)');
   const mo = a.last('matchover'); ok(mo.rk && mo.rk.matt === true && typeof mo.rk.next === 'number' && mo.tour === undefined && Array.isArray(mo.rank) && !a.got('rematch').length, `matchover { rk: { matt, next } }, no tour, no vote (${JSON.stringify(mo.rk)})`);

@@ -277,11 +277,11 @@ guest profile and never writes into the account.
 ### 3.1 Device id
 - Created lazily on the client, NEVER on page load: the first time this browser takes a SEAT to play (the `welcome`
   message with `side` 0 or 1 in a lobby court, not as a spectator, not on the title screen, not in the LOCAL room)
-  (the "while stats are on" condition is gone: Save my stats was REMOVED 2026-09-28, NOTES 115). It is created at seat time,
+  (the "while stats are on" condition is gone: Save my stats was REMOVED 2026-09-28, NOTES 116). It is created at seat time,
   not at match end, because the server must know the seat before the match is judged (a seat with no identity is
   anonymous, R3); the `hello` is sent at once on the open socket and `helloMsg` identifies the already-seated player.
   Just-in-time notice: the result card of the match that first STORES data for this id shows, once, "Your stats are
-  saved on this device. You can turn this off in Settings. Privacy Policy" (that copy REMOVED 2026-09-28, NOTES 115: today "Delete them any time on the Privacy Policy page"): the server sets `created: true` in the
+  saved on this device. You can turn this off in Settings. Privacy Policy" (that copy REMOVED 2026-09-28, NOTES 116: today "Delete them any time on the Privacy Policy page"): the server sets `created: true` in the
   `profile` message when `ownerForDevice` created the owner in that call (8.3, 9.3). No storage key is needed, and
   the notice appears exactly when data is first stored, whichever page load that is. Q5 asks whether EU/UK/Quebec traffic needs a
   one-tap "Save my stats" opt-in instead (then the id is created on that tap and match one is not saved).
@@ -295,7 +295,7 @@ guest profile and never writes into the account.
   - the server stores only `SHA-256(device id)` (32 bytes) and keeps the raw value only on the socket object in memory;
   - it is not a cookie (no cookie is needed for guests; this keeps step A cookie-free).
 - Rotated (a fresh one generated and the old key removed) on: sign-out, "Delete my data". (Turning stats off then on
-  also rotated it until the switch was REMOVED 2026-09-28, NOTES 115.)
+  also rotated it until the switch was REMOVED 2026-09-28, NOTES 116.)
 - **REMOVED 2026-09-28 (NOTES 116):** turning "Save my stats" off removed `poddle.device` and stopped sending `hello.dev` (section 9.6). Stats are now
   recorded for every player; the client deletes a leftover `poddle.stats.on` at load.
 - Its uses are closed: saving the player's own statistics and the fair-play checks inside Poddle. Never advertising,
@@ -1095,7 +1095,7 @@ builder at :383 and `backTo()` :377-378 are NOT changed.
     say something about the opponent), `self` "Matches against yourself don’t count", `restart` "Matches brought back
     after an update don’t count", `too_short` "Too short to count"; `saved:false` → nothing is shown.
   - One-time save notice (3.1): when the `profile` message has `created: true`, a second line: "Your stats are saved
-    on this device. You can turn this off in Settings." (REMOVED 2026-09-28, NOTES 115: now "Delete them any time on the Privacy Policy page.") + a "Privacy Policy" link (`/privacy.html#storage`, same
+    on this device. You can turn this off in Settings." (REMOVED 2026-09-28, NOTES 116: now "Delete them any time on the Privacy Policy page.") + a "Privacy Policy" link (`/privacy.html#storage`, same
     stopPropagation guard as 9.9). The server sends `created: true` exactly once per guest owner.
   - `nudge` → `#btn-save-signin` visible (win only; never on a loss, never for a signed-in player).
 - The button opens `#signin-card` (9.5), which is NOT part of the result overlay, so it survives the card closing
@@ -1195,7 +1195,7 @@ court list (`drawCourts`) and the bracket (`drawTour`).
 ### 9.9 Home-page notice (title screen)
 A sibling of `#safety` (web/index.html:229-235): `<div class="panel panel-sm notice" id="news" data-fit>` with
 "New: your stats are saved. Beat Matt at every level and track your best rally. Stats are saved with a random
-identifier in this browser, and you can turn this off in Settings. Privacy Policy updated {Month D, YYYY}." (the turn-off wording REMOVED 2026-09-28, NOTES 115; no #news element ships today) The "Privacy Policy" link carries `onpointerdown="event.stopPropagation()"` and the `onkeydown` Enter guard
+identifier in this browser, and you can turn this off in Settings. Privacy Policy updated {Month D, YYYY}." (the turn-off wording REMOVED 2026-09-28, NOTES 116; no #news element ships today) The "Privacy Policy" link carries `onpointerdown="event.stopPropagation()"` and the `onkeydown` Enter guard
 (the title screen starts the game on any pointerdown, main.js:654; test/seo.test.mjs:102-103 checks this pattern).
 Removed ~60 days after launch.
 
