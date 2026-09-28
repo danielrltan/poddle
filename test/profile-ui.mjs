@@ -133,10 +133,10 @@ r = await ev(pg, () => { const ui = window.__ui, q = (s, sel) => { const e = doc
     brNext: document.querySelector('#bracket .br-name + .reg-badge') ? document.querySelector('#bracket .br-name + .reg-badge').previousElementSibling.textContent : '' };
   ui.setTour(null); ui.lobbyRooms([], 2, []); return o; });
 ok(r.courts === 1 && r.chips === 1 && r.bracket === 1 && r.brNext === 'Dan' && r.courtText.some(t => t === 'Dan is waiting'), `court list, chips, bracket: one .reg-badge each, beside the developer's name only (${J(r)})`);
-// a username locks both name fields; Settings > You gets its own Change (9.5), gone again for a guest
-r = await ev(pg, () => { const ui = window.__ui, g = id => document.getElementById(id); ui.lockName('Bobby'); const on = { ro: g('set-name-input').readOnly, btn: !g('btn-set-name-change').hidden, lobbyBtn: !g('btn-name-change').hidden };
-  ui.lockName(null); return { on, off: { ro: g('set-name-input').readOnly, btn: !g('btn-set-name-change').hidden } }; });
-ok(r.on.ro && r.on.btn && r.on.lobbyBtn && !r.off.ro && !r.off.btn, `username: Settings name read-only with its own Change, a guest's editable with none (${J(r)})`);
+// a username locks the lobby name field with its Change; Settings has no name field, sign-in or sign-out at all (a rename or sign-out mid-match redials: a Ranked forfeit)
+r = await ev(pg, () => { const ui = window.__ui, g = id => document.getElementById(id); ui.lockName('Bobby'); const on = { ro: g('name-input').readOnly, btn: !g('btn-name-change').hidden };
+  ui.lockName(null); return { on, off: { ro: g('name-input').readOnly, btn: !g('btn-name-change').hidden }, gone: ['grp-you', 'set-name-input', 'btn-set-signin', 'btn-set-signout', 'set-account'].filter(id => g(id)) }; });
+ok(r.on.ro && r.on.btn && !r.off.ro && !r.off.btn && !r.gone.length, `username: the lobby name is read-only with its Change, a guest's editable; Settings has no You group (${J(r)})`);
 
 // a reload: the id is kept and is the FIRST frame of the new socket
 { const n = socks.length; await pg.reload(); await sleep(2500); const s = socks.slice(n).find(x => x.frames.length), f = s ? s.frames.filter(x => x.type !== 'ping') : [];
@@ -219,9 +219,9 @@ API.signin = true; google.length = 0; pg = await page('on');
 await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
 await pg.goto(URL0); await sleep(2200);
 ok(!google.length, `sign-in on, load: nothing requested from Google (${google})`);
-await ev(pg, () => window.__ui.settings(true)); await sleep(500);
-ok(await ev(pg, () => !document.getElementById('btn-set-signin').hidden), 'sign-in on: Settings has the Sign in with Google row');
-await ev(pg, () => document.getElementById('btn-set-signin').click()); await sleep(900);
+await pg.click('#btn-start').catch(() => {}); await sleep(900); await ev(pg, () => window.__ui.lobbyView('profile')); await sleep(1200);
+ok(await ev(pg, () => !document.getElementById('btn-pf-signin').hidden && !document.getElementById('btn-set-signin')), 'sign-in on: Your stats has Sign in with Google (and Settings has none)');
+await ev(pg, () => document.getElementById('btn-pf-signin').click()); await sleep(900);
 await sleep(1500);
 r = await ev(pg, () => ({ card: !document.getElementById('acct-layer').hidden && !document.getElementById('signin-card').hidden, err: document.getElementById('signin-err').textContent, age: !!document.getElementById('signin-age') }));
 ok(r.card && !r.age && google.some(u => u.startsWith('https://accounts.google.com/gsi/client')) && /could not load/.test(r.err), `the sign-in card opens (no age box) and only then is gsi/client requested (${google[0]}), aborted -> "${r.err}"`);
@@ -298,11 +298,10 @@ await pg.close();
 { API.signin = true; API.profile = FIXTURE; API.acct = { username: 'Tester', renameAt: null }; API.stale = true; API.signoutFail = true;
   const pg = await page('stale'); await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
   await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
-  await ev(pg, () => window.__ui.settings(true)); await sleep(400);
-  await ev(pg, () => document.getElementById('btn-set-signout').click()); await sleep(700);
-  let r = await ev(pg, () => ({ signed: !document.getElementById('set-account').hidden, toast: document.getElementById('toast').textContent }));
-  ok(r.signed && /Couldn’t sign you out/.test(r.toast), `sign-out answered 500: still signed in, and told so (${J(r)})`);
-  await ev(pg, () => window.__ui.settings(false)); await sleep(300);
+  await ev(pg, () => window.__ui.lobbyView('profile')); await sleep(1200);
+  await ev(pg, () => document.getElementById('btn-pf-signout').click()); await sleep(700);
+  let r = await ev(pg, () => ({ signed: !document.getElementById('btn-pf-signout').hidden, toast: document.getElementById('toast').textContent }));
+  ok(r.signed && /Couldn’t sign you out/.test(r.toast), `sign-out answered 500 (from Your stats): still signed in, and told so (${J(r)})`);
   await pg.goto(`http://127.0.0.1:${W}/web/privacy.html#your-data`); await sleep(900);
   await ev(pg, () => document.getElementById('btn-delete').click()); await sleep(200); await ev(pg, () => document.getElementById('btn-delete-yes').click()); await sleep(900);
   r = await ev(pg, () => document.getElementById('data-status').textContent);
