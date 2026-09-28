@@ -26,7 +26,7 @@ function origin(req) {                                           // hosted: alwa
 // dataOf(ownerId) -> what the owner's card draws, or null when there is no profile (the play counters come with it as profile.play)
 function dataOf(o) {
   const p = db.profileOf(o); if (!p) return null;
-  return card.dataOf(p, db.usernameOf(o));
+  return card.dataOf(p && p.ladder && p.ladder.tier === require('./ladder.js').TOP ? { ...p, places: db.leaderPlaces(o) } : p, db.usernameOf(o));   // Pro: its global leaderboard place for 'PRO #N' (NOTES 124/126); read only for Pro players
 }
 const links = (base, slug, d) => { const url = base + '/c/' + slug; return { url, image: url + '.png?v=' + card.hashOf(d) }; };
 // linkOf(ownerId, req) -> { url, image } | null: the owner's live link (for /api/stats), null when none

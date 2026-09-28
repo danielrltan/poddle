@@ -5,13 +5,13 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 6;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 7;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
 const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];   // wire level -> name; the ladder in difficulty order (Tour is 3 on the wire, between Club and Pro)
 // The rank emblems are the browser's own artwork: web/emblems.js (an ES module, loaded here through require(esm), Node 22.12+) exports the
-// SVG sprite, the seven ranks and their colours. Loaded once, lazily: if it ever fails, the card still renders, with the rank's name and no emblem
+// SVG sprite, the eight ranks and their colours (NOTES 124: a medal per division below Pro, `rank-<tier>-<div>`, and Pro's one, `rank-8`). Loaded once, lazily: if it ever fails, the card still renders, with the rank's name and no emblem
 let EMB;
 function emblems() {
   if (EMB !== undefined) return EMB;
@@ -20,14 +20,15 @@ function emblems() {
     // every id in the sprite gets a prefix: the card's own defs have ids too (its drop-shadow filter is `sh`, as is the sprite's sheen)
     const pre = t => t.replace(/\bid="([^"]+)"/g, 'id="em-$1"').replace(/href="#([^"]+)"/g, 'href="#em-$1"').replace(/url\(#([^)]+)\)/g, 'url(#em-$1)');
     const S = pre(E.SPRITE), defs = (S.match(/<defs>([\s\S]*?)<\/defs>/) || [])[1];
-    const sym = E.RANKS.map(r => (S.match(new RegExp(`<symbol id="em-rank-${r.id}" viewBox="0 0 64 64">([\\s\\S]*?)</symbol>`)) || [])[1]);
-    if (!defs || E.RANKS.length !== 7 || sym.some(x => !x)) throw new Error('sprite');
-    EMB = { defs, sym, ranks: E.RANKS, label: E.rankLabel, v: crypto.createHash('sha256').update(E.SPRITE + JSON.stringify(E.RANKS)).digest('hex').slice(0, 8) };   // v: a redrawn emblem is a new picture URL too
+    const top = E.RANKS.length, idOf = typeof E.emblemId === 'function' ? E.emblemId : (t, d) => (t === top ? `rank-${t}` : `rank-${t}-${d}`);   // the medal of a tier and division (Pro has one)
+    const sym = {}; for (const r of E.RANKS) for (let d = 1; d <= (r.id === top ? 1 : 3); d++) { const id = idOf(r.id, d), m = S.match(new RegExp(`<symbol id="em-${id}" viewBox="0 0 64 64">([\\s\\S]*?)</symbol>`)); if (!m) throw new Error('sprite ' + id); sym[r.id + ':' + d] = m[1]; }
+    if (!defs || top !== RANK_NAME.length) throw new Error('sprite');   // the table this file falls back on must agree with the art's
+    EMB = { defs, sym: (t, d) => sym[t + ':' + (t === top ? 1 : d)] || sym[t + ':1'], ranks: E.RANKS, label: E.rankLabel, v: crypto.createHash('sha256').update(E.SPRITE + JSON.stringify(E.RANKS)).digest('hex').slice(0, 8) };   // v: a redrawn emblem is a new picture URL too
   } catch { EMB = null; }
   return EMB;
 }
-const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'];   // server/ladder.js NAMES; used only if web/emblems.js did not load
-const INK = ['#7e4512', '#6d7f8c', '#b8720a', '#1f7a86', '#0f7fae', '#4f23a8', '#4a2f8a'];   // web/emblems.js RANKS colour.deep, the same fallback
+const RANK_NAME = require('./ladder.js').NAMES, ROMAN = ['', 'I', 'II', 'III'], TOP = RANK_NAME.length;   // server/ladder.js NAMES (eight: Master is tier 6, Pro tier 8); the names used if web/emblems.js did not load
+const INK = ['#7e4512', '#6d7f8c', '#b8720a', '#1f7a86', '#0f7fae', '#9b1c3a', '#4f23a8', '#4a2f8a'];   // web/emblems.js RANKS colour.deep, the same fallback
 
 const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/s rounded to 10, as Your stats shows it
@@ -38,8 +39,9 @@ const beaten = r => Number.isFinite(r.firstWinAt) && r.firstWinAt > 0;
 // drawRoad, docs/RANKED.md 2: one rank per player). No ladder (never played Ranked, an older server) is Bronze I with 0 trophies, as there
 const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b ? v : a;
 function rankOf(p) {
-  const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : {}, tier = int(L.tier, 1, 7), div = int(L.div, 1, 3), E = emblems();
-  return { name: E ? E.label(tier, div) : tier === 7 ? RANK_NAME[6] : `${RANK_NAME[tier - 1]} ${ROMAN[div]}`, tier, div: tier === 7 ? 1 : div, trophies: num(L.trophies) };
+  const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : {}, tier = int(L.tier, 1, TOP), div = int(L.div, 1, 3), E = emblems();
+  const pro = tier === TOP && p && p.places && p.places.trophies && Number.isInteger(p.places.trophies.rank) ? p.places.trophies.rank : null;   // Pro's global leaderboard place (NOTES 126), when the owner is listed
+  return { name: tier === TOP ? `${RANK_NAME[TOP - 1]}${pro ? ' #' + pro : ''}` : E ? E.label(tier, div) : `${RANK_NAME[tier - 1]} ${ROMAN[div]}`, tier, div: tier === TOP ? 1 : div, pro, trophies: num(L.trophies) };
 }
 const mattOf = p => rows(p).map(beaten).lastIndexOf(true);      // the toughest Matt beaten, in difficulty order (0 Rookie .. 3 Pro), -1 for none
 
@@ -68,7 +70,7 @@ function dataOf(p, username, play) {
   void titles; void aces; void smashes; void played;               // on Your stats, not on the card: six fixed figures fit the panel legibly
   const top = mattOf(p);
   const E = emblems();
-  return { v: CARD_V, em: E ? E.v : null, name: username || 'Poddle player', guest: !username, rank: rank.name, tier: rank.tier, div: rank.div, trophies: rank.trophies,
+  return { v: CARD_V, em: E ? E.v : null, name: username || 'Poddle player', guest: !username, rank: rank.name, tier: rank.tier, div: rank.div, pro: rank.pro, trophies: rank.trophies,
     matt: top < 0 ? null : LEVEL[ORDER[top]], mattI: top, big: all };
 }
 const hashOf = d => crypto.createHash('sha256').update(JSON.stringify(d)).digest('hex').slice(0, 12);   // ?v= and the ETag: a stat change is a new picture URL
@@ -111,14 +113,14 @@ function wordmark(x, base, S, fill) {                            // web/ui.css .
 }
 const inkOf = tier => { const E = emblems(), c = E ? E.ranks[tier - 1].colour.deep : INK[tier - 1] || INK[0];   // the rank's rim colour 15% darker, as text (web/ui.css --rank-ink mixed with black)
   return '#' + [1, 3, 5].map(k => Math.round(parseInt(c.slice(k, k + 2), 16) * 0.85).toString(16).padStart(2, '0')).join(''); };
-function emblem(cx, top, S, tier, div) {                         // the rank's emblem (web/emblems.js, the symbol inlined, S px square from top), a glow behind it, rays from Platinum up, the division on a pill over its lower edge
+function emblem(cx, top, S, tier, div, pro) {                         // the rank's emblem (web/emblems.js, the symbol inlined, S px square from top), a glow behind it, rays from Platinum up, the division on a pill over its lower edge
   const E = emblems(), cy = top + S / 2, ink = inkOf(tier);
   let rays = '';
   if (tier >= 4) { const n = 18, R2 = S * 0.74; for (let i = 0; i < n; i++) { const a0 = (i / n) * 2 * Math.PI - Math.PI / 2, a1 = a0 + Math.PI / n * 0.8;
     rays += `M${r2(cx)} ${r2(cy)}L${r2(cx + R2 * Math.cos(a0))} ${r2(cy + R2 * Math.sin(a0))}L${r2(cx + R2 * Math.cos(a1))} ${r2(cy + R2 * Math.sin(a1))}Z`; } }
-  const art = E ? `<g transform="translate(${r2(cx - S / 2)} ${r2(top)}) scale(${r2(S / 64)})" filter="url(#emsh)">${E.sym[tier - 1]}</g>` : '';
-  if (tier === 7) return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(S * 0.72)}" fill="url(#glow)"/>` + (rays ? `<clipPath id="rays"><rect x="0" y="${r2(top - 2)}" width="${r2(2 * cx)}" height="${r2(S + 60)}"/></clipPath><path d="${rays}" fill="#ffffff" opacity=".45" clip-path="url(#rays)"/>` : '') + art;   // Pro has no divisions (NOTES 126): no pill
-  const R = ROMAN[div] || 'I', fs = 30, pw = Math.max(52, measure(R, 900, fs, 2) + 30), ph = 42, py = top + S * 0.86 - ph / 2;   // .st-em[data-div]: a white pill over the lower edge, the numeral in the rank's ink
+  const art = E ? `<g transform="translate(${r2(cx - S / 2)} ${r2(top)}) scale(${r2(S / 64)})" filter="url(#emsh)">${E.sym(tier, div)}</g>` : '';
+  if (tier === TOP && !pro) return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(S * 0.72)}" fill="url(#glow)"/>` + (rays ? `<clipPath id="rays"><rect x="0" y="${r2(top - 2)}" width="${r2(2 * cx)}" height="${r2(S + 60)}"/></clipPath><path d="${rays}" fill="#ffffff" opacity=".45" clip-path="url(#rays)"/>` : '') + art;   // Pro has no divisions (NOTES 126): no numeral; its leaderboard place goes on the pill when known (below)
+  const R = tier === TOP ? '#' + pro : ROMAN[div] || 'I', fs = 30, pw = Math.max(52, measure(R, 900, fs, 2) + 30), ph = 42, py = top + S * 0.86 - ph / 2;   // .st-em[data-div]: a white pill over the lower edge, the numeral in the rank's ink
   return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(S * 0.72)}" fill="url(#glow)"/>` +
     (rays ? `<clipPath id="rays"><rect x="0" y="${r2(top - 2)}" width="${r2(2 * cx)}" height="${r2(S + 60)}"/></clipPath><path d="${rays}" fill="#ffffff" opacity=".45" clip-path="url(#rays)"/>` : '') + art +   // the rays stop under the PICKLEBALL tagline and above the rank's name
     `<rect x="${r2(cx - pw / 2)}" y="${r2(py)}" width="${r2(pw)}" height="${ph}" rx="${ph / 2}" fill="#ffffff" stroke="#143c64" stroke-opacity=".14" stroke-width="2" filter="url(#sh)"/>` +
@@ -151,7 +153,7 @@ ${E ? E.defs : ''}
   out.push(`<g transform="translate(${r2(cx - ww / 2)} 82)" filter="url(#lift)">${wm}</g>`);
   out.push(text(cx + 3, 124, 'PICKLEBALL', { size: 28, wt: 900, fill: '#0e3f8c', anchor: 'middle', ls: 6, extra: ' filter="url(#lift)"' }));   // +3: half the trailing letter-spacing, so it centres on the wordmark
   const lh = 330 + 70 + 64, top = 132 + Math.max(0, (474 - lh) / 2);   // the trophies and the bot badge always show: every card's left column is laid out the same   // the emblem, the rank and its pills, centred under the tagline
-  out.push(emblem(cx, top + 4, 222, d.tier, d.div));
+  out.push(emblem(cx, top + 4, 222, d.tier, d.div, d.pro));
   const rk = d.rank.toUpperCase();
   out.push(text(cx, top + 290, rk, { size: fit(rk, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
   let ly = top + 314;

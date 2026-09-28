@@ -137,7 +137,7 @@ const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'Press B to play Ma
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].replace(BADGE_OUT, '').slice(0, 24) || null : null);      // untrusted text: ui.js writes it with textContent only
 const cleanRegs = a => [0, 1].map(i => Array.isArray(a) && a[i] === true);      // only a literal true draws a badge (an old server sends none)
-const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r }; return Number.isInteger(o.tier) && o.tier >= 1 && o.tier <= 7 ? { tier: o.tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // { tier 1..7, div 1..3 } or nothing (a bare tier reads as division I)
+const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r }; return Number.isInteger(o.tier) && o.tier >= 1 && o.tier <= 8 ? { tier: o.tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // { tier 1..8 (server/ladder.js TIERS: Master since NOTES 124), div 1..3 } or nothing (a bare tier reads as division I)
 const cleanRanks = a => [0, 1].map(i => Array.isArray(a) ? rankRef(a[i]) : null);      // only a rank draws an emblem (a plain court sends [null, null] or nothing)
 // Who is on the scoreboard. A player reads 'You' on the left and the other seat on the right; a spectator reads side 0 on the
 // left (blue) and side 1 on the right (orange), names in both, never 'You'. Matt's second line is his level.

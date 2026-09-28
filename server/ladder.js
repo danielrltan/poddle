@@ -1,31 +1,33 @@
-// The Ranked ladder (docs/RANKED.md 5, DIVISIONS): seven ranks of three divisions each, their trophy floors, what a series and a queue game vs Matt
+// The Ranked ladder (docs/RANKED.md 5, DIVISIONS, NOTES 124): eight ranks, three divisions each below Pro (Pro has none, NOTES 126), their trophy floors, what a series and a queue game vs Matt
 // are worth. Pure CommonJS, no state, nothing runs on require. web/emblems.js mirrors the rank table (names, floors); test/ladder.test.mjs asserts they agree.
-// Vocabulary (RANKED.md 0.1): "trophies" is the count, "tier" the rank index 1..7, "div" the division 1..3 inside it (I lowest, III highest: after III you
-// rank up to the next rank's I). `ranked` elsewhere in this codebase means "counted", never this mode.
+// Vocabulary (RANKED.md 0.1): "trophies" is the count, "tier" the rank index 1..8, "div" the division 1..3 inside it (I lowest, III highest: after III you
+// rank up to the next rank's I; always 1 in Pro). `ranked` elsewhere in this codebase means "counted", never this mode.
 
 // tier, name, floor (trophies where the rank starts), sticky (a floor you never fall below once reached), matt (Matt's WIRE level while you
-// wait in the queue: Rookie 0, Club 1, Pro 2, Tour 3), mattWin (trophies for a played-out counted win against him; the top rank is only won against people)
+// wait in the queue: Rookie 0, Club 1, Pro 2, Tour 3), mattWin (trophies for a played-out counted win against him; 0 from Champion up, and MATT_CEILING stops him under Champion)
 const TIERS = Object.freeze([
   Object.freeze({ tier: 1, name: 'Bronze',   floor: 0,   sticky: true,  matt: 0, mattWin: 10 }),
   Object.freeze({ tier: 2, name: 'Silver',   floor: 150, sticky: true,  matt: 1, mattWin: 8 }),
   Object.freeze({ tier: 3, name: 'Gold',     floor: 300, sticky: true,  matt: 1, mattWin: 7 }),
   Object.freeze({ tier: 4, name: 'Platinum', floor: 450, sticky: true,  matt: 3, mattWin: 6 }),
   Object.freeze({ tier: 5, name: 'Diamond',  floor: 600, sticky: false, matt: 3, mattWin: 5 }),
-  Object.freeze({ tier: 6, name: 'Champion', floor: 750, sticky: false, matt: 2, mattWin: 4 }),
-  Object.freeze({ tier: 7, name: 'Pro',      floor: 900, sticky: false, matt: 2, mattWin: 0 }),
+  Object.freeze({ tier: 6, name: 'Master',   floor: 750, sticky: false, matt: 2, mattWin: 4 }),   // NOTES 124: the eighth rank (its name lives here and in web/emblems.js RANKS only)
+  Object.freeze({ tier: 7, name: 'Champion', floor: 900, sticky: false, matt: 2, mattWin: 0 }),
+  Object.freeze({ tier: 8, name: 'Pro',      floor: 1050, sticky: false, matt: 2, mattWin: 0 }),
 ]);
-const TOP = TIERS.length;                                        // 7
-const RANK_W = 150, DIV_W = 50, DIVS = 3;                        // a rank is 150 trophies wide, a division 50: Bronze I 0, II 50, III 100, Silver I 150 ... Champion III 850. Pro (900 and up, no cap) has NO divisions: its players are told apart by their global leaderboard place (NOTES 126, the owner: 'like Valorant')
+const TOP = TIERS.length;                                        // 8: Pro, the top rank (no divisions, NOTES 126)
+const RANK_W = 150, DIV_W = 50, DIVS = 3;                        // a rank is 150 trophies wide, a division 50: Bronze I 0, II 50, III 100, Silver I 150 ... Champion III 1000. Pro (1050 and up, no cap) has NO divisions: its players are told apart by their global leaderboard place (NOTES 126, the owner: 'like Valorant')
 const STICKY_TOP = 4;                                            // Bronze .. Platinum are kept for good (divisions inside them can be lost); Diamond and above can drop, never below Platinum's floor
 const NAMES = Object.freeze(TIERS.map(t => t.name));
 const FLOORS = Object.freeze(TIERS.map(t => t.floor));
 const ROMAN = Object.freeze(['I', 'II', 'III']);
-const MATT_CEILING = TIERS[TOP - 1].floor - 1;                   // 899: Matt never carries anyone into the top rank
+const CHAMPION = TIERS.findIndex(t => t.mattWin === 0) + 1;     // 7, Champion: the first rank Matt pays nothing in (found by the table, never by name)
+const MATT_CEILING = TIERS[CHAMPION - 1].floor - 1;              // 899 = the Champion floor - 1: Matt carries a player to Master III at most (NOTES 124; before Master it was the Pro floor - 1, the same 899)
 
 const int = v => (Number.isFinite(+v) ? Math.trunc(+v) : 0);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// tierOf(trophies) -> 1..7: the highest rank floor reached (anything unparseable or negative is Bronze)
+// tierOf(trophies) -> 1..8: the highest rank floor reached (anything unparseable or negative is Bronze)
 function tierOf(trophies) { const t = int(trophies); let i = 0; while (i + 1 < TOP && t >= FLOORS[i + 1]) i++; return i + 1; }
 // divOf(trophies, tier?) -> 1..3: the division inside the rank (tier defaults to tierOf(trophies)); always 1 in Pro, which has no divisions
 function divOf(trophies, tier) { const t = clamp(int(tier == null ? tierOf(trophies) : tier), 1, TOP); return t === TOP ? 1 : 1 + clamp(Math.floor((int(trophies) - FLOORS[t - 1]) / DIV_W), 0, DIVS - 1); }
@@ -35,10 +37,10 @@ const hasDivs = tier => clamp(int(tier), 1, TOP) < TOP;
 function romanOf(div) { return ROMAN[clamp(int(div), 1, DIVS) - 1]; }
 // rankName(tier, div) -> the player-facing rank string, 'Gold II' (div omitted, or Pro: the rank alone)
 function rankName(tier, div) { const n = TIERS[clamp(int(tier), 1, TOP) - 1].name; return div == null || !hasDivs(tier) ? n : n + ' ' + romanOf(div); }
-// floorOf(tier) -> that rank's first trophy count (a tier outside 1..7 is clamped)
+// floorOf(tier) -> that rank's first trophy count (a tier outside 1..8 is clamped)
 function floorOf(tier) { return FLOORS[clamp(int(tier), 1, TOP) - 1]; }
 // divFloorOf(tier, div) -> the division's first trophy count
-function divFloorOf(tier, div) { return floorOf(tier) + (clamp(int(div), 1, DIVS) - 1) * DIV_W; }
+function divFloorOf(tier, div) { return floorOf(tier) + (hasDivs(tier) ? clamp(int(div), 1, DIVS) - 1 : 0) * DIV_W; }   // Pro: its floor, whatever div is asked
 // nextFloorOf(tier) -> the next rank's floor, null at the top
 function nextFloorOf(tier) { const t = clamp(int(tier), 1, TOP); return t < TOP ? FLOORS[t] : null; }
 // nextDivFloorOf(tier, div) -> where the next division (or the next rank) starts, null in Pro
@@ -63,5 +65,5 @@ function mattAward(delta, dayUsed, dayCap, trophies) { return Math.max(0, Math.m
 
 const EXPORT_NAMES = NAMES;                                      // the export file names ranks by these words (never by tier number alone)
 
-module.exports = { TIERS, NAMES, FLOORS, ROMAN, TOP, DIVS, RANK_W, DIV_W, STICKY_TOP, MATT_CEILING, EXPORT_NAMES,
+module.exports = { TIERS, NAMES, FLOORS, ROMAN, TOP, DIVS, RANK_W, DIV_W, STICKY_TOP, CHAMPION, MATT_CEILING, EXPORT_NAMES,
   tierOf, divOf, hasDivs, romanOf, rankName, floorOf, divFloorOf, nextFloorOf, nextDivFloorOf, applyFloor, humanDelta, halveWin, mattDelta, mattLevel, mattAward };

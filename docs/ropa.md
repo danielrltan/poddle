@@ -4,7 +4,7 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
+Last reviewed: 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks re-derived from stored trophies; Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
 
 ## Recipients common to every activity
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`

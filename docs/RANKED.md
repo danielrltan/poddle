@@ -2,6 +2,8 @@
 
 Menu overhaul, the Ranked queue with Matt as the warm-up, best-of-3 series in a night stadium, a seven-rank trophy road, and the match show (VS, game cards, series card, trophy roll, rank-up). Implementation-ready. Every `file:line` below was verified in the worktree at `/Users/danieltan/poddle-ranked` (branch `ranked`, head `6f6488d`), including the uncommitted work already in it (section 0.2).
 
+> **2026-09-28:** NOTES 126 took Pro's divisions away and added the global leaderboard (Pro #N); NOTES 124 added an eighth rank, **Master** (tier 6, 750), between Diamond and Champion (Champion 900, Pro 1050, tier 8), and medals that evolve by division (sprite `rank-<tier>-<div>`, Pro `rank-8`; docs/RANK8.md sections 1-3 and 6). The Matt ceiling stays 899. Where this file says seven ranks or Pro III, those notes override it.
+
 Base design: the systems design (judged best by two of three judges), with the grafts the judges asked for and every flaw they listed fixed. Where the judges disagreed, the tie was broken by the owner's two asks (fun and progressable solo; fair when two humans meet) and the tiny player base.
 
 ---
@@ -285,7 +287,7 @@ seat both ─ 3-2-1 ─ game 1 ─┬─ rkgame card (RK_GAME_GAP_S) ─ rkgo �
 
 ## 5. Trophies and ranks (`server/ladder.js`, a new pure CommonJS module; `web/emblems.js` mirrors its table)
 
-### 5.1 The seven ranks, three divisions each (DIVISIONS: the owner's table of 2026-09-25 overrides the earlier floors)
+### 5.1 The eight ranks (seven before 2026-09-28), three divisions each below Pro (DIVISIONS: the owner's table of 2026-09-25 overrides the earlier floors)
 
 | tier | name | rank floor | I / II / III | sticky floor | Matt while you wait (wire level) | Matt win | Matt loss | emblem (already drawn, `#rank-N`) |
 |---|---|---|---|---|---|---|---|---|
@@ -294,8 +296,9 @@ seat both ─ 3-2-1 ─ game 1 ─┬─ rkgame card (RK_GAME_GAP_S) ─ rkgo �
 | 3 | Gold | 300 | 300 / 350 / 400 | yes | Club (1) | +7 | 0 | gold hexagon with six rivets |
 | 4 | Platinum | 450 | 450 / 500 / 550 | yes | Tour (3) | +6 | 0 | platinum octagon, double frame |
 | 5 | Diamond | 600 | 600 / 650 / 700 | no (never below 450) | Tour (3) | +5 | 0 | cut cyan gem with a sparkle |
-| 6 | Champion | 750 | 750 / 800 / 850 | no | Pro (2) | +4 | 0 | purple star with wings |
-| 7 | Pro | 900 | 900 / 950 / 1000+ | no | Pro (2) | 0 | 0 | laurel crest, crown, prism ramp |
+| 6 | Master (2026-09-28) | 750 | 750 / 800 / 850 | no | Pro (2) | +4 | 0 | ruby rosette (NOTES 124) |
+| 7 | Champion | 900 | 900 / 950 / 1000 | no | Pro (2) | 0 (the 899 ceiling) | 0 | purple star with wings |
+| 8 | Pro | 1050 | none: Pro #N on the global leaderboard (NOTES 126) | no | Pro (2) | 0 | 0 | laurel crest, crown, prism ramp |
 
 DIVISIONS: `RANK_W = 150`, `DIV_W = 50`; `divOf(trophies, tier) = 1 + min(2, floor((trophies - floor) / 50))` (I is the lowest, after III you rank up to the next rank's I). NOTES 126 (the owner, 2026-09-28): Pro, 900 and up with no cap, has NO divisions (`divOf` is 1, `hasDivs(7)` false, the name is plain `Pro`); Pro players are told apart by their global leaderboard place, 'Pro #12'. Player-facing rank string `rankName(tier, div)` = `Gold II`. Beside a name only the emblem shows (its title/aria is the full string). Every wire field that carries `tier` carries `div` beside it (section 9).
 

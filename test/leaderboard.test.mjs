@@ -15,7 +15,7 @@ const acct = (sub, name) => { const a = db.createAccount(sub, T0); if (name) db.
 const A = acct('s-a', 'Ace'), B = acct('s-b', 'Bree'), C = acct('s-c', 'Cato'), D = acct('s-d', 'Dino'), N = acct('s-n', null);
 const G = db.ownerForDevice(dev('guest'), T0, { create: true });
 const tro = (o, n) => db.ladderApply({ owner: o, delta: n, won: true, vsBot: false, now: T0 + 1 });
-tro(A.owner_id, 960); tro(B.owner_id, 400); tro(C.owner_id, 400); tro(N.owner_id, 999); tro(G, 999);   // D has never played Ranked
+tro(A.owner_id, 1100); tro(B.owner_id, 400); tro(C.owner_id, 400); tro(N.owner_id, 1199); tro(G, 1199);   // D has never played Ranked; Ace is Pro (1050+ since Master, NOTES 124)
 const match = (a, b, rallyA, rallyB, t) => db.recordMatch({ now: t, kind: 'human', ending: 'won', winner: 0, score: [11, 4], secs: 90,
   seats: [{ owner: a, record: true, bests: true, bestRally: rallyA }, { owner: b, record: true, bests: true, bestRally: rallyB }] });
 match(D.owner_id, A.owner_id, 30, 30, T0 + 10); match(D.owner_id, B.owner_id, 2, 2, T0 + 20); match(C.owner_id, N.owner_id, 12, 40, T0 + 30); match(G, C.owner_id, 50, 9, T0 + 40);
@@ -24,7 +24,7 @@ console.log('trophies');
 const t = db.leaderboard('trophies');
 ok(t && t.rows.map(r => r.name).join(',') === 'Ace,Bree,Cato', `accounts with a username and trophies only, highest first, a tie by name (${t && t.rows.map(r => r.name + ':' + r.v).join(', ')})`);
 ok(t.rows.map(r => r.rank).join(',') === '1,2,2' && t.total === 3, `a tie shares its number: ranks ${t.rows.map(r => r.rank)}; total ${t.total}`);
-ok(t.rows[0].tier === 7 && t.rows[0].div === 1 && t.rows[1].tier === 3, `each row carries the emblem's tier and division, Pro with none (Ace ${t.rows[0].tier}/${t.rows[0].div})`);
+ok(t.rows[0].tier === 8 && t.rows[0].div === 1 && t.rows[1].tier === 3, `each row carries the emblem's tier and division, Pro with none (Ace ${t.rows[0].tier}/${t.rows[0].div})`);
 ok(t.rows.every(r => Object.keys(r).join(',') === 'rank,name,v,tier,div'), 'a row is rank, name, value, tier, div: no owner id, no account id');
 console.log('rally and streak');
 const r = db.leaderboard('rally');
@@ -35,7 +35,7 @@ ok(s.rows.map(x => x.name + ':' + x.v).join(',') === 'Dino:2,Cato:1', `streak: D
 ok(db.leaderboard('speed') === null && db.leaderboard('__proto__') === null, 'an unknown board (speed is phone-reported) is null');
 console.log('places');
 const pa = db.leaderPlaces(A.owner_id), pc = db.leaderPlaces(C.owner_id), pd = db.leaderPlaces(D.owner_id);
-ok(pa.listed && pa.trophies.rank === 1 && pa.trophies.v === 960 && pa.rally.rank === 1 && pa.streak === null, `Ace: #1 in trophies and rally, no streak place (${JSON.stringify(pa)})`);
+ok(pa.listed && pa.trophies.rank === 1 && pa.trophies.v === 1100 && pa.rally.rank === 1 && pa.streak === null, `Ace: #1 in trophies and rally, no streak place (${JSON.stringify(pa)})`);
 ok(pc.trophies.rank === 2 && pc.rally.rank === 3 && pc.streak.rank === 2, 'Cato: the same numbers as the rows (2, 3, 2)');
 ok(pd.trophies === null && pd.rally.rank === 1 && pd.streak.rank === 1, 'Dino: no trophies, no trophy place');
 for (const b of ['trophies', 'rally', 'streak']) { const L = db.leaderboard(b); ok(L.rows.every(x => { const o = { Ace: A, Bree: B, Cato: C, Dino: D }[x.name].owner_id, p = db.leaderPlaces(o)[b]; return p && p.rank === x.rank && p.v === x.v; }), `${b}: every row's rank is that player's place`); }

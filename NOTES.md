@@ -2515,6 +2515,40 @@ family. It stays greener and paler than Diamond's sky blue. Everything that read
 and emblems, Your stats, the RANK UP beat, the share card's emblem and ink) follows; the share card's emblem digest changes, so
 card URLs refresh.
 
+## 124. An eighth rank, Master, and medals that evolve by division
+
+The owner asked for one more rank between Diamond and Champion, then for medals that change with each division ("i wanted
+division evolutions"), and for Pro to have no divisions but a number on a leaderboard. The last part shipped first from a
+parallel session (NOTES 126, the global leaderboard and "Pro #N"); this section keeps that and adds the rest. Spec: docs/RANK8.md.
+
+- **Eight ranks** (server/ladder.js TIERS, web/emblems.js RANKS; test/ladder.test.mjs asserts they agree): Bronze 0, Silver 150,
+  Gold 300, Platinum 450, Diamond 600, **Master 750** (new, tier 6), Champion 900, Pro 1050 (tier 8, no divisions). A rank stays 150
+  wide. The name Master is Claude's pick (the owner did not name it): rename it in those two tables only. The Matt ceiling stays
+  899, now defined as the Champion floor - 1: Matt carries a player to Master III at most (mattWin 4 in Master, 0 from Champion).
+  ladder.js divFloorOf now returns Pro's floor whatever division is asked.
+- **Existing players**: trophies never change. db.js extra() re-derives tier/div from trophies and best_tier/best_div from
+  best_trophies on every open, in one UPDATE inside the extra() transaction, built from the frozen rank table and rewriting only
+  rows that disagree (a second open changes 0 rows; a row an older build writes is healed on the next open). 750-899 was Champion
+  and is now Master, 900-1049 was Pro and is now Champion, 1050+ is Pro. No MIGRATIONS entry. test/accounts-unit.test.mjs checks
+  every count 0..1200 against ladder.js and the boundaries 749/750/899/900/1049/1050, and that re-opening changes nothing.
+- **Medals evolve by division** (web/emblems.js: 22 sprite symbols, `rank-<tier>-<div>` for tiers 1..7 and `rank-8` for Pro,
+  `emblemId(tier, div)`, `hasDivs(tier)`; every drawing helper takes the division): I is the medal as before; II adds a second rim
+  in the rank's metal with four studs; III adds a soft glow with rays and gems in the NEXT rank's colour, so III reads one step from
+  ranking up. Master is a 12-point ruby rosette. Pro keeps one medal, the most ornate. ui.js passes the division everywhere a
+  medal is drawn (Your stats crest, rank badges beside names, the result and trophy cards, the Ranked tile and view, the search
+  bar); on the Ranks page your rank shows your division's medal, ranks passed their III, ranks ahead their I. The Ranks grid is
+  4 + 4 (2 a row under 900 px). Sheets: test/ui-shots/emblems.png (150 px) and emblems-xs.png (24 and 20 px); gallery
+  test/emblems.html. About 10.5 KB added to emblems.js.
+- **Share card**: the division's own medal, Master, and "PRO #N" on the pill from the owner's trophies place on the global
+  leaderboard (share.js reads db.leaderPlaces only for a Pro owner; plain "Pro" when not listed), CARD_V 7; renders for
+  Master I-III, Champion III, Pro #1 and #27 in test/ui-shots/share/.
+- test/leaderboard.test.mjs (NOTES 126): its Pro fixture moved from 960 (now Champion II) to 1100 trophies.
+- Legal and docs: privacy (eight ranks in the rank emblem item, a dated line in section 15), how-to-play (eight ranks, growing
+  medals, Pro #N, and the leaderboard: it had still said every rank has three divisions and trophies are never shown), the
+  changelog (September 28), CLAUDE.md data flows, docs/ropa.md, docs/RANKED.md (override note, rank table). No new data is
+  stored or shown: Master is a new name for trophy counts already kept.
+- The Ranks page line "Pro is won only against people" stays removed (NOTES 125).
+
 ## 125. The Ranks page drops "Pro is won only against people"
 
 The owner: the line reads as if the other ranks were not won against people. The Ranks page note now ends at "Diamond and

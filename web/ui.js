@@ -69,12 +69,12 @@ export function regBadge(nameEl, on) {                   // on: a registered use
 // The rank emblem beside a name (docs/RANKED.md 6): the same rule as the badge, its own element AFTER the .reg-badge if there is one, else after
 // the name; never in the name's text. r = { tier: 1..7, div: 1..3 } shows that rank (aria-label / title carry 'Gold II'), null removes it.
 // Beside a name only the emblem shows; from .is-md up the wrapper's data-div draws the division's roman numeral over the emblem (ui.css).
-const tierOf = t => Number.isInteger(t) && t >= 1 && t <= 7 ? t : 0;
+const tierOf = t => Number.isInteger(t) && t >= 1 && t <= RANKS.length ? t : 0;      // 1..8 since Master (NOTES 124)
 const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r, div: 1 }, tier = tierOf(o.tier); return tier ? { tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // a bare number still reads (division I)
 // Your stats' crest wears the Ranked emblem (one rank per player, docs/RANKED.md 2): the emblem at .is-lg inside the crest, its division as the tag
 export function rankCrest(crest, r) {
   if (!crest) return; r = rankRef(r) || { tier: 1, div: 1 }; lastRank = { tier: r.tier, div: r.div, best: Math.max(r.tier, lastRank && lastRank.best || 1) }; let w = crest.querySelector('.st-em');
-  if (!w) { w = document.createElement('span'); w.className = 'st-em'; w.append(emblemEl(r.tier, 'is-lg')); crest.append(w); } else setEmblem(w.firstElementChild, r.tier);
+  if (!w) { w = document.createElement('span'); w.className = 'st-em'; w.append(emblemEl(r.tier, 'is-lg', r.div)); crest.append(w); } else setEmblem(w.firstElementChild, r.tier, r.div);      // the division's own medal (NOTES 124)
   setDiv(w, r); w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep); w.setAttribute('role', 'img'); w.setAttribute('aria-label', `Rank: ${rankLabel(r.tier, r.div)}`);
 }
 const setDiv = (el, r) => { if (hasDivs(r.tier)) el.dataset.div = String(r.div); else delete el.dataset.div; };      // Pro has no divisions (NOTES 126): no numeral pill on its emblem
@@ -84,8 +84,8 @@ export function rankBadge(nameEl, r, cls = 'is-xs') {
   const next = after.nextElementSibling, has = !!next && next.classList.contains('rank-badge');
   if (!r) { if (has) next.remove(); return; }
   const name = rankLabel(r.tier, r.div), label = `Rank: ${name}`, ink = RANKS[r.tier - 1].colour.deep;
-  if (has) { if (next.title !== name) { setEmblem(next.firstElementChild, r.tier); next.setAttribute('aria-label', label); next.title = name; setDiv(next, r); next.style.setProperty('--rank-ink', ink); } return; }
-  const b = document.createElement('span'); b.className = 'rank-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', label); b.title = name; setDiv(b, r); b.style.setProperty('--rank-ink', ink); b.append(emblemEl(r.tier, cls)); after.after(b);
+  if (has) { if (next.title !== name) { setEmblem(next.firstElementChild, r.tier, r.div); next.setAttribute('aria-label', label); next.title = name; setDiv(next, r); next.style.setProperty('--rank-ink', ink); } return; }
+  const b = document.createElement('span'); b.className = 'rank-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', label); b.title = name; setDiv(b, r); b.style.setProperty('--rank-ink', ink); b.append(emblemEl(r.tier, cls, r.div)); after.after(b);
 }
 export function setScore(me, them) {
   for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); if (+v > 0) { const t = el.closest('.score-tab'); if (t) restart(t, 'ov-scored'); } } }      // the tab that scored gets a sweep of its colour (not the 0-0 reset)
@@ -196,7 +196,7 @@ function trophyReset() {
 function trophyCard(tier, div) {
   const em = $('trophy-em'); if (!em) return null; let c = em.querySelector('.rank-card-em');
   if (!c) { c = emblemCard(tier, 'is-lg', div); em.append(c); return c; }
-  const R = RANKS[tier - 1]; setEmblem(c.querySelector('.rank-em'), tier); setText(c.querySelector('b'), rankLabel(tier, div)); setDiv(c, { tier, div }); c.style.setProperty('--rank-ink', R.colour.deep); c.style.setProperty('--rank-mid', R.colour.mid); c.hidden = false; return c;
+  const R = RANKS[tier - 1]; setEmblem(c.querySelector('.rank-em'), tier, div); setText(c.querySelector('b'), rankLabel(tier, div)); setDiv(c, { tier, div }); c.style.setProperty('--rank-ink', R.colour.deep); c.style.setProperty('--rank-mid', R.colour.mid); c.hidden = false; return c;
 }
 // bestOf dots as a row of pips: won of them filled, the one at `now` pulsing (the game in play), the one at `fresh` popping (the game just won)
 function drawPips(ol, n, won, now, fresh = -1) {
@@ -1168,27 +1168,27 @@ export function tourEnded(why, asToast = false) {                               
 // Everything here draws from what main.js / web/profile.js hand in; nothing is fetched. Every string is textContent. Rank names come from
 // web/emblems.js RANKS; a tier is 1..7, anything else = not known.
 const rankName = t => (tierOf(t) ? RANKS[t - 1].name : '');
-const proLabel = (tier, div, place) => (tier === 7 && Number.isInteger(place) && place > 0 ? `Pro #${place.toLocaleString('en-US')}` : rankLabel(tier, div));      // Pro is told apart by the global leaderboard place: 'Pro #12' (NOTES 126)
+const proLabel = (tier, div, place) => (tier === RANKS.length && Number.isInteger(place) && place > 0 ? `Pro #${place.toLocaleString('en-US')}` : rankLabel(tier, div));      // Pro is told apart by the global leaderboard place: 'Pro #12' (NOTES 126)
 const divIn = (n, tier, div) => (div === 2 || div === 3 ? div : div === 1 ? 1 : divOf(n, tier));      // the division as sent, else from the count
 // the tile: { tier, div, trophies, queued }. A tier draws the small emblem beside 'Gold II · 372'; none = the Bronze emblem, dimmed, and 'Play your first match'.
 // queued > 0 lights the corner badge '1 waiting' (the strongest lever on a small player base: the home screen says an opponent exists)
 export function rkTile(o = {}) {
   const em = $('ranked-em'), tier = tierOf(o.tier), n = Math.max(0, o.trophies | 0);
-  if (em) { let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs'); em.append(e); } setEmblem(e, tier || 1); e.classList.toggle('is-off', !tier); }
+  if (em) { const d = tier ? divIn(n, tier, o.div) : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs', d); em.append(e); } setEmblem(e, tier || 1, d); e.classList.toggle('is-off', !tier); }
   setText($('ranked-line-text'), tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n}` : 'Play your first match');
   const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
 }
 // the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
-// The head ('Gold II'), the bar through the rank's three divisions, the seven-step road with its division pips, Find a match and its status line.
+// The head ('Gold II'), the bar through the rank's three divisions, the eight-step road (NOTES 124) with its division pips, Find a match and its status line.
 let rkQueuedSaid = false;
-// The Ranks page: all seven medals, each with where it starts and its three divisions; the player's own rank ringed, the ones reached marked
+// The Ranks page: all eight medals, each with where it starts and its three divisions; the player's own rank ringed, the ones reached marked
 function drawRanks() {
   const g = $('rkx-grid'); if (!g) return; g.textContent = ''; const me = lastRank;
   RANKS.forEach((r, i) => {
     const t = i + 1, now = !!me && t === me.tier, done = !!me && !now && t <= Math.max(me.tier, me.best || 1), floor = THRESHOLDS[i];
     const li = mk('li', 'rkx-card' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t); li.style.setProperty('--rank-ink', r.colour.deep); li.style.setProperty('--rank-mid', r.colour.mid);
-    const em = emblemEl(t, 'is-xl'); if (now) em.classList.add('is-pop');
-    const divs = mk('span', 'rkx-divs'); if (hasDivs(t)) [0, 1, 2].forEach(d => { const at = floor + d * DIV_W, pip = mk('span', 'rkx-div' + (now && d + 1 <= me.div || done ? ' is-on' : ''), `${romanOf(d + 1)} ${at}`); divs.append(pip); });
+    const em = emblemEl(t, 'is-xl', now ? me.div : done ? 3 : 1); if (now) em.classList.add('is-pop');      // your rank at your division's medal, a rank passed at its full III, one ahead at its I (NOTES 124)
+    const divs = mk('span', 'rkx-divs'); if (hasDivs(t)) [0, 1, 2].forEach(d => { const on = now && d + 1 <= me.div || done, pip = mk('span', 'rkx-evo' + (on ? ' is-on' : '')); pip.append(emblemEl(t, 'is-sm', d + 1), mk('span', 'rkx-div' + (on ? ' is-on' : ''), romanOf(d + 1)), mk('small', 'rkx-at', String(floor + d * DIV_W))); divs.append(pip); });      // each division's own medal, its numeral and where it starts (NOTES 124): the medal grows I, II, III
     else divs.append(mk('span', 'rkx-div' + (now || done ? ' is-on' : ''), 'By leaderboard place'));      // Pro: no divisions, the global leaderboard tells its players apart
     const tag = now ? mk('span', 'rkx-tag is-now', `You · ${proLabel(t, me.div, me.place)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Never lost') : null;
     li.append(em, mk('b', 'rkx-name', r.name), mk('small', 'rkx-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`), divs); if (tag) li.append(tag);
@@ -1209,7 +1209,7 @@ export function rkView(s) {
   const road = $('rk-road'); if (road) { road.textContent = '';
     RANKS.forEach((r, i) => { const t = i + 1, now = t === tier && known, done = !now && (t < tier || t <= best && known), li = mk('li', 'rk-step' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t);
       const pips = mk('span', 'rk-pips'), lit = now ? div : done ? 3 : 0; for (let k = 1; k <= (hasDivs(t) ? 3 : 0); k++) pips.append(mk('i', k <= lit ? 'is-lit' : '')); pips.setAttribute('aria-hidden', 'true');      // three divisions, filled up to the current one
-      li.append(emblemEl(t, 'is-md'), mk('b', '', r.name), pips, mk('small', '', String(THRESHOLDS[i])));
+      li.append(emblemEl(t, 'is-md', now ? div : done ? 3 : 1), mk('b', '', r.name), pips, mk('small', '', String(THRESHOLDS[i])));
       const at = known && t === best && Number.isFinite(s.bestAt) && s.bestAt > 0 ? new Date(s.bestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
       const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? (hasDivs(t) ? `, your rank, division ${romanOf(div)}` : ', your rank') : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
       road.append(li); }); }
@@ -1254,7 +1254,7 @@ export function rkBanner(o = {}) {
   } else if (on && since && since !== barSince) { barSince = since; tickBar(); }
   if (!on) return;
   const t = tierOf(o.tier), em = $('rk-search-em');
-  if (em) { let e = em.firstElementChild; if (!e) { e = emblemEl(t || 1, 'is-md'); em.append(e); } setEmblem(e, t || 1); e.classList.toggle('is-off', !t); }
+  if (em) { const d = o.div === 2 || o.div === 3 ? o.div : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(t || 1, 'is-md', d); em.append(e); } setEmblem(e, t || 1, d); e.classList.toggle('is-off', !t); }
   setText($('rk-search-sub'), t ? `Ranked · ${rankLabel(t, o.div)}` : 'Ranked');
   const w = $('btn-rk-warm'); if (w) w.disabled = !!o.busy;
 }

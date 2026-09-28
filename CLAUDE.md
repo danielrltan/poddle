@@ -37,8 +37,8 @@ Important changes also need a notice on the home page. Open questions for the op
   share (owner, random 10-char slug, created; one per owner, opt-in via Share card, deleted by Stop sharing, with the
   owner, for the guest on a merge, or by the operator: `admin.js unshare <link>` / `unshare-user <username>`);
   match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length, and for
-  Ranked mode: mode 'ladder'|'casual', series id, the trophy change per side); ladder (per owner: trophies, rank tier and
-  division, best rank/division and when, Ranked wins/losses/streaks, Matt queue wins/losses, Matt trophies awarded today).
+  Ranked mode: mode 'ladder'|'casual', series id, the trophy change per side); ladder (per owner: trophies, rank tier 1..8 and
+  division (Pro: none; tier/div re-derived from the trophy counts at every open, NOTES 124), best rank/division and when, Ranked wins/losses/streaks, Matt queue wins/losses, Matt trophies awarded today).
   No IPs, no guest display names, no emails. Retention (db.sweep at boot + every 24 h): guests 90 d after last
   recorded match (7 d if only one), accounts 24 months idle, match_log 30 d (sooner, oldest first, near the DB_MAX_MB
   cap; at most LOG_CAP_DAY=100 rows per owner a day; no row for leaving Matt), sessions at expiry, name holds 30 d

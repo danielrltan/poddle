@@ -13,37 +13,48 @@
   .ground.is-navy{background:#0e2a4d;box-shadow:0 3px 0 rgba(0,0,0,.25),0 8px 16px rgba(0,0,0,.2);color:#eaf3f8}
   .ground.is-navy .caps,.ground.is-navy .lbl{color:#8fb3d6}
   .caps{font-size:.75rem;font-weight:800;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft)}
-  .line{display:flex;align-items:center;gap:1rem} .line.is-cards{gap:1.5rem;align-items:flex-start}
+  .line{display:flex;align-items:center;gap:1rem;flex-wrap:wrap} .grp{display:inline-flex;align-items:center;gap:.25rem} .line.is-cards{gap:1.5rem;align-items:flex-start}
   .lbl{width:4rem;font-size:.6875rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
   .name{display:inline-flex;align-items:center;gap:.375rem;font-size:1rem;font-weight:700;color:var(--ink-strong)} .ground.is-navy .name{color:#eaf3f8}
   .name small{font-weight:500;color:var(--ink-faint)}
   .card{display:flex;flex-direction:column;align-items:center;gap:.375rem;text-align:center} .card small{font-size:.6875rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)} .ground.is-navy .card small{color:#8fb3d6}
 </style>
 <h1>Rank emblems</h1>
-<p class="lead">web/emblems.js on the light ground and the stadium navy strip: 20 px (.is-xs), 40 px (.is-md), 120 px (.is-xl) plus emblemCard() at 80 px, a name line, Silver beside Platinum at 20 px, a swap and a hidden one.</p>
+<p class="lead">web/emblems.js on the light ground and the stadium navy strip: all 22 medals (Bronze..Champion in divisions I, II, III, and Pro) at 20 px (.is-xs), 40 px (.is-md), 120 px (.is-xl), plus emblemCard() at 80 px, a name line, Silver beside Platinum at 20 px, a swap and a hidden one.</p>
 <div id="grounds"></div>
 <script type="module">
-  import { RANKS, THRESHOLDS, rankOf, emblem, emblemEl, setEmblem, emblemCard, installSprite } from '../web/emblems.js';
-  const NAMES = ['Sam', 'Priya', 'Matt', 'Jonah', 'Elena', 'Kofi', 'Yuki'];
+  import { RANKS, THRESHOLDS, TOP, rankOf, emblem, emblemEl, emblemId, setEmblem, emblemCard, installSprite, SPRITE } from '../web/emblems.js';
+  const NAMES = ['Sam', 'Priya', 'Matt', 'Jonah', 'Elena', 'Ines', 'Kofi', 'Yuki'];
   installSprite(); installSprite();      // twice on purpose: the sprite must be in the DOM once
   const sprites = document.querySelectorAll('svg.rank-sprite'); if (sprites.length !== 1) console.error(`sprite count ${sprites.length}`);
   if (sprites[0] !== document.body.firstElementChild) console.error('sprite is not the first child of body');
+  // every medal: [tier, div] for Bronze..Champion I, II, III and Pro (one medal, no division)
+  const ALL = RANKS.flatMap(r => r.id === TOP ? [[r.id, 1]] : [1, 2, 3].map(d => [r.id, d]));
+  if (ALL.length !== 22) console.error(`${ALL.length} medals, want 22`);
+  const ids = ALL.map(([t, d]) => emblemId(t, d)), syms = [...sprites[0].querySelectorAll('symbol')].map(s => s.id);
+  if (new Set(ids).size !== 22 || ids.some(id => !syms.includes(id)) || syms.length !== 22) console.error(`sprite symbols ${syms.join(',')} vs ${ids.join(',')}`);
+  if ((SPRITE.match(/<symbol /g) || []).length !== 22) console.error('SPRITE export does not hold 22 symbols');
   const row = (lbl, inner) => `<div class="line"><span class="lbl">${lbl}</span>${inner}</div>`;
-  const all = cls => RANKS.map(r => emblem(r, cls)).join('');
+  const all = cls => RANKS.map(r => `<span class="grp">${ALL.filter(([t]) => t === r.id).map(([t, d]) => emblem(t, cls, d)).join('')}</span>`).join('');
   const ground = (cls, title) => `<div class="ground ${cls}"><span class="caps">${title}</span>
     ${row('20 px', all('is-xs'))}${row('40 px', all('is-md'))}${row('120 px', all('is-xl'))}
     <div class="line is-cards"><span class="lbl">Card</span></div>
-    ${row('Name', RANKS.map((r, i) => `<span class="name">${emblem(r.id)}${NAMES[i]} <small>· ${r.name}</small></span>`).join(''))}
+    ${row('Name', RANKS.map((r, i) => `<span class="name">${emblem(rankOf(THRESHOLDS[i] + 60))}${NAMES[i]} <small>· ${r.name}${r.id === TOP ? '' : ' II'}</small></span>`).join(''))}
     ${row('2 vs 4', `<span class="name">${emblem(2, 'is-xs')}${emblem(4, 'is-xs')}${emblem(2, 'is-xs')}${emblem(4, 'is-xs')} <small>· Silver, Platinum, Silver, Platinum at 20 px</small></span><span class="name" data-zoom>${emblem(2, 'is-xs')}${emblem(4, 'is-xs')}${emblem(2, 'is-md')}${emblem(4, 'is-md')}</span><span class="name">${emblem(2)}${emblem(4)} <small>· 24 px</small></span>`)}
-    ${row('Swap', `<span class="name" data-swap>${emblem(1, 'is-md')}Bronze &rarr; Pro</span><span class="name" data-hide>${emblem(4, 'is-md')}hidden &rarr;</span><span class="name" data-pop>${emblem(5, 'is-md is-pop')}pop</span><span class="name" data-el></span>`)}
+    ${row('Swap', `<span class="name" data-swap>${emblem(1, 'is-md')}Bronze I &rarr; Pro</span><span class="name" data-evo>${emblem(3, 'is-md')}Gold I &rarr; III</span><span class="name" data-hide>${emblem(4, 'is-md')}hidden &rarr;</span><span class="name" data-pop>${emblem(5, 'is-md is-pop', 3)}pop</span><span class="name" data-el></span>`)}
   </div>`;
   document.getElementById('grounds').innerHTML = ground('is-light', 'Light ground') + ground('is-navy', 'Stadium navy #0e2a4d');
   for (const g of document.querySelectorAll('.ground')) {
-    const cards = g.querySelector('.is-cards'); for (const r of RANKS) { const c = document.createElement('div'); c.className = 'card'; const ce = emblemCard(r); if (g.classList.contains('is-navy')) ce.classList.add('is-inverse'); c.appendChild(ce); cards.appendChild(c); }
-    setEmblem(g.querySelector('[data-swap] .rank-em'), 7); setEmblem(g.querySelector('[data-hide] .rank-em'), null);
-    const el = emblemEl(rankOf(THRESHOLDS[5]), 'is-md'); g.querySelector('[data-el]').append(el, ' emblemEl(rankOf(1000))');
-    if (el.outerHTML.replace('></use>', '/>') !== emblem(6, 'is-md')) console.error('emblemEl and emblem differ: ' + el.outerHTML);
+    const cards = g.querySelector('.is-cards');
+    for (const [t, d] of [...ALL, [TOP, 0, 4]]) { const c = document.createElement('div'); c.className = 'card'; const ce = t === TOP ? emblemCard(t, 'is-lg', 0, d === 0 ? 4 : 0) : emblemCard(t, 'is-lg', d); if (g.classList.contains('is-navy')) ce.classList.add('is-inverse'); c.appendChild(ce); cards.appendChild(c); }
+    setEmblem(g.querySelector('[data-swap] .rank-em'), TOP); setEmblem(g.querySelector('[data-evo] .rank-em'), 3, 3); setEmblem(g.querySelector('[data-hide] .rank-em'), null);
+    const el = emblemEl(rankOf(THRESHOLDS[5] + 60), 'is-md'); g.querySelector('[data-el]').append(el, ` emblemEl(rankOf(${THRESHOLDS[5] + 60})): Master II`);
+    if (el.outerHTML.replace('></use>', '/>') !== emblem(6, 'is-md', 2)) console.error('emblemEl and emblem differ: ' + el.outerHTML);
   }
+  // the helpers pick the evolved medal themselves
+  const href = e => e.querySelector('use').getAttribute('href');
+  if (href(document.querySelector('[data-swap] .rank-em')) !== '#rank-8' || href(document.querySelector('[data-evo] .rank-em')) !== '#rank-3-3') console.error('setEmblem did not pick the division medal');
+  if (href(emblemCard(rankOf(260))) !== '#rank-2-3' || href(emblemCard(TOP, 'is-lg', 3)) !== '#rank-8' || emblemCard(TOP, 'is-lg', 3).dataset.div) console.error('emblemCard division medal / Pro');
   // every visible emblem must draw something: an unresolved <use> has an empty box
   const dud = [...document.querySelectorAll('.rank-em:not([hidden])')].filter(e => { const b = e.querySelector('use').getBBox(); return !(b.width > 0 && b.height > 0); }).length;
   if (dud) console.error(`${dud} emblems drew nothing`);

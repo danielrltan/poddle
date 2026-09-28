@@ -8,7 +8,7 @@ const card = require('../server/card.js'), LAD = require('../server/ladder.js'),
 const out = process.argv[2] || new URL('./ui-shots/share/', import.meta.url).pathname; fs.mkdirSync(out, { recursive: true });
 const DAY = 86400e3, T = Date.parse('2026-09-01');
 const matt = won => [0, 1, 3, 2].map((lv, i) => ({ level: lv, wins: won[i] ? 3 : 0, losses: 1, streak: 0, bestStreak: won[i] ? 3 : 0, firstWinAt: won[i] ? T + i * DAY : null }));
-const lad = t => ({ trophies: t, tier: LAD.tierOf(t), div: LAD.divOf(t), bestTrophies: t, wins: 0, losses: 0 });   // profile.ladder (db.ladderOf): 'Gold II' is tier 3, div 2
+const lad = t => ({ trophies: t, tier: LAD.tierOf(t), div: LAD.divOf(t), bestTrophies: t, wins: 0, losses: 0 });   // profile.ladder (db.ladderOf): 'Gold II' is tier 3, div 2   // profile.ladder (db.ladderOf): 'Gold II' is tier 3, div 2
 const prof = o => ({ guest: false, played: 0, human: { wins: 0, losses: 0, streak: 0, bestStreak: 0 }, titles: 0, matt: matt([0, 0, 0, 0]), bests: { rally: { v: 0 }, hit: { v: 0 }, speed: { v: 0 } }, ...o });
 const V = {
   veteran: [prof({ ladder: lad(575), played: 86, human: { wins: 31, losses: 12, streak: 2, bestStreak: 7 }, titles: 2, matt: matt([1, 1, 1, 0]), bests: { rally: { v: 24 }, hit: { v: 80 }, speed: { v: 27.4 } },
@@ -24,10 +24,18 @@ const V = {
   losing: [prof({ ladder: lad(20), played: 15, human: { wins: 1, losses: 14, streak: 0, bestStreak: 1 }, bests: { rally: { v: 4 }, hit: { v: 20 }, speed: { v: 5 } }, play: { hits: 40, returns: 9, chances: 30, winners: 2, aces: 0, smashes: 1 } }), 'sam'],   // a 1-14 record: neither a tile nor a chip
   'streak-no-rate': [prof({ ladder: lad(318), played: 20, human: { wins: 6, losses: 2, streak: 4, bestStreak: 5 }, titles: 1, matt: matt([1, 0, 0, 0]), bests: { rally: { v: 9 }, hit: { v: 50 }, speed: { v: 25 } }, play: { hits: 300, returns: 70, chances: 160, winners: 12, aces: 3, smashes: 8 } }), 'Rookie_Rick'],   // under 50%: the record, streak, title take the tiles before the swing
   lowret: [prof({ ladder: lad(158), played: 6, human: { wins: 0, losses: 2, streak: 0, bestStreak: 0 }, bests: { rally: { v: 3 }, hit: { v: 30 }, speed: { v: 5.06 } }, play: { hits: 20, returns: 3, chances: 60, winners: 1, aces: 0, smashes: 0 } }), 'rookie_rae'],   // a weak start: no 5% tile, no 3-hit rally
-  'champion-3': [prof({ ladder: lad(868), played: 140, human: { wins: 52, losses: 30, streak: 3, bestStreak: 9 }, titles: 3, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 33 }, hit: { v: 85 }, speed: { v: 30 } },
+  'master-1': [prof({ ladder: lad(760), played: 140, human: { wins: 52, losses: 30, streak: 3, bestStreak: 9 }, titles: 3, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 33 }, hit: { v: 85 }, speed: { v: 30 } },
     play: { hits: 5200, returns: 3300, chances: 4100, winners: 610, aces: 120, smashes: 300 } }), 'Chloe_C'],   // the longest rank name: CHAMPION III
-  'pro-top': [prof({ ladder: lad(1046), played: 410, human: { wins: 160, losses: 44, streak: 11, bestStreak: 17 }, titles: 9, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 58 }, hit: { v: 95 }, speed: { v: 36 } },
-    play: { hits: 16000, returns: 11800, chances: 12600, winners: 2300, aces: 540, smashes: 1300 } }), 'TopSpin'],   // the top of the ladder: Pro (no divisions, NOTES 126)
+  'master-2': [prof({ ladder: lad(815), played: 140, human: { wins: 52, losses: 30, streak: 3, bestStreak: 9 }, titles: 3, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 33 }, hit: { v: 85 }, speed: { v: 30 } },
+    play: { hits: 5200, returns: 3300, chances: 4100, winners: 610, aces: 120, smashes: 300 } }), 'Chloe_C'],   // the longest rank name: CHAMPION III
+  'master-3': [prof({ ladder: lad(868), played: 140, human: { wins: 52, losses: 30, streak: 3, bestStreak: 9 }, titles: 3, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 33 }, hit: { v: 85 }, speed: { v: 30 } },
+    play: { hits: 5200, returns: 3300, chances: 4100, winners: 610, aces: 120, smashes: 300 } }), 'Chloe_C'],   // the longest rank name: CHAMPION III
+  'champion-3': [prof({ ladder: lad(1010), played: 140, human: { wins: 52, losses: 30, streak: 3, bestStreak: 9 }, titles: 3, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 33 }, hit: { v: 85 }, speed: { v: 30 } },
+    play: { hits: 5200, returns: 3300, chances: 4100, winners: 610, aces: 120, smashes: 300 } }), 'Chloe_C'],   // the longest rank name: CHAMPION III
+  'pro-top': [prof({ ladder: lad(1260), places: { trophies: { rank: 1, v: 1260 } }, played: 410, human: { wins: 160, losses: 44, streak: 11, bestStreak: 17 }, titles: 9, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 58 }, hit: { v: 95 }, speed: { v: 36 } },
+    play: { hits: 16000, returns: 11800, chances: 12600, winners: 2300, aces: 540, smashes: 1300 } }), 'TopSpin'],   // the top of the ladder: Pro #1
+  'pro-27': [prof({ ladder: lad(1080), places: { trophies: { rank: 27, v: 1080 } }, played: 410, human: { wins: 160, losses: 44, streak: 11, bestStreak: 17 }, titles: 9, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 58 }, hit: { v: 95 }, speed: { v: 36 } },
+    play: { hits: 16000, returns: 11800, chances: 12600, winners: 2300, aces: 540, smashes: 1300 } }), 'Kitchen_Kid'],   // Pro, 27th on the leaderboard
 };
 for (const [name, [p, user]] of Object.entries(V)) {
   const d = card.dataOf(p, user), svg = card.svgOf(d), t = Date.now();

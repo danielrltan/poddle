@@ -3,8 +3,9 @@
 // Loading this file does nothing: node:sqlite is required inside open(), so a server with stats off never touches it.
 // Every function is a no-op returning null/false (or its documented empty value) while the database is not open, and
 // NONE of them throws: endMatch runs inside sim() on the 60 Hz interval, and a throw there ends every room (4.2, 11.4).
-// SQL: every value is a bound parameter of a statement prepared once in open(). The only number spliced into SQL text is
-// max_page_count (a PRAGMA cannot take a parameter): an operator env value, forced to a clamped integer first.
+// SQL: every value is a bound parameter of a statement prepared once in open(). The only numbers spliced into SQL text are
+// max_page_count (a PRAGMA cannot take a parameter): an operator env value, forced to a clamped integer first; and the rank table's own
+// integer constants (server/ladder.js FLOORS / DIV_W, frozen, never input) in extra()'s tier recompute.
 const crypto = require('node:crypto'), fs = require('node:fs'), path = require('node:path');
 const LAD = require('./ladder');                                  // the Ranked ladder's pure table: tiers, floors, the Matt ceiling (docs/RANKED.md 5)
 
@@ -152,13 +153,23 @@ CREATE TABLE IF NOT EXISTS share (
 CREATE INDEX IF NOT EXISTS ladder_trophies ON ladder(trophies);
 CREATE INDEX IF NOT EXISTS profile_rally ON profile(best_rally);
 CREATE INDEX IF NOT EXISTS profile_hstreak ON profile(h_best_streak);`;   // the global leaderboards (NOTES 126): each board reads one column, highest first
+// the rank table as SQL (NOTES 124): tier / div of a trophy count, exactly ladder.js tierOf / divOf (top rank first; Pro has one division; negatives are
+// Bronze I: max(0, ...) matches JS's floor clamp although SQLite's integer division truncates toward zero). Built once from the frozen table (constants, never
+// input), so a new rank or floor needs no SQL edit
+const tierSql = c => 'CASE ' + LAD.FLOORS.map((f, i) => [f, i + 1]).reverse().map(([f, t]) => `WHEN ${c} >= ${f} THEN ${t} `).join('') + 'ELSE 1 END';
+const divSql = c => 'CASE ' + LAD.FLOORS.map((f, i) => [f, i + 1]).reverse().map(([f, t]) => `WHEN ${c} >= ${f} THEN 1 + min(${LAD.hasDivs(t) ? LAD.DIVS - 1 : 0}, max(0, (${c} - ${f}) / ${LAD.DIV_W})) `).join('') + 'ELSE 1 END';
+// Every open: tier / div from trophies and best_tier / best_div from best_trophies, for every row whose derived columns disagree with the table (Master
+// moved Champion and Pro up one tier, NOTES 124). Trophies are never touched, so it is idempotent (a second run changes 0 rows) and heals rows an older build wrote
+const RECOMPUTE = `UPDATE ladder SET tier = ${tierSql('trophies')}, div = ${divSql('trophies')}, best_tier = ${tierSql('best_trophies')}, best_div = ${divSql('best_trophies')}
+  WHERE tier IS NOT ${tierSql('trophies')} OR div IS NOT ${divSql('trophies')} OR best_tier IS NOT ${tierSql('best_trophies')} OR best_div IS NOT ${divSql('best_trophies')}`;
+let recomputed = 0;                                               // rows the last open's recompute rewrote (the unit test reads it through ladderRecomputed())
 function extra() {
   const have = new Set(D.prepare('PRAGMA table_info(profile)').all().map(c => c.name)), acct = new Set(D.prepare('PRAGMA table_info(accounts)').all().map(c => c.name));
   D.exec('BEGIN IMMEDIATE');
   try {
     for (const c of PLAY_COLS) if (!have.has(c)) D.exec(`ALTER TABLE profile ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // c is a constant from PLAY_COLS, never input
     if (!acct.has('lb_hidden')) D.exec('ALTER TABLE accounts ADD COLUMN lb_hidden INTEGER NOT NULL DEFAULT 0');   // NOTES 126: 1 = the owner turned off Show me on the global leaderboard
-    D.exec(EXTRA); D.exec('COMMIT');
+    D.exec(EXTRA); recomputed = Number(D.prepare(RECOMPUTE).run().changes); D.exec('COMMIT');
   } catch (e) { if (D.isTransaction) D.exec('ROLLBACK'); throw e; }
 }
 
@@ -739,7 +750,8 @@ const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'prof
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
+const ladderRecomputed = () => recomputed;                       // rows the last open()'s tier recompute rewrote (NOTES 124; 0 on every open after the first)
 module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
-  leaderboard, leaderPlaces, leaderHide, BOARDS: Object.keys(BOARDS) };
+  leaderboard, leaderPlaces, leaderHide, BOARDS: Object.keys(BOARDS), ladderRecomputed };

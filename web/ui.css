@@ -1524,7 +1524,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .court-who .reg-badge{display:inline-grid;margin-left:.25em} .vs-side > .reg-badge{margin:0}      /* the court list: inline in the nowrap line. The VS card: under the name, in its column */
 
 /* ---------- rank emblems (web/emblems.js) ----------
-   One sprite of <symbol id="rank-1..7"> sits at the start of <body> (installSprite()); every emblem is <svg class="rank-em"><use href="#rank-N"/></svg>.
+   One sprite of 22 symbols (rank-<tier>-<div> for tiers 1..7, rank-8 for Pro: NOTES 124) sits at the start of <body> (installSprite()); every emblem is <svg class="rank-em"><use href="#rank-..."/></svg>.
    Base 1.5rem beside a name; .is-xs 1.25rem in a list row, .is-md 2.5rem on a score tab, .is-lg 5rem on a card, .is-xl 7.5rem as the hero.
    .is-pop is a one-shot for a new rank (scale .6 -> 1.12 -> 1 over --d-slow, bounce); the reduced-motion rule below lands it on its last frame. */
 .rank-sprite{position:absolute;width:0;height:0;overflow:hidden}
@@ -1718,7 +1718,7 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 .name-row #btn-name-change{flex:none;height:max(2.5rem,44px);padding:0 1.125rem}
 
 /* ==========================================================================================================
-   RANKED (docs/RANKED.md 2, 7.5, 8.2): the lobby view (emblem, trophies, the road of seven ranks, Find a match), the queue pill over the
+   RANKED (docs/RANKED.md 2, 7.5, 8.2): the lobby view (emblem, trophies, the road of eight ranks, Find a match), the queue pill over the
    warm-up court, and the page's night tint while the stadium is behind the glass. web/ui.js rkView / rkPill / rkCourt draw it.
    ========================================================================================================== */
 .ranked-view{gap:var(--s-4)!important;padding:var(--s-5) var(--s-6)!important}
@@ -1730,11 +1730,11 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 .rk-bar{position:relative;width:16rem;max-width:100%;height:.875rem;margin-top:.25rem;border-radius:var(--r-pill);background:var(--sky-3);border:.125rem solid #fff;box-shadow:inset 0 .0625rem .25rem rgba(120,170,200,.3);overflow:hidden}
 .rk-bar i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(var(--p,0));border-radius:inherit;background:linear-gradient(90deg,var(--me),var(--line));transition:transform 1s var(--ease-out)}
 .rk-next{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
-/* the road: seven steps in a row (four and three on a narrow window). Reached steps are lit, the current one ringed and breathing, the rest wait at 45 % */
+/* the road: eight steps in one row (5.125rem each, NOTES 124), two rows of four on a narrow window. Reached steps are lit, the current one ringed and breathing, the rest wait at 45 % */
 .rk-road{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-3) var(--s-2);width:100%;margin:0;padding:0;list-style:none}
-.rk-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;width:6rem;padding:.625rem .25rem .5rem;border-radius:var(--r-lg);border:.125rem solid transparent;opacity:.45;transition:opacity var(--d-med) var(--ease-soft)}
+.rk-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;width:5.125rem;padding:.625rem .25rem .5rem;border-radius:var(--r-lg);border:.125rem solid transparent;opacity:.45;transition:opacity var(--d-med) var(--ease-soft)}
 .rk-step b{font-size:var(--t-xs);font-weight:800;letter-spacing:.04em;color:var(--ink-strong);white-space:nowrap} .rk-step small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums}
-.rk-pips{display:inline-flex;gap:.25rem;margin:.125rem 0} .rk-pips i{width:.625rem;height:.625rem;border-radius:50%;background:var(--sky-3);box-shadow:inset 0 0 0 .0625rem rgba(120,170,200,.4)} .rk-pips i.is-lit{background:linear-gradient(180deg,var(--me),var(--me-deep));box-shadow:0 0 0 .0625rem #fff}      /* the three divisions of a rank, lit up to the one you hold */
+.rk-pips{display:inline-flex;align-items:center;gap:.25rem;height:.625rem;margin:.125rem 0} .rk-pips i{width:.625rem;height:.625rem;border-radius:50%;background:var(--sky-3);box-shadow:inset 0 0 0 .0625rem rgba(120,170,200,.4)} .rk-pips i.is-lit{background:linear-gradient(180deg,var(--me),var(--me-deep));box-shadow:0 0 0 .0625rem #fff}      /* the three divisions of a rank, lit up to the one you hold */
 .rk-emblem .rank-card-em{--em-h:7.5rem}
 .rk-step.is-done,.rk-step.is-now{opacity:1}
 .rk-step.is-now{border-color:var(--line);background:linear-gradient(180deg,#fff,var(--sky-2));box-shadow:var(--sh-1)} .rk-step.is-now b{color:var(--me-ink)}
@@ -1743,7 +1743,7 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 .rk-status{min-height:1.5em;font-weight:700;transition:color var(--d-med) var(--ease-soft)} .rk-status.is-accent{color:var(--me-ink)} .rk-status.ov-pop{animation:num-pop 450ms var(--ease-bounce)}
 .rk-rules{max-width:40rem;line-height:1.45}
 #btn-ranked-go{min-width:18rem} #btn-ranked-go:disabled{opacity:.5;pointer-events:none}
-@media (max-width:700px){ .rk-head{flex-direction:column;text-align:center} .rk-lines{align-items:center} .rk-step{width:5.5rem} }
+@media (max-width:700px){ .rk-head{flex-direction:column;text-align:center} .rk-lines{align-items:center} .rk-step{width:calc(25% - var(--s-2) * 3 / 4)} }      /* eight steps (NOTES 124): two rows of four */
 @media (max-aspect-ratio:1/1){ .ranked-view{padding:var(--s-4)!important} .rk-tier{font-size:var(--t-xl)} .rk-emblem .rank-em.is-xl{width:6rem;height:6rem} .rk-emblem .rank-card-em{--em-h:6rem} #btn-ranked-go{width:min(26rem,100%);height:4.75rem;padding:0 2rem;font-size:var(--t-xl)} }      /* 'Find a match' on one line at 600 px */
 @media (max-height:560px){ .ranked-view{gap:var(--s-3)!important;padding:var(--s-4) var(--s-5)!important} .rk-emblem .rank-em.is-xl{width:5.5rem;height:5.5rem} .rk-emblem .rank-card-em{--em-h:5.5rem} .rk-tier{font-size:var(--t-xl)} .rk-step{padding:.375rem .25rem} .rk-step .rank-em.is-md{width:2rem;height:2rem} .rk-rules{display:none} #btn-ranked-go{height:3.25rem} }      /* 1366x500: the head and the road shrink, the rules line goes (Find a match stays a full-size press) */
 /* the queue pill (8.2): bottom centre, above the key hints, in the rally lozenge's dress. Hidden under any overlay like the toast; the dot breathes */
@@ -1955,14 +1955,18 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 /* ---------- The Ranks page (#lobby-ranks): every medal to win. Opened from the crest on Your stats, the Ranked view's emblem or See all ranks ---------- */
 .ranks-view{gap:var(--s-3)!important;padding:var(--s-5) var(--s-6)!important;max-height:calc(100dvh - 11rem);overflow-y:auto;overscroll-behavior:contain}
 .rkx-lead{margin:0;text-align:center;color:var(--ink-soft);font-weight:700}
-.rkx-grid{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-3)}
-.rkx-card{position:relative;width:13.25rem;display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:var(--s-3) var(--s-3) var(--s-4);border-radius:var(--r-lg);
+.rkx-grid{list-style:none;width:100%;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s-3)}      /* eight medals (NOTES 124): 4 + 4, or 2 a row on a narrow window (never a lone straggler) */
+@media (max-width:900px){ .rkx-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.rkx-card{position:relative;min-width:0;display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:var(--s-3) var(--s-3) var(--s-4);border-radius:var(--r-lg);
   background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-faint);box-shadow:var(--sh-1);animation:hm-tile 520ms var(--ease-bounce) backwards}
-.rkx-card:nth-child(2){animation-delay:50ms} .rkx-card:nth-child(3){animation-delay:100ms} .rkx-card:nth-child(4){animation-delay:150ms} .rkx-card:nth-child(5){animation-delay:200ms} .rkx-card:nth-child(6){animation-delay:250ms} .rkx-card:nth-child(7){animation-delay:300ms}
+.rkx-card:nth-child(2){animation-delay:50ms} .rkx-card:nth-child(3){animation-delay:100ms} .rkx-card:nth-child(4){animation-delay:150ms} .rkx-card:nth-child(5){animation-delay:200ms} .rkx-card:nth-child(6){animation-delay:250ms} .rkx-card:nth-child(7){animation-delay:300ms} .rkx-card:nth-child(8){animation-delay:350ms}
 .rkx-card .rank-em{width:5.25rem;height:5.25rem;filter:drop-shadow(0 .25rem .45rem rgba(20,60,90,.22))}
 .rkx-name{font-size:var(--t-lg);font-weight:900;color:color-mix(in srgb,var(--rank-ink,var(--ink-strong)) 85%,#000);line-height:1.1}
 .rkx-from{color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
-.rkx-divs{display:flex;gap:.25rem;margin-top:.15rem}
+.rkx-divs{display:flex;justify-content:center;gap:.5rem;margin-top:.15rem}
+.rkx-evo{display:flex;flex-direction:column;align-items:center;gap:.125rem;min-width:0}      /* a division: its evolved medal, its numeral, the count it starts at (NOTES 124) */
+.rkx-card .rkx-evo .rank-em{width:2.5rem;height:2.5rem;filter:drop-shadow(0 .125rem .1875rem rgba(20,60,90,.2))}
+.rkx-at{font:700 max(var(--t-xs),11px)/1.2 var(--font);color:var(--ink-soft);font-variant-numeric:tabular-nums}
 .rkx-div{padding:.1rem .45rem;border-radius:var(--r-pill);font:800 max(var(--t-xs),11px)/1.4 var(--font);font-variant-numeric:tabular-nums;color:var(--ink-soft);background:var(--sky-2);white-space:nowrap}
 .rkx-div.is-on{background:color-mix(in srgb,var(--rank-ink,var(--line-deep)) 85%,#000);color:#fff}      /* white on the darkened rim colour: 5:1 and up for every rank */
 .rkx-tag{margin-top:.2rem;padding:.15rem .6rem;border-radius:var(--r-pill);font:800 max(var(--t-xs),11px)/1.4 var(--font);letter-spacing:.04em;background:var(--sky-2);color:var(--ink-soft)}
@@ -1971,7 +1975,7 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .rkx-card.is-done{border-color:var(--line-soft)}
 .rkx-note{margin:0;text-align:center}
 .rkx-go{align-self:center}
-@media (max-width:900px){ .rkx-card{width:calc(50% - var(--s-3) / 2)} .rkx-card .rank-em{width:4.25rem;height:4.25rem} .ranks-view{padding:var(--s-4)!important} }
+@media (max-width:900px){ .rkx-card .rank-em{width:4.25rem;height:4.25rem} .ranks-view{padding:var(--s-4)!important} }
 @media (prefers-reduced-motion: reduce){ .rkx-card{animation:none} .rkx-card.is-now{transform:none} }
 /* the medal is a link to the Ranks page: a pointer, a small lift on hover, the focus halo on the keyboard */
 .st-crest.is-link,.rk-emblem.is-link{cursor:pointer;border-radius:var(--r-lg);transition:scale var(--d-fast) var(--ease-bounce)}

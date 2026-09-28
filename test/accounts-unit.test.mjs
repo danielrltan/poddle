@@ -533,7 +533,7 @@ console.log('ladder');
   w = db.ladderApply({ owner: a, delta: -70, won: false, vsBot: false, now: T0 + 9 }); ok(w.trophies === 150 && w.div === 1 && w.divWas === 2 && w.floorHeld === true && w.delta === -63 && db.ladderOf(a).bestDiv === 2 && db.ladderOf(a).streak === 0, 'a loss: the Silver floor holds at 150 (a division lost, the rank kept), best_div stays');
   // demotion above Platinum, never below 450
   const c = db.ownerForDevice(dev(23), T0, { create: true }); db.ladderApply({ owner: c, delta: 760, won: true, vsBot: false, now: T0 });
-  w = db.ladderApply({ owner: c, delta: -20, won: false, vsBot: false, now: T0 + 1 }); ok(w.trophies === 740 && w.tier === 5 && w.div === 3 && w.tierWas === 6 && !w.floorHeld, 'a Champion I losing 20 is Diamond III (demotion)');
+  w = db.ladderApply({ owner: c, delta: -20, won: false, vsBot: false, now: T0 + 1 }); ok(w.trophies === 740 && w.tier === 5 && w.div === 3 && w.tierWas === 6 && !w.floorHeld, 'a Master I losing 20 is Diamond III (demotion)');
   w = db.ladderApply({ owner: c, delta: -320, won: false, vsBot: false, now: T0 + 2 }); ok(w.trophies === 450 && w.tier === 4 && w.floorHeld === true, 'never below Platinum\'s 450');
   // Matt: the day cap and the ceiling inside ladderApply, bot_wins / bot_losses apart, the one game's row gets the delta
   const d = db.ownerForDevice(dev(24), T0, { create: true });
@@ -545,8 +545,9 @@ console.log('ladder');
   w = db.ladderApply({ owner: d, delta: 0, won: false, vsBot: true, now: T0 + 13 }); ok(w.delta === 0 && db.ladderOf(d).botLosses === 1 && db.ladderOf(d).wins === 0, 'a Matt loss: bot_losses, never the human record');
   w = db.ladderApply({ owner: d, delta: 10, won: true, vsBot: true, now: T0 + DAY + 1 }); ok(w.delta === 10 && w.dayLeft === 2 && db.ladderOf(d, T0 + DAY + 1).mattDayLeft === 2, 'a new UTC day: the cap is fresh');
   const e = db.ownerForDevice(dev(25), T0, { create: true }); db.ladderApply({ owner: e, delta: 897, won: true, vsBot: false, now: T0 });
-  w = db.ladderApply({ owner: e, delta: 4, won: true, vsBot: true, now: T0 + 1 }); ok(w.delta === 2 && w.trophies === 899 && w.tier === 6 && w.div === 3, 'the ceiling: Matt stops at 899 (Champion III)');
-  ok(db.ladderApply({ owner: e, delta: 4, won: true, vsBot: true, now: T0 + 2 }).delta === 0 && db.ladderApply({ owner: e, delta: 30, won: true, vsBot: false, now: T0 + 3 }).tier === 7, 'and pays 0 there; a series still carries into Pro');
+  w = db.ladderApply({ owner: e, delta: 4, won: true, vsBot: true, now: T0 + 1 }); ok(w.delta === 2 && w.trophies === 899 && w.tier === 6 && w.div === 3, 'the ceiling: Matt stops at 899 (Master III)');
+  ok(db.ladderApply({ owner: e, delta: 4, won: true, vsBot: true, now: T0 + 2 }).delta === 0 && db.ladderApply({ owner: e, delta: 30, won: true, vsBot: false, now: T0 + 3 }).tier === 7, 'and pays 0 there; a series still carries into Champion');
+  ok(db.ladderApply({ owner: e, delta: 150, won: true, vsBot: false, now: T0 + 4 }).tier === 8 && db.ladderOf(e).div === 1 && db.ladderOf(e).nextDiv === null && db.ladderOf(e).next === null, 'and on into Pro (1079): div 1, no next division or rank');
   // fold on sign-in: max for trophies / best_*, sums for W/L and Matt games, the account's streak, the day count added on the same day
   const acct = db.createAccount('sub-L', T0), ao = acct.owner_id;
   db.ladderApply({ owner: ao, delta: 40, won: true, vsBot: false, now: T0 + 20 }); db.ladderApply({ owner: ao, delta: 10, won: true, vsBot: true, now: T0 + 21 });
@@ -557,6 +558,36 @@ console.log('ladder');
   ok(db.ladderOf(a) === null, 'the guest\'s row went with its owner');
   // delete: the cascade takes the row; the log deltas identify nobody
   ok(db.deleteOwner(ao, T0 + 30) && db.counts().ladder === 4 && db.ladderOf(ao) === null && !JSON.stringify(db.exportOf(b, T0 + 31)).includes('owner'), 'deleteOwner cascades to ladder; the other side\'s export still has no owner in it');
+  db.close();
+}
+// ======================================================================= the eighth rank: the recompute in extra() and the Pro leaderboard (docs/RANK8.md 2, 7)
+console.log('rank8: tier recompute');
+{
+  const LAD = require('../server/ladder.js'), { DatabaseSync } = await import('node:sqlite'), f8 = path.join(tmp, 'rank8.db');
+  ok(quiet(() => db.open(f8)) && db.ladderRecomputed() === 0, 'a new file: the schema, nothing to recompute'); db.close();
+  // rows as the seven-rank build stored them (Champion 750 = 6, Pro 900 = 7), trophies and best_trophies apart, plus junk derived columns and a 0..1200 sweep
+  const OLD = [[1, 0, 1, 1, 0, 1, 1], [2, 760, 6, 1, 760, 6, 1], [3, 899, 6, 3, 899, 6, 3], [4, 950, 7, 2, 950, 7, 2], [5, 1100, 7, 3, 1100, 7, 3], [6, 760, 6, 1, 1100, 7, 3], [7, 300, 5, 3, 950, 2, 1], [8, -40, 3, 2, 0, 1, 1]];
+  const raw = (fn) => { const D = new DatabaseSync(f8); D.exec('BEGIN'); try { fn(D); D.exec('COMMIT'); } finally { D.close(); } };
+  raw(D => { const o = D.prepare("INSERT INTO owners (id, kind, created_at, touched_at) VALUES (?, 'device', ?, ?)"), p = D.prepare('INSERT INTO profile (owner_id, updated_at) VALUES (?, ?)');
+    const l = D.prepare('INSERT INTO ladder (owner_id, trophies, tier, div, best_trophies, best_tier, best_div, best_tier_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    for (const [id, t, ti, dv, bt, bti, bdv] of OLD) { o.run(id, T0, T0); p.run(id, T0); l.run(id, t, ti, dv, bt, bti, bdv, T0 + id, T0); }
+    for (let t = 0; t <= 1200; t++) { const id = 100 + t; o.run(id, T0, T0); p.run(id, T0); l.run(id, t, 9, 9, t, 0, 0, T0, T0); } });
+  ok(quiet(() => db.open(f8)) && db.ok() && db.ladderRecomputed() === 4 + 1201, `open recomputes exactly the rows whose tier/div/best disagree with the table (${db.ladderRecomputed()}: rows 5-8 and the sweep; Bronze I, Master I/III and Champion II keep their numbers, only their names moved)`);
+  const want = [[1, 'Bronze I', 'Bronze I'], [2, 'Master I', 'Master I'], [3, 'Master III', 'Master III'], [4, 'Champion II', 'Champion II'], [5, 'Pro', 'Pro'], [6, 'Master I', 'Pro'], [7, 'Gold I', 'Champion II'], [8, 'Bronze I', 'Bronze I']];
+  const nm = (t, d) => LAD.rankName(t, d);
+  for (const [id, now, best] of want) { const L = db.ladderOf(id, T0), R = OLD.find(r => r[0] === id);
+    ok(L && nm(L.tier, L.div) === now && nm(L.bestTier, L.bestDiv) === best && L.trophies === R[1] && L.bestTrophies === R[4] && L.bestTierAt === T0 + id && (L.tier === 8 ? L.div === 1 : true),
+      `${R[1]} (best ${R[4]}) stored as tier ${R[2]}/${R[3]} -> ${now}, best ${best}; trophies, best_trophies and best_tier_at untouched (${L && [L.tier, L.div, L.bestTier, L.bestDiv].join('/')})`); }
+  ok(db.ladderOf(5).tier === 8 && db.ladderOf(5).div === 1, `the old Pro III at 1100 is Pro (tier 8, div 1)`);
+  { let bad = 0; for (let t = 0; t <= 1200; t++) { const L = db.ladderTier(100 + t, T0); if (L.tier !== LAD.tierOf(t) || L.div !== LAD.divOf(t) || L.bestTier !== LAD.tierOf(t) || L.bestDiv !== LAD.divOf(t) || L.trophies !== t) bad++; }
+    ok(bad === 0, `every count 0..1200: the SQL recompute equals ladder.js tierOf / divOf, for trophies and best_trophies (${bad} off)`); }
+  db.close();
+  ok(quiet(() => db.open(f8)) && db.ladderRecomputed() === 0 && db.ladderOf(5).tier === 8 && db.ladderOf(2).trophies === 760, 'a second open changes nothing (idempotent)');
+  const idx = new DatabaseSync(f8).prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'ladder'").all().map(r => r.name);
+  ok(idx.includes('ladder_trophies'), 'the ladder(trophies) index exists (' + idx.join(', ') + ')');
+  db.close();
+  raw(D => { D.prepare('UPDATE ladder SET tier = 7, div = 3, best_tier = 7, best_div = 3 WHERE owner_id = 5').run(); });   // an older build wrote this row after the upgrade
+  ok(quiet(() => db.open(f8)) && db.ladderRecomputed() === 1 && db.ladderOf(5).tier === 8 && db.ladderOf(5).div === 1 && db.ladderOf(5).bestTier === 8, 'a row an older build wrote is healed on the next open (one row)');
   db.close();
 }
 { // merge rows 3 and 4 (MERGE_MAX, DEVICES_MAX), each on a fresh database with small caps
