@@ -1829,21 +1829,30 @@ body[data-overlay="rk-vs"] #screen-tour-vs{z-index:calc(var(--z-screen) + 1);bac
 .result-note-sub{display:block;margin-top:.25rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}      /* under 'Gold I': what the rank means */
 .screen.is-active .result-pips{animation:ov-title-pop 360ms var(--ease-bounce) 480ms both}
 .screen.is-active .tally-games{animation:ov-title-pop 360ms var(--ease-bounce) 1000ms both}
-/* ---- the trophy roll (8.9): the emblem, the new total counted up over 900 ms from 1100 ms, the change as a pill; a small line says why when nothing changed */
-.trophy{display:flex;flex-direction:column;align-items:center;gap:.25rem;margin:calc(var(--s-3) * -1) auto var(--s-4)}
-.trophy-row{display:flex;align-items:center;justify-content:center;gap:.875rem}
+/* ---- the trophy moment (8.9, 8.10; NOTES 117): the hero of the series card. One centred row: the rank's emblem card (5rem emblem, its name and division
+   tag), the total in tally digits over the word 'trophies', the change as a pill with the Rank up / Division up pill under it. The total is final from
+   frame one; the counter rolls over it from 1100 ms for 900 ms. A small line under the row says why when nothing changed, or what a new rank means */
+.trophy{display:flex;flex-direction:column;align-items:center;gap:.375rem;margin:calc(var(--s-3) * -1) auto var(--s-4)}
+.trophy-row{display:flex;align-items:center;justify-content:center;gap:1.25rem}
 .trophy-em{position:relative;display:inline-grid;place-items:center;isolation:isolate}
-.trophy-em .rank-em{position:relative;z-index:1}
-.trophy-em .medal-rays{bottom:50%;width:12rem;height:12rem;margin:0 0 -6rem -6rem;z-index:0}
+.trophy-em .rank-card-em{position:relative;z-index:1;gap:.625rem} .trophy-em .rank-card-em > b{font-size:max(var(--t-md),13px)}      /* 'Silver III' under the emblem, clear of the tag; never under 12 px at the 10px root */
+.trophy-em .rank-em{position:relative;z-index:1;filter:drop-shadow(0 .25rem .375rem rgba(20,60,90,.22))} .trophy-em .rank-card-em::after{z-index:2}      /* the division tag stays over the (grown) emblem */
+.trophy-em .medal-rays{top:2.5rem;bottom:auto;width:12rem;height:12rem;margin:-6rem 0 0 -6rem;z-index:0}      /* centred on the emblem (not on the card with its label) */
 .trophy-em .rank-em.is-down{animation:rank-down 300ms var(--ease-soft) both}
-.trophy-n{position:relative;font-size:2.75rem;font-weight:900;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums;min-width:2.5ch;text-align:center}
-.trophy-n::before{content:counter(n);counter-reset:n var(--n);position:absolute;inset:0;text-align:center;color:var(--ink-strong);opacity:0;pointer-events:none}
-.trophy-n small{font-size:var(--t-sm);font-weight:800;color:var(--ink-soft);margin-left:.25em;letter-spacing:.04em}
+.trophy-em.is-up .rank-em{scale:1.12;filter:drop-shadow(0 0 .75rem color-mix(in srgb,var(--rank-mid,#ffd34a) 75%,transparent)) drop-shadow(0 .25rem .375rem rgba(20,60,90,.22))}      /* a rank up: the new emblem grows and keeps a halo in its colour (static: glows never animate) */
+.rank-card-em.is-flip::after{animation:div-flip 520ms var(--ease-bounce) both}      /* a division up: the numeral flips on its tag */
+@keyframes div-flip{0%{opacity:0;scale:1 0}55%{opacity:1;scale:1.25 1.25}100%{opacity:1;scale:1}}
+.trophy-count{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+.trophy-n{position:relative;font-size:5rem;font-weight:800;line-height:1;color:var(--warn-deep);font-variant-numeric:tabular-nums;min-width:2.5ch;text-align:center}      /* tally digits, in trophy gold */
+.trophy-n::before{content:counter(n);counter-reset:n var(--n);position:absolute;inset:0;text-align:center;color:var(--warn-deep);opacity:0;pointer-events:none}
+.trophy-word{font-size:max(var(--t-xs),12px);font-weight:800;line-height:1;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft)}
+.trophy-pills{position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:1.25rem}      /* the pill sits level with the digits' middle; the kicker hangs under it without moving the row */
+.trophy-pills .rank-kicker{position:absolute;left:50%;top:calc(100% + .5rem);translate:-50% 0;margin:0;background:color-mix(in srgb,var(--rank-c,var(--gold-4)) 85%,#000)}      /* the rim colour 15% darker, as the rank's other inks: white on it reads at every rank (Silver too) */
 .trophy-d{display:inline-flex;align-items:center;height:2.125rem;padding:0 .875rem;border-radius:var(--r-pill);font-size:var(--t-lg);font-weight:900;font-variant-numeric:tabular-nums;background:var(--sky-2);color:var(--ink-soft);border:.125rem solid var(--line-faint)}
 .trophy-d.is-up{background:#e6f9ee;color:var(--good-deep);border-color:#bfeccf} .trophy-d.is-down{background:#fdecec;color:var(--bad-deep);border-color:#f7c8c8} .trophy-d.is-off{font-size:var(--t-md)}
-.trophy-note{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .trophy-note:empty{display:none}
+.trophy-note{font-size:max(var(--t-sm),12px);font-weight:700;color:var(--ink-soft)} .trophy-note:empty{display:none}
 .screen.is-active .trophy.is-roll .trophy-n{animation:ov-ink 2000ms linear}      /* no fill: the real glyphs come back the moment the counter lands */ .screen.is-active .trophy.is-roll .trophy-n::before{animation:ov-trophy-count 900ms var(--ease-out) 1100ms both}
-.screen.is-active .trophy-row{animation:ov-title-pop 360ms var(--ease-bounce) 900ms both} .screen.is-active .trophy-d{animation:ov-trophy-pop 420ms var(--ease-bounce) 1000ms both} .screen.is-active .trophy-note{animation:ov-title-pop 360ms var(--ease-bounce) 1100ms both}
+.screen.is-active .trophy-row{animation:ov-title-pop 420ms var(--ease-bounce) 900ms both} .screen.is-active .trophy-d{animation:ov-trophy-pop 420ms var(--ease-bounce) 1000ms both} .screen.is-active .trophy-note{animation:ov-title-pop 360ms var(--ease-bounce) 1100ms both}
 @keyframes ov-trophy-count{from{--n:var(--from,0);opacity:1}99.9%{opacity:1}to{--n:var(--to,0);opacity:0}}
 @keyframes ov-trophy-pop{0%{opacity:0;scale:.4}60%{opacity:1;scale:1.15}100%{opacity:1;scale:1}}
 @keyframes rank-down{0%{transform:scale(1)}100%{transform:scale(.9)}}
@@ -1852,6 +1861,67 @@ body[data-overlay="rk-vs"] #screen-tour-vs{z-index:calc(var(--z-screen) + 1);bac
 .trophy-em .medal-rays.is-on{animation:ov-rays-in 420ms var(--ease-bounce) both, ov-spin 8s linear 420ms infinite;background:repeating-conic-gradient(var(--rank-ray,rgba(255,211,74,.55)) 0 7deg,transparent 7deg 20deg)}
 @media (max-width:700px){ .rk-acts .btn{min-height:44px} .round-card{padding:var(--s-5) var(--s-4)} .game-num{font-size:4rem;min-width:4rem} .round-card h2{font-size:var(--t-xl)} .pip-row b,.game-next small,.trophy-note,.tally-games,.result-note-sub{font-size:max(var(--t-sm),12px)} .vs-card.is-ranked .vs-round{font-size:var(--t-lg)} .vs-bar{width:14rem} .result-card.is-rk h2{font-size:3rem} }
 @media (max-height:560px){ .round-card{gap:var(--s-3);padding:var(--s-4) var(--s-5)} .game-num{font-size:3.5rem} .vs-em:not([hidden]){min-height:4rem} }
+
+/* ==================== RANKED: the polish pass (NOTES 117). The drama is the emblem, light, motion and layout; never a text slam (NOTES 104) ==================== */
+/* the series card pays for the trophy moment in rem (1440x900 and 1280x720 share one 52.9rem budget): a smaller medal and less room around it, the games
+   in 5rem digits, and the '2-1' note read out but not drawn (the pips and the tally already say it). A forfeit's 'Priyanka left' stays in sight */
+.result-card.is-rk{margin-top:5rem;padding-top:6.25rem;padding-bottom:var(--s-6)} .result-card.is-rk .medal{scale:1}
+.result-card.is-rk .tally-num{font-size:5rem;min-width:5.5rem}
+#result-note.is-quiet{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* the emblems beside the tally names at .is-md, with their division tags; they hang into the row's padding rather than growing it */
+.tally-side .rank-badge{margin-block:-.5rem}
+/* beside a name in a score tab (.is-xs) only the emblem shows: the generic [data-div]::after rule was drawing the numeral there as bare text under it */
+.rank-badge:not(:has(> .is-md, > .is-lg, > .is-xl))::after{content:none}
+/* rank up: one band of light crosses the card (a transform sweep; its own animation name, so it replays after the win's) */
+#screen-match.is-active .result-flash.is-sweep{background-position:50% 0;animation:rk-sweep 1000ms var(--ease-soft) both}
+@keyframes rk-sweep{0%{opacity:1;transform:translateX(-70%)}80%{opacity:1}100%{opacity:0;transform:translateX(70%)}}
+
+/* MATCH FOUND as a broadcast bumper: one thin band of light across the navy card, a bigger VS, each emblem on a glow of its rank's colour */
+.vs-card.is-ranked{overflow:hidden}
+.vs-card.is-ranked::after{content:"";position:absolute;top:0;bottom:0;left:0;width:22%;z-index:3;pointer-events:none;opacity:0;transform:translateX(-150%) skewX(-18deg);
+  background:linear-gradient(90deg,rgba(159,230,255,0) 0%,rgba(159,230,255,.12) 30%,rgba(230,249,255,.42) 50%,rgba(159,230,255,.12) 70%,rgba(159,230,255,0) 100%)}
+.vs-card.is-ranked.go::after{animation:vs-sweep 1100ms var(--ease-soft) 120ms both}
+@keyframes vs-sweep{0%{opacity:1;transform:translateX(-150%) skewX(-18deg)}85%{opacity:1}100%{opacity:0;transform:translateX(520%) skewX(-18deg)}}
+@media (min-aspect-ratio:1/1){ .vs-card.is-ranked .vs-mark{font-size:7.5rem} }
+.vs-em .rank-card-em{gap:.625rem;isolation:isolate} .vs-em:not([hidden]){min-height:7rem}      /* the division tag clear of the name under it */
+.vs-em .rank-card-em::before{content:"";position:absolute;left:50%;top:2.5rem;width:8.5rem;height:8.5rem;margin:-4.25rem 0 0 -4.25rem;border-radius:50%;z-index:-1;pointer-events:none;
+  background:radial-gradient(circle,color-mix(in srgb,var(--rank-mid,#34beed) 58%,transparent) 0,color-mix(in srgb,var(--rank-mid,#34beed) 18%,transparent) 45%,transparent 70%)}
+
+/* the GAME card: everything that tells the next game (Game 2 in 6, its bar, who serves) is in sight by 700 ms; the score rolls sooner to match */
+#screen-rk-game.is-active .round-card h2{animation:ov-title-pop 520ms var(--ease-bounce) 180ms both}
+#screen-rk-game.is-active .tally-num{animation:ov-title-pop 480ms var(--ease-bounce) 280ms both, ov-ink 760ms linear}
+#screen-rk-game.is-active .tally-num.is-them{animation:ov-title-pop 480ms var(--ease-bounce) 340ms both, ov-ink 760ms linear}
+#screen-rk-game.is-active .tally-num::before{animation:ov-count 440ms var(--ease-out) 320ms both}      /* the counter lands at 760 ms, when ov-ink gives the real glyphs back */
+#screen-rk-game.is-active .game-next{animation:ov-title-pop 320ms var(--ease-bounce) 360ms both}
+#screen-rk-game.is-active .pip-row{animation:ov-title-pop 360ms var(--ease-bounce) 440ms both} #screen-rk-game.is-active .pip-row.is-them{animation-delay:500ms}
+#screen-rk-game.is-active .pips li{animation:ov-pip-in 320ms var(--ease-bounce) calc(500ms + var(--i,0) * 80ms) both}
+#screen-rk-game.is-active .pips li.is-new{animation:ov-pip-in 320ms var(--ease-bounce) calc(500ms + var(--i,0) * 80ms) both, num-pop 420ms var(--ease-bounce) 820ms}
+/* the row that took the game: gold, lifted and a touch larger */
+.pip-row.is-won{scale:1.04;border:.1875rem solid var(--gold-3);background:linear-gradient(180deg,#fff7d1,#ffe38f);box-shadow:0 0 0 .25rem rgba(255,211,74,.32), 0 .25rem .625rem rgba(168,100,0,.22)}
+.pip-row.is-won .pip-n{text-shadow:0 .0625rem 0 #fff}
+/* 1-1: the deciding game is warmer, the veil glows amber behind the card, its line is a pill */
+#screen-rk-game.is-deciding{background:radial-gradient(ellipse 62% 58% at 50% 50%,rgba(255,146,48,.3),rgba(255,146,48,0) 70%),rgba(44,20,16,.9)}
+#screen-rk-game.is-deciding .round-card{border-color:var(--warn);background:linear-gradient(180deg,#fff 0%,#fffaf0 50%,#ffefd4 100%);box-shadow:0 0 0 .25rem rgba(255,181,52,.3), 0 1.5rem 3rem rgba(0,0,0,.5), inset 0 0 0 .1875rem #fff}
+.game-deciding{display:inline-flex;align-items:center;height:2rem;padding:0 1rem;border-radius:var(--r-pill);background:#fff1d6;border:.125rem solid var(--warn);color:#8a5200}
+
+/* the HUD: series pips a size up and in the deep colours (the lozenge is grey over the night court), the game in play breathing without fading out;
+   GAME POINT / MATCH POINT as a filled pill inside the width the lozenge already keeps for it (tighter tracking pays for the padding) */
+body[data-rk] .rally{background:rgba(255,255,255,.9)}
+.series .pips{gap:.3125rem} .series .pips li{width:.8125rem;height:.8125rem;border-width:.1875rem}
+.series .pips.is-me li{border-color:var(--me-deep)} .series .pips.is-me li.is-won{background:var(--me-deep)}
+.series .pips li.is-now{animation:pip-now var(--d-pulse) var(--ease-soft) infinite}
+@keyframes pip-now{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
+.rally small.is-pressure{color:#fff;background:var(--me-ink);border-radius:var(--r-pill);padding:.125rem .25em;letter-spacing:.08em;box-shadow:0 .0625rem 0 rgba(0,0,0,.18)} .rally small.is-pressure.is-them{color:#fff;background:var(--them-ink)}
+@media (max-width:900px){ body[data-rk] .rally small.is-pressure{padding:.125rem .06em;letter-spacing:0} }      /* beats the .04em tracking the narrow series lozenge sets */
+/* the queue pill's dot breathes: the dot swells a little and a soft ring rises off it (both transform / opacity; the glow itself is static) */
+.rk-pill .rk-dot{position:relative;animation:rk-breathe var(--d-pulse) var(--ease-soft) infinite}
+.rk-pill .rk-dot::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--me);opacity:0;animation:rk-ring var(--d-pulse) var(--ease-out) infinite}
+@keyframes rk-breathe{0%,100%{transform:scale(.88)}50%{transform:scale(1.12)}} @keyframes rk-ring{0%{opacity:.55;transform:scale(1)}100%{opacity:0;transform:scale(2.4)}}
+/* the home tile's line and the Ranks page: small hierarchy fixes. The tile's emblem was taking the tile icon's 5rem (.tiles .tile svg) beside a 9 px line */
+.tiles .tile #ranked-em .rank-em{width:2.5rem;height:2.5rem;filter:drop-shadow(0 .125rem .1875rem rgba(20,60,90,.2))}
+#ranked-line{font-size:max(var(--t-sm),12px);font-weight:800;gap:.45em}
+.rkx-card.is-now{background:linear-gradient(180deg,#fff 0%,color-mix(in srgb,var(--rank-mid,var(--line)) 18%,#fff) 100%)}      /* your own rank's card, tinted in its colour */
+@media (prefers-reduced-motion: reduce){ .series .pips li.is-now,.rk-pill .rk-dot,.rk-pill .rk-dot::after,.rank-card-em.is-flip::after,.vs-card.is-ranked::after{animation:none!important} .vs-card.is-ranked::after{display:none} .trophy-em.is-up .rank-em{scale:1.12} }
 
 /* ---------- Your stats: the crest wears the Ranked emblem (docs/RANKED.md 2: one rank per player; profile.js drawRoad -> ui.rankCrest) ---------- */
 .st-crest.is-rk .st-disc{display:none}      /* the metal medal of NOTES 107 made way for the ladder's own emblem */

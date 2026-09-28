@@ -159,7 +159,7 @@ export function matchResult(o, me, them, name) {
   $('tally-sc-me').textContent = L; $('tally-sc-them').textContent = R; setText($('tally-name-me'), nameMe); setText($('tally-name-them'), nameThem);
   $('tally-me').classList.toggle('is-winner', won); $('tally-them').classList.toggle('is-winner', !won);
   { const r = Array.isArray(o.reg) ? o.reg : []; regBadge($('tally-name-me'), r[0] === true); regBadge($('tally-name-them'), r[1] === true); }      // reg: [left, right], registered usernames (docs/ACCOUNTS.md 7.5)
-  { const r = Array.isArray(o.rank) ? o.rank : []; rankBadge($('tally-name-me'), r[0]); rankBadge($('tally-name-them'), r[1]); }      // rank: [left, right], the tiers in a Ranked court (docs/RANKED.md 6); absent = none
+  { const r = Array.isArray(o.rank) ? o.rank : []; rankBadge($('tally-name-me'), r[0], 'is-md'); rankBadge($('tally-name-them'), r[1], 'is-md'); }      // rank: [left, right], the tiers in a Ranked court (docs/RANKED.md 6); absent = none. .is-md: the emblem with its division tag beside each name
   if (games) {                                                                          // the final pips over the tally, the per-game scores under it
     const need = Math.ceil(bestOf / 2); drawPips($('result-pips-me'), need, games[0], -1); drawPips($('result-pips-them'), need, games[1], -1); $('result-pips')?.setAttribute('aria-label', `Games ${games[0]} to ${games[1]}`); show('result-pips', true);
     const sc = (Array.isArray(RK.scores) ? RK.scores : []).filter(x => Array.isArray(x)).map(x => `${x[0] | 0}-${x[1] | 0}`); setText($('tally-games'), sc.join(' · ')); show('tally-games', sc.length > 0);
@@ -171,6 +171,7 @@ export function matchResult(o, me, them, name) {
   for (const id of ['btn-rematch', 'btn-leave', 'btn-rk-again', 'btn-rk-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
   setText($('rematch-note'), T || RK ? '' : watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
   if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final!') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
+  $('result-note').classList.toggle('is-quiet', SERIES && !o.forfeit);      // '2-1' is already the pips and the tally: read out, not drawn a third time. 'Priyanka left' stays in sight
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
   $('tally-sc-me').style.setProperty('--to', L | 0); $('tally-sc-them').style.setProperty('--to', R | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame (no stamp: NOTES 104)
@@ -182,11 +183,18 @@ export function matchResult(o, me, them, name) {
   if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60);
 }
 // the Ranked rows of the card, back to nothing: the pips, the game scores, the trophy roll and its ceremony (matchResult and champion both start clean)
-function resultRkReset() { { const k = $('rank-kicker'); if (k) k.hidden = true; } show('result-pips', false); show('tally-games', false); show('rk-acts', false); trophyReset(); }
+function resultRkReset() { show('result-pips', false); show('tally-games', false); show('rk-acts', false); trophyReset(); }
 function trophyReset() {
   clearTimeout(upT); upT = 0; const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll'); }
-  $('trophy-em')?.querySelector('.medal-rays')?.remove(); $('trophy-em')?.querySelector('.rank-em')?.classList.remove('is-pop', 'is-down');
-  $('result-note')?.querySelector('.result-note-sub')?.remove(); $('result-slam')?.classList.remove('is-rank');
+  const em = $('trophy-em'); if (em) { em.querySelector('.medal-rays')?.remove(); em.querySelector('.rank-em')?.classList.remove('is-pop', 'is-down'); em.querySelector('.rank-card-em')?.classList.remove('is-flip'); em.classList.remove('is-up'); }
+  { const k = $('rank-kicker'); if (k) { k.hidden = true; k.textContent = ''; } } $('result-flash')?.classList.remove('is-sweep');
+  const n = $('result-note'), c = $('result'); n?.querySelector('.result-note-sub')?.remove(); n?.classList.toggle('is-quiet', !!c && c.classList.contains('is-rk') && !c.classList.contains('is-forfeit')); $('result-slam')?.classList.remove('is-rank');
+}
+// the emblem card in the trophy row: the rank's emblem at .is-lg, its name and division under it (emblems.js emblemCard), re-pointed in place on a change
+function trophyCard(tier, div) {
+  const em = $('trophy-em'); if (!em) return null; let c = em.querySelector('.rank-card-em');
+  if (!c) { c = emblemCard(tier, 'is-lg', div); em.append(c); return c; }
+  const R = RANKS[tier - 1]; setEmblem(c.querySelector('.rank-em'), tier); setText(c.querySelector('b'), rankLabel(tier, div)); c.dataset.div = String(div); c.style.setProperty('--rank-ink', R.colour.deep); c.style.setProperty('--rank-mid', R.colour.mid); c.hidden = false; return c;
 }
 // bestOf dots as a row of pips: won of them filled, the one at `now` pulsing (the game in play), the one at `fresh` popping (the game just won)
 function drawPips(ol, n, won, now, fresh = -1) {
@@ -1288,8 +1296,8 @@ let upT = 0;
 export function trophyRow(r) {
   const box = $('trophy'); if (!box || !r || typeof r !== 'object') return; trophyReset();
   const now = rankRef(r), was = rankRef({ tier: r.tierWas, div: r.divWas }) || now, tier = now ? now.tier : 0, n = Math.max(0, r.trophies | 0), d = Number.isInteger(r.delta) ? r.delta : 0;
-  const em = $('trophy-em'); let e = em.querySelector('.rank-em'); if (!e) { e = emblemEl((was || now || { tier: 1 }).tier, 'is-md'); em.append(e); } setEmblem(e, was ? was.tier : tier || 1); e.classList.remove('is-down', 'is-pop');
-  const num = $('trophy-n'); num.textContent = String(n); num.style.setProperty('--from', String(Math.max(0, n - d))); num.style.setProperty('--to', String(n));      // final from the first frame
+  const had = was || now || { tier: 1, div: 1 }, card = trophyCard(had.tier, had.div), e = card && card.querySelector('.rank-em'); if (e) e.classList.remove('is-down', 'is-pop');      // the rank I had until the count lands, named under its emblem
+  const num = $('trophy-n'); num.textContent = String(n); setText($('trophy-word'), n === 1 ? 'trophy' : 'trophies'); num.style.setProperty('--from', String(Math.max(0, n - d))); num.style.setProperty('--to', String(n));      // final from the first frame
   box.classList.toggle('is-roll', d !== 0);
   const pill = $('trophy-d'); let text, cls = '', note = '';
   const why = (Array.isArray(r.why) ? r.why : []).find(w => RK_WHY[w]);
@@ -1306,21 +1314,24 @@ export function trophyRow(r) {
   if (now && was && (now.tier !== was.tier || now.div !== was.div)) { const kind = now.tier > was.tier ? 'rank' : now.tier < was.tier || now.div < was.div ? 'down' : 'div';
     upT = setTimeout(() => { upT = 0; if (slots.overlay === 'match') rankUp({ tier: now.tier, div: now.div, kind }); }, reduced() ? 0 : 2100); }      // after the count lands
 }
-// the ceremony (8.10): { tier, div, kind: 'rank' | 'div' | 'down' }. rank: the emblem swaps and pops, rays open behind it, RANK UP! in the rank's colour, the note names it;
-// div: the emblem pops and the note reads 'Gold II'; down: the emblem shrinks a little, the note reads 'Down to Gold I'. Sounds are main.js's (scene.jingle)
+// the ceremony (8.10; NOTES 117): { tier, div, kind: 'rank' | 'div' | 'down' }. The emblem card in the trophy row names the new rank. rank: the emblem swaps, pops and
+// stays grown, rays open behind it, one band of light crosses the card, 'Rank up' under the delta; div: a pop and the numeral flips on its tag, 'Division up';
+// down: the emblem shrinks a little and the line under the row says 'Down to Gold I'. #result-note carries the words for a screen reader. Sounds are main.js's (scene.jingle)
 export function rankUp(o) {
   const r = rankRef(o); if (!r) return; const kind = o.kind === 'div' || o.kind === 'down' ? o.kind : 'rank', R = RANKS[r.tier - 1], label = rankLabel(r.tier, r.div);
-  const em = $('trophy-em'), e = em && em.querySelector('.rank-em'); if (!e) return;
-  setEmblem(e, r.tier); e.classList.remove('is-down', 'is-pop');
-  const note = (t, sub) => { const n = $('result-note'); if (!n) return; n.textContent = t; if (sub) n.append(mk('small', 'result-note-sub', sub)); restart(n, 'ov-note'); };
-  const kick = t => { const n = $('result-note'); if (!n) return; let k = $('rank-kicker'); const d = $('trophy-d'); if (!k && d) { k = mk('b', 'rank-kicker'); k.id = 'rank-kicker'; d.after(k); } if (!k) return; k.hidden = !t; k.textContent = t || ''; k.style.setProperty('--rank-c', R.colour.deep); if (t) restart(k, 'ov-pop'); };      // the words for the moment (no stamp since NOTES 104): a caps pill beside the trophy delta, next to the emblem that just changed
+  const em = $('trophy-em'), card = em && em.querySelector('.rank-card-em'), e = card && card.querySelector('.rank-em'); if (!e) return;
+  trophyCard(r.tier, r.div); e.classList.remove('is-down', 'is-pop'); em.classList.remove('is-up');      // the card now names the new rank ('Gold I'): the emblem, its tag and its label change together
+  const note = (t, sub) => { const n = $('result-note'); if (!n) return; n.textContent = t; if (sub) n.append(mk('small', 'result-note-sub', sub)); n.classList.add('is-quiet'); };      // read out; drawn by the card (the label under the emblem says it)
+  const line = t => { const tn = $('trophy-note'); if (!tn) return; const had = tn.hidden ? '' : tn.textContent; setText(tn, had ? had + ' · ' + t.charAt(0).toLowerCase() + t.slice(1) : t); tn.hidden = false; };      // what the moment means, in sight under the row ('Forfeit · down to Platinum III')
+  const kick = t => { const k = $('rank-kicker'); if (!k) return; k.hidden = !t; k.textContent = t || ''; k.style.setProperty('--rank-c', R.colour.deep); if (t) restart(k, 'ov-pop'); };      // the words for the moment (no stamp since NOTES 104): a caps pill under the trophy delta, beside the emblem that just changed
   kick(kind === 'rank' ? 'Rank up' : kind === 'div' ? 'Division up' : '');
-  if (kind === 'down') { restart(e, 'is-down'); note(`Down to ${label}`); return; }
+  if (kind === 'down') { restart(e, 'is-down'); note(`Down to ${label}`); line(`Down to ${label}`); return; }
   restart(e, 'is-pop');
-  if (kind === 'div') { note(label); return; }
+  if (kind === 'div') { restart(card, 'is-flip'); note(label); return; }      // the numeral flips on its tag
+  em.classList.add('is-up'); { const f = $('result-flash'); if (f) restart(f, 'is-sweep'); }      // rank up: the emblem grows and stays grown, and one band of light crosses the card
   let rays = em.querySelector('.medal-rays'); if (!rays) { rays = document.createElement('i'); rays.className = 'medal-rays'; rays.setAttribute('aria-hidden', 'true'); em.prepend(rays); }
   rays.style.setProperty('--rank-ray', `color-mix(in srgb, ${R.colour.mid} 55%, transparent)`); restart(rays, 'is-on');
   const s = $('result-slam'); if (s) { s.textContent = 'RANK UP!'; s.classList.remove('is-them', 'is-gold'); s.classList.add('is-rank'); s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
-  note(label, r.tier <= 4 ? 'Bronze to Platinum are yours to keep' : 'Diamond and above can slip, never below Platinum');
+  { const sub = r.tier <= 4 ? 'Bronze to Platinum are yours to keep' : 'Diamond and above can slip, never below Platinum'; note(label, sub); if ($('trophy-note')?.hidden) line(sub); }
   confetti([R.colour.mid, '#ffd34a', '#ffffff'], 120);
 }
