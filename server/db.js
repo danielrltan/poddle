@@ -140,8 +140,8 @@ ALTER TABLE match_log ADD COLUMN delta_b INTEGER;
 `];
 
 // Additive schema outside the numbered migrations (NOTES 114): new profile counters and the share table. Idempotent, run on every open
-// after the migrations. It deliberately takes no MIGRATIONS slot: the Ranked branch owns migration 2, and whichever build deploys first
-// would own a shared slot while the other's migration silently never ran. Columns are only ever ADDED here (never renamed or dropped).
+// after the migrations. It deliberately takes no MIGRATIONS slot: Ranked (NOTES 112) owns migration 2, and the two were built in parallel, so
+// whichever deployed first would have owned a shared slot while the other's migration silently never ran. Columns are only ever ADDED here (never renamed or dropped).
 const PLAY_COLS = ['hits', 'returns', 'chances', 'winners', 'aces', 'smashes', 'pts_won', 'pts_lost', 'secs_played'];   // profile: every match kind, see stats.js play counters
 const EXTRA = `
 CREATE TABLE IF NOT EXISTS share (
@@ -247,7 +247,7 @@ function prepare() {                                             // every statem
     profGet: q('SELECT * FROM profile WHERE owner_id = ?'),
     profSet: q(`UPDATE profile SET played = ?, h_wins = ?, h_losses = ?, h_streak = ?, h_best_streak = ?, h_points_won = ?, h_points_lost = ?, tour_titles = ?,
       best_rally = ?, best_rally_at = ?, best_hit = ?, best_hit_at = ?, best_speed = ?, best_speed_at = ?, updated_at = ? WHERE owner_id = ?`),
-    playAdd: q(`UPDATE profile SET ${PLAY_COLS.map(c => c + ' = ' + c + ' + ?').join(', ')} WHERE owner_id = ?`),   // the play counters, PLAY_COLS order (constants, never input). Its own statement: profSet stays as the Ranked branch edits it
+    playAdd: q(`UPDATE profile SET ${PLAY_COLS.map(c => c + ' = ' + c + ' + ?').join(', ')} WHERE owner_id = ?`),   // the play counters, PLAY_COLS order (constants, never input). Its own statement: profSet stays as Ranked left it
     botGet: q('SELECT * FROM bot_record WHERE owner_id = ? AND level = ?'),
     botAll: q('SELECT * FROM bot_record WHERE owner_id = ? ORDER BY level'),
     botPut: q(`INSERT INTO bot_record (owner_id, level, wins, losses, abandons, streak, best_streak, first_win_at, best_margin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

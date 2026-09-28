@@ -2167,6 +2167,11 @@ use, we may disable a link) and resvg (MPL-2.0) in section 9's list. CLAUDE.md "
 Public), docs/ropa.md 3a, docs/ACCOUNTS.md (profile `share`, export `share`), the changelog and sitemap lastmod follow.
 No home-page notice: sharing is opt-in and the changelog carries the change.
 
+**For the Ranked session** (done: see "Merged with Ranked" below): when ranked merges, `rankOf(profile)` in server/card.js must switch to the ladder rank
+(RANK_NAME + divisions); it is the one function to change, and bump `CARD_V` with it so every card URL changes. The
+play counters use their own `playAdd` statement and `PLAY_COLS` columns (no MIGRATIONS entry), and stats.js's seatAcc,
+onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
+
 **Review fixes (before launch).**
 - Memory (critical): each render left ~3.5 MB of native memory (resvg's pixmap, tree and PNG) that is freed only when the
   worker's V8 collects, and its JS heap stays near 4 MB, so it rarely did: 100 renders in a row took RSS from 45 to 361 MB
