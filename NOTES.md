@@ -2249,3 +2249,26 @@ onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
   stats.js/game.js auto-merged (Ranked's mode/series beside the counters and `pointEnd(m, winner, why)`). Legal pages,
   ropa 3/3a and CLAUDE.md carry both features; the shared card now names the Ranked rank, its emblem and trophies
   (privacy 4 and 15, terms 5), dates stay 2026-09-27.
+
+## 115. Ranked touch-ups: tone-matched medals, an info circle, no You group in Settings, an even logo ball, a floodlit stadium, reset-stats
+- **Medals.** The owner: "i dont like the neon yellow pickleball on the ranked medals. can u make them tone matched". Each medal's
+  ball is now drawn in its own rank's tones (web/emblems.js `BALLS`, one `#pb1..#pb7` per rank instead of the shared neon `#pb`):
+  pale bronze on Bronze, silver on Silver, soft gold on Gold, icy blue on Platinum, cyan on Diamond, lilac on Champion, cream gold
+  on Pro. The share card inlines the same symbols (server/card.js); its emblem digest changes, so card links get a new `?v`.
+  test/share.test.mjs checks each card uses its own rank's ball.
+- **Ranked view.** "get rid of the see all ranks button … just make it the i circle icon next to it small": a small info circle
+  (`#btn-rk-all`, same id, `aria-label="See all ranks"`) at the end of the keep line opens the Ranks page; it keeps a 44 px target.
+- **Settings has no You group** (the name field, Sign in, Sign out): "that would prob break some things if u signed out mid game".
+  Renaming, signing in or out redials the socket, which mid-series is a Ranked forfeit. The name is set on the lobby's name row and
+  the account is managed on Your stats, where no match is running. profile-ui and ui-next follow.
+- **The logo ball** has seven even holes, one centred and six on a ring 60 degrees apart ("7 holes aligned evenly … with one hole in
+  the centre"): the title (ui.css), the phone page (pad.css), How to play, favicon.svg, favicon.ico / favicon-32 / icon-192 /
+  icon-512 / apple-touch-icon (re-rendered from favicon.svg with the same ground and ball size) and the share card's CTA ball.
+  The holes are sized in em, not %, so every hole is the same size (a % stop scales with each gradient's distance to the far corner).
+  og.jpg still shows the old ball until it is re-rendered.
+- **The stadium is floodlit** ("really hard to see your opponent because of how dark it is"): sun 1.75 -> 3.4 and a lighter fill
+  (hemi 1.15 -> 1.9, sky #b4c6ea / ground #4a5468), the park's brightness; the court, kitchen, apron and stands a shade lighter, fog
+  pushed back. The sky stays night. test/venue-shots.mjs checks the floodlit sun.
+- **Operator reset:** `node server/admin.js reset-stats <username>` (db.resetStats): the account's profile back to fresh, its Matt
+  record and Ranked ladder removed, the owner unlinked from match_log (R10/R11 history starts again); the account, username, devices,
+  sessions and share link stay. Run on the machine as the other admin commands, after `backup`.
