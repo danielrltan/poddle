@@ -382,7 +382,7 @@ function onRk(m) {                                 // the queue snapshot { phase
   ui.rkSearch?.(false); rkBarSync();
 }
 function onRkFail(why, warm) {                     // the queue said no: a toast, and the reason under Find a match while the view is up
-  if (warm) { if (pending && pending.type === 'rkwarm') settle(); rkBarSync(); say('No court free for a warm-up right now. Try again in a moment', null, 3200); return; }      // Warm up with Matt refused (no court, or one just closed): still queued, in the lobby
+  if (warm) { if (pending && pending.type === 'rkwarm') settle(); rkBarSync(); say('Can’t start a warm-up right now. Try again in a moment. You’re still in the queue', null, 3200); return; }      // Warm up with Matt refused (no court, or one just closed): still queued, in the lobby
   if (pending && (pending.type === 'rk' || pending.type === 'rkwarm')) settle(); ui.rkSearch?.(false); rkSinceP = 0; rkQueued = false; rkWarmNow = false; if (!rkKind || rkKind === 'warm') rkPhase = 'off';      // every other rkfail means no entry (refused, or ended: stats off, no hello)
   if (why === 'nostats') rkQuit();                 // Save my stats off mid-series: that is my forfeit (docs/RANKED.md 3.9), the rkres that follows says what it cost
   if (RK_VIEW_NOTE[why]) rkViewNote(RK_VIEW_NOTE[why]);      // held first: the Ranked view that toLobby opens draws it

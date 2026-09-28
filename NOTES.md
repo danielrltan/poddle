@@ -2317,3 +2317,5 @@ rows x2, Sensitivity +, spin, V H keys; one run also saw a flaky Part A "Esc: pa
 failure ("nudge ... focus not taken") is the same on a clean HEAD; ui-next the known 8; seo STRICT=1 PASS; verify the known 3 plus 9 new
 ok checks for the bar. Shots: test/ui-shots/rk-search*-{1440x900,1280x720,600x900,390x844}.png, ranked-e2e-00-queued-*.png,
 ranked-e2e-08-title-bar-*.png.
+- The refused Warm up toast (no court free, or the 1 s cooldown after a warm-up closed, which Back then Enter can hit since focus lands on
+  the button) says `Can’t start a warm-up right now. Try again in a moment. You’re still in the queue`: true in both cases.
