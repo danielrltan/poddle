@@ -2249,3 +2249,52 @@ onEnd seats map and `pointEnd(m, winner, why)` are the lines to merge with care.
   stats.js/game.js auto-merged (Ranked's mode/series beside the counters and `pointEnd(m, winner, why)`). Legal pages,
   ropa 3/3a and CLAUDE.md carry both features; the shared card now names the Ranked rank, its emblem and trophies
   (privacy 4 and 15, terms 5), dates stay 2026-09-27.
+
+## 115. Ranked polish: the trophy moment is the hero, MATCH FOUND is a bumper, the GAME card reads sooner
+
+The owner wanted "lots of emphasis on the ranked match experience" (Brawl Stars / TV-show style), then "do the visual polish pass". The drama comes from the emblem, light, motion and layout. There are no text slams (NOTES 104). Presentation only: web/ui.css, the render functions in web/ui.js, the trophy row's markup in web/index.html, and one freeze line in test/ui-mock.html. No data, protocol or copy changes, so the legal pages are untouched.
+- **Series card (and the Matt warm-up card, which shares the row).** The trophy row is one centred block:
+  - the rank's emblem card at 5rem (emblemCard: the emblem, its name "Silver III" and the division tag);
+  - the total in 5rem tally digits in trophy gold, over a small caps "TROPHIES";
+  - the change as a pill, with the Rank up / Division up pill hanging under it (absolutely placed, so the row never shifts).
+
+  The count-up contract is unchanged: the final textContent from the first frame, the @property roll from 1100 ms, static under reduced motion. The ceremony (ui.rankUp) re-points the same card:
+  - **Rank up:** the emblem swaps to the new rank, pops and stays 12% larger with a halo in its colour, and the rays open behind it (now centred on the emblem, not on the card with its label). One transform band of light crosses the card (`#result-flash.is-sweep`, its own `rk-sweep` keyframes so it replays after the win's). "Bronze to Platinum are yours to keep" goes on the line under the row.
+  - **Division up:** a pop, and the numeral flips on its tag (`.rank-card-em.is-flip::after`).
+  - **Down:** the gentle shrink as before, with "Down to Platinum III" on the line under the row (or "Forfeit · down to …").
+  - The kicker's fill is the rim colour 15% darker (white on Silver's rim was about 4.2:1).
+- **Paying for it (1440x900 and 1280x720 share one 52.9rem budget).** On the series card, NOTES 115 does five things:
+  - It shrinks the medal to scale 1 (from 1.2), with 1rem less room above the card and 1rem less inside it, and .75rem less at the bottom.
+  - It shows the games in 5rem digits.
+  - It makes `#result-note` `.is-quiet` (visually hidden, still read out). "2-1" was drawn three times (the note, the pips, the tally).
+  - It also makes the rank name quiet after a ceremony, since the emblem card's label now shows it.
+  - "Priyanka left" on a forfeit stays in sight.
+
+  The textContent is unchanged, so ranked-e2e's `^\d-\d$` note and verify's "Gold I…" still read it. The rank-up card at 1280x720 now spans 82..706 (was -4..715 with the medal clipped at the top).
+- **Emblems beside the tally names at .is-md** with their division tags; they hang into the row's padding.
+  - Fixed on the way: every `.rank-badge` at .is-xs (score tabs, and the tally before this) drew its division as bare text under the emblem, because the generic `[data-div]::after{content}` rule had no size guard. It showed as one to three thin sticks.
+  - The xs badge now shows the emblem alone.
+- **MATCH FOUND** is a broadcast bumper:
+  - A thin cyan-white band sweeps once across the navy card (a skewed `::after`, translateX, 1.1 s from 120 ms; the card clips it).
+  - The VS is 7.5rem in landscape (it stays 5rem in portrait, where the names need the width).
+  - Each emblem card sits on a soft glow of its rank's colour, with its tag clear of the name.
+  - The opponent's count is still never shown.
+- **GAME card:**
+  - "Game 2 in 6", its bar and "Priyanka serves first" are fully in sight by about 680 ms (they were at 1100 ms; checked live at +700 ms). The title, score roll (ov-ink kept equal to the counter's end, 760 ms) and pips moved earlier with them.
+  - The winner's pip row is gold, lifted and 4% larger.
+  - The deciding game glows amber behind a warm card, and "Deciding game" is a pill.
+  - The score line already sits under the title for spectators ("Daniel takes game 1", 7-4), so it is unchanged.
+- **HUD:**
+  - Series pips are a size up (.8125rem) in the deep colours on a more opaque lozenge. The game in play breathes by scale instead of fading to a quarter.
+  - GAME POINT / MATCH POINT is a filled pill (white on the side's ink, 4.9:1). It keeps inside the width the lozenge already reserves, so the tabs never move. That was measured at 1440, 1280, 600 and 390. It needed a stronger selector than the narrow lozenge's .04em tracking.
+  - The queue pill's dot breathes (a swell plus a ring rising off it; static under reduced motion).
+- **Views:**
+  - The home tile's emblem is 2.5rem. It had been picking up the tile icon's 5rem through `.tiles .tile svg`, beside a 9 px line; the line is now at least 12 px, weight 800.
+  - Your own rank's card on the Ranks page is tinted in its colour.
+  - The Ranked view is unchanged: See all ranks and its keep row belong to another branch.
+- Mock: the two new sweeps freeze past their end in stills (`--freeze-at`), so no bright band crosses the names.
+- Checks:
+  - `shoot.mjs` covered all 29 Ranked screens at 1440x900, 1280x720, 600x900 and 390x844: nothing clipped, no console errors.
+  - `verify.mjs` has only the 3 known main failures (lobby-courts 44 px, tourney-banner 12 px x2). All Ranked checks pass, including the contrast of the warm deciding card (5.72:1) and the gold row (7.25:1).
+  - `ranked-e2e`: 30/30 PASS.
+  - Before and after stills are in test/ui-shots/rk-before/ and rk-after/ (not committed).
