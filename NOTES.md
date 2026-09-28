@@ -2446,3 +2446,38 @@ ok checks for the bar. Shots: test/ui-shots/rk-search*-{1440x900,1280x720,600x90
 ranked-e2e-08-title-bar-*.png.
 - The refused Warm up toast (no court free, or the 1 s cooldown after a warm-up closed, which Back then Enter can hit since focus lands on
   the button) says `Can’t start a warm-up right now. Try again in a moment. You’re still in the queue`: true in both cases.
+
+## 119. Plainer copy across the site
+- The owner: "'matt keeps u warm' wtf is this copy writing, i need u to do an ultracode sweep across the entire website and get rid of bs
+  like this". Six readers went through every player-facing string (the game page, ui.js, main.js, profile.js, How to play, What's new,
+  404, the phone page, the share card and page, and the legal pages for fluff only); an editor merged them into one list under one
+  glossary, then the list was applied to the current tree (edits written before the stats switch, the polish and the optional warm-up
+  landed were applied by intent, or skipped where the copy no longer exists). Legal meaning is unchanged.
+- Glossary:
+  - The bot is Matt everywhere in the game and site (never 'the bot', 'Matt the bot' in UI, 'a bot', 'Tour Matt'). A level is written '<Level> Matt' (Club Matt). One exception: the share card image, og description and alt text say 'the <Level> bot', because strangers don't know Matt.
+  - Matt's levels are Rookie, Club, Tour, Pro. Level descriptions follow a pace-plus-accuracy pattern: Slow and forgiving / Medium pace, some mistakes / Quick, few mistakes / Fast and accurate.
+  - The Ranked warm-up is 'You play Matt while you wait for an opponent'; the pill says 'Playing Matt while you wait'.
+  - A place to play is a court, never a room or a game ('This court is full').
+  - Ranked is always capitalized. A rank is a rank, never a tier. There is no 'trophy road' and no 'placing'.
+  - The floor rule is always 'Ranks up to Platinum are never lost once reached. Diamond and above can drop'. The Ranks page tag is 'Never lost'.
+  - First trophies: 'Play Ranked for your first trophies'.
+  - Matches that don't count are 'Not counted' on the pill and 'don’t count' in notes. There is no 'Void' and no 'Walkover' ('Opponent forfeited').
+  - Server restarts: 'Poddle is updating' / 'Poddle was updated'. 'Matches resumed after a Poddle update don’t count'.
+  - Auto movement: 'the game moves you to the ball'. The setting is 'Move: Body / Auto'.
+  - The browser permission dialog is the 'camera prompt'. You 'choose Allow'.
+  - Sound devices are 'speakers', never 'output'.
+  - The set-up screen is 'Connect your phone' / 'Connect your AirPod', with a Phone / AirPod switch at the top.
+  - Paddle code: 'P- and 4 letters or numbers', shown as P-ABCD.
+  - Tournament: 'start' (not 'begin'), 'create' (not 'make'), 'With an odd number of players, Matt fills the empty spot'. Champion: 'You’re the champion' / 'You won the tournament'.
+  - Stats tile hints are instructions: 'Win a match to start a streak', 'Win a tournament to earn a title', 'Keep the ball in play', 'Swing hard to set a record'.
+  - US English: recenter, color, license.
+  - No exclamation marks, em or en dashes, or ellipsis characters in UI strings (lobby rule applied site-wide).
+  - Keep the existing curly apostrophe (’) in JS files that use it; how-to-play, legal pages and JSON-LD use straight quotes.
+  - Safety line: 'Check behind you before you swing' (used on title, how-to-play and pad).
+- Examples: "Matt keeps you warm" / "Matt warms you up while you wait" -> the search bar and "You can warm up with Matt while you wait";
+  "Bronze to Platinum are yours to keep" -> "Ranks up to Platinum are never lost once reached"; "Win one match to light the flame" ->
+  "Win a match to start a streak"; "Win a tournament to lift a cup" -> "Win a tournament to earn a title"; "Grab your paddle" ->
+  "Connect your phone"; "This game is full" -> "This court is full"; "B adds a bot" -> "Press B to play Matt"; "No answer. Try again." ->
+  "The game didn't respond. Try again."; "Recentre" -> "Recenter" (US English); level blurbs Club "Medium pace, some mistakes", Tour
+  "Quick, few mistakes"; "Toughest Matt beaten" -> "Hardest level beaten".
+- The tests that pin strings follow (menu, ui-next, profile-ui, ranked-e2e, verify, the e2e harnesses, ui-mock).
