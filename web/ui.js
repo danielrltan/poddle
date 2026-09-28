@@ -1199,12 +1199,12 @@ export function rkView(s) {
   const known = !!(s && typeof s === 'object'), tier = known ? tierOf(s.tier) || 1 : 1, n = known ? Math.max(0, s.trophies | 0) : 0, best = known ? Math.max(tier, tierOf(s.best)) : 1, div = known ? divIn(n, tier, s.div) : 1;
   const place = known && Number.isInteger(s.place) && s.place > 0 ? s.place : null;
   if (known) { lastRank = { tier, div, best, place }; if (view === 'ranks') drawRanks(); }
-  const floor = THRESHOLDS[tier - 1] || 0, span = DIV_W * 3, p = tier === 7 ? 1 : Math.max(0, Math.min(1, (n - floor) / span));      // Pro fills it and it stays full      // the bar: through the rank (three divisions of 50); Pro III fills it and stays full
+  const floor = THRESHOLDS[tier - 1] || 0, span = DIV_W * 3, p = tier === RANKS.length ? 1 : Math.max(0, Math.min(1, (n - floor) / span));      // Pro fills it and it stays full      // the bar: through the rank (three divisions of 50); Pro III fills it and stays full
   const head = $('rk-emblem'); if (head) { head.replaceChildren(emblemCard(tier, 'is-xl', known ? div : 0)); head.querySelector('.rank-em')?.classList.toggle('is-off', !known); }
   setText($('rk-tier'), known ? proLabel(tier, div, place) : 'No rank yet');
   setText($('rk-trophies'), String(n)); setText($('rk-count-word'), n === 1 ? ' trophy' : ' trophies');
   { const b = $('rk-bar'); if (b) { b.style.setProperty('--p', p.toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round(p * 100))); } }
-  const nextAt = div < 3 ? floor + div * DIV_W : THRESHOLDS[tier], nextName = tier === 7 ? '' : div < 3 ? rankLabel(tier, div + 1) : rankLabel(tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
+  const nextAt = div < 3 ? floor + div * DIV_W : THRESHOLDS[tier], nextName = tier === RANKS.length ? '' : div < 3 ? rankLabel(tier, div + 1) : rankLabel(tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
   setText($('rk-next'), !known ? 'Play Ranked for your first trophies' : !nextName ? (place ? 'Top rank · your place on the global leaderboard' : 'Top rank · ranked by global leaderboard place') : `${Math.max(1, nextAt - n)} to ${nextName}`);
   const road = $('rk-road'); if (road) { road.textContent = '';
     RANKS.forEach((r, i) => { const t = i + 1, now = t === tier && known, done = !now && (t < tier || t <= best && known), li = mk('li', 'rk-step' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t);

@@ -103,10 +103,10 @@ function drawRoad(p) {
   const { rows, won, beaten, top, nextI } = rungs(p), H = human(p), name = i => `${LEVEL[ORDER[i]]} Matt`;
   // the hero is the Ranked ladder (docs/RANKED.md 2, one rank per player): "Gold II", its trophies, the bar across the current division and
   // what the next step is. The crest wears the rank's emblem (ui.rankCrest). No ladder yet (never played Ranked, an older server): Bronze I, 0
-  const L = ladderOf(p) || { tier: 1, div: 1, trophies: 0 }, T = L.trophies, RF = RANK_FLOOR[L.tier - 1], rkTop = L.tier === 7;      // Pro has no divisions (NOTES 126): reaching it is the top
-  const dFloor = RF + (L.div - 1) * DIV_W, nextName = L.tier === 7 ? '' : L.div < 3 ? `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div + 1]}` : `${RANK_NAME[L.tier]} I`;
+  const L = ladderOf(p) || { tier: 1, div: 1, trophies: 0 }, T = L.trophies, RF = RANK_FLOOR[L.tier - 1], rkTop = L.tier === TOP;      // Pro has no divisions (NOTES 126): reaching it is the top
+  const dFloor = RF + (L.div - 1) * DIV_W, nextName = L.tier === TOP ? '' : L.div < 3 ? `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div + 1]}` : `${RANK_NAME[L.tier]} I`;
   const crest = $('st-crest'); if (crest) { crest.className = 'st-crest is-rk is-' + RANK_NAME[L.tier - 1].toLowerCase() + (rkTop ? ' is-top' : ''); h.crest(crest, { tier: L.tier, div: L.div }); }
-  text('st-rank', L.tier === 7 ? RANK_NAME[6] : `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div]}`); text('st-trophies', String(T));      // 'Pro' has no numeral: the #12 pill beside it says where (drawPlace)
+  text('st-rank', L.tier === TOP ? RANK_NAME[TOP - 1] : `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div]}`); text('st-trophies', String(T));      // 'Pro' has no numeral: the #12 pill beside it says where (drawPlace)
   text('st-rank-cap', !T && !ladderOf(p) ? 'Play Ranked for your first trophies' : rkTop ? `${T === 1 ? 'trophy' : 'trophies'} · top rank` : `${T === 1 ? 'trophy' : 'trophies'} · ${Math.max(1, dFloor + DIV_W - T)} to ${nextName}`);
   const bar = $('st-rank-bar'); if (bar) { const f = rkTop ? 1 : Math.min(1, Math.max(0, (T - dFloor) / DIV_W)); bar.style.setProperty('--p', f.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(f * 100))); }
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
@@ -255,12 +255,12 @@ async function toggleShow() {
 }
 
 // ---------- Ranked (docs/RANKED.md 2): the view draws from the Profile's ladder ----------
-const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'], RANK_FLOOR = [0, 150, 300, 450, 600, 750, 900], DIV_W = 50;      // web/emblems.js RANKS, by tier; the three divisions of a rank (this file imports nothing from ui.js or emblems.js: see the header)
-const tierNum = t => Number.isInteger(t) && t >= 1 && t <= 7 ? t : 1, divNum = d => (d === 2 || d === 3 ? d : 1);
+const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'], RANK_FLOOR = [0, 150, 300, 450, 600, 750, 900, 1050], DIV_W = 50, TOP = RANK_NAME.length;   // eight since Master (NOTES 124); TOP: Pro, no divisions      // web/emblems.js RANKS, by tier; the three divisions of a rank (this file imports nothing from ui.js or emblems.js: see the header)
+const tierNum = t => Number.isInteger(t) && t >= 1 && t <= TOP ? t : 1, divNum = d => (d === 2 || d === 3 ? d : 1);
 const trophyPlace = p => { const P = placeOf(p); return P && P.listed && P.trophies && Number.isInteger(P.trophies.rank) ? P.trophies.rank : null; };      // my trophy leaderboard place: Pro shows it as 'Pro #12'
 function ladderOf(p) {                                      // p.ladder as the server sends it (10.1 profileOf), or null when the Profile has none (an older server, nothing saved)
   const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : null; if (!L) return null;
-  return { place: trophyPlace(p), tier: tierNum(L.tier), div: tierNum(L.tier) === 7 ? 1 : divNum(L.div), trophies: num(L.trophies), best: tierNum(L.bestTier), bestDiv: divNum(L.bestDiv), bestAt: Number.isFinite(L.bestTierAt) ? L.bestTierAt : 0, next: num(L.next), wins: num(L.wins), losses: num(L.losses), streak: num(L.streak), botWins: num(L.botWins), botLosses: num(L.botLosses), mattDayLeft: num(L.mattDayLeft) };
+  return { place: trophyPlace(p), tier: tierNum(L.tier), div: tierNum(L.tier) === TOP ? 1 : divNum(L.div), trophies: num(L.trophies), best: tierNum(L.bestTier), bestDiv: divNum(L.bestDiv), bestAt: Number.isFinite(L.bestTierAt) ? L.bestTierAt : 0, next: num(L.next), wins: num(L.wins), losses: num(L.losses), streak: num(L.streak), botWins: num(L.botWins), botLosses: num(L.botLosses), mattDayLeft: num(L.mattDayLeft) };
 }
 let rkGen = 0;
 export async function showRanked() {                       // the Ranked view opened: what is known at once, then /api/stats. Off (no stats server): a fresh Bronze, so the view still reads
