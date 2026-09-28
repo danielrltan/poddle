@@ -250,7 +250,7 @@ if (ONLY.includes('a')) for (const [w, h] of [[1280, 720], [600, 900]]) {
   ok(r.hit === 'btn-rematch' && r.pe === 'none', `${tag} Rematch takes a click at 100 ms under the sweep (${r.hit}; pointer-events ${r.pe})`);
   ok(r.stats === '14Longest rally*|3Smashes|5Best run' && r.has, `${tag} stats row: ${r.stats}`);
   await sleep(800); r = await res(); ok(r.fit && r.focus === 'btn-rematch', `${tag} with 3 stats the card still fits (${r.fit}), focus ${r.focus}`);
-  await sleep(400); r = await ev(pg, () => ['tally-sc-me', 'tally-sc-them'].map(id => getComputedStyle(T.$(id)).color + '/' + getComputedStyle(T.$(id), '::before').opacity));      // ~1.3 s: the count is over, the real glyphs show
+  await sleep(1200); r = await ev(pg, () => ['tally-sc-me', 'tally-sc-them'].map(id => getComputedStyle(T.$(id)).color + '/' + getComputedStyle(T.$(id), '::before').opacity));      // ~2.1 s: the card waited 780 ms for VICTORY! (NOTES 130), then its count is over and the real glyphs show
   ok(r.every(c => !c.startsWith('rgba(0, 0, 0, 0)') && c.endsWith('/0')), `${tag} after the count-up the real scores are drawn and the counter is gone (${r.join(' ')})`);
   r = await ev(pg, () => { const st = () => (T.seen('result-stats') ? 'shown' : 'hidden') + ':' + T.$('result-stats').childElementCount, beat = () => T.$('screen-match').dataset.beat, a = [], S = { rally: 14, smashes: 3, run: 5 };
     __ui.matchResult({ won: true, me: 6, them: 4, nameThem: 'Bo', forfeit: true, stats: S }); a.push(st(), beat());

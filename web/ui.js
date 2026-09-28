@@ -143,6 +143,7 @@ export function confetti(colors, n = 46) {
 // o = { won, me, them, nameMe, nameThem, forfeit, role, vote }: me / them are the left and right scores, won = the left side won.
 // The old positional call (won, me, them, name) still works and means a room with no vote: the next game starts by itself.
 let resultRole = 'player', voted = false, votedYes = false, noCount = false, countT = 0, countLeft = 0, countTotal = 0;
+let stampT = 0;                                                  // the VICTORY! beat's timer: the card waits for it (NOTES 130)
 export function matchResult(o, me, them, name) {
   const legacy = o === null || typeof o !== 'object';                                   // the old positional call: it never carries stats
   if (legacy) o = { won: !!o, me, them, nameThem: name, vote: false };
@@ -175,7 +176,8 @@ export function matchResult(o, me, them, name) {
   $('result-note').classList.toggle('is-quiet', SERIES && !o.forfeit);      // '2-1' is already the pips and the tally: read out, not drawn a third time. 'Priyanka left' stays in sight
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
-  { const st = $('result-slam'); if (st) { st.textContent = won && !watching && !o.forfeit ? 'VICTORY!' : ''; if (st.textContent) restart(st, 'go'); } }      // the stamp on a win of your own only (NOTES 122): gone by 380 ms, before the title pops
+  { const st = $('result-slam'), scr = $('screen-match'); if (st) { st.textContent = won && !watching && !o.forfeit ? 'VICTORY!' : ''; st.classList.remove('is-rank'); st.classList.toggle('is-victory', !!st.textContent); if (st.textContent) restart(st, 'go'); }
+    clearTimeout(stampT); const v = !!(st && st.textContent) && !matchMedia('(prefers-reduced-motion: reduce)').matches; scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => scr?.classList.remove('is-stamp'), 780); }      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
   $('tally-sc-me').style.setProperty('--to', L | 0); $('tally-sc-them').style.setProperty('--to', R | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame (no stamp: NOTES 104)
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
@@ -1097,7 +1099,7 @@ function brPick(k) { brTab = k; drawBracket(); $('br-tabs').querySelector('[aria
 export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
-  { const st = $('result-slam'); if (st) st.textContent = ''; }      // the champion's card has no stamp: the final's VICTORY! goes with its card
+  { const st = $('result-slam'); if (st) { st.textContent = ''; st.classList.remove('is-victory'); } clearTimeout(stampT); $('screen-match')?.classList.remove('is-stamp'); }      // the champion's card has no stamp: the final's VICTORY! goes with its card
   $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won', 'is-rk'); resultStats(null, card); resultRkReset();      // the final's own card is replaced at once: its stats, beat and any Ranked rows go with it
   setText($('result-title'), me ? 'You’re the champion' : `${name} is the champion`); setText($('result-note'), me ? 'Your tournament matches' : `${name}’s tournament matches`);
   const road = $('result-road'); road.textContent = '';
@@ -1368,7 +1370,7 @@ export function rankUp(o) {
   em.classList.add('is-up'); { const f = $('result-flash'); if (f) restart(f, 'is-sweep'); }      // rank up: the emblem grows and stays grown, and one band of light crosses the card
   let rays = em.querySelector('.medal-rays'); if (!rays) { rays = document.createElement('i'); rays.className = 'medal-rays'; rays.setAttribute('aria-hidden', 'true'); em.prepend(rays); }
   rays.style.setProperty('--rank-ray', `color-mix(in srgb, ${R.colour.mid} 55%, transparent)`); restart(rays, 'is-on');
-  const s = $('result-slam'); if (s) { s.textContent = 'RANK UP'; s.classList.remove('is-them', 'is-gold'); s.classList.add('is-rank'); s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
+  const s = $('result-slam'); if (s) { s.textContent = 'RANK UP'; s.classList.remove('is-them', 'is-gold', 'is-victory'); s.classList.add('is-rank'); s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
   { const sub = r.tier <= 4 ? 'Ranks up to Platinum are never lost once reached' : 'Diamond and above can drop, but never below Platinum'; note(label, sub); if ($('trophy-note')?.hidden) line(sub); }
   confetti([R.colour.mid, '#ffd34a', '#ffffff'], 120);
 }

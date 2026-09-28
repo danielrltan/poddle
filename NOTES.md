@@ -2623,3 +2623,15 @@ warm-up still starts at the rank's level (ladder.js mattLevel).
 - Tests: accounts-unit checks the default is off (dev and production), keeps its R11c cases with the switch on, and adds "a new loser
   is an ordinary loser". ranked.test sets STATS_ESTABLISHED explicitly on every server, so it is unchanged. docs/ropa.md follows.
   The privacy page and terms never described R11c, so they do not change.
+
+## 130. VICTORY! is paced: its own beat, then the card
+
+The owner: the VICTORY screen goes way too fast; use the timing of the old GAME! pop-up. That update (8cd58f1, NOTES 97)
+slammed GAME! in and out within 380 ms, while the card's whole entrance played underneath from the same moment, and NOTES 122
+restored exactly that for VICTORY!. So the fix is pacing, not a copy of the old numbers:
+- VICTORY! has its own animation (ov-victory, 950 ms): in by 114 ms (the win sting's impact, scene.js), held, gone by 950 ms.
+- The card waits for it: ui.js matchResult sets #screen-match.is-stamp, which pauses every animation in the card (and the light
+  sweep) at its first frame, so the card is unseen; at 780 ms the class drops and the medal, rays, title, score count-up, crown,
+  claps and stats play their usual entrance. The buttons are still keyboard-focused and clickable at once.
+- Only on a win of your own (as before); reduced motion skips the stamp and the wait. RANK UP keeps its short slam.
+- test/ui-next.mjs reads the counted-up scores at ~2.1 s instead of ~1.3 s.
