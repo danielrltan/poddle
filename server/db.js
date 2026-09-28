@@ -611,6 +611,19 @@ const deleteOwner = guard(false, (o, now) => {
   return gone;
 });
 
+// resetStats(ownerId, now) -> true when the owner exists. The operator's reset (admin.js reset-stats, the owner's own request): the profile row
+// back to a fresh one, the Matt record and the Ranked ladder gone, the owner unlinked from match_log (so R10/R11 history starts again);
+// the owner, account, username, devices, sessions and any share link stay
+const resetStats = guard(false, (o, now) => {
+  if (!isId(o) || !isNow(now)) return false;
+  return tx(() => {
+    if (!D.prepare('SELECT 1 FROM owners WHERE id = ?').get(o)) return false;
+    for (const t of ['bot_record', 'ladder', 'profile']) D.prepare(`DELETE FROM ${t} WHERE owner_id = ?`).run(o);
+    D.prepare('UPDATE match_log SET owner_a = NULL WHERE owner_a = ?').run(o); D.prepare('UPDATE match_log SET owner_b = NULL WHERE owner_b = ?').run(o);
+    S.profIns.run(o, now); return true;
+  });
+});
+
 // claimUsername(accountId, name, key, now) -> 'ok' | 'taken' | 'held' | 'cooldown' (7.4). name and key come from usernames.validate().
 // One BEGIN IMMEDIATE: cooldown, holds, the old key's 30-day hold and the UPDATE; a concurrent claim loses on the UNIQUE index -> 'taken'.
 // opts.admin (admin.js rename): no cooldown or hold check, and renamed_at is cleared so the player may pick their own name at once.
@@ -673,6 +686,6 @@ const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'prof
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
-module.exports = { open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
+module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf };

@@ -3,6 +3,7 @@
 //   counts                      rows per table (numbers only)
 //   rename <username> <new>     operator rename of an offensive name; clears renamed_at so the player may choose their own at once
 //   release <username>          drop a name hold
+//   reset-stats <username>      the account's own stats, Matt record and Ranked ladder back to zero (the owner's request); the account stays
 //   delete-account <username>   OPERATOR-initiated only: an under-13 report (6.5) or a Terms breach. Never on an e-mailed username alone (8.1)
 //   backup [--clean]            VACUUM INTO /tmp/poddle-backup-YYYYMMDD-HHMM.db (outside /data: never in a volume snapshot, 11.6); --clean deletes them
 //   sweep                       the retention sweep of 10.5, now
@@ -13,7 +14,7 @@
 const fs = require('node:fs'), path = require('node:path');
 const db = require('./db');
 
-const USAGE = 'usage: node server/admin.js counts | rename <username> <new> | release <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username>';
+const USAGE = 'usage: node server/admin.js counts | rename <username> <new> | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username>';
 function names() {                                               // usernames.js (7.1-7.2) is loaded only by the commands that need it
   try { return require('./usernames'); } catch { throw new Error('server/usernames.js is not available'); }
 }
@@ -29,7 +30,7 @@ const stamp = d => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(
 
 async function main(argv) {
   const [cmd, a1, a2] = argv;
-  if (!cmd || !['counts', 'rename', 'release', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user'].includes(cmd)) throw new Error(USAGE);
+  if (!cmd || !['counts', 'rename', 'release', 'reset-stats', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user'].includes(cmd)) throw new Error(USAGE);
   if (cmd === 'backup' && a1 === '--clean') {                    // needs no database: deletes the /tmp copies after they were downloaded
     let k = 0; for (const f of fs.readdirSync('/tmp')) if (/^poddle-backup-[0-9-]+\.db$/.test(f)) { const p = path.join('/tmp', f); if (fs.lstatSync(p).isFile()) { fs.unlinkSync(p); k++; } }
     return console.log('removed ' + k + ' backup file(s)');
@@ -53,6 +54,7 @@ async function main(argv) {
     }
     if (cmd === 'unshare-user') { const a = find(a1); if (!db.shareDrop(a.owner_id)) throw new Error('that account has no live link'); return console.log('removed (the link now answers 404)'); }
     if (cmd === 'release') { if (!db.releaseHold(keyOf(a1))) throw new Error('no hold on that name'); return console.log('released'); }
+    if (cmd === 'reset-stats') { const a = find(a1); if (!db.resetStats(a.owner_id, now)) throw new Error('reset failed'); return console.log('reset (profile, Matt record and Ranked ladder cleared; the account, name and sessions stay)'); }
     if (cmd === 'delete-account') {
       const a = find(a1);
       if (!db.deleteOwner(a.owner_id, now)) throw new Error('delete failed');
