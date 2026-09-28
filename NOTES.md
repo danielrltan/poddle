@@ -2590,3 +2590,11 @@ because 124 is taken by the eighth-rank work in progress (docs/RANK8.md).
   ladder.test (Pro), share.test (CARD_V 6, PRO with no pill), menu and profile-ui (six tiles: 2 over 4, 2 / 2 / 2, one column).
 - Decisions made without the owner (reversible): the three boards; on by default with a switch (existing accounts signed up under "no
   leaderboards"); accounts only; top 100; a guest sees "Sign in to get on the global leaderboard", no number.
+
+## 127. The Leaderboard tile animates like the others
+
+The owner asked for the Leaderboard home tile (NOTES 126) to get its own icon animation; every other tile had one (Quick
+play's play button, Courts' lens, Play a bot's head, Your stats' bars, Ranked's trophy). On hover (looping) and on keyboard
+focus (once), the podium rises in finishing order, third then second then first (ic-step, each step from the floor, 120 ms
+apart), then the star spins up over the top step and lands on it (ic-crown). web/ui.css only; the global reduced-motion rule
+clamps it like the rest.
