@@ -106,7 +106,7 @@ const LV = [['#3ecf72', '#13803f', '#e2f8ea'], ['#3aa0ff', '#1b63b8', '#e3f1ff']
 
 function ball(cx, cy, r) {                                       // web/favicon.svg, the Poddle ball, centred at cx,cy with radius r
   const k = r / 30.5, at = (x, y) => `${r2(cx + (x - 32) * k)}" cy="${r2(cy + (y - 32) * k)}`;
-  const holes = [[19.8, 21.02, 5.19], [39.32, 16.14, 5.19], [32, 33.22, 4.88], [14.92, 39.32, 4.88], [49.08, 34.44, 4.88], [30.78, 51.52, 4.88]];
+  const holes = [[32, 32, 4.7], [32.0, 15.0, 4.7], [46.72, 23.5, 4.7], [46.72, 40.5, 4.7], [32.0, 49.0, 4.7], [17.28, 40.5, 4.7], [17.28, 23.5, 4.7]];      // web/favicon.svg's seven even holes: one centred, six a ring apart
   return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" fill="url(#ball)"/><circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" fill="url(#ballS)"/>` +
     `<g fill="#a9b912">${holes.map(([x, y, rr]) => `<circle cx="${at(x, y)}" r="${r2(rr * k)}"/>`).join('')}</g>` +
     `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r * 0.982)}" fill="none" stroke="#a3b310" stroke-width="${r2(1.1 * k)}"/>`;
