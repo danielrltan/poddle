@@ -110,8 +110,9 @@ console.log('1. queue alone: waiting in the lobby (no court); rkwarm: a private 
   ok(str.room && str.room.role === 'spectator' && str.room.rk === true && str.room.kind === 'warm' && str.welcome.venue === 'stadium', `watching a Ranked court: room { role: spectator, rk, kind } (${JSON.stringify(str.room)})`);
   str.send({ type: 'ask' }); await until(() => str.got('askstate').length);
   ok(str.last('askstate')?.s === 'refused' && str.last('askstate').why === 'rk', 'ask for Matt\'s seat: refused rk');
-  a.send({ type: 'bot', level: 2 }); await until(() => a.got('botinfo', m => m.reason).length);
-  ok(a.last('botinfo').reason === 'ranked' && a.last('botinfo').level === 0, 'bot { level }: botinfo reason ranked, the level unchanged');
+  a.send({ type: 'bot', level: 2 }); await until(() => a.got('botinfo', m => m.level === 2).length || a.got('botinfo', m => m.reason).length);
+  ok(a.got('botinfo', m => m.level === 2 && !m.reason).length > 0, 'bot { level } in the warm-up: Matt changes level freely (NOTES 128)');
+  a.send({ type: 'bot', level: 0 }); await until(() => a.last('botinfo') && a.last('botinfo').level === 0);   // back to Rookie, the Bronze rank's level, for the bounty checks below
   a.send({ type: 'pause', on: true }); ok(await until(() => a.got('paused', m => m.on === true).length), 'pause is allowed in the warm-up (one human)'); a.send({ type: 'pause', on: false });
   a.mark(); a.send({ type: 'rk' }); await until(() => a.got('rk').length);
   ok(a.last('rk').phase === 'queue' && a.last('rk').warm === true && a.n('room') === 0, 'rk while queued: a fresh snapshot, nothing else');
@@ -324,6 +325,13 @@ console.log('8. tier crossing and the sticky floor; the Matt ceiling; the day ca
   ok(m.rk.you.tier === 6 && m.rk.you.div === 3 && m.rk.you.next === 900 && m.rk.you.nextDiv === 900 && m.info && m.info.level === 2 && m.info.name === 'Pro', `a Champion III at 897: Matt at Pro (${JSON.stringify(m.rk.you)})`);
   ok(await until(() => m.res, 30000) && !m.res.won && m.res.delta === 0 && m.res.trophies === 897 && m.res.tier === 6 && m.res.div === 3, `a loss to Pro Matt pays 0 and moves nothing (the 899 ceiling on a win is pinned by test/accounts-unit.test.mjs and test/ladder.test.mjs) (${JSON.stringify(m.res)})`);
   bye(m); await until(async () => (await status(PORT)).courts === 0, 6000);
+  { // NOTES 128: an easier Matt than the rank's is practice. A Gold player (Club Matt) who drops him to Rookie and wins gets no trophies
+    const dg = dev(), og = db.ownerForDevice(auth.deviceHash(dg), Date.now(), { create: true }); db.ladderApply({ owner: og, delta: 320, won: true, vsBot: false, now: Date.now() });
+    const g = await lobbied('', PORT, { dev: dg }); hit(g); await queue(g, 'Gia'); await warm(g); await until(() => g.info);
+    ok(g.info && g.info.level === 1, `a Gold player's warm-up starts at Club (${JSON.stringify(g.info)})`);
+    g.send({ type: 'bot', level: 0 }); ok(await until(() => g.info && g.info.level === 0, 5000), 'and may drop Matt to Rookie');
+    g.res = null; ok(await until(() => g.res && g.res.won, 90000) && g.res.delta === 0 && g.res.easy === true && g.res.need === 1 && g.res.trophies === 320, `a win against the easier Matt is practice: no trophies, need Club (${JSON.stringify(g.res)})`);
+    bye(g); await until(async () => (await status(PORT)).courts === 0, 6000); }
   // the day cap on the RK_MATT_DAY 12 server: seed 10 of today's 12 through the test's own connection
   ok(db.open(path.join(tmp, 'd.db')), 'open the RK_MATT_DAY 12 server\'s file'); const dd = dev(), od = db.ownerForDevice(auth.deviceHash(dd), Date.now(), { create: true });
   const seeded = db.ladderApply({ owner: od, delta: 10, won: true, vsBot: true, now: Date.now() }); ok(seeded && seeded.delta === 10 && seeded.dayLeft === 2, 'seed: one Matt win today, 2 left');

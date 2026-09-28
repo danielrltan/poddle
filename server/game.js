@@ -702,7 +702,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // B key: alone -> join now; already playing the bot -> next difficulty; two humans -> say why not.
   function botRequest(from, level) {
     if (over) return;                                            // a match is being voted on: nothing starts behind the result screen
-    if (MATCH || opts.rk) return send(from, { ...botInfo(), reason: opts.rk ? 'ranked' : 'tournament' });   // a tournament match: Matt stays at Tour, and nobody calls him in. A Ranked court: his level is the rank's (the client is silent on 'ranked')
+    if (MATCH || (opts.rk && opts.kind !== 'warm')) return send(from, { ...botInfo(), reason: opts.rk ? 'ranked' : 'tournament' });   // a Ranked warm-up is the player's own court: Matt's level is theirs to change (NOTES 128; rkMatt pays only at the rank's level or harder)   // a tournament match: Matt stays at Tour, and nobody calls him in. A Ranked court: his level is the rank's (the client is silent on 'ranked')
     if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
     if (Number.isInteger(level)) botLevel = clamp(level, 0, BOTS.length - 1);
     else if (theBot()) botLevel = BOT_ORDER[(BOT_ORDER.indexOf(botLevel) + 1) % BOT_ORDER.length];   // B walks the display order: Club -> Tour -> Pro -> Rookie
@@ -1653,10 +1653,11 @@ function rkMatt(q, w, sc, rec, forfeit) {                      // a warm-up game
   const won = w === pl.side, counted = !!(rec && rec.ranked);
   let owner = rkOwnerOfId(q.ident); if (owner == null && rec && rec.owners) owner = rec.owners[pl.side];   // live through the frozen identity (REVIEW FIX: a sign-in during the warm-up merges the guest owner away; the stale id wrote nothing, or onto a reused id), else the owner game 1 just created
   if (owner != null && owner !== q.owner) { q.owner = owner; rkRead(q); }   // the ladder row behind the entry moved (a merge): the snapshot and the deltas follow it
-  const tierWas = q.tier;
-  const r = { type: 'rkres', matt: true, saved: false, won, delta: 0, trophies: q.trophies, tier: q.tier, div: q.div, tierWas, divWas: q.div, floorHeld: false, counted, why: counted ? [] : rec && rec.msgs[pl.side] ? rec.msgs[pl.side].why : ['not_counted'], dayLeft: q.dayLeft };
+  const tierWas = q.tier, need = LAD.mattLevel(tierWas), lvl = rec && Number.isInteger(rec.level) ? rec.level : need;   // the level the game counted at (the easiest used, docs/ACCOUNTS.md 4.6)
+  const easy = BOT_ORDER.indexOf(lvl) < BOT_ORDER.indexOf(need);   // an easier Matt than the rank's is practice: no trophies (NOTES 128), so the free level choice cannot farm Rookie
+  const r = { type: 'rkres', matt: true, need, easy: easy || undefined, saved: false, won, delta: 0, trophies: q.trophies, tier: q.tier, div: q.div, tierWas, divWas: q.div, floorHeld: false, counted, why: counted ? [] : rec && rec.msgs[pl.side] ? rec.msgs[pl.side].why : ['not_counted'], dayLeft: q.dayLeft };
   if (counted && owner != null) {
-    const res = db.ladderApply({ owner, delta: won ? LAD.mattDelta(tierWas) : 0, won, vsBot: true, logId: rec.logId, now: Date.now() });
+    const res = db.ladderApply({ owner, delta: won && !easy ? LAD.mattDelta(tierWas) : 0, won, vsBot: true, logId: rec.logId, now: Date.now() });
     if (res) { r.saved = true; r.delta = res.delta; r.trophies = res.trophies; r.tier = res.tier; r.div = res.div; r.tierWas = res.tierWas; r.divWas = res.divWas; r.dayLeft = res.dayLeft; q.owner = owner; q.trophies = res.trophies; q.tier = res.tier; q.div = res.div; q.dayLeft = res.dayLeft; if (res.tier > q.bestTier || res.tier === q.bestTier && res.div > q.bestDiv) { q.bestTier = res.tier; q.bestDiv = res.div; } }
   } else if (!counted && owner == null) r.saved = false;
   tell(ws, r); if (ws.room && ws.room.setTier) ws.room.setTier(pl, q.tier, q.div); q.dirty = true;

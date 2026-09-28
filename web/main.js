@@ -143,7 +143,7 @@ const cleanRanks = a => [0, 1].map(i => Array.isArray(a) ? rankRef(a[i]) : null)
 // left (blue) and side 1 on the right (orange), names in both, never 'You'. Matt's second line is his level.
 function drawNames() {
   const pd = state ? state.paddles : [], sub = i => !pd[i] ? '' : pd[i].bot ? botLevel : STATUS_WORD[pd[i].status] || (pd[i].wait ? 'Calibrating' : '');      // the same word as the tag over their character (wait: a server from before 'status')
-  ui.setBot(!spec() && tourKind !== 'match' && !rkKind && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour) or a Ranked court (his level follows your rank)
+  ui.setBot(!spec() && tourKind !== 'match' && rkKind !== 'match' && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour) or a Ranked court (his level follows your rank)      // NOTES 128: the Ranked warm-up shows it too (the level is the player's to change there)
   if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1), reg: [!!pd[0] && regs[0], !!pd[1] && regs[1]], rank: [!!pd[0] && !pd[0].bot ? ranks[0] : null, !!pd[1] && !pd[1].bot ? ranks[1] : null] }); return; }
   const o = pd[1 - side];
   if (!o) ui.setNames({ me: 'You', ...alone(), reg: [false, false], rank: [ranks[side], null] });

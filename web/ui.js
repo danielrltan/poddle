@@ -1326,6 +1326,7 @@ export function setPressure(o) {
 // the trophy roll (8.9): r = the rkres message { matt, void, saved, won, delta, trophies, tier, div, tierWas, divWas, floorHeld, counted, why, dayLeft }.
 // The emblem shows the rank the player HAD until the count lands; the number is the new total from frame one (the counter rolls from the old one over it);
 // the pill is the change as applied; a small line says why when nothing changed. A changed rank or division is the ceremony at 2100 ms (8.10).
+const MATT_LV = ['Rookie', 'Club', 'Pro', 'Tour'];               // Matt's wire level -> name (the trophy note of a practice game, NOTES 128)
 const RK_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count', left_early: 'They left before a game finished', noshow: 'Your opponent never joined' };
 let upT = 0;
 export function trophyRow(r) {
@@ -1344,6 +1345,7 @@ export function trophyRow(r) {
   else if (d > 0) { text = `+${d}`; cls = 'is-up'; note = r.forfeit === true ? 'Opponent forfeited' : ''; }      // forfeit: main.js passes the series card's matchover flag (rkres has none)
   else { text = '±0'; note = r.floorHeld === true && tier ? `You keep ${RANKS[tier - 1].name}` : ''; }
   if (r.matt === true && r.dayLeft === 0 && d === 0) note = 'Daily Matt trophy limit reached';
+  if (r.matt === true && r.easy === true && d === 0) { text = 'Practice'; cls = 'is-off'; note = `Trophies need ${MATT_LV[r.need] || 'your rank\u2019s'} Matt or harder`; }      // NOTES 128: an easier Matt than the rank's pays nothing
   pill.className = 'trophy-d' + (cls ? ' ' + cls : ''); setText(pill, text); setText($('trophy-note'), note); show('trophy-note', !!note);
   box.hidden = false;
   if (now && was && (now.tier !== was.tier || now.div !== was.div)) { const kind = now.tier > was.tier ? 'rank' : now.tier < was.tier || now.div < was.div ? 'down' : 'div';

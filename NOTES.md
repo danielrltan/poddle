@@ -2598,3 +2598,15 @@ play's play button, Courts' lens, Play a bot's head, Your stats' bars, Ranked's 
 focus (once), the podium rises in finishing order, third then second then first (ic-step, each step from the floor, 120 ms
 apart), then the star spins up over the top step and lands on it (ic-crown). web/ui.css only; the global reduced-motion rule
 clamps it like the rest.
+
+## 128. Matt's level is free in the Ranked warm-up
+
+The owner: "why is matt's level locked during the rank warm up??? users should be able to change freely". It was locked on
+both sides: main.js hid the Difficulty row and the 1-4 hint on any Ranked court, and game.js botRequest refused `bot` there
+(reason 'ranked'). Now a warm-up court (opts.kind 'warm') takes `bot` like any Matt court; a series court still refuses. The
+warm-up still starts at the rank's level (ladder.js mattLevel).
+- The bounty stays fair: rkMatt pays mattDelta only when the level the game counted at (stats' easiest level used, rec.level)
+  is the rank's level or harder (BOT_ORDER). An easier Matt is practice: delta 0, rkres `easy: true, need: <wire level>`, and the
+  trophy card says "Practice · Trophies need Club Matt or harder". Without the gate a Master could farm Rookie Matt.
+- test/ranked.test.mjs: the warm-up accepts a level change (it asserted the refusal), and a Gold player who drops Matt to
+  Rookie and wins gets no trophies (easy, need Club). how-to-play and the changelog say so.
