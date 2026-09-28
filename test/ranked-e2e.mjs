@@ -72,15 +72,15 @@ const findMatch = async pg => { s = await until(pg, s => s.tile, 6000, 'the Rank
 // =====================================================================================================================
 const a = await open('a', 'Ann'); let s;
 await toLobby(a); s = await findMatch(a);
-ok(s.head === 'Bronze III' && s.venue === 'stadium' && s.go === 'Find a match' && s.status === 'You can warm up with Matt while it searches', `Ann's Ranked view: "${s.head}", ${s.headN} trophies, the stadium behind the glass, "${s.status}"`);
+ok(s.head === 'Bronze III' && s.venue === 'stadium' && s.go === 'Find a match' && s.status === 'You can warm up with Matt while you wait', `Ann's Ranked view: "${s.head}", ${s.headN} trophies, the stadium behind the glass, "${s.status}"`);
 s = await until(a, s => s.bar && s.rk.queued, 6000, 'queued in the lobby, the search bar up');
-ok(s.screen === 'lobby' && s.lview === 'ranked' && !s.room && /^Finding a match \d:\d\d \| Ranked · Bronze III$/.test(s.bar) && s.goOff && /^In the queue/.test(s.status) && s.focus === 'btn-rk-warm' && s.rk.phase === 'queue' && s.rk.warm === false && s.rk.kind === null,
+ok(s.screen === 'lobby' && s.lview === 'ranked' && !s.room && /^Finding a match \d:\d\d \| Ranked · Bronze III$/.test(s.bar) && s.goOff && /^Finding a match\. Warm up with Matt/.test(s.status) && s.focus === 'btn-rk-warm' && s.rk.phase === 'queue' && s.rk.warm === false && s.rk.kind === null,
   `Ann queued and still on the Ranked view: bar "${s.bar}", Find a match off, "${s.status}", focus ${s.focus}, __stats.rk ${JSON.stringify(s.rk)}`);
 await sleep(600); await shot(a, '00-queued', [...SIZES, [390, 844]]);
 await a.click('#btn-rk-warm');
 await toCourt(a);
 s = await until(a, s => s.pill && s.rk.kind === 'warm', 10000, 'the warm-up court');
-ok(s.rkBody === 'warm' && s.venue === 'stadium' && /Finding an opponent \| You stay queued if you leave/.test(s.pill) && !s.bar && !s.roomPill && s.leaveBtn === 'Stop warm-up' && s.rk.queued === true && s.rk.warm === true && s.rk.tier === 1 && s.rk.div === 3 && s.emblems === 1 && !/1234/.test(s.keys.replace(/\s/g, '')) && !s.pips,
+ok(s.rkBody === 'warm' && s.venue === 'stadium' && /Finding a match \| You stay in the queue if you leave/.test(s.pill) && !s.bar && !s.roomPill && s.leaveBtn === 'Stop warm-up' && s.rk.queued === true && s.rk.warm === true && s.rk.tier === 1 && s.rk.div === 3 && s.emblems === 1 && !/1234/.test(s.keys.replace(/\s/g, '')) && !s.pips,
   `Warm up with Matt: Ann plays him: pill "${s.pill}", no bar, no court pill, Leave reads "${s.leaveBtn}", __stats.rk ${JSON.stringify(s.rk)}, her emblem in the tab, no 1 2 3 4, no series pips`);
 await sleep(1200); await shot(a, '01-warmup', SIZES);      // the calibration card's 'All set' has faded
 
@@ -114,7 +114,7 @@ ok(rw.result.slam == null, `no stamp on the series card (NOTES 104: the light sw
 s = await until(L, s => !!s.trophy, 4000, "the loser's trophy row");
 ok(!!s.trophy && /^\u2212\d+$/.test(s.trophy.pill) && +s.trophy.n < 140 && s.trophy.em === '#rank-1' && s.rk.trophies === +s.trophy.n, `the loser's trophy roll: ${JSON.stringify(s.trophy)}, still Bronze, __stats.rk ${s.rk.trophies}`);
 s = await until(W, s => s.trophy && s.trophy.em === '#rank-2', 6000, 'the rank-up ceremony (the emblem swaps after the count)');
-ok(!!s.trophy && /^\+\d+$/.test(s.trophy.pill) && +s.trophy.n >= 150 && s.trophy.rays && /^Silver I/.test(s.result.note) && s.rk.tier === 2 && s.rk.trophies === +s.trophy.n, `the winner's trophy roll: ${JSON.stringify(s.trophy)}, RANK UP to "${s.result.note}", __stats.rk tier ${s.rk.tier}, ${s.rk.trophies} trophies`);
+ok(!!s.trophy && /^\+\d+$/.test(s.trophy.pill) && +s.trophy.n >= 150 && s.trophy.rays && /^Silver I/.test(s.result.note) && s.rk.tier === 2 && s.rk.trophies === +s.trophy.n, `the winner's trophy roll: ${JSON.stringify(s.trophy)}, Rank up to "${s.result.note}", __stats.rk tier ${s.rk.tier}, ${s.rk.trophies} trophies`);
 ok(s.confetti > 0, `confetti for the rank-up (${s.confetti})`);
 await shot(W, '05-series-win', SIZES); await shot(L, '06-series-lose');
 

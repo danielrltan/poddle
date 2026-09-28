@@ -152,7 +152,7 @@ export function matchResult(o, me, them, name) {
   $('result').classList.toggle('is-rk', SERIES); resultRkReset();
   $('medal').className = 'medal ' + (lost ? 'is-silver' : 'is-gold');
   const winner = won ? nameMe : nameThem;
-  $('result-title').textContent = SERIES ? (watching ? `${winner} wins the match` : won ? 'You win the match' : `${nameThem} wins the match`) : MATT ? (won ? 'You beat Matt' : 'Matt wins') : watching ? `${winner} wins` : won ? 'You win!' : `${nameThem} wins`;
+  $('result-title').textContent = SERIES ? (watching ? `${winner} wins the match` : won ? 'You win the match' : `${nameThem} wins the match`) : MATT ? (won ? 'You beat Matt' : 'Matt wins') : watching ? `${winner} wins` : won ? 'You win' : `${nameThem} wins`;
   setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : '');
   const games = SERIES && Array.isArray(RK.games) ? [RK.games[0] | 0, RK.games[1] | 0] : null, bestOf = SERIES ? Math.max(1, RK.bestOf | 0) || 3 : 0;
   const L = games ? games[0] : o.me ?? 0, R = games ? games[1] : o.them ?? 0;      // the series card tallies games; every other card the points
@@ -170,7 +170,7 @@ export function matchResult(o, me, them, name) {
   show('rematch-btns', vote); show('rematch-count', false); show('rk-acts', SERIES && !watching);
   for (const id of ['btn-rematch', 'btn-leave', 'btn-rk-again', 'btn-rk-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
   setText($('rematch-note'), T || RK ? '' : watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
-  if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final!') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
+  if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
   $('result-note').classList.toggle('is-quiet', SERIES && !o.forfeit);      // '2-1' is already the pips and the tally: read out, not drawn a third time. 'Priyanka left' stays in sight
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
@@ -286,8 +286,8 @@ export function onPaddleSwap(fn) {                                              
 }
 const ROW = {
   airpod: { ok: '', wait: 'Open Poddle Helper, then take one AirPod out and hold it.', bad: 'Signal lost. Check Poddle Helper is open and the AirPod is connected to this Mac.' },
-  game: { ok: '', wait: 'Finding the game', bad: 'Can’t reach the game. Trying again.' },
-  camera: { ok: 'Stand where it can see you.', wait: 'Allow the camera so stepping moves you on court.', bad: 'No camera. The game moves you.', off: 'No camera. The game moves you.' },
+  game: { ok: '', wait: 'Connecting to the game', bad: 'Can’t reach the game. Trying again.' },
+  camera: { ok: 'Stand where the camera can see you.', wait: 'Allow the camera so stepping moves you on court.', bad: 'No camera. The game moves you.', off: 'No camera. The game moves you.' },
 };
 const STATE_WORD = { ok: 'Ready', wait: 'Waiting', bad: 'Problem', off: 'Off' };
 const LOST = { airpod: 'AirPod signal lost', game: 'Reconnecting to the game' };
@@ -314,7 +314,7 @@ export function setServerAddress(text) { setText($('downurl'), String(text).repl
 // e = the MotionModel 'cal' event { stage: 'hold'|'tilt', progress, ok, msg }. The big headline always says what to do NOW
 // (it is the only thing read from two metres away), so it follows the event, not just the stage.
 const HOLD_SECONDS = 5;
-const LEAD = { hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', settle: 'Keep it there until the bar fills.', done: 'Here comes the court.' };
+const LEAD = { hold: 'Hold the AirPod like a paddle handle, pointing at the screen.', tilt: 'Tip the front up toward the ceiling.', settle: 'Keep it there until the bar fills.', done: 'Done. Loading the court.' };
 let calPrev = { ok: true, msg: '' }, badUntil = 0, badHead = '';
 export function calibrationReset() {
   calPrev = { ok: true, msg: '' }; badUntil = 0;
@@ -365,7 +365,7 @@ const CAM_TEXT = {
   system: ['Your computer is blocking the camera', 'The browser asked, but your computer’s privacy settings said no. Turn the camera on for your browser, then press Try again.'],
   nocam: ['No camera found', 'Plug in a webcam, or check it isn’t switched off or covered, then press Try again.'],
   busy: ['The camera won’t start', 'Another app may be using it, or your computer may be blocking it. Close any app with the camera on (Zoom, Teams and the like), check the steps below, then press Try again.'],      // Windows' privacy switch in Chrome/Edge also lands here (NotReadableError), so the steps show
-  dismissed: ['You closed the question', 'Press Try again, then choose Allow when your browser asks. If it doesn’t ask, use the steps below.'],      // Chrome blocks after ~3 closes and still says 'dismissed': the steps stay
+  dismissed: ['You closed the camera prompt', 'Press Try again, then choose Allow when your browser asks. If it doesn’t ask, use the steps below.'],      // Chrome blocks after ~3 closes and still says 'dismissed': the steps stay
   insecure: ['This page can’t use a camera', 'Browsers only share the camera with a secure page. Open poddleball.com, or localhost on this computer.'],
   other: ['The camera didn’t start', 'Check your browser lets this page use the camera, then press Try again.'],
 };
@@ -502,7 +502,7 @@ function drawNote() {
   const b = $('btn-leave-room'), t = setNote.forfeit ? 'Forfeit' : setNote.rkWarm ? 'Stop warm-up' : 'Leave court';
   if (b && swapText(b, t) && setOpen && !b.hidden) restart(b, 'ov-nudge');
   const n = $('set-note'); if (!n) return;
-  setText(n, setNote.rkMatch ? 'Ranked matches can’t pause' : setNote.tourMatch ? 'Tournament matches can’t pause' : setNote.canPause ? 'Ranked: Matt is fixed while you wait' : 'Online games can’t pause');
+  setText(n, setNote.rkMatch ? 'Ranked matches can’t pause' : setNote.tourMatch ? 'Tournament matches can’t pause' : setNote.canPause ? 'Matt’s level is locked during the Ranked warm-up' : 'Online games can’t pause');
   n.hidden = !(!setNote.canPause || setNote.rkWarm);
 }
 export function setPaused(on) {                            // the rest is CSS: blur behind the open card, the "Paused" tag while it is closed
@@ -706,7 +706,7 @@ function rowsOf() {                                                             
   for (const r of list.rooms) { const k = kindOf(r), w = r.watchers | 0, hi = nm(r, 0) && nm(r, 0) !== 'Matt' ? 0 : nm(r, 1) && nm(r, 1) !== 'Matt' ? 1 : -1, human = hi < 0 ? '' : nm(r, hi), hr = hi >= 0 && rg(r, hi);
     if (k === 'open') out.push({ kind: k, code: r.code, who: !r.players ? 'Empty' : `${human || 'A player'} is waiting`, segs: r.players ? [[human || 'A player', hr], ' is waiting'] : null, meta: w > 0 ? `${w} watching` : '', go: 'Join', watch: r.players > 0 && r.watch > 0, w, players: r.players > 0 });      // players: a human is sitting there waiting. segs: who, in pieces: [name, registered] | plain text
     else if (k === 'ask') out.push({ kind: k, code: r.code, who: `${human || 'A player'} vs Matt`, segs: [[human || 'A player', hr], ' vs Matt'], meta: sc(r), go: 'Ask to play', watch: r.watch > 0, w });
-    else out.push({ kind: k, code: r.code, who: `${nm(r, 0) || 'Player 1'} vs ${nm(r, 1) || 'Player 2'}`, segs: [[nm(r, 0) || 'Player 1', rg(r, 0)], ' vs ', [nm(r, 1) || 'Player 2', rg(r, 1)]], meta: (r.live === false ? 'Starting' : sc(r)) + (w > 0 ? ` · ${w} watching` : ''), go: r.watch > 0 ? 'Watch' : 'Stands full', full: !(r.watch > 0), w }); }
+    else out.push({ kind: k, code: r.code, who: `${nm(r, 0) || 'Player 1'} vs ${nm(r, 1) || 'Player 2'}`, segs: [[nm(r, 0) || 'Player 1', rg(r, 0)], ' vs ', [nm(r, 1) || 'Player 2', rg(r, 1)]], meta: (r.live === false ? 'Starting' : sc(r)) + (w > 0 ? ` · ${w} watching` : ''), go: r.watch > 0 ? 'Watch' : 'Can’t watch', full: !(r.watch > 0), w }); }
   return out;
 }
 const tabOf = row => row.kind === 'full' ? 'full' : 'open';
@@ -763,13 +763,13 @@ function drawState(st, s) {
   const p = $('room-empty'); if (!p) return; const was = p.dataset.state; p.textContent = ''; p.dataset.state = st; if (was !== st && st !== 'rows' && st !== 'loading') restart(p, 'lob-swap');      // a new message rises in; typing inside 'no match' does not flicker
   const btn = (text, fn) => { const b = mk('button', 'btn btn-sm is-tall', text); b.type = 'button'; b.addEventListener('click', fn); return b; };
   const q = query, other = filter === 'open' ? 'full' : 'open';
-  if (st === 'down') p.append(mk('span', '', 'Courts show again when the game is back.'));
+  if (st === 'down') p.append(mk('span', '', 'Courts will show when the connection is back.'));
   else if (st === 'loading') p.append(mk('span', 'vh', 'Loading courts'));
   else if (st === 'empty-open') p.append(mk('span', '', 'No open courts right now.'), s.full.length ? btn(`${s.full.length} to watch in Full`, () => { setFilter('full'); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); }) : btn('Create court', () => { if (!needName()) lobbyView('create'); }));      // Create court is already beside the list: point at what can be watched instead
   else if (st === 'empty-full') p.append(mk('span', '', 'Nobody is playing right now.'));
   else if (st === 'nomatch') {
     const code = q.length === 4 && cleanCode(q) === q && !s.all.some(r => r.code === q);      // a whole code that is not listed: private courts only join by code
-    p.append(mk('span', '', code ? `${q} isn’t listed. Private courts join by code.` : `No courts match “${q}”.`));
+    p.append(mk('span', '', code ? `${q} isn’t listed. It may be a private court.` : `No courts match “${q}”.`));
     if (code) p.append(btn('Use this code', () => useCode(q)));
     else if (s[other].length) p.append(btn(`${s[other].length} in ${other === 'full' ? 'Full' : 'Open'}`, () => { setFilter(other); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); }));
     p.append(btn('Clear search', () => { setQuery(''); $('court-search').focus(); }));
@@ -815,7 +815,7 @@ export function setRoom(code, link = '') {
 export function backLabel(text) { for (const t of document.querySelectorAll('.screen .back-text')) setText(t, text); }      // 'Cancel' while a paddle swap mid-game can still be undone
 export function titleRoom(code, watch) { $('title-room').hidden = !code; setText($('title-room-code'), code || ''); setText($('title-room-spec'), watch ? '\u00a0as spectator' : ''); }     // opened from a shared link (&watch=1: 'as spectator')
 // What lands on the clipboard: a line to paste into a chat, then the link.
-const INVITE = { play: 'Play against me in Poddle! Pickleball you swing with your phone, on any computer:', watch: 'Watch me play Poddle, pickleball with your phone as the paddle:' };
+const INVITE = { play: 'Play me in Poddle, pickleball with your phone as the paddle:', watch: 'Watch me play Poddle, pickleball with your phone as the paddle:' };
 async function copyLink(btn, watch) {      // watch: the viewer link (&watch=1), which opens the court as a spectator
   let href = $('share-link').dataset.href; if (!href) return;
   if (watch) { const u = new URL(href); u.searchParams.set('watch', '1'); href = u.href; }
@@ -948,8 +948,8 @@ function drawTour() {
   const num = $('tour-n-num'), was = num.textContent; if (was !== String(n)) { setText(num, String(n)); if (was && +was < n) restart(num, 'pop'); }      // the count pops once when someone joins (not under reduced motion: ui.css)
   setText($('tour-n-of'), `of ${max}`); show('tour-n-of', n < max);      // full: 'Full: 16 players' says it
   names($('tour-names'), s, 9);
-  setText($('tour-why'), n >= max ? `Full: ${max} players` : !ready ? `Needs at least 4 players · ${4 - on} more` : 'Ready when you are.');      // Matt's odd spot is the rules line's (a guest never sees this line once it is ready)
-  setText($('tour-rules'), `Knockout. Matches go to ${s.win | 0 || 7}, the final to ${s.final | 0 || 11}. Odd numbers are fine: Matt the bot fills the empty spot.`);
+  setText($('tour-why'), n >= max ? `Full: ${max} players` : !ready ? `Needs at least 4 players · ${4 - on} more` : 'Ready to start');      // Matt's odd spot is the rules line's (a guest never sees this line once it is ready)
+  setText($('tour-rules'), `Knockout. Matches go to ${s.win | 0 || 7}, the final to ${s.final | 0 || 11}. With an odd number of players, Matt fills the empty spot.`);
   if (!copiedT) setText($('tour-copied'), `${tapWord()} the code to copy it`);
   $('tour-why').classList.toggle('is-ready', ready); $('tour-why').hidden = !host && ready;      // a guest reads the count only while it is short; then who they wait for
   show('tour-wait', !host && (ready || viewer)); setText($('tour-wait-text'), `Waiting for ${tnm(s.host) || 'the host'} to start`);
@@ -979,7 +979,7 @@ export function tourConfirm(on) { const c = $('tour-confirm'); if (!c) return; c
 // ---- copying: the code alone (a click on it), or the invite (a line to paste, then the link)
 let copiedT = 0;
 async function clip(text) { try { await navigator.clipboard.writeText(text); } catch { const t = document.createElement('textarea'); t.value = text; t.style.cssText = 'position:fixed;opacity:0'; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch { /* nothing more to try */ } t.remove(); } }
-const invite = () => ts ? (tLink ? `Join my Poddle tournament! Code ${ts.code}: ${tLink}` : ts.code) : '';
+const invite = () => ts ? (tLink ? `Join my Poddle tournament. Code ${ts.code}: ${tLink}` : ts.code) : '';
 const tapWord = () => (matchMedia('(hover: none)').matches ? 'Tap' : 'Click');      // a phone is never clicked
 function copied(labelId, text, back) { const l = $(labelId); if (!l) return; setText(l, text); clearTimeout(copiedT); copiedT = setTimeout(() => { copiedT = 0; setText(l, back()); }, 1500); }
 // ---- the HUD: a pill in the corner while in one of its courts (warm-up: the count; a match: the round and who), and the host's Start
@@ -991,11 +991,11 @@ function drawPill() {
   const p = $('tour-pill'), go = $('btn-tour-go'); if (!p) return; const s = ts, on = !!(s && tKind && (tKind === 'match' || s.phase === 'reg'));
   p.hidden = !on; if (!on) { if (go) go.hidden = true; tSaidN = -1; return; }
   const n = tPlayers(s).length, host = !!(s.you && s.you.host), m = tKind === 'match' ? myMatch(s) : null;
-  setText($('tour-pill-long'), m ? `${m.round} · vs ${m.vs}` : tKind === 'match' ? 'Tournament match' : 'Waiting for the tournament to begin');
+  setText($('tour-pill-long'), m ? `${m.round} · vs ${m.vs}` : tKind === 'match' ? 'Tournament match' : 'Waiting for the tournament to start');
   setText($('tour-pill-short'), m ? m.round : tKind === 'warm' ? 'Waiting' : 'Tournament');      // a narrow window: the warm-up still says what the count is for ('Waiting' over '5 joined'; the label reads it all out)
   const b = $('tour-pill-n'), t = tKind === 'warm' ? `${n} joined` : ''; if (b.textContent !== t) { setText(b, t); if (t && tSaidN >= 0 && n > tSaidN) restart(b, 'pop'); }
   if (tKind === 'warm' && n !== tSaidN) { if (tSaidN >= 0) setText($('tour-live'), `${n} joined`); tSaidN = n; }      // read out on a change only
-  p.setAttribute('aria-label', `${m ? `${m.round}, versus ${m.vs}` : `Waiting for the tournament to begin, ${n} joined`}. Tournament details (T)`);
+  p.setAttribute('aria-label', `${m ? `${m.round}, versus ${m.vs}` : `Waiting for the tournament to start, ${n} joined`}. Tournament details (T)`);
   if (go) { go.hidden = !(tKind === 'warm' && host && s.phase === 'reg' && tOn(s) >= 4); go.setAttribute('aria-label', `Start tournament with ${tOn(s)} players`); }
 }
 // someone joined while you warm up: the watcher card's place and look, with a trophy
@@ -1049,8 +1049,8 @@ function drawBracket() {
   const s = ts, box = $('bracket'); if (!s || !box) return;
   const you = s.you || {}, id = you.id, rs = Array.isArray(s.rounds) ? s.rounds : [], cur = roundNow(s), champ = s.champ, mine = x => id != null && (x.a && x.a.id === id || x.b && x.b.id === id);
   const live = rs[cur] && (rs[cur].matches || []).find(x => mine(x) && !x.w), upcoming = rs.find((r, k) => k > cur && (r.matches || []).every(x => !x.a || !(x.a.name || x.a.bot)));
-  setText($('br-you'), s.phase === 'done' && champ ? (champ.id != null && champ.id === id ? 'You’re the champion!' : `${champ.bot ? 'Matt' : tnm(champ.name)} is the champion`)
-    : you.viewer ? `Watching ${tnm(s.host) || 'a'}’s tournament` : s.phase === 'reg' ? 'The bracket is drawn when the host starts' : you.out ? 'You’re out. Stay and watch, or leave any time.'
+  setText($('br-you'), s.phase === 'done' && champ ? (champ.id != null && champ.id === id ? 'You’re the champion' : `${champ.bot ? 'Matt' : tnm(champ.name)} is the champion`)
+    : you.viewer ? (tnm(s.host) ? `Watching ${tnm(s.host)}’s tournament` : 'Watching a tournament') : s.phase === 'reg' ? 'The bracket is drawn when the host starts' : you.out ? 'You’re out. Stay and watch, or leave any time.'
     : live ? 'Your match is next' : 'You’re through. Your next match starts when the round ends.');
   $('br-you').classList.toggle('is-out', !!you.out && !you.viewer); if (!tLeaveAt) setText($('btn-br-leave'), you.viewer ? 'Stop watching' : 'Leave tournament');      // not mid press-twice: a snapshot then must not wipe 'Press again'
   const nx = s.next && typeof s.next === 'object' ? s.next : null, left = nx ? Math.max(0, Math.round(+nx.in || 0)) : 0;
@@ -1094,7 +1094,7 @@ export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
   $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won', 'is-rk'); resultStats(null, card); resultRkReset();      // the final's own card is replaced at once: its stats, beat and any Ranked rows go with it
-  setText($('result-title'), me ? 'You’re the champion!' : `${name} is the champion!`); setText($('result-note'), me ? 'The road to the title' : `${name}’s road to the title`);
+  setText($('result-title'), me ? 'You’re the champion' : `${name} is the champion`); setText($('result-note'), me ? 'Your tournament matches' : `${name}’s tournament matches`);
   const road = $('result-road'); road.textContent = '';
   for (const st of Array.isArray(c.path) ? c.path : []) { const li = mk('li', 'road-step'), sc = Array.isArray(st.score) ? st.score : [0, 0], vs = st.bot ? 'Matt' : tnm(st.vs) || 'Player';
     li.append(mk('small', '', tnm(st.round))); li.append(mk('span', '', st.forfeit ? `${vs} left` : `Beat ${vs}`)); if (!st.forfeit || sc[0] | sc[1]) li.append(mk('b', '', `${sc[0] | 0}-${sc[1] | 0}`)); road.append(li); }
@@ -1103,7 +1103,7 @@ export function champion(c, you = null) {
 }
 export const championShowing = () => slots.overlay === 'match' && $('result').classList.contains('is-champion');
 // ---- the tournament ended under you: a notice on the lobby (why = restart | empty | expired | gone), a toast for your own leave
-const ENDED = { restart: 'The tournament ended: the server restarted', empty: 'The tournament ended: everyone left', expired: 'The tournament ended: it never started', gone: 'This tournament has ended' };
+const ENDED = { restart: 'The tournament ended: the server restarted', empty: 'The tournament ended: everyone left', expired: 'The tournament ended: it didn’t start in time', gone: 'This tournament has ended' };
 export function tourEnded(why, asToast = false) {                                          // asToast: the player is on an ordinary court, where the lobby's notice would sit unseen
   const el = $('tour-ended'); if (!el) return;
   if (why === 'left') { toast('You left the tournament', 2600); return; } if (asToast) { if (ENDED[why]) toast(ENDED[why], 3200); return; }
@@ -1183,8 +1183,8 @@ function drawRanks() {
     const li = mk('li', 'rkx-card' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t); li.style.setProperty('--rank-ink', r.colour.deep); li.style.setProperty('--rank-mid', r.colour.mid);
     const em = emblemEl(t, 'is-xl'); if (now) em.classList.add('is-pop');
     const divs = mk('span', 'rkx-divs'); [0, 1, 2].forEach(d => { const at = floor + d * DIV_W, pip = mk('span', 'rkx-div' + (now && d + 1 <= me.div || done ? ' is-on' : ''), `${romanOf(d + 1)} ${at}${t === 7 && d === 2 ? '+' : ''}`); divs.append(pip); });
-    const tag = now ? mk('span', 'rkx-tag is-now', `You · ${rankLabel(t, me.div)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Yours to keep') : null;
-    li.append(em, mk('b', 'rkx-name', r.name), mk('small', 'rkx-from', t === 1 ? 'Where everyone starts' : `From ${floor} trophies`), divs); if (tag) li.append(tag);
+    const tag = now ? mk('span', 'rkx-tag is-now', `You · ${rankLabel(t, me.div)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Never lost') : null;
+    li.append(em, mk('b', 'rkx-name', r.name), mk('small', 'rkx-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`), divs); if (tag) li.append(tag);
     li.setAttribute('aria-label', `${r.name}, from ${floor} trophies${now ? `, your rank, ${rankLabel(t, me.div)}` : done ? ', reached' : ''}`); g.append(li);
   });
 }
@@ -1197,7 +1197,7 @@ export function rkView(s) {
   setText($('rk-trophies'), String(n)); setText($('rk-count-word'), n === 1 ? ' trophy' : ' trophies');
   { const b = $('rk-bar'); if (b) { b.style.setProperty('--p', p.toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round(p * 100))); } }
   const nextAt = div < 3 ? floor + div * DIV_W : THRESHOLDS[tier], nextName = div < 3 ? rankLabel(tier, div + 1) : tier < 7 ? rankLabel(tier + 1, 1) : '';      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
-  setText($('rk-next'), !known ? 'Play a Ranked match to place' : !nextName ? 'Top rank' : `${Math.max(1, nextAt - n)} to ${nextName}`);
+  setText($('rk-next'), !known ? 'Play Ranked for your first trophies' : !nextName ? 'Top rank' : `${Math.max(1, nextAt - n)} to ${nextName}`);
   const road = $('rk-road'); if (road) { road.textContent = '';
     RANKS.forEach((r, i) => { const t = i + 1, now = t === tier && known, done = !now && (t < tier || t <= best && known), li = mk('li', 'rk-step' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t);
       const pips = mk('span', 'rk-pips'), lit = now ? div : done ? 3 : 0; for (let k = 1; k <= 3; k++) pips.append(mk('i', k <= lit ? 'is-lit' : '')); pips.setAttribute('aria-hidden', 'true');      // three divisions, filled up to the current one
@@ -1212,7 +1212,7 @@ export function rkView(s) {
 let rkInQueue = false, noteNow = ['', false];
 export function rkNote(text, accent = false) {
   noteNow = [text || '', !!accent];
-  const el = $('rk-status'); if (!el) return; const t = text || (rkInQueue ? 'In the queue. Warm up with Matt or cancel from the bar at the top' : 'You can warm up with Matt while it searches');
+  const el = $('rk-status'); if (!el) return; const t = text || (rkInQueue ? 'Finding a match. Warm up with Matt or cancel from the bar at the top' : 'You can warm up with Matt while you wait');
   el.classList.toggle('is-accent', !!accent); if (swapText(el, t, accent && !rkQueuedSaid ? 'ov-pop' : '') && accent) rkQueuedSaid = true; if (!accent) rkQueuedSaid = false;
 }
 // the court: kind = 'warm' | 'match' | null. body[data-rk] hides the court pill's invite menu (an rk court is never shared) and themes the HUD
@@ -1225,7 +1225,7 @@ export function rkPill(o = {}) {
   const on = !!o.on, since = Number.isFinite(o.since) && o.since > 0 ? o.since : 0;      // 0: not known yet (a new entry's warm-up room comes before its snapshot)
   if (on !== pillOn) { pillOn = on; el.hidden = !on; clearInterval(pillT); pillT = 0; pillHops = 0; if (on) { pillSince = since || performance.now(); restart(el, 'ov-pill'); pillT = setInterval(tickPill, 1000); tickPill(); } }
   else if (on && since && since !== pillSince) { pillSince = since; pillHops = Math.floor(Math.max(0, performance.now() - since) / 30000); tickPill(); }      // the snapshot's clock: the 30 s hops count from it
-  if (on && 'queued' in o) setText($('rk-pill-sub'), o.queued > 0 ? 'Someone is waiting. Matching you' : 'You stay queued if you leave');
+  if (on && 'queued' in o) setText($('rk-pill-sub'), o.queued > 0 ? 'Someone is waiting. Matching you' : 'You stay in the queue if you leave');
 }
 // the search bar (docs/RANKED.md 8.1, OPTIONAL WARM-UP): { on, since (performance.now clock), tier, div, busy }. On while queued and off court: it hangs from the top of the title
 // and of every lobby view (ui.css hides it anywhere else). Its timer is textContent once a second; Warm up with Matt is disabled while that request is out (busy).
@@ -1318,7 +1318,7 @@ export function setPressure(o) {
 // the trophy roll (8.9): r = the rkres message { matt, void, saved, won, delta, trophies, tier, div, tierWas, divWas, floorHeld, counted, why, dayLeft }.
 // The emblem shows the rank the player HAD until the count lands; the number is the new total from frame one (the counter rolls from the old one over it);
 // the pill is the change as applied; a small line says why when nothing changed. A changed rank or division is the ceremony at 2100 ms (8.10).
-const RK_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches brought back after an update don’t count', too_short: 'Too short to count', left_early: 'They left before a game finished', noshow: 'Your opponent never arrived' };
+const RK_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count', left_early: 'They left before a game finished', noshow: 'Your opponent never joined' };
 let upT = 0;
 export function trophyRow(r) {
   const box = $('trophy'); if (!box || !r || typeof r !== 'object') return; trophyReset();
@@ -1328,14 +1328,14 @@ export function trophyRow(r) {
   box.classList.toggle('is-roll', d !== 0);
   const pill = $('trophy-d'); let text, cls = '', note = '';
   const why = (Array.isArray(r.why) ? r.why : []).find(w => RK_WHY[w]);
-  if (r.void === true) { text = 'Void'; cls = 'is-off'; note = why ? RK_WHY[why] : 'No trophies changed'; }
+  if (r.void === true) { text = 'Not counted'; cls = 'is-off'; note = why ? RK_WHY[why] : 'No trophies changed'; }
   else if (d < 0) { text = `−${-d}`; cls = 'is-down'; note = r.leaver === true ? 'Forfeit' : ''; }      // the change as applied comes first: a leaver's loss is never 'No trophies' (it is taken whatever the verdict)
   else if (r.leaver === true) { text = '±0'; note = r.floorHeld === true && tier ? `Forfeit · you keep ${RANKS[tier - 1].name}` : 'Forfeit'; }      // my own forfeit that cost nothing (the floor held, or nothing to save to): never 'They left'
   else if (r.counted === false) { text = 'No trophies'; cls = 'is-off'; note = why ? RK_WHY[why] : ''; }
   else if (r.saved === false) { text = 'No trophies'; cls = 'is-off'; note = r.matt === true ? 'Sign in or finish a game to keep trophies' : 'Couldn’t save trophies right now'; }
-  else if (d > 0) { text = `+${d}`; cls = 'is-up'; note = r.forfeit === true ? 'Walkover' : ''; }      // forfeit: main.js passes the series card's matchover flag (rkres has none)
+  else if (d > 0) { text = `+${d}`; cls = 'is-up'; note = r.forfeit === true ? 'Opponent forfeited' : ''; }      // forfeit: main.js passes the series card's matchover flag (rkres has none)
   else { text = '±0'; note = r.floorHeld === true && tier ? `You keep ${RANKS[tier - 1].name}` : ''; }
-  if (r.matt === true && r.dayLeft === 0 && d === 0) note = 'Daily Matt trophies reached';
+  if (r.matt === true && r.dayLeft === 0 && d === 0) note = 'Daily Matt trophy limit reached';
   pill.className = 'trophy-d' + (cls ? ' ' + cls : ''); setText(pill, text); setText($('trophy-note'), note); show('trophy-note', !!note);
   box.hidden = false;
   if (now && was && (now.tier !== was.tier || now.div !== was.div)) { const kind = now.tier > was.tier ? 'rank' : now.tier < was.tier || now.div < was.div ? 'down' : 'div';
@@ -1358,7 +1358,7 @@ export function rankUp(o) {
   em.classList.add('is-up'); { const f = $('result-flash'); if (f) restart(f, 'is-sweep'); }      // rank up: the emblem grows and stays grown, and one band of light crosses the card
   let rays = em.querySelector('.medal-rays'); if (!rays) { rays = document.createElement('i'); rays.className = 'medal-rays'; rays.setAttribute('aria-hidden', 'true'); em.prepend(rays); }
   rays.style.setProperty('--rank-ray', `color-mix(in srgb, ${R.colour.mid} 55%, transparent)`); restart(rays, 'is-on');
-  const s = $('result-slam'); if (s) { s.textContent = 'RANK UP!'; s.classList.remove('is-them', 'is-gold'); s.classList.add('is-rank'); s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
-  { const sub = r.tier <= 4 ? 'Bronze to Platinum are yours to keep' : 'Diamond and above can slip, never below Platinum'; note(label, sub); if ($('trophy-note')?.hidden) line(sub); }
+  const s = $('result-slam'); if (s) { s.textContent = 'RANK UP'; s.classList.remove('is-them', 'is-gold'); s.classList.add('is-rank'); s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
+  { const sub = r.tier <= 4 ? 'Ranks up to Platinum are never lost once reached' : 'Diamond and above can drop, but never below Platinum'; note(label, sub); if ($('trophy-note')?.hidden) line(sub); }
   confetti([R.colour.mid, '#ffd34a', '#ffffff'], 120);
 }

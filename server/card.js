@@ -193,8 +193,8 @@ ${E ? E.defs : ''}
   });
   if (!n) {                                                       // nothing to boast yet: an invitation instead of empty tiles
     out.push(`<rect x="${x0}" y="${ty}" width="${iw}" height="${th}" rx="26" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    out.push(text(x0 + iw / 2, ty + th / 2 - 4, 'Fresh on the court', { size: 56, wt: 900, fill: '#1b63b8', anchor: 'middle' }));
-    out.push(text(x0 + iw / 2, ty + th / 2 + 50, 'First match coming up', { size: 34, wt: 800, fill: '#65717b', anchor: 'middle' }));
+    out.push(text(x0 + iw / 2, ty + th / 2 - 4, 'New player', { size: 56, wt: 900, fill: '#1b63b8', anchor: 'middle' }));
+    out.push(text(x0 + iw / 2, ty + th / 2 + 50, 'No matches yet', { size: 34, wt: 800, fill: '#65717b', anchor: 'middle' }));
   }
   let cxp = x0; const cy = ty + th + 18;
   for (const c of d.chips) { const w2 = measure(c, 800, 30) + 36; if (cxp + w2 > x0 + iw) continue;   // one that does not fit is skipped: a shorter one after it may
@@ -203,7 +203,7 @@ ${E ? E.defs : ''}
   out.push(`<rect x="${x0}" y="${by}" width="${iw}" height="${bh}" rx="32" fill="url(#cta)" stroke="#0e3f8c" stroke-opacity=".22" stroke-width="2"/>`);
   out.push(`<rect x="${x0 + 14}" y="${by + 6}" width="${iw - 28}" height="${bh / 2 - 8}" rx="${bh / 2 - 12}" fill="#ffffff" opacity=".14"/>`);
   out.push(ball(x0 + 48, by + bh / 2, 30));
-  const q = 'Think you can return my serve?', q2 = 'Your phone is the paddle · poddleball.com';   // the second line says how the game is played: the hook a stranger clicks for
+  const q = 'Pickleball in your browser', q2 = 'Your phone is the paddle · poddleball.com';   // the second line says how the game is played: the hook a stranger clicks for
   out.push(text(x0 + 92, by + 42, q, { size: fit(q, 900, 32, iw - 116), wt: 900, fill: '#ffffff' }));
   out.push(text(x0 + 92, by + 79, q2, { size: fit(q2, 800, 30, iw - 116), wt: 800, fill: '#ffffff' }));   // white: the old pale gold was ~3.5:1 on the blue and went first when shrunk
   out.push('</svg>');

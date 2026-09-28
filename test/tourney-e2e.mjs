@@ -60,7 +60,7 @@ const toCourt = async pg => { const s = await until(pg, s => s.screen === 'calib
 // =====================================================================================================================
 const h = await open('h', 'Hana'); let s;
 await toLobby(h); await h.click('#btn-courts'); s = await until(h, s => s.lview === 'courts', 3000, 'Courts');
-ok(await h.evaluate(() => document.getElementById('tour-note').textContent.trim() === 'Needs at least 4 players. Up to 16.' && !document.getElementById('btn-tour').hasAttribute('aria-disabled')), 'Courts: Create tournament is live, with its disclosure "Needs at least 4 players. Up to 16."');
+ok(await h.evaluate(() => document.getElementById('tour-note').textContent.trim() === '4 to 16 players' && !document.getElementById('btn-tour').hasAttribute('aria-disabled')), 'Courts: Create tournament is live, with its disclosure "Needs at least 4 players. Up to 16."');
 await h.click('#btn-tour'); s = await until(h, s => s.lview === 'tour' && s.code.length === 4, 5000, 'Create tournament -> the code screen');
 const CODE = s.code;
 ok(s.n === '1' && s.start && !s.start.on && /Needs at least 4 players · 3 more/.test(s.why) && s.names.length === 1 && /Hana/.test(s.names[0]), `the host's screen: code ${CODE}, 1 joined, Start disabled, "${s.why}", chips ${s.names}`);
@@ -75,7 +75,7 @@ const b = await open('b', 'Ben'); await toLobby(b); await b.click('#btn-courts')
 s = await until(b, s => s.rows.some(r => r.includes(CODE) && r.includes('Tournament')), 8000, 'the tournament row is listed, with its badge');
 ok(s.rows.some(r => r.includes(CODE) && /Hana’s tournament/.test(r) && /1 of 16 joined/.test(r)), `Ben's list: ${s.rows.find(r => r.includes(CODE))}`);
 await b.click(`#room-list [data-code="${CODE}"]`); s = await toCourt(b);
-s = await until(b, s => s.pill && /Waiting for the tournament to begin/.test(s.pill) && /2 joined/.test(s.pill), 6000, 'the banner in the warm-up');
+s = await until(b, s => s.pill && /Waiting for the tournament to start/.test(s.pill) && /2 joined/.test(s.pill), 6000, 'the banner in the warm-up');
 ok(s.tourBody === 'warm' && !s.roomPill && s.tour && s.tour.kind === 'warm', `Ben warms up against Matt: pill "${s.pill}", no court pill (${s.roomPill})`);
 s = await until(h, s => s.n === '2', 4000, 'Hana sees 2 joined'); ok(s.names.some(n => /Ben/.test(n)), `Hana's chips: ${s.names}`);
 
@@ -84,7 +84,7 @@ await c.click('#code-boxes .code-box'); await c.keyboard.type(CODE, { delay: 40 
 const d = await open('d', 'Di', `&court=${CODE}`); await d.click('#btn-start'); await d.evaluate(() => document.fullscreenElement && document.exitFullscreen()); await toCourt(d);      // the invite link: Play joins it at once
 for (const pg of [b, c, d]) { s = await until(pg, s => s.pill && /4 joined/.test(s.pill), 8000, 'the banner counts 4'); }
 s = await until(h, s => s.n === '4' && s.start && s.start.on, 5000, 'Hana: 4 joined, Start on');
-ok(/Start with 4 players/.test(s.start.label) && /Ready when you are/.test(s.why), `from 4: "${s.start.label}", "${s.why}"`);
+ok(/Start with 4 players/.test(s.start.label) && /Ready to start/.test(s.why), `from 4: "${s.start.label}", "${s.why}"`);
 await shot(h, '02-host-ready', SIZES); await shot(b, '03-banner', SIZES);
 
 // =====================================================================================================================
@@ -116,9 +116,9 @@ s = await until(outs[0], s => s.brWatch.length === 1, 15000, 'the final is live 
 await outs[0].click('#bracket .br-watch'); s = await until(outs[0], s => s.role === 'spectator' && s.phase === 'watch', 8000, 'Watch the final');
 ok(s.tour.kind === 'match' && !s.roomPill, `watching the final (kind ${s.tour.kind})`);
 const ch = await Promise.all([h, b, c, d].map(pg => until(pg, s => s.result && s.result.champ, 90000, 'the champion card')));
-const champ = ch.find(s => s.result.title === 'You’re the champion!'), others = ch.filter(s => s !== champ);
-ok(!!champ && others.every(s => / is the champion!$/.test(s.result.title)), `champion: ${ch.map(s => s.result.title).join(' ; ')}`);
-ok(ch.every(s => s.result.back && /Semifinal/.test(s.result.road) && /Final/.test(s.result.road)), `the road to the title: ${ch[0].result.road}`);
+const champ = ch.find(s => s.result.title === 'You’re the champion'), others = ch.filter(s => s !== champ);
+ok(!!champ && others.every(s => / is the champion$/.test(s.result.title)), `champion: ${ch.map(s => s.result.title).join(' ; ')}`);
+ok(ch.every(s => s.result.back && /Semifinal/.test(s.result.road) && /Final/.test(s.result.road)), `the tournament matches: ${ch[0].result.road}`);
 ok(ch.some(s => s.confetti > 0), `confetti falls (${ch.map(s => s.confetti)})`);
 const champPg = [h, b, c, d][ch.indexOf(champ)]; await sleep(1200); await shot(champPg, '07-champion', SIZES);
 await champPg.click('#btn-champ-back'); s = await until(champPg, s => s.screen === 'lobby' && s.lview === 'courts' && !s.tour, 5000, 'Back to courts'); ok(!s.tour, 'Back to courts: out of the tournament');

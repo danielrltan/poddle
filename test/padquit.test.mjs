@@ -1,7 +1,7 @@
 // The X on the phone (NOTES 59): held, it hangs the paddle up for good. The real pad.html in a real Chrome, the real
 // server, and a plain socket standing in for the computer's tab (?pad=CODE). What is checked: the phone reaches the live
 // view and is sending; a HELD X stops the samples, closes the socket (the computer is told its paddle has gone) and shows
-// the way out; a TAP does nothing; and "Be the paddle again" brings it all back.   Usage: node test/padquit.test.mjs
+// the way out; a TAP does nothing; and "Start again" brings it all back.   Usage: node test/padquit.test.mjs
 import { spawn } from 'child_process'; import fs from 'fs';
 import WebSocket from 'ws';
 import puppeteer from 'puppeteer-core';
@@ -74,7 +74,7 @@ ok(await pg.evaluate(() => !document.querySelector('[data-name="live"]').checkVi
 // ---- and back again
 await pg.click('#again');
 for (let i = 0; i < 40 && await view() !== 'live'; i++) await sleep(150);
-ok(await view() === 'live', `"Be the paddle again" starts it over: view ${await view()}`);
+ok(await view() === 'live', `"Start again" starts it over: view ${await view()}`);
 await sleep(800);
 const back = samples; await sleep(500);
 ok(samples > back, `it is sending again (${samples - back} samples in half a second)`);

@@ -51,7 +51,7 @@ let s = await game(desk); ok(/Nothing to install/.test(s.note), `title says so: 
 await desk.click('#btn-start'); await sleep(400); await desk.evaluate(() => document.fullscreenElement && document.exitFullscreen());
 await desk.click('#btn-bot'); await sleep(300); await desk.click('#btn-bot-0');
 s = await until(async () => { const v = await game(desk); return v.screen === 'connect' && v.qr ? v : null; }, 5000, 'Play a bot -> the set-up screen with a QR code');
-ok(s && s.pair && s.title === 'Grab your paddle' && /^P-[A-HJ-NP-Z2-9]{4}$/.test(s.code), `set-up screen (the code reads P-XXXX, NOTES 81): "${s && s.title}", code ${s && s.code}`);
+ok(s && s.pair && s.title === 'Connect your phone' && /^P-[A-HJ-NP-Z2-9]{4}$/.test(s.code), `set-up screen (the code reads P-XXXX, NOTES 81): "${s && s.title}", code ${s && s.code}`);
 ok(s && /^Phone: Scan the code/.test(s.row) && s.foot === 'Nothing to install.' && s.swap === 'phone' && !s.titleShown && s.tog === 'Show phone', `row "${s && s.row}", footer "${s && s.foot}", the Phone | AirPod switch on ${s && s.swap} in place of the title, settings say "${s && s.tog}"`);
 ok(s && !s.helper, 'phone mode: no Poddle Helper card');
 await sleep(400); await desk.screenshot({ path: `${root}test/ui-shots/pad-1-setup-1280x720.png` });
@@ -86,7 +86,7 @@ s = await until(async () => { const v = await game(desk); return v.calibrated &&
 s = await until(async () => { const v = await game(desk); return v.swings >= 3 && v.myHits >= 1 ? v : null; }, 60000, 'swings are called and one connects');
 ok(s, `playing: ${s && s.swings} swings, ${s && s.myHits} of my hits, ${s && s.hits} hits in all`);
 const gl = await ph.evaluate(() => getComputedStyle(document.getElementById('glow')).getPropertyValue('--c').trim()); ok(/^rgb\(255 \d+ \d+\)$/.test(gl), `my hit flared the phone's edges in the trail colour (${gl})`);
-p = await phone(ph); ok(p.naming === 'zxy' && p.head === 'Swing!', `phone found the z,x,y naming (${p.naming}) and says "${p.head}"`);
+p = await phone(ph); ok(p.naming === 'zxy' && p.head === 'Playing', `phone found the z,x,y naming (${p.naming}) and says "${p.head}"`);
 await ph.screenshot({ path: `${root}test/ui-shots/pad-4-phone-live-390x844.png` }); await desk.screenshot({ path: `${root}test/ui-shots/pad-4-court-1280x720.png` });
 
 // ---- 4. the phone's buttons, and the phone going away and coming back

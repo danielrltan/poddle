@@ -57,7 +57,7 @@ const myName = () => cleanName(ui.playerName()) || cleanName(ls.get('poddle.name
 const nameOf = i => names[i] || (state && state.paddles[i] && state.paddles[i].bot ? 'Matt' : i ? 'Player 2' : 'Player 1');
 const prefs = (() => { try { return JSON.parse(ls.get('poddle.settings')) || {}; } catch { return {}; } })();      // { airpod, stats, reach, sound, sink, sinkName }
 // body: webcam tracks where you actually stand. auto: server runs you to the ball. (Aim, the wrist's angle moving you, is gone: NOTES 33.)
-const MODES = ['body', 'auto'], MODE_TEXT = { body: 'Body: step to move, tilt the AirPod to walk', auto: 'Auto: the game runs, you swing' }, MODE_NAME = { body: 'Body', auto: 'Auto' };
+const MODES = ['body', 'auto'], MODE_TEXT = { body: 'Body: step side to side, tilt the paddle to move forward or back', auto: 'Auto: the game moves you to the ball, you swing' }, MODE_NAME = { body: 'Body', auto: 'Auto' };
 let bodyZ = 6.5, walkV = 0, walkHold = 0, bodyY = 1.0, vX = 0, vY = 0, lastFrame = performance.now();
 // critically damped follow (frame-rate independent): smooth, no overshoot
 function damp(cur, target, vel, smooth, dt) { const o = 2 / smooth, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), ch = cur - target, tmp = (vel + o * ch) * dt; return [target + (ch + tmp) * e, (vel - o * tmp) * e]; }
@@ -96,7 +96,7 @@ function camTrouble(t) {                           // the camera said no. On a s
   if (t.granted) return;                           // it was allowed and the tracking failed to load: nothing the player can fix, the game moves them
   const k = camKind(t);
   if (phase === 'camera' || phase === 'connect') { primer('help', k); return; }
-  if (camAsked) say({ nocam: 'No camera found', busy: 'The camera won’t start. Close any app using it, then pick Body again.', insecure: 'This page can’t use a camera', dismissed: 'The camera question was closed. Pick Body again, then Allow.' }[k] || 'The camera is blocked. Allow it for this site, then pick Body again.', null, 3600);
+  if (camAsked) say({ nocam: 'No camera found', busy: 'The camera won’t start. Close any app using it, then pick Body again.', insecure: 'This page can’t use a camera', dismissed: 'The camera prompt was closed. Pick Body again, then choose Allow.' }[k] || 'The camera is blocked. Allow it for this site, then pick Body again.', null, 3600);
 }
 // '' = no primer; 'ask'; 'help' (the browser already says no); 'wait' (its answer is not in yet)
 function camAsk() { if (NO_CAM) return ''; const c = ls.get(CAM_KEY); if (c === 'skip') return ''; if (!permKnown) return 'wait'; if (camPerm === 'denied') return 'help';
@@ -114,7 +114,7 @@ function camTurnOn() { if (NO_CAM) return; ls.set(CAM_KEY, 'allow'); camWant = c
 ui.onCamPrimer({
   allow: () => { ls.set(CAM_KEY, 'allow'); camWant = camAsked = true; camRestart(); if (phase === 'camera') primer('wait'); },      // the click IS the gesture the browser's question follows. Even an instant grant answers after this line
   retry: () => { camAgain = true; ui.camPrimer({ view: 'wait' }); camView = 'wait'; ls.set(CAM_KEY, 'allow'); camWant = camAsked = true; camRestart(); },
-  skip: () => { ls.set(CAM_KEY, 'skip'); camWant = false; stopCam(); setMode('auto', true); if (phase === 'camera') primerDone(); say('No camera: Auto movement is on. The game runs you to the ball, you swing.', null, 3600); },      // say what replaces it, after primerDone so the toast lands on the next screen      // Auto, kept: never asked again (Settings -> Move -> Body still turns it on)
+  skip: () => { ls.set(CAM_KEY, 'skip'); camWant = false; stopCam(); setMode('auto', true); if (phase === 'camera') primerDone(); say('No camera, so Move is set to Auto. The game moves you to the ball.', null, 3600); },      // say what replaces it, after primerDone so the toast lands on the next screen      // Auto, kept: never asked again (Settings -> Move -> Body still turns it on)
 });
 ui.onCamOn(camTurnOn);
 function setMode(m, quiet) {                       // chosen in the settings panel (the M key is gone from the court). Every switch starts the mode from rest, in this ONE place: nothing of the last mode's motion is carried in
@@ -133,7 +133,7 @@ let rally = 0, unsettled = null;                  // unsettled: my last swing re
 let ms = null;
 const msNew = () => ({ sum: 0, rally: 0, smash: [0, 0], run: [0, 0], best: [0, 0], cur: -1, kind: [null, null] });
 const msCommit = i => { if (ms && ms.kind[i] === 'smash') ms.smash[i]++; if (ms) ms.kind[i] = null; };      // a shot counts once, with its final kind (a bet's kind can still be re-aimed by 'launch')
-const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'B adds a bot', meSub: '' });      // the far side of the scoreboard with nobody on it. In a room the bot walks in by itself
+const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'Press B to play Matt', meSub: '' });      // the far side of the scoreboard with nobody on it. In a room the bot walks in by itself
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].replace(BADGE_OUT, '').slice(0, 24) || null : null);      // untrusted text: ui.js writes it with textContent only
 const cleanRegs = a => [0, 1].map(i => Array.isArray(a) && a[i] === true);      // only a literal true draws a badge (an old server sends none)
@@ -216,21 +216,21 @@ function findSinks() {
     .then(s => { for (const t of s.getTracks()) t.stop(); }, () => { })      // a throw is NOT proof of refusal: with no microphone, or a busy one, the PERMISSION can still have landed, and the permission is all the list needs
     .then(() => loadSinks()).then(() => {                                    // so let the device list be the judge
       sinkDenied = !sinks.length; syncSettings();
-      say(sinks.length ? 'Your speakers are listed now' : 'Your speakers still can’t be listed', null, 2800);
+      say(sinks.length ? 'Speakers found. Pick one in Sound.' : 'Couldn’t list your speakers', null, 2800);
     });
 }
 function pickSink(id) {
   unlock();                                        // the AudioContext has to exist before it can be pointed anywhere
   scene.audio.setSink(id).then(ok => {
-    if (!ok) return forgetSink('Couldn’t use that output');
+    if (!ok) return forgetSink('Couldn’t switch to that speaker');
     sinkId = id || ''; savePrefs(); syncSettings();
-    const d = sinks.find(x => x.id === sinkId); say(sinkId ? `Sound: ${d ? d.label : 'that output'}` : 'Sound: system default', null, 2000);
+    const d = sinks.find(x => x.id === sinkId); say(sinkId ? `Sound: ${d ? d.label : 'that speaker'}` : 'Sound: system default', null, 2000);
   });
 }
 function setPod(on) { showPod = !!on; show('podwrap', showPod); savePrefs(); syncSettings(); }
 function setBody(on) { showBody = !!on; scene.setSelfBody(showBody); savePrefs(); syncSettings(); }
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
-function recenter() { model.recenter(); if (body) body.center(); say('Recentred'); }
+function recenter() { model.recenter(); if (body) body.center(); say('Camera recentered'); }
 const rkQuit = () => { if (rkKind === 'match' && !spec() && !(rkSeries && rkSeries.done)) { rkLeft = performance.now() + 5000; setTimeout(redialDue, 5100); } };      // leaving a Ranked series under way is my forfeit: its rkres reaches me in the lobby (onRkRes says 'Forfeit: 20 trophies'). A waiting redial holds for it: a socket closed before that frame is read would lose it
 function leave() { if (!LOBBY || !room) return; rkQuit(); game.send({ type: 'leave' }); toLobby(); }
 // The socket opens again so the server hears who this is now (docs/ACCOUNTS.md 6.2, 9.7): signed in or out, storage cleared, data
@@ -314,7 +314,7 @@ function request(m) {                               // one lobby request at a ti
   if (pending) return; if (rkLobbyQ() && RK_ELSEWHERE.has(m.type)) { botWant = null; say(RK_IN_QUEUE, null, 3200); return; }
   const n = myName(); m.name = sentName = n; if (n && !profile.username()) ls.set('poddle.name', n);
   pending = m; ui.lobbyBusy(true); game.send(m);
-  pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (m.type === 'rk') ui.rkSearch?.(false); if (link.g) say('No answer. Try again.', null, 2600); }, 5000);      // Find a match stops saying Searching too      // an old server never answers: do not leave the lobby dimmed for good
+  pendT = setTimeout(() => { if (pending !== m) return; settle(); botWant = null; if (m.type === 'rk') ui.rkSearch?.(false); if (link.g) say('The game didn’t respond. Try again.', null, 2600); }, 5000);      // Find a match stops saying Searching too      // an old server never answers: do not leave the lobby dimmed for good
 }
 // the menu's address (NOTES 108): each lobby view has a path the server answers with this same page, so a reload lands back on it instead of the title.
 // replaceState only: the browser's Back button still leaves the site as before. A court keeps '/' with its ?court=CODE (the invite).
@@ -348,8 +348,8 @@ const rkLobbyQ = () => rkQueued && rkPhase === 'queue' && !rkKind && !rkMoving &
 const rkOthers = () => Math.max(0, rkQueuedN - (rkQueued && rkPhase === 'queue' ? 1 : 0));      // the counts include my own entry: the tile, the pill and the view say whether SOMEONE ELSE waits
 const RK_IN_QUEUE = 'You’re in the Ranked queue. Cancel it to play something else';
 function rkBarSync() { ui.rkBanner?.({ on: rkLobbyQ(), since: rkSinceP, tier: rkYou.tier, div: rkYou.div, busy: !!pending && pending.type === 'rkwarm' }); }
-const RK_FAIL = { nocid: 'Reload and try again', busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', addr: 'Two players on your network are already in the queue', nostats: 'Ranked couldn’t save your trophies. Reload and try again', intour: 'Leave your tournament first' };      // nostats: the queue heard no hello from this socket (storage refused the device id, RANKED.md 3.9)
-const RK_VIEW_NOTE = { busy: 'Courts are full right now. Try again in a moment', full: 'Courts are full right now. Try again in a moment', intour: 'Leave your tournament first' };
+const RK_FAIL = { nocid: 'Couldn’t join Ranked. Reload and try again.', busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', addr: 'Two players on your network are already in the queue', nostats: 'Ranked couldn’t save your trophies. Reload and try again', intour: 'Leave your tournament first' };      // nostats: the queue heard no hello from this socket (storage refused the device id, RANKED.md 3.9)
+const RK_VIEW_NOTE = { busy: 'Ranked is full right now. Try again in a minute', full: 'Ranked is full right now. Try again in a minute', intour: 'Leave your tournament first' };
 const onRankedView = () => phase === 'lobby' && !room && ui.currentScreen() === 'lobby' && ['ranked', 'ranks'].includes(ui.lobbyView());      // the Ranks page stands in the stadium too
 const THEME = { park: '#dfeef6', stadium: '#0b1116' };
 function setVenue(name) {                          // the scene's venue (web/scene.js setVenue, body[data-venue]) and the browser's own colour bar with it
@@ -362,7 +362,7 @@ const RK_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion',
 const rkLeaver = m => m.won === false && (performance.now() < rkLeft || rkWait || Array.isArray(m.why) && m.why.includes('left_early'));      // my own forfeit: I left, my held seat ran out while I was away (rkWait: nothing else ends a series while a socket is down), or the server says I left early
 function rkResNote(m) {                            // my side of a settlement as one line on the Ranked view (docs/RANKED.md 8.8): the change as applied first, 'didn’t count' only when nothing moved
   const d = m.delta | 0, left = rkLeaver(m), r = rankRef(m), rank = m.floorHeld === true && r ? RK_NAMES[r.tier - 1] : '';      // floorHeld: the loss stopped at the rank's floor
-  if (m.void === true) return 'Void: no trophies changed';
+  if (m.void === true) return 'Not counted: no trophies changed';
   if (d < 0) return left ? `Forfeit: ${-d} trophies` : `−${-d} trophies`;
   if (d > 0) return `+${d} trophies`;
   if (left) return rank ? `Forfeit: you keep ${rank}` : 'Forfeit: no trophies changed';
@@ -382,7 +382,7 @@ function onRk(m) {                                 // the queue snapshot { phase
   ui.rkSearch?.(false); rkBarSync();
 }
 function onRkFail(why, warm) {                     // the queue said no: a toast, and the reason under Find a match while the view is up
-  if (warm) { if (pending && pending.type === 'rkwarm') settle(); rkBarSync(); say('Can’t start a warm-up right now. Try again in a moment. You’re still in the queue', null, 3200); return; }      // Warm up with Matt refused (no court, or one just closed): still queued, in the lobby
+  if (warm) { if (pending && pending.type === 'rkwarm') settle(); rkBarSync(); say('Couldn’t start the warm-up. You’re still in the queue', null, 3200); return; }      // Warm up with Matt refused (no court, or one just closed): still queued, in the lobby
   if (pending && (pending.type === 'rk' || pending.type === 'rkwarm')) settle(); ui.rkSearch?.(false); rkSinceP = 0; rkQueued = false; rkWarmNow = false; if (!rkKind || rkKind === 'warm') rkPhase = 'off';      // every other rkfail means no entry (refused, or ended: no hello)
   if (RK_VIEW_NOTE[why]) rkViewNote(RK_VIEW_NOTE[why]);      // held first: the Ranked view that toLobby opens draws it
   if (room && rkKind && !spec()) toLobby();         // every rkfail on a Ranked court comes after the server took the seat away (Play again on the series card, no hello): no 'closed' follows, so leave the dead court now (toLobby first: it clears toasts)
@@ -392,7 +392,7 @@ function endRk(why) {                              // rkend: restart | gone (and
   clearTimeout(rkHang); clearTimeout(rkVsT); rkWait = false; rkLeft = 0; rkSinceP = 0; rkQueued = false; rkMoving = false; rkPhase = 'off'; rkWarmNow = false; rkSeries = null; ui.rkSearch?.(false); ui.setSeries?.(null); rkBarSync();
   if (['tour-vs', 'rk-vs'].includes(ui.currentOverlay())) ui.showOverlay(null);
   if (room) toLobby(); else { if (phase === 'lobby' && ui.currentScreen() !== 'lobby') screen('lobby'); if (phase === 'lobby') ui.lobbyView('ranked'); }
-  if (why === 'restart') say('Updating. The Ranked match is void, no trophies changed.', null, 4000); venueSync(); redialDue();
+  if (why === 'restart') say('Poddle was updated. This Ranked match doesn’t count. No trophies changed.', null, 4000); venueSync(); redialDue();
 }
 const rkRow = m => ({ ...m, forfeit: m.forfeit === true || rkWalk && m.won === true, leaver: rkLeaver(m) });      // the card's row: a win by forfeit is a Walkover, my own forfeit is never 'didn’t count'
 function onRkRes(m) {                              // my side of a settlement (heard anywhere, the leaver in the lobby included): the card's trophy row on the court, a line on the view otherwise
@@ -443,7 +443,7 @@ function tourMove(m) {                              // my next match is drawn: t
 }
 function showChamp() {                              // for everyone: the champion card over the court, confetti twice (docs/COURTS-TOURNEY.md 4.6 item 10)
   champShown = tour.code; const c = tour.champ, me = tour.you && tour.you.id != null ? tour.you.id : null;
-  if (room && !tourKind) { say(me != null && c.id === me ? 'You’re the champion!' : `${c.bot ? 'Matt' : cleanName(c.name) || 'Someone'} is the champion!`, null, 3200); tour = null; champShown = ''; ui.setTour(null); game.send({ type: 'tleave' }); return; }      // busy in an ordinary court: a toast, and the tournament lets go; nobody is pulled off their court
+  if (room && !tourKind) { say(me != null && c.id === me ? 'You won the tournament' : `${c.bot ? 'Matt' : cleanName(c.name) || 'Someone'} won the tournament`, null, 3200); tour = null; champShown = ''; ui.setTour(null); game.send({ type: 'tleave' }); return; }      // busy in an ordinary court: a toast, and the tournament lets go; nobody is pulled off their court
   if (room) { game.send({ type: 'leave' }); toLobby(); }      // off the final's court first: its 'closed round' must not take the card down
   tourMoving = false; ui.tourVs(null); screen(null); ui.champion(c, me); scene.jingle('champ');      // cuts the final's win/lose jingle, which is still ringing: this card follows it at once
   const gold = ['#ffd34a', '#f2a81d', '#3aa0ff', '#ffffff']; ui.confetti(gold, 140); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.championShowing()) ui.confetti(gold, 100); }, 900);
@@ -516,7 +516,7 @@ function connect(urls, el, onmsg, onopen) {
     ws = new WebSocket(el === 'g' ? url + '?cid=' + CID + (CAN_PHONE ? '&pad=' + PAD : '') + (LOBBY ? '&lobby=1' + (tourOn() ? '&tour=' + tour.code : '') + (rkBusy() ? '&rk=1' : '') + (room ? '&room=' + room + (spec() ? '&watch=1' : '') : tourOn() && tour.you && tour.you.viewer ? '&watch=1' : '') + ((room || tourOn() || rkOn()) && myName() ? '&name=' + encodeURIComponent(myName()) : '') + (room && !tourOn() && !rkKind ? backTo() : '') : '') : url);      // room: a reconnect asks for its seat (or its place to watch) back. tour: its tournament (&watch=1 with no room: its viewer, never signed up by a reconnect; never back=1: nothing of a tournament is revived, docs/COURTS-TOURNEY.md 4.5). rk=1: the queue (a warm-up or a series seat, rebound by the server; never back=1 either: docs/RANKED.md 3.10)
     const sock = ws, giveUp = setTimeout(() => { if (!opened) sock.close(); }, 1500);       // a dead IP just hangs: don't wait for TCP to time out
     ws.onopen = () => { opened = true; clearTimeout(giveUp); delay = 400; fails = 0; link[el] = true; ui.setLink(el, true);
-      if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Saved address didn’t answer. Using this Mac.', null, 2800); } }
+      if (el === 'g') { gameEver = true; if (ui.currentOverlay() === 'server-down') ui.showOverlay(null); if (i % urls.length > 0 && location.hash) { history.replaceState(null, '', location.pathname + location.search); say('Couldn’t reach the saved server. Using this Mac instead.', null, 2800); } }
       onopen && onopen(); };
     ws.onmessage = e => { try { onmsg(JSON.parse(e.data)); } catch (err) { stats.errors++; console.error(err); } };
     ws.onclose = () => { link[el] = false; ui.setLink(el, false);
@@ -549,7 +549,7 @@ const padPhase = () => padFx(phase === 'calibrate' || phase === 'camera' ? 'cal'
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
   const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
   ui.setPaddle(kind); pod.setKind(kind);
-  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: 'P-' + PAD, title: phone ? 'Grab your paddle' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
+  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: 'P-' + PAD, title: phone ? 'Connect your phone' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
     foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.' });
   ui.setSettings({ paddle: CAN_PHONE ? kind : null });
 }
@@ -596,7 +596,7 @@ function onSample(sample, from) {
     else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(false);
       // 'All set' arrives in this same batch: hold the green card long enough to be read, then open the court
       setTimeout(() => { if (phase !== 'play') return; openCourt();
-        setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve!', null, 2600); }, 380); }, 900); }     // after the fade
+        setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve', null, 2600); }, 380); }, 900); }     // after the fade
     else if (e.type === 'swing' || e.type === 'swingFix') { const fix = e.type === 'swingFix'; if (!fix) stats.swings++;     // swings are reported early; a fix follows if the real peak differs
       if (!calibrating && !spec() && seated() && !frozen && !holding) {      // a paused or held room takes no swings
         // Spin is DELIBERATE: intent x speed. Intent is a wrist roll through the ball clearly past what a plain stroke does
@@ -640,14 +640,14 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'padtaken') { newPad(); game.send({ type: 'padcode', code: PAD }); showPair(); return; }      // another live tab drew this code first: pick again (nothing was paired to it yet)
   if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
   if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
-  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (tour) say('Updating. The tournament will end.', null, 4000); else if (rkOn()) say('Updating. The Ranked match will end.', null, 4000); else if (room) say('Updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect; a tournament or a Ranked match does not
+  if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (tour) say('Poddle is updating. The tournament will end.', null, 4000); else if (rkOn()) say('Poddle is updating. The Ranked match will end.', null, 4000); else if (room) say('Poddle is updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect; a tournament or a Ranked match does not
   if (m.type === 'tourend') { clearTimeout(tourHang); if (tour) endTour(m.why); return; }      // before joinfail and closed (docs/COURTS-TOURNEY.md 4.5)
   if (!LOBBY) { if (m.type === 'closed') { ui.showOverlay(null); return; } if (['lobby', 'room', 'joinfail', 'left'].includes(m.type)) return; }          // legacy path: no room UI, whatever the server says
   if (m.type === 'lobby') { ui.lobbyRooms(m.rooms, m.online, m.tours); const q = m.rk && typeof m.rk === 'object' ? Math.max(0, m.rk.queued | 0) : 0;      // rk.queued: how many are waiting for an opponent (a count, no names): the home tile's '1 waiting' and the view's line
     if (q !== rkQueuedN) { rkQueuedN = q; rkTile(); const o = rkOthers(); if (onRankedView() && performance.now() > rkNoteHold) ui.rkNote?.(o > 0 && !rkQueued ? 'Someone is waiting to play' : '', o > 0 && !rkQueued); } return; }      // my own entry is in the count: only someone ELSE lights it, and never while I am queued myself
   if (m.type === 'tour') { if (m.code && typeof m.code === 'string') onTour(m); return; }      // above the guard: between rounds nobody is in a court
   if (m.type === 'tmove') { tourMove(m); return; }
-  if (m.type === 'tourfail') { say(m.why === 'busy' ? 'Courts are full right now. Try Start again in a moment.' : `Needs at least 4 players · ${m.n | 0} here now`, null, 3200); return; }
+  if (m.type === 'tourfail') { say(m.why === 'busy' ? 'Courts are full right now. Press Start again in a moment.' : `Needs at least 4 players · ${m.n | 0} here now`, null, 3200); return; }
   if (m.type === 'rk') { onRk(m); return; }                 // Ranked (docs/RANKED.md 9), above the guard: the queue outlives any one court
   if (m.type === 'rkfail') { onRkFail(String(m.why || ''), m.warm === true); return; }      // warm: Warm up with Matt was refused, the entry stands
   if (m.type === 'rkend') { endRk(m.why === 'restart' ? 'restart' : 'gone'); return; }
@@ -676,9 +676,9 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if ((m.reason === 'tfull' || m.reason === 'started') && m.watch === true && tcode.length === 4) { ui.askWatch(tcode, m.reason === 'tfull' ? 'This tournament is full. Watch instead?' : 'This tournament has started. Watch instead?'); return; }      // a tournament's code: watch its bracket instead
     if (m.reason === 'intour') { say(`You’re in tournament ${tcode}. Leave it first.`, null, 3200); if (tour) tourScreen(true); return; }
     if (was && was.type === 'twatch') { say('That match just ended', null, 2200); return; }      // a Watch on the bracket, a moment too late
-    if (was && was.type === 'tcreate') { say(m.reason === 'busy' ? 'Too many tournaments right now. Try again soon.' : 'Couldn’t make a tournament. Reload and try again.', null, 3000); return; }
+    if (was && was.type === 'tcreate') { say(m.reason === 'busy' ? 'Too many tournaments right now. Try again soon.' : 'Couldn’t create the tournament. Reload and try again.', null, 3000); return; }
     if (m.reason === 'full' && m.watch === true && !watching) { const code = ui.cleanCode(typeof m.code === 'string' ? m.code : was && was.code); if (code.length === 4) { ui.askWatch(code); return; } }      // 'Court is full. Watch instead?'
-    const text = (watching ? { notfound: 'Court not found', busy: 'Too many watching', full: 'Too many watching' } : { notfound: 'Court not found', full: 'Court is full', busy: 'No free courts. Try again soon.', nocid: 'Couldn’t join. Reload and try again.' })[m.reason] || 'Couldn’t join';
+    const text = (watching ? { notfound: 'Court not found', busy: 'Too many people watching', full: 'Too many people watching' } : { notfound: 'Court not found', full: 'Court is full', busy: 'No free courts. Try again soon.', nocid: 'Couldn’t join. Reload and try again.' })[m.reason] || 'Couldn’t join';
     if (was && (was.type === 'join' || watching) && ui.lobbyView() === 'courts' && was.code === ui.typedCode()) ui.codeError(text); else say(text, null, 2600);      // typed in the boxes: said under them. A row click: a toast
     return;
   }
@@ -774,7 +774,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (ms) { ms.sum = sum; msCommit(0); msCommit(1); ms.rally = Math.max(ms.rally, rally);      // rally: this point's hits, the HUD's number ('serve' resets it later)
       const w = m.winner === 1 ? 1 : 0; ms.run[w] = ms.cur === w ? ms.run[w] + 1 : 1; ms.run[1 - w] = 0; ms.cur = w; ms.best[w] = Math.max(ms.best[w], ms.run[w]); } }
   if (m.type === 'serve') { ui.countdown(0); over = null; bodyZ = 6.5; walkV = 0; rally = 0; ui.setRally(0); ui.setServe(m.by === (spec() ? 0 : side) ? 'me' : 'them'); if (ui.currentOverlay() === 'match' || ui.currentOverlay() === 'rk-game') ui.showOverlay(null);
-    if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve!', null, 2600); }
+    if (m.wait && m.by === side && !spec() && inPlay()) say('Your serve', null, 2600); }
   if (m.type === 'whiff') stats.whiffs++;                        // no commentary: you can see that you missed
   if (m.type === 'point' && rkKind && !m.final) { const L = spec() ? 0 : side, gp = m.mp === 0 || m.mp === 1 ? m.mp : m.gp === 0 || m.gp === 1 ? m.gp : null; ui.setPressure?.(gp == null ? null : { side: gp === L ? 'me' : 'them', kind: m.mp === gp ? 'match' : 'game' }); }      // GAME POINT / MATCH POINT on the scoreboard (docs/RANKED.md 8.6); the ring goes with the next point without it
   if (m.type === 'point' && !m.final && live()) {
@@ -825,7 +825,7 @@ setInterval(() => {                               // 20Hz: tell the server where
 let unlocked = false;
 // The AudioContext only exists from the first gesture on, so the kept output is applied HERE, not at load. A device that has
 // since been unplugged rejects: drop it rather than let the panel name a speaker nothing is playing out of.
-const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That output is gone: back to the system default'); }); } };
+const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That speaker was disconnected. Using the system default.'); }); } };
 scene.audio.onDevicesChanged(loadSinks);           // an AirPod connecting mid-match changes the list under the open card
 addEventListener('pointerdown', e => { unlock(); if (!e.target?.closest?.('#rk-search')) play(); });      // the Ranked search bar over the title is not a press of Play (its Cancel stays on the title)
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)

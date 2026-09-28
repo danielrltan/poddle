@@ -119,7 +119,7 @@ console.log('4 players: two matches, no Matt; a whole bracket to a champion by f
   win1.send({ type: 'tleave' }); await until(() => win1.got('tourend').length);
   ok(await until(() => win2.tour.phase === 'done' && win2.tour.champ), `a tleave mid-final: forfeit, the tournament is done (${win2.tour.phase} ${JSON.stringify(win2.tour.rounds.map(r => r.matches.map(x => [x.a.id, x.b.id, x.w, x.forfeit])))} win1 ${win1.tour.you.id}: ${win1.log.map(m => m.type + (m.reason || m.why || m.name || '')).join(' ')})`);
   const ch = win2.tour.champ;   // win2's view: the host may be the one who left
-  ok(ch.name === win2.tour.players.find(p => p.id === win2.tour.you.id).name && ch.bot === false && ch.path.length === 2 && ch.path[0].round === 'Semifinal' && ch.path[1].round === 'Final' && ch.path[1].forfeit === true && ch.path.every(s => Array.isArray(s.score) && typeof s.vs === 'string'), `the champion with the road to the title: ${JSON.stringify(ch)}`);
+  ok(ch.name === win2.tour.players.find(p => p.id === win2.tour.you.id).name && ch.bot === false && ch.path.length === 2 && ch.path[0].round === 'Semifinal' && ch.path[1].round === 'Final' && ch.path[1].forfeit === true && ch.path.every(s => Array.isArray(s.score) && typeof s.vs === 'string'), `the champion with their tournament matches: ${JSON.stringify(ch)}`);
   ok(lose2.tour.champ && lose2.tour.champ.id === ch.id, 'the eliminated see the champion too');
   ok(await until(() => win2.tour.rounds[1].matches[0].w != null && !win2.tour.next), 'the final has its winner, nothing next');
   ps.forEach(c => c.ws.close()); }

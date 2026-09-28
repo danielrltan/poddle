@@ -60,7 +60,7 @@ export async function fetchProfile() {                      // -> the Profile of
 }
 
 // ---------- after a match: one line on the result card (9.3) ----------
-const WHY = { not_counted: 'This match doesn’t count toward your record', self: 'Matches against yourself don’t count', restart: 'Matches brought back after an update don’t count', too_short: 'Too short to count' };
+const WHY = { not_counted: 'This match doesn’t count toward your record', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count' };
 const BEST = { rally: v => `longest rally ${v}`, speed: v => `fastest swing ${degs(v)}°/s` };      // hit (power) is kept and exported but never shown: it is a unitless internal number
 let overTour = false, overQuiet = false, nudged = false;      // nudged: the sign-in nudge shows once a visit, and on every first win
 export function matchover(tour, quiet) { overTour = !!tour; overQuiet = !!quiet; show('result-save', false); }      // a new result: last match's line goes (result() fills it again for this one). tour: a tournament's card (the line, no nudge). quiet: a game of a Ranked series that is not over (docs/RANKED.md 8.8): nothing until the final card
@@ -70,7 +70,7 @@ export function result(p) {                                 // the 'profile' mes
   const lv = Number.isInteger(p.level) && LEVEL[p.level] ? LEVEL[p.level] : '', why = Array.isArray(p.why) ? p.why.filter(w => typeof w === 'string') : [], bests = Array.isArray(p.bests) ? p.bests.filter(b => b && BEST[b.what] && Number.isFinite(b.v)) : [];
   let line = '';
   if (p.saved === true) {                                  // saved:false (no database, anonymous, the new-guest cap): nothing to say
-    if (p.first === true) line = lv ? `First win against ${lv} Matt!` : 'Your first win!';
+    if (p.first === true) line = lv ? `First win against ${lv} Matt` : 'Your first win';
     else if (bests.length) { const b = bests[0], prev = Number.isFinite(b.prev) && b.prev > 0 ? b.prev : 0; const shown = v => (b.what === 'speed' ? degs(v) + '°/s' : String(Math.round(v))), was = prev ? shown(prev) : ''; line = `New best: ${BEST[b.what](b.what === 'speed' ? b.v : Math.round(b.v))}` + (was && was !== shown(b.v) ? ` (was ${was})` : ''); }      // a gain below the rounding step would read '1330°/s (was 1330°/s)': the old value is left out then
     else if (num(p.streak) >= 2) line = `${num(p.streak)} wins in a row`;
     else if (p.ranked === false) { const w = why.find(x => WHY[x]); if (w) line = WHY[w]; }
@@ -104,7 +104,7 @@ function drawRoad(p) {
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
   if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one
   text('st-streak-n', String(hot.n));
-  const cap = $('st-streak-cap'); if (cap) { cap.textContent = hot.n === 1 ? `vs ${hot.who} · win again to build it` : hot.n ? `vs ${hot.who} · best ` : 'Win one match to light the flame'; if (hot.n >= 2) cap.append(mk('b', '', String(best))); }
+  const cap = $('st-streak-cap'); if (cap) { cap.textContent = hot.n === 1 ? `vs ${hot.who} · win again to extend it` : hot.n ? `vs ${hot.who} · best ` : 'Win a match to start a streak'; if (hot.n >= 2) cap.append(mk('b', '', String(best))); }
   drawMatt(p);
 }
 // the Matt badge: every level can be picked at any time, so this is a badge for the toughest one beaten (difficulty order, never the
@@ -137,10 +137,10 @@ function tile(id, v, cap, chip) {                           // one number tile: 
 }
 function drawTiles(p) {
   const B = p && p.bests && typeof p.bests === 'object' ? p.bests : {}, best = k => { const x = B[k] && typeof B[k] === 'object' ? B[k] : {}; return Number.isFinite(x.v) && x.v > 0 ? x : null; }, titles = num(p && p.titles);
-  tile('st-t-titles', titles, titles ? `Tournament win${titles === 1 ? '' : 's'}` : 'Win a tournament to lift a cup', titles > 1 ? `Champion ×${titles}` : 'Champion');
+  tile('st-t-titles', titles, titles ? `Tournament win${titles === 1 ? '' : 's'}` : 'Win a tournament to earn a title', titles > 1 ? `Champion ×${titles}` : 'Champion');
   const r = best('rally'), s = best('speed');      // no Hardest hit: a unitless number nobody can read
   tile('st-t-rally', r ? Math.round(r.v) : 0, r ? `Set on ${dayS(r.at)}` : 'Keep the ball in play');
-  tile('st-t-speed', s ? degs(s.v) : 0, s ? `Set on ${dayS(s.at)}` : 'Swing hard, it counts');
+  tile('st-t-speed', s ? degs(s.v) : 0, s ? `Set on ${dayS(s.at)}` : 'Swing hard to set a record');
 }
 // the play row (docs/SHARE.md 3): profile.play's counters. An older server sends no play: the row stays hidden, nothing else changes
 const clock = s => s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m` : s ? '<1m' : '0m';      // time on court: "1h 20m", "12m"
@@ -149,7 +149,7 @@ function drawPlay(p) {
   const P = p && p.play && typeof p.play === 'object' ? p.play : null; if (!show('pf-play', !!P)) return;
   const ch = num(P.chances), rt = Math.min(num(P.returns), ch), ok = ch >= 10, f = ok ? rt / ch : 0;      // under 10 chances a percentage says nothing: the coaching line instead
   const ring = $('st-ring'); if (ring) { ring.style.setProperty('--p', f.toFixed(3)); ring.classList.toggle('is-zero', !f); }
-  text('st-ret-pct', ok ? `${Math.round(100 * f)}%` : ''); show('st-ret-pct', ok); text('st-ret-cap', ok ? `${rt.toLocaleString()} of ${ch.toLocaleString()} returned` : 'Return 10 balls to see it'); cls('st-ret', 'is-hint', !ok);
+  text('st-ret-pct', ok ? `${Math.round(100 * f)}%` : ''); show('st-ret-pct', ok); text('st-ret-cap', ok ? `${rt.toLocaleString()} of ${ch.toLocaleString()} returned` : 'Shows after 10 balls are hit to you'); cls('st-ret', 'is-hint', !ok);
   const pw = num(P.pointsWon), pl = num(P.pointsLost);      // every kind of match (h_points_* in human stay people-only)
   fig('st-f-winners', num(P.winners).toLocaleString()); fig('st-f-aces', num(P.aces).toLocaleString()); fig('st-f-smashes', num(P.smashes).toLocaleString()); fig('st-f-hits', num(P.hits).toLocaleString());
   fig('st-f-points', `${pw + pl ? Math.round(100 * pw / (pw + pl)) : 0}%`); fig('st-f-time', clock(num(P.secs)));
@@ -163,7 +163,7 @@ function drawHead(p) {
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available). Guest or signed in changes only the header: every stat draws the same way
   shareable = !!p && typeof p === 'object' && 'share' in p; share = shareable ? shareOf(p.share) : null;      // fresh at every draw: the image's ?v= changes with the stats
   drawHead(p); drawRoad(p || null); drawPeople(p || null); drawPlay(p || null); drawTiles(p || null); drawAcct();
-  const msg = p === undefined ? 'Stats aren’t available right now. The game still works.' : '';      // nothing yet: no bar, the card's own lines say it (Start here, the people hint, the tile captions)
+  const msg = p === undefined ? 'Stats aren’t available right now. You can still play.' : '';      // nothing yet: no bar, the card's own lines say it (Start here, the people hint, the tile captions)
   text('pf-msg', msg); show('pf-msg', !!msg); // download and delete live on the privacy page (web/data-tools.js): the footer links there
 }
 export async function showProfile() {                      // the lobby view opened: draw what is known at once (empty), then the answer
@@ -185,7 +185,7 @@ export async function showRanked() {                       // the Ranked view op
   const g = ++rkGen, base = { tier: 1, div: 1, trophies: 0, best: 1, queued: h.queued() };
   h.rkView(base); if (!on) return;
   const p = await fetchProfile(); if (g !== rkGen || !['ranked', 'ranks'].includes(h.view())) return;      // the Ranks page draws from the same answer
-  if (p === undefined) { h.rkView({ ...base, note: 'Stats aren’t available right now. The game still works' }); return; }
+  if (p === undefined) { h.rkView({ ...base, note: 'Stats aren’t available right now. You can still play' }); return; }
   const L = ladderOf(p); h.rkView({ ...base, ...(L || {}), queued: h.queued() }); if (L) h.ladder(L);      // an older server (no ladder) or nothing saved yet: Bronze, 0. The home tile's line follows what was fetched
 }
 
@@ -274,7 +274,7 @@ async function shareCard() {                                // Share card: copy 
   openShare(); copied.then(ok => { if (ok) { h.toast('Link copied', 1800); flashCopied(); } else pickUrl(); }, () => pickUrl());
 }
 let copiedT = 0;
-function flashCopied() { const b = $('btn-share-copy'); if (!b) return; b.textContent = 'Copied!'; b.classList.add('is-done'); clearTimeout(copiedT); copiedT = setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('is-done'); }, 1800); }
+function flashCopied() { const b = $('btn-share-copy'); if (!b) return; b.textContent = 'Copied'; b.classList.add('is-done'); clearTimeout(copiedT); copiedT = setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('is-done'); }, 1800); }
 function pickUrl() { const i = $('share-url'); if (i && !i.closest('[hidden]')) { i.focus({ preventScroll: true }); i.select(); } }      // no clipboard: the link is selected for the player to copy
 function openShare() {
   if (!share) return; const s = share, i = $('share-url'), img = $('share-img'), fg = $('share-prev');
@@ -295,7 +295,7 @@ async function downloadCard() {                             // the PNG as a file
 async function stopSharing() {                              // DELETE /api/share (204, idempotent): the link dies; Share card makes a new one next time
   let r; try { r = await api('/api/share', 'DELETE', devBody()); } catch { r = { ok: false, status: 0 }; }
   if (!r.ok) { h.toast('Couldn’t stop sharing. Try again.', 2400); return; }
-  share = null; closeCard(); h.toast('Sharing stopped. That link no longer works', 2600);
+  share = null; closeCard(); h.toast('Sharing stopped. That link no longer works.', 2600);
 }
 function wireShare() {
   click('btn-pf-share', () => { shareCard(); });
@@ -334,7 +334,7 @@ export async function claimName(name) {                    // -> true when the s
   let r; try { r = await api('/api/username', 'POST', { username: n }); } catch { r = { ok: false, status: 0, j: null }; }
   if (r.ok && r.j && typeof r.j.username === 'string') {
     me.account = { username: r.j.username.slice(0, 12), renameAt: Number.isFinite(r.j.renameAt) ? r.j.renameAt : null }; drawAcct(); h.redial();      // the court shows the badge once the socket's upgrade carries the cookie again
-    closeCard(); h.toast(`You’re ${me.account.username}`, 2400); if (h.view() === 'profile') showProfile(); return true;
+    closeCard(); h.toast(`Your username is ${me.account.username}`, 2400); if (h.view() === 'profile') showProfile(); return true;
   }
   const j = r.j || {};
   err('claim-err', r.status === 409 ? 'That name is taken' : r.status === 422 ? CLAIM_ERR[j.reason] || 'That name isn’t allowed' : r.status === 423 ? `You can change your name again on ${day(j.until) || 'a later day'}` : r.status === 401 ? 'You’re signed out. Sign in again to pick a name.' : 'Couldn’t save that name. Try again.');

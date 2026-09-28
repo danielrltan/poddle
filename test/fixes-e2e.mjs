@@ -135,7 +135,7 @@ await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click(
 await until(a, s => s.hits > 0, 30000, 'a ball is struck'); rest('b'); await b.keyboard.press('KeyC'); s = await until(a, s => s.themSub === 'Calibrating', 4000, 'a is told'); 
 s = await until(a, s => s.hold, 20000, 'the wait is counted down'); ok(/^Waiting for Ben\|\d+$/.test(s.hold), `the serve waits for Ben, counted down: "${s.hold}"`); await shot(a, 'G-wait-card', BOTH);
 s = await until(a, s => s.result, 20000, 'the staller forfeits'); await sleep(700); u = await boxes(a, ['rematch-count', 'rematch-bar', 'btn-leave', 'btn-rematch']); t = await a.evaluate(() => ({ r: document.getElementById('btn-rematch').disabled, l: document.getElementById('btn-leave').disabled }));
-ok(s.result.title === 'You win!' && s.result.note === 'Ben left' && u['rematch-count'] === null && t.r && !t.l, `forfeit card: "${s.result.title} / ${s.result.note}", no countdown bar (${JSON.stringify(u['rematch-count'])}), only Leave`); await shot(a, 'G-forfeit-card', BOTH);
+ok(s.result.title === 'You win' && s.result.note === 'Ben left' && u['rematch-count'] === null && t.r && !t.l, `forfeit card: "${s.result.title} / ${s.result.note}", no countdown bar (${JSON.stringify(u['rematch-count'])}), only Leave`); await shot(a, 'G-forfeit-card', BOTH);
 t = await until(b, s => s.screen === 'lobby', 3000, 'Ben is in the lobby'); ok(t.toast === 'Court closed' || t.toast === null, `Ben: "${t.toast}"`);
 await R.close(); }
 

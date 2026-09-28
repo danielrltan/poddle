@@ -26,10 +26,10 @@ const stats = window.__pad = { sent: 0, hz: 0, rtt: 0, host: false, open: false,
 let code = clean(qs.get('k')), ws = null, started = false, sawMotion = false, peak = 0, fxText = '';
 
 // ---------- the code ----------
-if (ok(code)) { $('start-code').textContent = shown(code); view('start'); } else { view('code'); if (qs.get('k')) $('code-note').textContent = 'That code didn’t look right. It is P- and 4 letters or numbers.'; }
+if (ok(code)) { $('start-code').textContent = shown(code); view('start'); } else { view('code'); if (qs.get('k')) $('code-note').textContent = 'That code isn’t valid. Codes are P- and 4 letters or numbers.'; }
 $('code-in').addEventListener('input', e => { e.target.value = clean(e.target.value); });
 $('code-form').addEventListener('submit', e => { e.preventDefault(); const c = clean($('code-in').value);
-  if (!ok(c)) { bad('The code is P- and 4 letters or numbers.'); return; }
+  if (!ok(c)) { bad('Codes are P- and 4 letters or numbers.'); return; }
   code = c; history.replaceState(null, '', 'pad.html?k=' + c); $('start-code').textContent = shown(c); view('start'); });
 
 // ---------- the sensors ----------
@@ -59,7 +59,7 @@ document.addEventListener('visibilitychange', () => { if (started && document.vi
 
 async function start() {
   if (!window.DeviceMotionEvent || !window.DeviceOrientationEvent) { view('nomotion'); return; }
-  if (!window.isSecureContext) { $('nomotion-p').textContent = 'Phones only share their motion sensors with a secure (https) page. Open poddleball.com instead.'; view('nomotion'); return; }
+  if (!window.isSecureContext) { $('nomotion-p').textContent = 'Motion sensors only work on a secure page. Open poddleball.com instead.'; view('nomotion'); return; }
   if (!await allow()) { view('denied'); return; }
   if (!started) { window.addEventListener('deviceorientation', onOrientation); window.addEventListener('devicemotion', onMotion); }
   started = true; sawMotion = false; stayAwake(); connect(); view('live'); render();
@@ -130,7 +130,7 @@ function glow(n, fresh) {
     { duration: smash ? 900 : 420 + 380 * n, easing: 'cubic-bezier(.2,.7,.3,1)' }); glowAnim.smash = smash;
 }
 window.__glow = glow;      // test/pad-glow shots
-const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Swing!', idle: '', found: 'Match found', game: 'Game won', series: 'Match over' };      // found / game / series: Ranked (docs/RANKED.md 8.11), a buzz each and the headline
+const FX_TEXT = { cal: 'Follow the steps on your computer', play: 'Playing', idle: '', found: 'Match found', game: 'Game won', series: 'Match over' };      // found / game / series: Ranked (docs/RANKED.md 8.11), a buzz each and the headline
 function fx(m) {
   if (m.fx === 'hit') { try { navigator.vibrate && navigator.vibrate(20 + Math.round(50 * (m.b != null ? m.b : m.n || 0))); } catch { /* no buzzer (iOS) */ }
     glow(m.n || 0, true); }
@@ -145,9 +145,9 @@ function render() {
   const on = stats.open && stats.host, was = document.body.dataset.link; document.body.dataset.link = on ? 'on' : 'wait';
   const ring = $('ring'); if (on && was === 'wait' && !still(ring)) ring.animate([{ scale: 1 }, { scale: 1.07, offset: 0.4 }, { scale: 1 }], { duration: 440, easing: 'cubic-bezier(.34,1.56,.64,1)' });      // a little 'hello' when the computer answers
   say($('live-h'), on ? (fxText || 'Connected') : stats.open ? 'Looking for your computer' : 'Reconnecting');
-  say($('live-p'), on ? 'Watch the computer, not the phone. Keep this page open.' : stats.open ? `Open poddleball.com on a computer and press Play. This phone is paddle ${code}.` : 'Check this phone is online.');
+  say($('live-p'), on ? 'Watch the computer, not the phone. Keep this page open.' : stats.open ? `Open poddleball.com on a computer and press Play. Paddle code: ${shown(code)}.` : 'Check that this phone is online.');
 }
 let lastSent = 0;
-setInterval(() => { stats.hz = stats.sent - lastSent; lastSent = stats.sent; $('live-stats').textContent = stats.open && stats.host ? `${stats.hz} samples/s · ${Math.round(stats.rtt)} ms` : ''; }, 1000);
+setInterval(() => { stats.hz = stats.sent - lastSent; lastSent = stats.sent; }, 1000);
 setInterval(() => { $('ring-fill').style.transform = `scaleY(${Math.min(1, peak / 25).toFixed(3)})`; const w = $('ring-word'), t = peak > 20 ? 'Smash' : peak > 9 ? 'Swing' : 'Ready';
   if (w.textContent !== t) { w.textContent = t; if (t !== 'Ready' && !still(w)) w.animate([{ scale: 1.25 }, { scale: 1 }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' }); } peak *= 0.8; }, 100);      // the meter jumps with a swing and sinks back. 'Smash' from 20 rad/s: below ~19 phone rad/s the game can no longer call one, however wide the stroke (web/motion.js PACE_R x sqrt(RATE_GAIN), NOTES 82); it said so from 18

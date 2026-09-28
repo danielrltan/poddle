@@ -56,11 +56,11 @@ function allowRender(req) {                                      // -> { wait (s
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function blurb(d) {                                              // og:description: one line of the best of the card, then where to play
   const bits = [`${d.rank} rank`, ...d.big.slice(0, 2).map(b => b.label === 'Return rate' ? `${b.value} return rate` : b.label === 'Longest rally' ? `${b.value}-hit rally`
-    : b.label === 'Fastest swing' ? `${b.value}°/s swing` : `${b.value} ${b.label.toLowerCase()}`), d.matt ? `beat ${d.matt} Matt (the bot)` : null].filter(Boolean);
+    : b.label === 'Fastest swing' ? `${b.value}°/s swing` : `${b.value} ${b.label.toLowerCase()}`), d.matt ? `beat the ${d.matt} bot` : null].filter(Boolean);
   return bits.join(' · ') + '. Pickleball with your phone as the paddle. Play free at poddleball.com';   // what the game is: most people who see the preview never open the page
 }
 function html(d, url, image, img) {
-  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, d.trophies ? `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}` : '', ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat ${d.matt} Matt, the bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
+  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, d.trophies ? `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}` : '', ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat the ${d.matt} bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -122,7 +122,7 @@ h1{margin:0;font-size:clamp(22px,3.4vw,30px);font-weight:900;line-height:1.25;co
 <a class="logo" href="/" aria-label="Poddle home">P<i></i>ddle</a>
 <a class="card" href="/"><img src="${esc(img)}" width="1200" height="630" alt="${esc(alt)}"></a>
 <h1>${d.guest ? 'This player' : esc(d.name)} plays pickleball with a phone for a paddle.</h1>
-<p class="what">Free in your browser, with your phone or AirPod. Your turn.</p>
+<p class="what">Free in your browser. Play with your phone or an AirPod.</p>
 <a class="play" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>Play Poddle free</a>
 <p class="own">Make your own card: <a href="/">play</a>, then open Your stats</p>
 </main>

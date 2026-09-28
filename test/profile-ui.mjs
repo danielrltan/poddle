@@ -97,7 +97,7 @@ ok(socks.every(s => !id0 || !s.url.includes(id0)), `the id is never in a WebSock
 const card = () => ev(pg, () => { const h = id => { const e = document.getElementById(id); return !e || e.hidden; }; return { box: !h('result-save'), text: document.getElementById('result-save-text')?.textContent || '', notice: !h('result-notice'), nudge: !h('btn-save-signin') }; });
 push({ type: 'matchover', winner: 0, score: [11, 5], forfeit: false, rematchBy: 20, reg: [false, false] }); await sleep(150);
 push({ type: 'profile', saved: true, guest: true, ranked: true, first: true, level: 3, created: true, nudge: true, streak: 1, bests: [], why: [] }); await sleep(400);
-r = await card(); ok(r.box && r.text === 'First win against Tour Matt!' && r.notice && !r.nudge, `profile after matchover: "${r.text}", notice ${r.notice}, no nudge with sign-in off (${r.nudge})`);
+r = await card(); ok(r.box && r.text === 'First win against Tour Matt' && r.notice && !r.nudge, `profile after matchover: "${r.text}", notice ${r.notice}, no nudge with sign-in off (${r.nudge})`);
 push({ type: 'matchover', winner: 0, score: [11, 9], forfeit: false, rematchBy: 20, reg: [false, false] }); await sleep(150);
 push({ type: 'profile', saved: true, guest: true, ranked: true, first: false, level: 3, streak: 2, bests: [], why: [] }); await sleep(400);
 r = await card(); ok(r.box && r.text === '2 wins in a row' && !r.notice, `a later profile without created: "${r.text}", no notice (${r.notice})`);
@@ -349,7 +349,7 @@ await pg.close();
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300);
   await ev(pg, () => { window.__clip.length = 0; }); await pg.click('#btn-share-copy'); await sleep(400);
   r = await ev(pg, () => ({ b: document.getElementById('btn-share-copy').textContent, clip: window.__clip.slice() }));
-  ok(r.b === 'Copied!' && J(r.clip) === J([url1]), `Copy: the link again, the button says "${r.b}" (${J(r.clip)})`);
+  ok(r.b === 'Copied' && J(r.clip) === J([url1]), `Copy: the link again, the button says "${r.b}" (${J(r.clip)})`);
   await pg.click('#btn-share-dl'); let file = ''; for (let k = 0; k < 30 && !file; k++) { await sleep(200); file = fs.readdirSync(DL).find(f => f === 'poddle-card.png') || ''; }
   { const got = file ? fs.statSync(path.join(DL, file)).size : 0, want = fs.statSync(CARD).size; ok(!!file && got === want, `Download image: poddle-card.png with the picture's bytes (${got} of ${want})`); }
   await pg.click('#btn-share-native'); await sleep(300); r = await ev(pg, () => window.__shared.slice());
@@ -379,7 +379,7 @@ await pg.close();
   // under 10 chances: no percentage, the coaching line, an empty ring
   API.profile = { ...FIXTURE, play: { ...FIXTURE.play, returns: 4, chances: 6 } }; await openStats();
   r = await ev(pg, () => ({ pct: !document.getElementById('st-ret-pct').hidden, cap: document.getElementById('st-ret-cap').textContent, hint: document.getElementById('st-ret').classList.contains('is-hint'), zero: document.getElementById('st-ring').classList.contains('is-zero') }));
-  ok(!r.pct && r.cap === 'Return 10 balls to see it' && r.hint && r.zero, `6 chances: no percentage, "${r.cap}", an empty ring (${J(r)})`);
+  ok(!r.pct && r.cap === 'Shows after 10 balls are hit to you' && r.hint && r.zero, `6 chances: no percentage, "${r.cap}", an empty ring (${J(r)})`);
   await pg.screenshot({ path: path.join(SHOTS, 'stats-coach-1280x800.png') });
   // an older server: no play, no share -> no play row, no Share card, the rest as before (the Ranked hero from the fixture's ladder: Silver II)
   { const OLD = { ...FIXTURE }; delete OLD.play; delete OLD.share; API.profile = OLD; } await openStats();
