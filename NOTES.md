@@ -2635,3 +2635,10 @@ restored exactly that for VICTORY!. So the fix is pacing, not a copy of the old 
   claps and stats play their usual entrance. The buttons are still keyboard-focused and clickable at once.
 - Only on a win of your own (as before); reduced motion skips the stamp and the wait. RANK UP keeps its short slam.
 - test/ui-next.mjs reads the counted-up scores at ~2.1 s instead of ~1.3 s.
+
+## 131. Longest rally is the Leaderboard's first tab
+
+The owner asked for Longest rally to be the first tab on the global leaderboard (NOTES 126). The tabs read Longest rally,
+Trophies, Win streak, and the page opens on Longest rally (web/profile.js `board`). The #N place pill beside the rank on Your
+stats still opens the Trophies board, since that number is a trophy place (ui.js sets lb-tabs data-want, showBoard reads it).
+The API's own default board (?b omitted) stays trophies; the page always asks for a board by name.

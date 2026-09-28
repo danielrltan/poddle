@@ -841,7 +841,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('btn-watch-code', 'click', () => { const c = getCode(); if (c.length === 4 && !needName() && on.watch) on.watch(c); });
   on2('btn-bot', 'click', () => { if (!needName()) lobbyView('bot'); });
   on2('btn-profile', 'click', () => lobbyView('profile'));      // no name needed: nobody is seated
-  on2('btn-leaderboard', 'click', () => lobbyView('leaderboard')); on2('st-place', 'click', () => lobbyView('leaderboard'));      // the global leaderboard, from its tile or from the #301 beside the rank on Your stats
+  on2('btn-leaderboard', 'click', () => lobbyView('leaderboard')); on2('st-place', 'click', () => { const t = $('lb-tabs'); if (t) t.dataset.want = 'trophies'; lobbyView('leaderboard'); });      // the global leaderboard, from its tile or from the #301 beside the rank on Your stats
   on2('btn-ranked', 'click', () => { if (!needName()) lobbyView('ranked'); });      // Ranked seats you: it needs a name, like Quick play
   on2('btn-ranked-go', 'click', () => { if (!needName() && on.ranked) on.ranked(); });
   on2('btn-rk-warm', 'click', () => { if (on.rkWarm) on.rkWarm(); }); on2('btn-rk-cancel', 'click', () => { if (on.rkCancel) on.rkCancel(); });      // the search bar (OPTIONAL WARM-UP): its two actions

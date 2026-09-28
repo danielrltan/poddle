@@ -188,7 +188,8 @@ const BOARD = {
   rally: { what: 'Longest rally, in hits', unit: n => (n === 1 ? 'hit' : 'hits'), none: 'Keep the ball in play for a rally of 3 or more' },
   streak: { what: 'Best win streak against people', unit: n => (n === 1 ? 'win' : 'wins'), none: 'Win a match against a person' },
 };
-let board = 'trophies', boardGen = 0, places = null;      // places: the last /api/stats answer's places ({ listed, why, hidden, trophies, rally, streak }), null = not known
+let board = 'rally', boardGen = 0, places = null;      // Longest rally is the first tab (NOTES 131); the #N beside the rank on Your stats opens Trophies (lb-tabs data-want)
+      // places: the last /api/stats answer's places ({ listed, why, hidden, trophies, rally, streak }), null = not known
 const placeOf = p => (p && p.places && typeof p.places === 'object' ? p.places : null);
 const rankNum = n => '#' + Number(n).toLocaleString('en-US');
 // Your stats: the trophy place beside the rank name ('Champion II  #301'). Only for a listed player with trophies: a guest, a player with no username
@@ -239,6 +240,7 @@ async function drawBoard() {
   list.scrollTop = 0;
 }
 export async function showBoard() {                        // the view opened: the board at once, then my places from /api/stats
+  { const tabs = $('lb-tabs'), w = tabs && tabs.dataset.want; if (w) { delete tabs.dataset.want; if (BOARD[w]) board = w; } }      // opened from a place pill: that pill's board
   drawBoard(); if (!on) return;
   const p = await fetchProfile(); places = placeOf(p);
   if (h.view() === 'leaderboard') drawBoard();      // my row lights up once the list knows whether I am hidden
