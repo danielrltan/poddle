@@ -2376,3 +2376,17 @@ The owner wanted "lots of emphasis on the ranked match experience" (Brawl Stars 
   - `verify.mjs` has only the 3 known main failures (lobby-courts 44 px, tourney-banner 12 px x2). All Ranked checks pass, including the contrast of the warm deciding card (5.72:1) and the gold row (7.25:1).
   - `ranked-e2e`: 30/30 PASS.
   - Before and after stills are in test/ui-shots/rk-before/ and rk-after/ (not committed).
+
+## 118. Share card: no taunt line, the same six stats on every card
+
+The owner: "Think you can return my serve?" was corny, and the card should not pick flattering stats, so cards compare.
+- **Call to action** (server/card.js): "Play free at poddleball.com" over "Pickleball in your browser · your phone is the paddle".
+- **Fixed figures**: every card draws the same six tiles in two rows, in one order: return rate (with its bar), longest
+  rally (hits), fastest swing (°/s), record vs people, best streak, winners. Zeros are drawn; '-' only where there is no
+  data at all (no ball to return yet, no measured swing). No chips, no thresholds (NOTES 114's 20-chance / 50% / winning-record
+  rules are gone). One figure size for all six. The trophies pill (0 too) and the bot badge ("No bot beaten yet") always show,
+  so the left column is laid out the same on every card. The name moved up so its descenders clear the tiles.
+- og:description names the same figures (return rate, rally, record vs people), leaving out a '-'.
+- CARD_V 5: every card URL changes, so chat apps fetch the new picture. Privacy (the six stats, zeros included), terms,
+  changelog, ropa and CLAUDE.md say "the same six stats"; the pages were already dated 2026-09-28. test/share.test.mjs checks
+  the fixed six on weak, fresh and losing profiles and the '-' rule.

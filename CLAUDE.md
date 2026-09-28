@@ -50,7 +50,7 @@ Important changes also need a notice on the home page. Open questions for the op
   name, to the opponent and spectators (VS card, scoreboard, result card). Stats are otherwise private to their owner (no
   leaderboards) unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
   (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), Ranked rank + ladder trophies and its
-  emblem, toughest Matt beaten, up to six card stats, also in the og tags; the apps it is pasted into fetch it for
+  emblem, toughest Matt beaten, the same six card stats for everyone (return rate, rally, swing, record vs people, best streak, winners), also in the og tags; the apps it is pasted into fetch it for
   previews and may keep them. Both players are told when a match did not count.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,

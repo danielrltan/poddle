@@ -93,7 +93,7 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
 - The stats: return rate (returns / chances, shown only from 10 chances up; since the review fixes, NOTES 114: a card tile only from 20 chances at 50% or better, the rally from 5 hits; since design round 1: W-L vs people only from 3 wins with more wins than losses, matches played as a chip only, the swing after record / streak / titles), longest rally, fastest swing (deg/s,
   rounded to 10 like the page), W-L vs people, best win streak, titles, winners/aces if room. Choose what reads best;
   zero or missing values are left off rather than shown as 0.
-- The brand: the Poddle wordmark/ball, "poddleball.com", a call to action ("Think you can return my serve?").
+- The brand: the Poddle wordmark/ball, "poddleball.com", a plain call to action ("Play free at poddleball.com" over "Pickleball in your browser · your phone is the paddle"; no taunt line, NOTES 118).
 - The look: the game's bright sky/court palette, chunky rounded type (M PLUS Rounded 1c 800/900), gold accents,
   crisp at 1200x630 and legible when a chat app shrinks it to ~400 px wide. It has to make people want to click.
 

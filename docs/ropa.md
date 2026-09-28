@@ -57,9 +57,9 @@ Last reviewed: 2026-09-28 (Save my stats removed: stats are always recorded, NOT
   renders a minute (server/share.js), and the last 64 rendered PNGs (until replaced or a restart; privacy section 7 says so).
 - Made public to anyone with the link (page /c/<slug> and its PNG, both `noindex`): the username (or "Poddle player";
   guest display names are never stored), the Ranked rank and division with its emblem and the ladder trophies
-  (Bronze I, no trophies, before any Ranked game), the toughest Matt beaten, up to six stats (return rate,
-  longest rally, fastest swing, W-L vs people, best streak, titles, winners, aces, smashes, matches played), read
-  from the profile at request time.
+  (Bronze I, 0 trophies, before any Ranked game), the toughest Matt beaten, the same six stats on every card, zeros
+  included (return rate, longest rally, fastest swing, W-L vs people, best streak, winners), read from the profile
+  at request time.
 - Basis: contract (Art. 6(1)(b)): the sharing feature the player asks for; stopped at any time (Stop sharing).
 - Recipients: anyone the player gives the link to; the servers of the apps it is pasted into (link-preview
   crawlers: iMessage, WhatsApp, Discord, Slack, X, LinkedIn and so on), which may keep their own preview copy; Fly.io.
