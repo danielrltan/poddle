@@ -3,8 +3,20 @@
 const $ = id => document.getElementById(id);
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };   // replay a one-shot CSS animation
-const setText = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };       // names arrive here: textContent only, never markup
-const swapText = (el, t, cls) => { if (!el || el.textContent === t) return false; el.textContent = t; if (cls) restart(el, cls); return true; };      // setText that replays a one-shot (cls) when the words really change
+// The gold trophy stands for the word (NOTES 138): in an element marked data-cup, every "trophy" / "trophies" in its text becomes the icon (its
+// aria-label keeps the word). Only on elements that hold our own words, never on a player's name, so a username "Trophy" stays a name.
+const CUP_SVG = '<svg class="cup-ic" viewBox="0 0 24 24" role="img" aria-label="LABEL"><path class="cup-h" d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4"/><path class="cup-c" d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z"/><path class="cup-s" d="M10.5 14.5h3v3h-3Z"/><rect class="cup-b" x="7" y="17" width="10" height="4" rx="1.2"/><path class="cup-g" d="M9 5.5v3.8a3.2 3.2 0 0 0 1.4 2.6"/></svg>', CUP_SPLIT = /\b(troph(?:y|ies))\b/i;
+const cupped = el => { cupify(el); return el; };
+export function cupify(el) {
+  if (!el) return; const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), hits = [];
+  for (let n = w.nextNode(); n; n = w.nextNode()) if (CUP_SPLIT.test(n.data) && !n.parentElement?.closest('.cup')) hits.push(n);
+  for (const n of hits) { const f = document.createDocumentFragment();
+    n.data.split(CUP_SPLIT).forEach((part, i) => { if (i % 2) { const c = document.createElement('i'); c.className = 'cup'; c.innerHTML = CUP_SVG.replace('LABEL', part.toLowerCase()); f.append(c); } else if (part) f.append(part); });
+    n.replaceWith(f); }
+}
+const cupT = new WeakMap();      // the words last set on a data-cup element: its textContent no longer holds them once the icons are in
+const setText = (el, t) => { if (!el) return; if (el.hasAttribute('data-cup')) { if (cupT.get(el) === t) return; cupT.set(el, t); el.textContent = t; cupify(el); return; } if (el.textContent !== t) el.textContent = t; };       // names arrive here: textContent only, never markup
+const swapText = (el, t, cls) => { if (!el) return false; const cup = el.hasAttribute('data-cup'); if (cup ? cupT.get(el) === t : el.textContent === t) return false; el.textContent = t; if (cup) { cupT.set(el, t); cupify(el); } if (cls) restart(el, cls); return true; };      // setText that replays a one-shot (cls) when the words really change
 { const ONE = { 'lob-row-in': 'lob-in', 'num-pop': 'lob-pop', 'lob-fill': 'lob-fill', 'lob-clear': 'lob-clear', 'lob-swap': 'lob-swap', nudge: 'lob-nope' };      // one-shot class <- its animation: back to rest when it ends (or a hidden screen cancels it), so nothing replays when it shows again
   const done = e => { const c = ONE[e.animationName]; if (c && e.target.classList?.contains(c) && (e.type === 'animationend' || e.target.closest?.('.screen:not(.is-active)'))) e.target.classList.remove(c); };      // a cancel from restart() itself must not strip the replay it just started
   document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
@@ -82,13 +94,14 @@ function adoptTitle(el) {
 function tipShow(el) {
   const t = el.dataset.tip; if (!t) return;
   if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'tip'; tipEl.setAttribute('aria-hidden', 'true'); document.body.append(tipEl); }
-  tipFor = el; tipEl.textContent = t; tipEl.classList.remove('on');
+  tipFor = el; tipEl.textContent = t; cupify(tipEl); tipEl.classList.remove('on');
   const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight, below = r.top < h + 12;
   tipEl.style.left = Math.round(Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))) + 'px';
   tipEl.style.top = Math.round(below ? r.bottom + 8 : r.top - h - 8) + 'px';
   tipEl.classList.toggle('is-below', below); void tipEl.offsetWidth; tipEl.classList.add('on');
 }
 const tipOff = () => { clearTimeout(tipT); tipFor = null; tipEl?.classList.remove('on'); };
+document.querySelectorAll('[data-cup]').forEach(cupify);      // the words in the markup (the Ranks page's lead, the leaderboard's Trophies tab)
 if (typeof MutationObserver === 'function' && document.documentElement) {
   document.querySelectorAll('[title]').forEach(adoptTitle);
   new MutationObserver(ms => { for (const m of ms) { if (m.type === 'attributes') { if (m.target.hasAttribute('title')) adoptTitle(m.target); }
@@ -159,8 +172,8 @@ export function countdown(n) {
   if (b.textContent !== t) { b.textContent = b.dataset.text = t; restart(el, 'tick'); }
 }
 let toastT;
-export function toast(text, ms = 1200) {
-  const el = $('toast'), b = document.body, again = el.classList.contains('on') && el.textContent !== text; el.textContent = text; el.classList.add('on'); b.classList.add('has-toast');     // .has-toast: the key strip yields the bottom band
+export function toast(text, ms = 1200, cup = false) {      // cup: the words are ours, the trophy icon may stand for 'trophies' (never for a toast that carries a name)
+  const el = $('toast'), b = document.body, again = el.classList.contains('on') && el.textContent !== text; el.textContent = text; if (cup) cupify(el); el.classList.add('on'); b.classList.add('has-toast');     // .has-toast: the key strip yields the bottom band
   if (again) restart(el, 'ov-bump');                                                   // new words in a toast that is already up: a small bump, not a silent swap
   clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('on'); b.classList.remove('has-toast'); }, ms);
 }
@@ -1222,7 +1235,7 @@ const divIn = (n, tier, div) => (div === 2 || div === 3 ? div : div === 1 ? 1 : 
 export function rkTile(o = {}) {
   const em = $('ranked-em'), gate = o.gate === 'signin' || o.gate === 'username' ? o.gate : '', tier = gate ? 0 : tierOf(o.tier), n = Math.max(0, o.trophies | 0);      // gate (NOTES 133): Ranked needs a sign-in (and a username): the tile says so, the emblem dimmed
   if (em) { const d = tier ? divIn(n, tier, o.div) : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs', d); em.append(e); } setEmblem(e, tier || 1, d); e.classList.toggle('is-off', !tier); }
-  setText($('ranked-line-text'), gate === 'signin' ? 'Sign in to play' : gate === 'username' ? 'Pick a username to play' : tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n}` : 'Play your first match');
+  setText($('ranked-line-text'), gate === 'signin' ? 'Sign in to play' : gate === 'username' ? 'Pick a username to play' : tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n} trophies` : 'Play your first match');
   const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
 }
 // the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
@@ -1243,7 +1256,7 @@ function drawRanks() {
     const divs = mk('span', 'rkx-divs'); if (hasDivs(t)) [0, 1, 2].forEach(d => { const on = now && d + 1 <= me.div || done, pip = mk('span', 'rkx-evo' + (on ? ' is-on' : '')); pip.append(emblemEl(t, 'is-sm', d + 1), mk('span', 'rkx-div' + (on ? ' is-on' : ''), romanOf(d + 1)), mk('small', 'rkx-at', String(floor + d * DIV_W))); divs.append(pip); });      // each division's own medal, its numeral and where it starts (NOTES 124): the medal grows I, II, III
     else divs.append(mk('span', 'rkx-div' + (now || done ? ' is-on' : ''), 'By leaderboard place'));      // Pro: no divisions, the global leaderboard tells its players apart
     const tag = now ? mk('span', 'rkx-tag is-now', `You · ${proLabel(t, me.div, me.place)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Never lost') : null;
-    li.append(em, mk('b', 'rkx-name', r.name), mk('small', 'rkx-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`), divs); if (tag) li.append(tag);
+    li.append(em, mk('b', 'rkx-name', r.name), cupped(mk('small', 'rkx-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`)), divs); if (tag) li.append(tag);
     li.setAttribute('aria-label', `${r.name}, from ${floor} trophies${now ? `, your rank, ${rankLabel(t, me.div)}` : done ? ', reached' : ''}`); g.append(li);
   });
 }

@@ -5,7 +5,7 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 7;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 8;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
@@ -158,9 +158,10 @@ ${E ? E.defs : ''}
   out.push(text(cx, top + 290, rk, { size: fit(rk, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
   let ly = top + 314;
   {
-    const tro = `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}`, tw = measure(tro, 800, 28) + 44;
+    const tro = String(d.trophies), nw = measure(tro, 800, 28), IC = 34, tw = nw + 8 + IC + 44, x0 = cx - tw / 2 + 22;      // the number, then the gold trophy for the word (NOTES 138, web/ui.js CUP_SVG)
     out.push(`<rect x="${r2(cx - tw / 2)}" y="${ly}" width="${r2(tw)}" height="46" rx="23" fill="url(#gold)" stroke="#c97f08" stroke-width="2"/>`);
-    out.push(text(cx, ly + 33, tro, { size: 28, wt: 800, fill: '#7a4a00', anchor: 'middle' })); ly += 70;
+    out.push(text(x0, ly + 33, tro, { size: 28, wt: 800, fill: '#7a4a00' }));
+    out.push(`<g transform="translate(${r2(x0 + nw + 8)} ${ly + 6}) scale(${IC / 24})"><path d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4" fill="none" stroke="#c97f08" stroke-width="2" stroke-linecap="round"/><path d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z" fill="#fff1a6" stroke="#c97f08" stroke-width="1.2" stroke-linejoin="round"/><path d="M10.5 14.5h3v3h-3Z" fill="#c97f08"/><rect x="7" y="17" width="10" height="4" rx="1.2" fill="#7a4a00"/></g>`); ly += 70;
   }
   {
     const lv = d.matt ? LV[d.mattI] || LV[0] : ['#c3dbe8', '#65717b'], s = d.matt ? `Beat the ${d.matt} bot` : 'No bot beaten yet', fs = fit(s, 900, 30, 262), sw = measure(s, 900, fs) + 98, x0 = cx - sw / 2;   // "bot", not "Matt": a stranger does not know Matt is the AI. At most 360 px wide: clear of the edge and the panel

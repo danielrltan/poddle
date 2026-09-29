@@ -126,7 +126,7 @@ const autoNow = () => mode === 'auto' || (mode === 'body' && !(body && body.seen
 const s = () => (side === 0 ? 1 : -1);
 
 // ---------- messages ----------
-const say = (text, _color, ms = 1200) => ui.toast(text, ms);   // small pill toast
+const say = (text, _color, ms = 1200, cup = false) => ui.toast(text, ms, cup);   // small pill toast
 let rally = 0, unsettled = null;                  // unsettled: my last swing report, while it is still a bet
 // This match's stats for the result card (ui.matchResult o.stats). Memory only: nothing is saved or sent. null = not seen from 0-0 (a reconnect,
 // a late spectator, a missed point), and the card shows no stats rather than wrong ones. kind: each side's last shot, counted once with its final kind.
@@ -389,13 +389,13 @@ function onRkFail(why, warm) {                     // the queue said no: a toast
   if (room && rkKind && !spec()) toLobby();         // every rkfail on a Ranked court comes after the server took the seat away (Play again on the series card, no hello): no 'closed' follows, so leave the dead court now (toLobby first: it clears toasts)
   const stale = why === 'signin' && !profile.rkGate();      // signed in here, but this socket opened before the cookie (NOTES 133): it reconnects with it
   if (stale) redialWait = true;
-  say(stale ? 'Connecting your account. Press Find a match again' : RK_FAIL[why] || 'Couldn’t join Ranked. Try again.', null, 3200); rkBarSync(); redialDue();
+  say(stale ? 'Connecting your account. Press Find a match again' : RK_FAIL[why] || 'Couldn’t join Ranked. Try again.', null, 3200, true); rkBarSync(); redialDue();
 }
 function endRk(why) {                              // rkend: restart | gone (and 'late': an rkres answered the reconnect). Only ever an answer to a reconnect with &rk=1, which left this socket in the lobby: nothing is revived (docs/RANKED.md 3.10)
   clearTimeout(rkHang); clearTimeout(rkVsT); rkWait = false; rkLeft = 0; rkSinceP = 0; rkQueued = false; rkMoving = false; rkPhase = 'off'; rkWarmNow = false; rkSeries = null; ui.rkSearch?.(false); ui.setSeries?.(null); rkBarSync();
   if (['tour-vs', 'rk-vs'].includes(ui.currentOverlay())) ui.showOverlay(null);
   if (room) toLobby(); else { if (phase === 'lobby' && ui.currentScreen() !== 'lobby') screen('lobby'); if (phase === 'lobby') ui.lobbyView('ranked'); }
-  if (why === 'restart') say('Poddle was updated. This Ranked match doesn’t count. No trophies changed.', null, 4000); venueSync(); redialDue();
+  if (why === 'restart') say('Poddle was updated. This Ranked match doesn’t count. No trophies changed.', null, 4000, true); venueSync(); redialDue();
 }
 const rkRow = m => ({ ...m, forfeit: m.forfeit === true || rkWalk && m.won === true, leaver: rkLeaver(m) });      // the card's row: a win by forfeit is a Walkover, my own forfeit is never 'didn’t count'
 function onRkRes(m) {                              // my side of a settlement (heard anywhere, the leaver in the lobby included): the card's trophy row on the court, a line on the view otherwise
@@ -848,7 +848,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
 profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
   gate: () => rkTile(),      // sign-in, sign-out or a new username: the Ranked tile's line follows (NOTES 133)
-  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), board: () => { if (!room) ui.lobbyView('leaderboard'); }, rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0, place: Number.isInteger(L.place) ? L.place : rkYou.place }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
+  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), cup: el => ui.cupify?.(el), board: () => { if (!room) ui.lobbyView('leaderboard'); }, rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0, place: Number.isInteger(L.place) ? L.place : rkYou.place }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 rkTile();                                          // the Ranked tile's line before anything is known: the dimmed Bronze emblem and 'Play your first match'
 { const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats, /ranked...: straight back to that view (after profile.init: Your stats fetches through it)

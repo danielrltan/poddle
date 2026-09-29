@@ -10,7 +10,8 @@ const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } }, del(k) { try { localStorage.removeItem(k); } catch { /* same */ } } };
 const show = (id, on) => { const el = $(id); if (el) el.hidden = !on; return !!el && !el.hidden; };
-const text = (id, t) => { const el = $(id); if (el && el.textContent !== t) el.textContent = t; };
+const cupT = new WeakMap();      // data-cup elements (NOTES 138): main.js's hook turns 'trophies' into the gold icon, so the words last set are kept here
+const text = (id, t) => { const el = $(id); if (!el) return; if (el.hasAttribute('data-cup')) { if (cupT.get(el) !== t) { cupT.set(el, t); el.textContent = t; h.cup(el); } return; } if (el.textContent !== t) el.textContent = t; };
 const mk = (tag, cls, t) => { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; };
 const day = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : '';
 const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/s rounded to 10 (Q7): 27.4 rad/s = 1570°/s
@@ -454,7 +455,7 @@ let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, rankBadge: noop, board: noop, gate: noop };
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, rankBadge: noop, board: noop, gate: noop, cup: noop };
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now

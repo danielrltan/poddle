@@ -2741,3 +2741,16 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
 - Tests: test/scene-next.mjs "named look: Dan" (colours, hair and eyes hidden, glow intact after ghostify, Matt unchanged,
   setLooks([null, null]) restores, attract rally, lookFor cases) and a front / back / Matt render
   (test/ui-shots/scene-next/dan-front-back-and-matt-1280x720.png). scene-preview.html takes `&dan=0|1`.
+
+## 138. The gold trophy replaces the word "trophies" everywhere in the game
+- NOTES 136 put the icon on the leaderboard and Your stats; now every place the game says trophy / trophies shows it:
+  the Ranked view's count, the Ranks page (its lead line and every "From 300 [cup]"), the Ranked tile's line
+  ("Silver II · 240 [cup]"), the VS card ("Friendly match, no [cup]"), the match-end trophy roll (under the number) and
+  its pill and note, the Ranked status line under Find a match (settlements, the sign-in gate), the two Ranked toasts,
+  the leaderboard's Trophies tab (icon only, its accessible name "trophies"), its caption and empty-state lines, and any
+  tooltip. ui.js cupify(el) swaps the words for the icon (aria-label keeps the word) in elements marked data-cup only,
+  so a player's name is never touched (a username "Trophy" stays a name); setText / swapText / profile.js text() on a
+  data-cup element remember the words they set. Toasts only when the caller says the words are its own (ui.toast cup).
+- The share card PNG (server/card.js) draws the number and a gold trophy in its pill instead of "815 trophies";
+  CARD_V 7 -> 8 so link previews fetch the new picture. The og tags, aria-labels and the static pages (How to play,
+  changelog, Terms, Privacy) keep the word: they are text for other apps, screen readers and legal reading.

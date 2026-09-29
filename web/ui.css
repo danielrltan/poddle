@@ -2058,7 +2058,9 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .lb-who{display:flex;align-items:center;gap:.4rem;min-width:0}
 .lb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;color:var(--ink-strong)}
 .cup-ic{flex:none;width:1.25em;height:1.25em;overflow:visible;filter:drop-shadow(0 .0625rem 0 rgba(201,127,8,.35))} .cup-ic .cup-h{fill:none;stroke:var(--gold-3);stroke-width:2;stroke-linecap:round} .cup-ic .cup-c{fill:var(--gold-2);stroke:var(--gold-3);stroke-width:1.2;stroke-linejoin:round} .cup-ic .cup-s{fill:var(--gold-3)} .cup-ic .cup-b{fill:var(--gold-4)} .cup-ic .cup-g{fill:none;stroke:#fff;stroke-width:1.3;stroke-linecap:round;opacity:.75}      /* the trophy icon in place of the word trophies (NOTES 136) */
-.st-rank-cap .cup-ic{width:1.5rem;height:1.5rem;margin-left:-.125rem} .lb-cup{display:inline-flex;vertical-align:-.2em;margin-left:.25rem} .lb-cup .cup-ic{width:1.35rem;height:1.35rem}
+.st-rank-cap .cup-ic{width:1.5rem;height:1.5rem;margin-left:-.125rem} .cup{display:inline-flex;vertical-align:-.22em;margin:0 .06em;font-style:normal} .cup .cup-ic{width:1.25em;height:1.25em}      /* the icon inside a sentence (ui.js cupify, NOTES 138) */
+.lb-tabs .cup .cup-ic{width:1.5em;height:1.5em} .trophy-word .cup .cup-ic{width:2.4em;height:2.4em}
+.lb-cup{display:inline-flex;vertical-align:-.2em;margin-left:.25rem} .lb-cup .cup-ic{width:1.35rem;height:1.35rem}
 .lb-v{white-space:nowrap;color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)} .lb-v b{font-size:var(--t-lg);font-weight:900;color:var(--ink-strong);font-variant-numeric:tabular-nums}
 .lb-row.is-me,.lb-you.is-on{border-color:var(--line);background:linear-gradient(180deg,#fff,#eef7fc);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 30%,transparent)}
 .lb-state{position:absolute;inset:0;margin:0;display:grid;place-items:center;text-align:center;color:var(--ink-soft);font-weight:700}
