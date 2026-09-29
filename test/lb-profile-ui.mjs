@@ -89,7 +89,10 @@ await toBoard(pg);
   ok(/^1\. Dan, Developer, Pro, 60 hits\. Open profile$/.test(r.dan || '') && r.me === 'Kiko', `the developer's row says so ("${r.dan}"); my row is Kiko's`); }
 await pg.focus(rowSel('Dan')); await pg.keyboard.press('Enter'); await sleep(120);
 let s = await sheet(pg);
-ok(s.open && s.state === 'loading' && s.name === 'Dan' && s.badge && s.stats.length === 11 && s.stats.every(x => x.skel) && s.stats.map(x => x.l).join() === TAGS.join() && s.em && s.rank === 'Pro', `Enter on Dan's row: the sheet opens loading (the row's emblem, the hammer, eleven skeletons under the card's tags): ${J({ state: s.state, name: s.name, badge: s.badge, rank: s.rank, n: s.stats.length })}`);
+{ const w = await ev(pg, sel => { const b = document.querySelector(sel); return { busy: b.getAttribute('aria-busy'), cls: b.classList.contains('is-opening') }; }, rowSel('Dan'));
+  ok(!s.open && w.busy === 'true' && w.cls, `Enter on Dan's row: no half-drawn card while the answers are on their way, the row is busy (NOTES 150: the card opens once, whole) (${J({ open: s.open, ...w })})`); }
+await sleep(400); s = await sheet(pg);
+ok(s.open && s.name === 'Dan' && s.badge && s.state === 'ok' && !(await ev(pg, sel => document.querySelector(sel).hasAttribute('aria-busy'), rowSel('Dan'))), `then the card opens already loaded (state ${s.state}), the hammer on the name, the row no longer busy`);
 { const a = await ev(pg, () => { const c = document.getElementById('lbp-card'); return { role: c.getAttribute('role'), modal: c.getAttribute('aria-modal'), by: document.getElementById(c.getAttribute('aria-labelledby'))?.textContent }; });
   ok(a.role === 'dialog' && a.modal === 'true' && a.by === 'Dan', `a modal dialog labelled by the name (${J(a)})`); }
 await sleep(500); s = await sheet(pg);
@@ -132,7 +135,10 @@ ok(s.state === 'ok' && s.rank === 'Diamond III' && s.stats.length === 11 && !s.s
 await pg.keyboard.press('Escape'); await sleep(250); s = await sheet(pg); ok(s.focusRow === 'Zed', `and Esc hands focus back to Zed's row (${s.focusRow})`);
 
 // ---------- 9: a stale answer never draws; a double click opens one sheet ----------
-await pg.click(rowSel('Lobster')); await sleep(120); await pg.keyboard.press('Escape'); await sleep(100); await pg.click(rowSel('Nova')); await sleep(1200); s = await sheet(pg);
+await pg.click(rowSel('Lobster')); await sleep(120); await pg.keyboard.press('Escape'); await sleep(100);
+{ const v = await ev(pg, () => window.__ui.lobbyView()); ok(v === 'leaderboard' && !(await sheet(pg)).open, `Esc while Lobster's card is on its way: no card, and the view stays (not the lobby's Back) (${v})`); }
+await sleep(900); ok(!(await sheet(pg)).open, "Lobster's answers arrive after the Esc: no card pops up");
+await pg.click(rowSel('Nova')); await sleep(1200); s = await sheet(pg);
 ok(s.open && s.name === 'Nova' && s.state === 'ok' && s.stats[0].v === '50%', `Lobster (800 ms) closed, Nova (50 ms) opened: the sheet shows Nova, never Lobster (${s.name} ${s.stats[0]?.v})`);
 await pg.keyboard.press('Escape'); await sleep(200);
 await pg.click(rowSel('Juno'), { clickCount: 2 }); await sleep(600); s = await sheet(pg);

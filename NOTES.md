@@ -3080,3 +3080,22 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   pressed by script send nothing and say why; Courts rows, the code boxes and a ?court= link send watch and never join; no name; the paddle code (Go
   lands on pad.html's Start with P-CODE); landscape; and an iPad, a desktop and ?mobile=0 keep the title and the full lobby. Screenshots:
   test/ui-shots/mobile-home.png, mobile-courts.png, mobile-land.png.
+
+## 150. One card, opened whole; the Getting ready panel fits; Friends | Quick play | Ranked; Add friend moves; places on the name line
+- The owner: "I'm seeing the normal stats card appear, but then the friend card pops up after ... delete the shittier, less full
+  stats card". There was only one card (#lbp-card), but it opened at once on its loading face (dashes for all eleven stats, no
+  places, no Matt level, no friend row) and ~400 ms later grew 85 px into the full card with the friend row, which read as a second,
+  lesser card. profile.js openPlayer now waits: the pressed name breathes (.is-opening, aria-busy) and the card opens once, loaded
+  (8 s cap: its error face). Esc while it waits cancels it (and is not the lobby's Back); another name, a closed view or another
+  card open drops it. openCard(id, back, from) keeps the pressed element for Close's focus. Try again inside an open card still
+  shows the loading face. test/lb-profile-ui.mjs checks no card while loading, then a loaded card, and the Esc race. CLAUDE.md
+  gets "One card per thing, and it opens whole" so no session builds a second card for the same thing or opens a card half-drawn.
+- The Getting ready (connect) panel was taller than its body at 1440x900, 1280x720 and small phones and slid under the header and
+  footer: shorter status rows there, a smaller QR under 960 px tall, tighter body padding, and the body scrolls from the top
+  (safe center) if it still does not fit. Measured with the phone-pairing variant (?padtest=1) at 1920x1080 down to 375x667.
+- Home: the three big tiles read Friends | Quick play | Ranked (the owner's order; Friends moved first in the markup, so Tab follows
+  it); on a phone, where the tiles stack, Quick play stays on top (order:-1 at <=480 px).
+- Add friend (the Friends list's and the profile card's): a person-plus icon that waves every few seconds, a shine across the pill,
+  a lift and a spinning + on hover, a squash on press, and the Requested line that replaces it pops in. Reduced motion: none of it.
+- The profile card's leaderboard places (#12 Trophies, #3 Longest rally) sit on the name's line beside the hammer, not in a row of
+  their own between the rank and the stats.

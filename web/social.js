@@ -101,7 +101,7 @@ function whoEl(name, ctx, rank, sub) {                     // the name (a button
 }
 function relActs(name, rel) {                              // what can be done about this name now: one control, never a destructive one
   const k = low(name), wait = busy.has(k), a = [];
-  if (rel === 'none') a.push(btn('btn btn-sm fr-act is-add', 'Add friend', () => act('add', name)));
+  if (rel === 'none') a.push(addIc(btn('btn btn-sm fr-act is-add fr-add', 'Add friend', () => act('add', name))));
   else if (rel === 'in') a.push(btn('btn btn-sm fr-act is-add', 'Accept', () => act('accept', name)));
   else if (rel === 'out') a.push(mk('span', 'fr-tag', 'Requested'));
   else if (rel === 'friend') { const t = mk('span', 'fr-tag is-friend', 'Friends'); t.prepend(tick()); a.push(t); }
@@ -109,6 +109,7 @@ function relActs(name, rel) {                              // what can be done a
   for (const x of a) if (x.tagName === 'BUTTON') x.disabled = wait;
   return a;
 }
+const addIc = b => { const i = mk('i', 'fr-add-ic'); i.setAttribute('aria-hidden', 'true'); i.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c.6-4.2 3.1-6.3 6.5-6.3s5.9 2.1 6.5 6.3Z"/><path class="fr-add-plus" d="M19 7v6M16 10h6"/></svg>'; b.prepend(i); return b; };      // Add friend's person-plus (NOTES 150): it waves, the + pops (ui.css .fr-add)
 const tick = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<path d="m5 12.5 4.5 4.5L19 7.5"/>'; return s; };
 const dots = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>'; return s; };
 function row(cls, name, kids, acts) { const li = mk('li', 'fr-row ' + cls); li.dataset.name = name; li.append(...kids, mk('span', 'fr-acts')); li.lastChild.append(...acts); return li; }
@@ -277,7 +278,7 @@ export function cardRow(box, info) {
   } else if (rel === 'in') {
     who.append(line('Wants to be friends'));
     acts.append(B('lbp-fr-add', 'Accept', () => act('accept', name)), B('btn-quiet', 'Decline', () => act('decline', name)));
-  } else { who.append(line('Friends see when you’re online')); acts.append(B('lbp-fr-add', 'Add friend', () => act('add', name))); }
+  } else { who.append(line('Friends see when you’re online')); acts.append(addIc(B('lbp-fr-add fr-add', 'Add friend', () => act('add', name)))); }
   box.append(who); if (acts.children.length) box.append(acts);
   if (had && !box.contains(document.activeElement)) (box.querySelector('button:not(:disabled)') || box.closest('[tabindex]'))?.focus({ preventScroll: true });      // rebuilt under the focus (a request went out): it stays in the card, where its Tab trap and Esc work
 }

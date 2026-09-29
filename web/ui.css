@@ -280,6 +280,7 @@ body[data-paused]:not([data-settings]):not([data-tourcard]):not([data-friendscar
 /* big status rows for the connect screen */
 .status-list{display:flex;flex-direction:column;gap:.75rem;margin:0;padding:0;list-style:none;text-align:left}
 .status-row{display:flex;align-items:center;gap:1.125rem;min-height:4.5rem;padding:.75rem 1.5rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
+#screen-connect .menu-body{justify-content:safe center;overflow-y:auto;overscroll-behavior:contain;padding-block:var(--s-3)} @media (max-height:960px){ #screen-connect .pad-qr{width:9.75rem;height:9.75rem} #screen-connect .pad-pair{margin-bottom:var(--s-4);padding-block:var(--s-4)} } #screen-connect .status-row{min-height:3.75rem;padding-block:.5rem}      /* the Getting ready panel was taller than its body (1440x900, 1280x720, small phones) and ran under the header and footer (NOTES 150): shorter status rows, and if it is still too tall the body scrolls from the top instead */
 .status-name{font-size:var(--t-lg);font-weight:700;color:var(--ink-strong);min-width:9rem}
 .status-text{flex:1;font-size:var(--t-md);color:var(--ink);line-height:1.35}
 .status-state{font-style:normal;font-size:var(--t-sm);font-weight:800;letter-spacing:.06em;color:var(--ink-faint);white-space:nowrap}
@@ -613,6 +614,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
 .tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
 .tile:nth-child(5){animation-delay:280ms} .tile:nth-child(6){animation-delay:350ms} .tile:nth-child(7){animation-delay:420ms}
+@media (max-width:480px){ #btn-quick{order:-1} }      /* the heroes read Friends | Quick play | Ranked in a row (NOTES 150); stacked on a phone, Quick play stays on top */
 @media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="4"]{display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
 @keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
 /* Five entries (docs/RANKED.md 1.1): a hero row (Quick play, Ranked: art left of the label) over a utility row (Courts, Play a bot, Your stats: icon left, the narrow-window look).
@@ -2125,7 +2127,7 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 
 /* ---------- a player's profile card from the leaderboard (NOTES 140): the share sheet's frame, Your stats' pieces (the emblem, the Matt disc, the figure tiles) ---------- */
 .lbp-card{width:min(32rem,100%)}
-.lbp-title{display:flex;align-items:center;gap:.5rem;min-width:0} .lbp-card .lbp-title h2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-xl);font-weight:900;line-height:1.15}
+.lbp-title{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem .5rem;min-width:0} .lbp-card .lbp-title h2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-xl);font-weight:900;line-height:1.15}
 .lbp-hero{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"em rank" "m mt";column-gap:var(--s-4);row-gap:var(--s-3);align-items:center;padding:var(--s-4) var(--s-5) var(--s-4) var(--s-4);
   --lv:#8fa3b1;--lv-deep:#5d6f7c}
 .lbp-hero:has(.is-lv0){--lv:#3ecf72;--lv-deep:#13803f} .lbp-hero:has(.is-lv1){--lv:#3aa0ff;--lv-deep:#1b63b8} .lbp-hero:has(.is-lv2){--lv:#a77bf3;--lv-deep:#6a3fc2} .lbp-hero:has(.is-lv3){--lv:var(--gold-2);--lv-deep:var(--warn-deep)}      /* .st-matt's level colours: the disc reads them */
@@ -2158,7 +2160,8 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .lbp-hero.no-matt{grid-template-areas:"em rank"} .lbp-hero.no-matt .lbp-matt,.lbp-hero.no-matt .lbp-mtext{display:none} .lbp-hero[hidden]{display:none}
 .lbp-card[data-state="part"] .lbp-stats{display:none}
 .lbp-card .lbp-msg.is-note{padding:0 var(--s-3);font-size:var(--t-sm);font-weight:700;background:none}      /* a quiet line, not the not-found box */
-.lbp-places{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--s-2)} .lbp-places[hidden]{display:none}      /* the place numbers from /api/player: one short line of pills */
+.lbp-places{list-style:none;margin:0 0 0 .25rem;padding:0;display:flex;flex-wrap:wrap;gap:var(--s-1) var(--s-2)} .lbp-places[hidden]{display:none}      /* the place numbers from /api/player: pills on the name's line (NOTES 150), not a row of their own under the rank */
+.lbp-title .lbp-place{padding:.1875rem .625rem;font-size:var(--t-xs)}
 .lbp-place{display:inline-flex;align-items:baseline;gap:.375rem;padding:.3125rem .75rem;border-radius:var(--r-pill);background:#fff;box-shadow:var(--sh-1),inset 0 0 0 .125rem var(--sky-2);font-size:var(--t-sm);font-weight:700;color:var(--ink-soft);white-space:nowrap}
 .lbp-place b{font-weight:900;color:var(--line-deep);font-variant-numeric:tabular-nums} .lbp-place.is-top1 b{color:var(--gold-4)} .lbp-place.is-top2 b{color:var(--silver-4)} .lbp-place.is-top3 b{color:#b8662a}
 /* the friend row: a figure tile's frame (sky-1, the sky-2 hairline) with what we are on the left and the one thing to do on the right */
@@ -2212,6 +2215,22 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .fr-st{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
 .fr-row[data-st="off"] .fr-st{color:var(--ink-faint)}
 .fr-acts{flex:none;display:flex;align-items:center;gap:.375rem}
+.is-opening[aria-busy="true"]{cursor:progress;animation:card-opening 640ms var(--ease-soft) infinite alternate}      /* a name whose profile card is on its way (NOTES 150): it breathes until the card opens, whole */
+@keyframes card-opening{to{opacity:.55}}
+@media (prefers-reduced-motion:reduce){ .is-opening[aria-busy="true"]{animation:none;opacity:.7} }
+/* Add friend (NOTES 150): the person-plus waves hello every few seconds and a shine runs across the pill, so the one thing to do here asks to be pressed;
+   hover lifts it and pops the +, a press squashes it, and the Requested line that replaces it pops in. Reduced motion: none of it */
+.fr-add{background-image:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.95) 50%,transparent 62%),linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);background-size:260% 100%,auto;background-repeat:no-repeat;background-position:160% 0,0 0;animation:fr-shine 3.6s var(--ease-soft) 1.4s infinite;transition:transform var(--d-fast) var(--ease-bounce)}
+.fr-add-ic{flex:none;display:inline-grid;width:1.25em;height:1.25em;margin-right:-.125rem;transform-origin:50% 85%;animation:fr-wave 3.6s var(--ease-soft) 1.4s infinite}
+.fr-add-ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;overflow:visible} .fr-add-ic .fr-add-plus{stroke:var(--line-deep);stroke-width:2.6;transform-box:fill-box;transform-origin:center}
+@media (hover:hover){ .fr-add:hover:not(:disabled){transform:translateY(-.125rem)} .fr-add:hover:not(:disabled) .fr-add-plus{animation:fr-plus 520ms var(--ease-bounce)} }
+.fr-add:active:not(:disabled){transform:scale(.94);transition-duration:90ms}
+.lbp-friend.is-out .lbp-fr-line,.fr-tag{animation:fr-sent 420ms var(--ease-bounce) backwards}
+@keyframes fr-shine{0%,62%{background-position:160% 0,0 0}90%,100%{background-position:-60% 0,0 0}}
+@keyframes fr-wave{0%,64%,100%{rotate:0deg;scale:1}70%{rotate:-14deg;scale:1.12}76%{rotate:10deg;scale:1.12}82%{rotate:-6deg;scale:1.06}88%{rotate:0deg;scale:1}}
+@keyframes fr-plus{0%{scale:1;rotate:0deg}45%{scale:1.5;rotate:90deg}100%{scale:1;rotate:90deg}}
+@keyframes fr-sent{from{opacity:0;scale:.85}}
+@media (prefers-reduced-motion:reduce){ .fr-add,.fr-add-ic,.fr-add .fr-add-plus,.lbp-friend.is-out .lbp-fr-line,.fr-tag{animation:none!important} .fr-add:hover,.fr-add:active{transform:none} }
 .fr-invite:empty{display:none}      /* slice B's invite buttons */
 .fr-act{height:2.5rem;min-height:40px;padding:0 1.125rem;font-size:var(--t-sm);gap:.375rem}
 .fr-row .btn:hover{scale:none}      /* in a scroll box: the lift would clip its halo, as in the court list */

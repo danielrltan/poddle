@@ -289,17 +289,28 @@ export const inLobby = () => !!h.view();      // web/social.js: the lobby is up 
 export function closePlayer() { if (playerOpen()) closeCard(); }      // main.js: MATCH FOUND and a tournament's VS card; seated(): a seat of my own
 // openPlayer(name, { from, rank, via, back }): from = the element pressed (focus goes back to it; Safari does not focus a clicked button); rank = {tier,div}
 // for the loading face; via = 'board' | 'friends' | 'court'; back() = where focus goes when a redraw replaced `from` (web/social.js: that name's new row)
+// NOTES 150: the card opens ONCE, whole. It used to open at once on a skeleton (dashes, no places, no friend row) and then grow into the full card
+// when the answers came, which read as a second, lesser card popping up first. Now the name pressed shows it is busy (.is-opening) and the card
+// opens when both answers are in (or at the 8 s cap, on its error face). Esc, another name, or leaving the view while it waits drops the opening.
+let lbpWait = null;      // { g, mark }: an opening waiting for its answers
+const lbpUnwait = () => { if (!lbpWait) return; const m = lbpWait.mark; if (m) { m.classList.remove('is-opening'); m.removeAttribute('aria-busy'); } lbpWait = null; };
 export function openPlayer(name, { from = null, rank = null, via = 'board', back = null } = {}) {
   name = typeof name === 'string' ? name.slice(0, 12) : ''; if (!name || !$('lbp-card')) return;
   if (from && document.activeElement !== from && from.isConnected) from.focus({ preventScroll: true });
-  lbpName = name; lbpFrom = via; openCard('lbp-card', back);
-  loadPlayer(name, rank && Number.isInteger(rank.tier) ? { tier: rank.tier, div: rank.div } : null);
+  lbpUnwait(); const v0 = h.view(), mark = from && from.isConnected ? from : null;
+  if (mark) { mark.classList.add('is-opening'); mark.setAttribute('aria-busy', 'true'); }
+  loadPlayer(name, rank && Number.isInteger(rank.tier) ? { tier: rank.tier, div: rank.div } : null, g => {      // the answers are in: open now, unless the moment has passed
+    const ok = lbpWait && lbpWait.g === g && h.view() === v0 && !cardOpen(); lbpUnwait();      // a list redrawn under the name (a push, the board refreshing) still opens: Close finds the focus through back()
+    if (!ok) return false; lbpName = name; lbpFrom = via; openCard('lbp-card', back, mark); return true; });
+  lbpWait = { g: lbpGen, mark };
 }
+addEventListener('keydown', e => { if (e.key === 'Escape' && lbpWait) { e.preventDefault(); e.stopImmediatePropagation(); lbpGen++; lbpUnwait(); } }, true);      // Esc while a card is on its way: no card, and not the lobby's Back
 const asked = () => !!(on && me.enabled && me.account && me.account.username);      // /api/player is asked only by a player who can have friends: its rel and st are for them
-async function loadPlayer(name, rank) {      // rank: the opener's emblem for the loading face (null: never played Ranked, or a retry: none known)
-  const g = ++lbpGen; lbpSaid = null; drawPlayer({ name, rank }, 'loading');
-  const get = u => api(u).catch(() => null), both = await Promise.all([get('/api/leaderboard/player?u=' + encodeURIComponent(name)), asked() ? get('/api/player?name=' + encodeURIComponent(name)) : null]);
-  if (g !== lbpGen || !playerOpen()) return;      // closed, or another card opened meanwhile: these answers are stale
+async function loadPlayer(name, rank, open = null) {      // rank: the opener's emblem for a retry's loading face. open(g): a first opening (the card is not up yet: no loading face, NOTES 150)
+  const g = ++lbpGen; lbpSaid = null; if (!open) drawPlayer({ name, rank }, 'loading');      // a retry (Try again, the card is up): its own loading face
+  const get = u => Promise.race([api(u).catch(() => null), new Promise(r => setTimeout(() => r(null), 8000))]), both = await Promise.all([get('/api/leaderboard/player?u=' + encodeURIComponent(name)), asked() ? get('/api/player?name=' + encodeURIComponent(name)) : null]);
+  if (g !== lbpGen) return;      // another name, Esc or a close meanwhile: these answers are stale
+  if (open ? !open(g) : !playerOpen()) return;      // a first opening that is no longer wanted, or a retry whose card was closed
   const [r, q] = both, lb = r && r.ok && r.j && typeof r.j.name === 'string' ? r.j : null, pl = q && q.ok && q.j && typeof q.j.name === 'string' ? q.j : null;
   lbpSaid = pl ? { rel: pl.rel, st: pl.st } : null;
   if (lb) drawPlayer({ ...lb, places: pl && pl.places }, 'ok');
@@ -391,9 +402,9 @@ export async function showRanked() {                       // the Ranked view op
 
 // ---------- the account cards (9.5, 9.7): over everything, one at a time. Escape closes; game keys never reach main.js behind them ----------
 export const cardOpen = () => { const l = $('acct-layer'); return !!l && !l.hidden; };
-function openCard(id, back) {      // back() -> where Close puts the focus if the opener's element is gone (a friends panel redrew: openPlayer's back)
+function openCard(id, back, from = null) {      // from: the element that asked for it, when the card opens later than the press (a profile card waits for its answers, NOTES 150)      // back() -> where Close puts the focus if the opener's element is gone (a friends panel redrew: openPlayer's back)
   const l = $('acct-layer'), c = $(id); if (!l || !c) return;
-  if (!cardOpen()) { lastFocus = document.activeElement; lastBack = typeof back === 'function' ? back : null; }
+  if (!cardOpen()) { lastFocus = from || document.activeElement; lastBack = typeof back === 'function' ? back : null; }
   for (const k of l.children) k.hidden = k !== c; l.hidden = false; openAt = performance.now();
   setTimeout(() => { if (!c.hidden) (c.querySelector('[data-first]:not([hidden])') || c).focus({ preventScroll: true }); }, 30);
 }

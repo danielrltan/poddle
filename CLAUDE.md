@@ -24,6 +24,18 @@ notice the Terms / Privacy pages legally promise for an important change to how 
 profile.js lbNotice are these), and even then ask the owner before adding one. Toasts that answer something the player
 just did (a friend request arrived, a copy worked, an error) are fine: they are not announcements.
 
+## One card per thing, and it opens whole (the owner's rule, 2026-09-29, NOTES 150)
+The owner saw a "shittier, less full stats card" appear and then the friend card pop up after it, and read it as a feature built
+twice. (It was one card opening on a skeleton and then growing into the full card with the friend row.) So:
+- Before building a card, sheet, panel, popup or list row, look for one that already shows the same thing (grep web/index.html for
+  role="dialog", data-view and the component's class prefix; read NOTES for the feature). Extend it; never add a second, lesser
+  version. A player's name, anywhere, opens #lbp-card through profile.js openPlayer() and nothing else.
+- Several sessions work on this repo at once: before adding UI, check `git log origin/main` and the other worktrees for the same
+  feature in progress, and build on it.
+- A card or sheet never opens on a placeholder that later changes shape (skeleton stats, missing rows that pop in). Wait for its
+  data, show the pressed control as busy meanwhile (.is-opening + aria-busy), and open it complete. A retry inside a card that is
+  already open may show its loading face.
+
 ### Current data flows (diff new features against this)
 - Server (Fly.io, Toronto; memory): display name (12 chars), IP (4 courts per IP, 1 open tournament
   per IP, ask-to-play cooldown, 2 Ranked queue entries per computer (Ranked only for signed-in accounts with a username, NOTES 133) and never paired within one computer group), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
