@@ -2679,3 +2679,16 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
   socket, a named account queues, signing out while queued ends the entry, production ignores RK_GUESTS).
 - Decisions made without the owner: a username is required too (Ranked names go on the leaderboard; the username form follows sign-in anyway);
   a guest's share card still shows Bronze I, 0 trophies.
+
+## 134. The leaderboard's You card gets its own padding; the developer's DEV pill becomes a hammer
+- The You card under the global leaderboard (web/index.html #lb-you) used a list row's padding (.25rem top and bottom,
+  .5rem on the left), which only works beside a rank badge. When you are not on the board (guest, no username, hidden,
+  no result yet) the badge is hidden and "You" and its line sat half a rem from the border. It now has its own padding
+  from the spacing tokens (--s-3 top and bottom, --s-5 on the left with no badge, --s-4 on a phone), a 4rem minimum
+  height, and the same width as the list's rows (the list pads them .25rem in); the Show me switch row matches.
+- The developer's badge beside the username Dan (ui.js regBadge, NOTES 106) is a white hammer in an orange disc instead
+  of the letters DEV. Same element, class, aria-label and title ("Developer"); test/profile-ui.mjs checks for the svg.
+- test/ui-shots/sweep.mjs: the real index.html (?acctest=1) against a fake game socket and a fake /api, every lobby
+  view, the You card in all six states (guest, nouser, hidden, none, outside, listed), Settings and the static pages,
+  at 1440x900, 1280x720 and 390x844, with a data-fit / sideways-scroll check. `node test/ui-shots/sweep.mjs <out> [filter]`,
+  SWEEP_PORT (default 9460), SWEEP_SIZES, SWEEP_DPR. Screenshots go to the out dir (default test/ui-shots/sweep, not committed).

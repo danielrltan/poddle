@@ -59,11 +59,12 @@ export function setNames({ me, meSub, them, themSub, reg, rank } = {}) {
 }
 // The registered-name badge: its own element BESIDE the name, never in the name's text, drawn as a pill with an SVG tick, so no
 // name a guest can type reproduces it (docs/ACCOUNTS.md 7.5). Made and removed here: a guest's seat has no .reg-badge at all.
+const HAMMER = '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(40 12 12)"><rect x="10.3" y="7" width="3.4" height="16" rx="1.7"/><path d="M5.5 1.5h10l4 1.5v5l-4 1.5h-10A1.5 1.5 0 0 1 4 8V3a1.5 1.5 0 0 1 1.5-1.5z"/></g></svg';      // the developer's badge: a hammer (NOTES 134), was the letters DEV
 const DEV_NAMES = new Set(['dan']);      // usernames that carry the DEV badge and show in orange (unique and confusable-folded on the server, so only the owner's account has them)
-export function regBadge(nameEl, on) {                   // on: a registered username sits there. Only the developer's gets a mark: a DEV pill beside the name, and the name in orange (NOTES 106)
+export function regBadge(nameEl, on) {                   // on: a registered username sits there. Only the developer's gets a mark: a hammer badge beside the name, and the name in orange (NOTES 106)
   if (!nameEl) return; const dev = !!on && DEV_NAMES.has((nameEl.textContent || '').trim().toLowerCase()), next = nameEl.nextElementSibling, has = !!next && next.classList.contains('reg-badge');
   nameEl.classList.toggle('is-dev', dev);
-  if (dev && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Developer'); b.title = 'Developer'; b.textContent = 'DEV'; nameEl.after(b); }
+  if (dev && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Developer'); b.title = 'Developer'; b.innerHTML = HAMMER; nameEl.after(b); }
   else if (!dev && has) next.remove();
 }
 // The rank emblem beside a name (docs/RANKED.md 6): the same rule as the badge, its own element AFTER the .reg-badge if there is one, else after

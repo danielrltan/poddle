@@ -45,7 +45,7 @@ Important changes also need a notice on the home page. Open questions for the op
   (rename) / 90 d (deleted account). Fly volume snapshots daily, kept 5 d; admin backups in /tmp, gone within 5 d.
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
-  (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a DEV pill
+  (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a hammer badge
   and in orange. In Ranked courts the rank emblem (the rank's tier and division only, never trophies or record) beside a
   name, to the opponent and spectators (VS card, scoreboard, result card). The global leaderboard (NOTES 126; GET /api/leaderboard, public, no sign-in): the top 100 of three boards (Ranked
   trophies, best rally, best win streak vs people), each row place + username + value + rank emblem (tier/div), accounts WITH a

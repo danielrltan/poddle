@@ -1,0 +1,82 @@
+// Spacing sweep screenshots (NOTES 134): the real index.html (?acctest=1) against a fake game socket and a fake /api, every lobby view
+// and the leaderboard's You card in each state, plus the static pages. Usage: node test/ui-shots/sweep.mjs [out-dir] [filter]
+// SWEEP_PORT=<base> moves the ports (default 9460: pages + /api, 9461: fake game, 9462: nothing = no AirPod). SWEEP_SIZES=1440x900,...
+import http from 'http'; import fs from 'fs'; import path from 'path';
+import { WebSocketServer } from 'ws';
+import puppeteer from 'puppeteer-core';
+const P0 = +process.env.SWEEP_PORT || 9460, W = P0, G = P0 + 1, DEAD = P0 + 2, root = new URL('../..', import.meta.url).pathname, sleep = ms => new Promise(r => setTimeout(r, ms));
+const OUT = path.resolve(process.argv[2] || path.join(root, 'test/ui-shots/sweep')), FILTER = process.argv[3] || '';
+fs.mkdirSync(OUT, { recursive: true });
+const J = o => JSON.stringify(o);
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
+
+// ---------- the fake /api: STATE picks the account and the places ----------
+const day = Date.UTC(2026, 8, 20), rung = (level, name, wins, losses, streak, bestStreak, firstWinAt) => ({ level, name, wins, losses, abandons: 0, streak, bestStreak, firstWinAt, bestMargin: 0 });
+const PROFILE = { guest: false, since: day - 864e5, expiresAt: day + 90 * 864e5, played: 9,
+  human: { wins: 3, losses: 2, streak: 1, bestStreak: 2, pointsWon: 50, pointsLost: 41 }, titles: 1,
+  matt: [rung(0, 'Rookie', 3, 0, 3, 3, day), rung(1, 'Club', 1, 1, 0, 1, day + 3600e3), rung(3, 'Tour', 0, 2, 0, 0, null), rung(2, 'Pro', 0, 0, 0, 0, null)],
+  bests: { rally: { v: 14, at: day }, hit: { v: 22, at: day }, speed: { v: 9.4, at: day } },
+  play: { hits: 412, returns: 187, chances: 256, winners: 38, aces: 9, smashes: 21, pointsWon: 214, pointsLost: 173, secs: 4980 },
+  ladder: { trophies: 240, tier: 2, div: 2, floor: 150, next: 250, bestTrophies: 240, bestTier: 2, bestDiv: 2, bestTierAt: day, wins: 3, losses: 1, streak: 1, botWins: 9, botLosses: 4, mattDayLeft: 32 },
+  share: null };
+const NAMES = ['Dan', 'Kiko', 'Rallyqueen', 'Paddlebot', 'Mo', 'Ace_Vega', 'Lobster', 'Zed', 'Pickle_Rick', 'Nova', 'Dinkmaster', 'Juno'];
+const ROWS = NAMES.map((name, i) => ({ rank: i + 1, name, v: 60 - i * 4, tier: i < 8 ? 8 - (i >> 1) : undefined, div: 1 + (i % 3) }));
+const STATES = {      // the You card's states (web/profile.js drawYou)
+  guest: { acct: null, places: null },
+  nouser: { acct: { username: null }, places: null },
+  hidden: { acct: { username: 'Sam' }, places: { listed: false, hidden: true } },
+  none: { acct: { username: 'Sam' }, places: { listed: true, hidden: false } },
+  outside: { acct: { username: 'Sam' }, places: { listed: true, hidden: false, rally: { rank: 1234, v: 9 }, trophies: { rank: 301, v: 240 }, streak: { rank: 88, v: 2 } } },
+  listed: { acct: { username: 'Kiko' }, places: { listed: true, hidden: false, rally: { rank: 2, v: 56 }, trophies: { rank: 2, v: 240 }, streak: { rank: 2, v: 5 } } },
+};
+let STATE = STATES.guest;
+const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
+  if (u === '/api/me') return send(200, { db: true, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: STATE.acct });
+  if (u === '/api/stats') return send(200, { profile: { ...PROFILE, places: STATE.places } });
+  if (u === '/api/leaderboard') return send(200, { rows: ROWS });
+  if (u === '/api/signin/nonce') return send(200, { nonce: 'n'.repeat(32) });
+  return send(404, { error: 'nope' }); };
+const web = http.createServer((q, r) => {
+  if (q.url.startsWith('/api/')) { let body = ''; q.on('data', c => { body += c; }); q.on('end', () => apiAnswer(q, body, r)); return; }
+  let f = path.join(root, decodeURIComponent(q.url.split('?')[0])); if (!f.startsWith(root)) { r.writeHead(403); return r.end(); } if (f.endsWith('/')) f += 'index.html';
+  const serve = (g, next) => fs.readFile(g, (e, d) => { if (e && next) return next(); r.writeHead(e ? 404 : 200, { 'content-type': MIME[path.extname(g)] || 'application/octet-stream' }); r.end(e ? '' : d); });
+  serve(f, () => serve(path.join(root, 'web', decodeURIComponent(q.url.split('?')[0])), null)); }).listen(W, '127.0.0.1');
+
+// ---------- the fake game: a lobby list with two courts ----------
+const LIST = { type: 'lobby', online: 5, rooms: [{ code: 'KXQ8', names: ['Kiko', null], state: 'waiting', public: true }, { code: 'PLM4', names: ['Mo', 'Zed'], score: [5, 3], state: 'playing', public: true }] };
+const wss = new WebSocketServer({ port: G, host: '127.0.0.1' });
+wss.on('connection', ws => { ws.send(J(LIST)); ws.on('message', raw => { let m; try { m = JSON.parse(raw); } catch { return; } if (m.type === 'ping') ws.send(J({ type: 'pong', c: m.c })); }); });
+
+const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--hide-scrollbars', '--use-gl=angle', '--enable-unsafe-swiftshader', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+const SIZES = (process.env.SWEEP_SIZES || '1440x900,1280x720,390x844').split(',').map(s => s.split('x').map(Number));
+const URL0 = `http://127.0.0.1:${W}/web/index.html?uitest=1&acctest=1&cam=0&game=${G}&bridge=${DEAD}`;
+const report = [];
+async function open(w, h) { const pg = await browser.newPage(); await pg.setViewport({ width: w, height: h, deviceScaleFactor: +process.env.SWEEP_DPR || 1 }); await pg.setRequestInterception(true);
+  pg.on('request', q => (/google\.com|gstatic\.com/.test(q.url()) ? q.abort() : q.continue()));
+  pg.on('pageerror', e => report.push(`PAGEERROR ${e.message}`)); return pg; }
+// data-fit panels that leave the window, and any element wider than the page (horizontal scroll)
+const fit = pg => pg.evaluate(() => { const bad = [...document.querySelectorAll('[data-fit]')].filter(e => { if (e.closest('[hidden]')) return false; const b = e.getBoundingClientRect(); return b.width && (b.left < -.5 || b.top < -.5 || b.right > innerWidth + .5 || b.bottom > innerHeight + .5); }).map(e => e.id || e.className);
+  if (document.documentElement.scrollWidth > innerWidth + 1) bad.push('page scrolls sideways'); return bad; });
+const want = n => !FILTER || n.includes(FILTER);
+async function lobby(pg, view) { await pg.goto(URL0, { waitUntil: 'domcontentloaded' }); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
+  await pg.evaluate(v => window.__ui.lobbyView(v), view); await sleep(1300); }
+const VIEWS = ['home', 'courts', 'create', 'bot', 'profile', 'ranked', 'ranks', 'leaderboard'];
+try {
+  for (const [w, h] of SIZES) {
+    const tag = `${w}x${h}`;
+    // the title screen
+    if (want('title')) { STATE = STATES.guest; const pg = await open(w, h); await pg.goto(URL0, { waitUntil: 'domcontentloaded' }); await sleep(2200); await pg.screenshot({ path: `${OUT}/title-${tag}.png` }); report.push(`title ${tag} ${J(await fit(pg))}`); await pg.close(); }
+    // every lobby view, signed in with a username
+    for (const v of VIEWS) { const n = `view-${v}-${tag}`; if (!want(n)) continue; STATE = STATES.listed; const pg = await open(w, h); await lobby(pg, v); await pg.screenshot({ path: `${OUT}/${n}.png` }); report.push(`${n} ${J(await fit(pg))}`); await pg.close(); }
+    // the leaderboard You card in each state
+    for (const s of Object.keys(STATES)) { const n = `lb-${s}-${tag}`; if (!want(n)) continue; STATE = STATES[s]; const pg = await open(w, h); await lobby(pg, 'leaderboard');
+      const you = await pg.$('#lb-you'); if (you && await pg.evaluate(e => !e.hidden, you)) await you.screenshot({ path: `${OUT}/${n}-card.png` }); const top = await pg.$('.lb-row.is-top1'); if (top) await top.screenshot({ path: `${OUT}/${n}-top.png` });
+      await pg.screenshot({ path: `${OUT}/${n}.png` }); report.push(`${n} ${J(await fit(pg))}`); await pg.close(); }
+    // settings sheet from the lobby
+    if (want(`settings-${tag}`)) { STATE = STATES.listed; const pg = await open(w, h); await lobby(pg, 'home'); await pg.evaluate(() => window.__ui.settings?.(true)); await sleep(700); await pg.screenshot({ path: `${OUT}/settings-${tag}.png` }); report.push(`settings ${tag} ${J(await fit(pg))}`); await pg.close(); }
+    // static pages, full length
+    for (const p of ['how-to-play', 'changelog', 'privacy', 'terms', '404', 'pad']) { const n = `page-${p}-${tag}`; if (!want(n)) continue; const pg = await open(w, h); await pg.goto(`http://127.0.0.1:${W}/web/${p}.html`, { waitUntil: 'domcontentloaded' }); await sleep(900);
+      await pg.screenshot({ path: `${OUT}/${n}.png`, fullPage: true }); report.push(`${n} ${J(await fit(pg))}`); await pg.close(); }
+  }
+} finally { console.log(report.join('\n')); await browser.close(); web.close(); wss.close(); }

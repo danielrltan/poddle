@@ -1524,7 +1524,8 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
    sign-in / username / delete cards and Settings > You. web/profile.js draws all of it; every string goes in as text.
    ========================================================================================================== */
 /* the badge of a registered username (7.5): its own element beside the name, an accent pill with a drawn tick. No glyph a guest could type */
-.reg-badge{flex:none;display:inline-grid;place-items:center;height:1.15em;padding:0 .4em;margin-left:.35em;border-radius:var(--r-pill);background:linear-gradient(180deg,#ffc95c,var(--warn-lamp));box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.5), 0 .0625rem .125rem rgba(120,60,0,.25);color:#fff;font-size:.55em;font-weight:900;letter-spacing:.08em;line-height:1;text-shadow:0 .0625em 0 rgba(0,0,0,.15);vertical-align:-.1em}      /* the DEV pill (ui.js regBadge): the developer's username only */
+.reg-badge{flex:none;display:inline-grid;place-items:center;width:1.3em;height:1.3em;padding:0;margin-left:.35em;border-radius:50%;background:linear-gradient(180deg,#ffc95c,var(--warn-lamp));box-shadow:inset 0 .0625rem 0 rgba(255,255,255,.5), 0 .0625rem .125rem rgba(120,60,0,.25);color:#fff;font-size:.8em;line-height:1;vertical-align:-.2em}      /* the developer's badge (ui.js regBadge): a white hammer in an orange disc, the developer's username only (NOTES 134) */
+.reg-badge svg{width:78%;height:78%;fill:currentColor;filter:drop-shadow(0 .0625em 0 rgba(120,60,0,.25))}
 .is-dev,.is-dev b{color:var(--warn-lamp)!important}      /* the developer's name, in the pill's orange, wherever it shows */
 .score-who:has(> .reg-badge){display:grid;grid-template-columns:minmax(0,max-content) auto;justify-content:start;align-items:center;column-gap:0} .score-who:has(> .reg-badge) small{grid-column:1 / -1}      /* the name and its badge on one line, the sub-label under both */
 .score-tab.is-them .score-who:has(> .reg-badge){justify-content:end}
@@ -1561,7 +1562,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .tally-side:has(> .rank-badge){display:grid;grid-template-columns:auto auto auto;justify-content:center;justify-items:center;align-items:center;row-gap:.375rem} .tally-side:has(> .rank-badge) .chip{grid-column:1 / -1}
 .vs-side > .rank-badge{margin:0} .view-chip .rank-badge{margin-left:.25em}
 .score-who .rank-badge{margin-left:.25em} .score-who .rank-badge .rank-em{width:1.1em;height:1.1em}      /* the 17.5rem tab: a 12-character name, its badge and the emblem must share one line, so the emblem sits at the badge's height */
-.score-who:has(> .rank-badge) b{font-size:1.1875rem} .score-who:has(> .rank-badge) .reg-badge{min-width:1.25em;padding:0 .2em;margin-left:.25em}      /* with both, each gives a little: the name keeps the most room (a long name still ellipsizes at the 10px floor, as it does with the badge alone) */
+.score-who:has(> .rank-badge) b{font-size:1.1875rem} .score-who:has(> .rank-badge) .reg-badge{margin-left:.25em}      /* with both, each gives a little: the name keeps the most room (a long name still ellipsizes at the 10px floor, as it does with the badge alone) */
 
 /* the result card's line (9.3): what this match did to my record. Quiet, under the tally; it never takes focus */
 .result-save{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:calc(-1 * var(--s-3)) auto var(--s-4);max-width:36rem;text-align:center}
@@ -2057,12 +2058,13 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .lb-v{white-space:nowrap;color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)} .lb-v b{font-size:var(--t-lg);font-weight:900;color:var(--ink-strong);font-variant-numeric:tabular-nums}
 .lb-row.is-me,.lb-you.is-on{border-color:var(--line);background:linear-gradient(180deg,#fff,#eef7fc);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 30%,transparent)}
 .lb-state{position:absolute;inset:0;margin:0;display:grid;place-items:center;text-align:center;color:var(--ink-soft);font-weight:700}
-.lb-you{width:min(40rem,100%);grid-template-columns:auto minmax(0,1fr) auto auto}
+.lb-you{width:min(39.5rem,calc(100% - .5rem));grid-template-columns:auto minmax(0,1fr) auto auto;min-height:4rem;padding:var(--s-3) var(--s-4) var(--s-3) var(--s-2)}      /* the list's rows sit .25rem inside it: the same width. Its own padding, not a row's (NOTES 134) */
+.lb-you:not(.is-on){padding-left:var(--s-5)}      /* no rank badge on the left: the text needs its own inset */
 .lb-you .lb-rank{min-width:3.25rem;color:var(--line-deep)} .lb-you .lb-rank:empty{display:none}
 .lb-you-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0} .lb-you-text small{color:var(--ink-soft);font-weight:700;font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis}
 .lb-you:not(.is-on) .lb-you-text{grid-column:1 / 3}
-.lb-show{width:min(40rem,100%);border-radius:var(--r-lg)}
+.lb-show{width:min(39.5rem,calc(100% - .5rem));border-radius:var(--r-lg)}
 .st-rank-row{display:flex;align-items:center;gap:.625rem;min-width:0}
 .st-place{flex:none;display:inline-flex;align-items:center;gap:.3rem;height:2.25rem;padding:0 .75rem 0 .5rem;border-radius:var(--r-pill);border:.125rem solid var(--line-faint);background:#fff;box-shadow:var(--sh-1);color:var(--line-deep);font:900 var(--t-lg)/1 var(--font);font-variant-numeric:tabular-nums;cursor:pointer;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}
 .st-place:hover,.st-place:focus-visible{border-color:var(--line);box-shadow:var(--glow);transform:translateY(-.0625rem)}
-@media (max-width:480px){ .lb-view{padding:var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row,.lb-you{padding-right:.625rem;gap:.5rem} }
+@media (max-width:480px){ .lb-view{padding:var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row{padding-right:.625rem;gap:.5rem} .lb-you{padding-right:var(--s-3);gap:var(--s-2)} .lb-you:not(.is-on){padding-left:var(--s-4)} }
