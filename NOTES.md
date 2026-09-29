@@ -2642,3 +2642,16 @@ The owner asked for Longest rally to be the first tab on the global leaderboard 
 Trophies, Win streak, and the page opens on Longest rally (web/profile.js `board`). The #N place pill beside the rank on Your
 stats still opens the Trophies board, since that number is a trophy place (ui.js sets lb-tabs data-want, showBoard reads it).
 The API's own default board (?b omitted) stays trophies; the page always asks for a board by name.
+
+## 132. A small notice when you set a new personal best mid-match
+- The owner: "when a new record is set mid game, throw up a small notification that's non invasive. use existing notification
+  component like the one we have for watcher joined".
+- The server decides (stats.records, called in game.js point() right after stats.pointEnd): a seat's best of THIS match (the same
+  bestRally / bestSpeed that are saved at the end, so the swing is a settled phone or AirPod peak, capped, never swingBad) is compared
+  with the best already saved on its profile (read once per seat and match). Past it, that seat alone gets { type: 'record', what:
+  'rally' | 'speed', v } at the end of the point, never mid-rally and never to spectators. A higher best later in the match is told
+  again; the swing only when it changes in the tens of deg/s that Your stats shows.
+- Only a player with a best to beat is told (saved rally 3+, saved swing above 0): a first match does not announce every point.
+  Matt and anonymous seats never. Whether the match counts is still decided at its end; the card says when it did not.
+- The client: ui.recordNote(what, v) on the watcher pill (notePill, shared with ui.watcherNote): a gold star, "New best rally: 14
+  hits" / "New fastest swing: 1,570°/s", 3.6 s, at most three pills. test/records.test.mjs covers records(); test/menu.mjs stubs recordNote.

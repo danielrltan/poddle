@@ -570,12 +570,20 @@ export function emote(i, name) {
 }
 // someone sat down in the stands: a small card on the left edge for a few seconds. Three at most; names go in as textContent only
 const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>';
-export function watcherNote(name) {
+function notePill(icon, text, cls = '') {                  // one pill on the left edge: the watcher card and the record card (NOTES 132) share it
   const box = $('notices'); if (!box) return;
   while (box.childElementCount >= 3) box.firstElementChild.remove();
-  const el = document.createElement('div'), t = document.createElement('span'); el.className = 'notice'; el.innerHTML = EYE;
-  t.textContent = name ? `${name} is watching` : 'Someone is watching'; el.append(t); box.append(el);
+  const el = document.createElement('div'), t = document.createElement('span'); el.className = 'notice' + (cls ? ' ' + cls : ''); el.innerHTML = icon;
+  t.textContent = text; el.append(t); box.append(el);
   setTimeout(() => { el.classList.add('is-out'); setTimeout(() => el.remove(), 400); }, 3600);
+}
+export function watcherNote(name) { notePill(EYE, name ? `${name} is watching` : 'Someone is watching'); }
+// a new personal best, told at the end of the point that set it (server 'record', NOTES 132): what = 'rally' (hits) | 'speed' (deg/s)
+const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>';
+export function recordNote(what, v) {
+  const n = Math.max(0, Math.round(+v || 0)); if (!n) return;
+  if (what === 'rally') notePill(STAR, `New best rally: ${n} hits`, 'is-record');
+  else if (what === 'speed') notePill(STAR, `New fastest swing: ${n.toLocaleString('en-US')}°/s`, 'is-record');
 }
 export function notesOff() { $('notices')?.replaceChildren(); }
 export function emotesOff() { const layer = $('emote-layer'); if (layer) layer.replaceChildren(); }     // out of the room: nothing carries over

@@ -112,6 +112,25 @@ function contact(m, pl, sw) {
   if (sw.sure) { swingBest(s, sw.n, sw.pk, sw.src); return true; }
   return false;
 }
+// records(m) -> [{ side, what: 'rally' | 'speed', v }]: a seat's best of this match that passed the best already saved on its profile, each new
+// high once (NOTES 132: a small notice, like 'X is watching'). Read at the end of a point, so nothing pops up mid-rally. Only a player with a best
+// to beat is told (a rally best of 3+, a swing best above 0), so a first match does not announce every point. Whether the match counts is decided
+// at its end: a notice is about the play, the card still says when a match did not count
+const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/s to 10, as Your stats shows it (web/profile.js)
+function records(m) {
+  const out = []; if (!m || m.done || !db) return out;
+  m.seats.forEach((s, side) => {
+    if (!s || s.bot || !s.ident || s.ident.anon) return;
+    if (!s.prev) {                                                // the saved bests, read once per seat and match (a rematch is a new match: it reads the new ones)
+      let p = null; try { const o = s.ident.ownerId != null ? s.ident.ownerId : s.ident.devHash ? db.guestOwner(s.ident.devHash) : null; p = o != null ? db.profileOf(o) : null; } catch { p = null; }
+      const b = p && p.bests ? p.bests : {}; s.prev = { rally: (b.rally && b.rally.v) || 0, speed: (b.speed && b.speed.v) || 0, rallyTold: 0, speedTold: 0 };
+    }
+    const P = s.prev;
+    if (P.rally >= 3 && s.bestRally > Math.max(P.rally, P.rallyTold)) { P.rallyTold = s.bestRally; out.push({ side, what: 'rally', v: s.bestRally }); }
+    if (P.speed > 0 && !s.swingBad && degs(s.bestSpeed) > degs(Math.max(P.speed, P.speedTold))) { P.speedTold = s.bestSpeed; out.push({ side, what: 'speed', v: degs(s.bestSpeed) }); }
+  });
+  return out;
+}
 // pointEnd(m, winner, why): point(), before the score moves: a rally won by parking the paddle is not a best. winner is a side, and m.seats is
 // indexed by side (newMatch seats [bySide(0), bySide(1)], seatFill(m, side)). 'double bounce' / 'passed' are won by ball.lastHit: the receiver
 // never touched it (a chance missed); rally 1 means only the serve was struck (an ace). 'out' is the hitter's own fault: points only
@@ -247,5 +266,5 @@ function forget({ tokenHash = null, accountId = null, devHash = null, deleted = 
   for (const m of live) for (const s of m.seats) if (s && !s.bot && hit(s.ident)) s.gone = true;
 }
 
-module.exports = { init, config, linkMap, identOf, sameIdent, seen, seatAcc, newMatch, drop, accOf, seatFill, identify, member, optOut, launched, rallyReset, contact, pointEnd,
+module.exports = { init, config, linkMap, identOf, sameIdent, seen, seatAcc, newMatch, drop, accOf, seatFill, identify, member, optOut, launched, rallyReset, contact, pointEnd, records,
   swingBest, fixRecords, level, sample, onEnd, title, forget, SPEED_CAP, SPEED_BAD, _live: live };

@@ -712,7 +712,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'askstate') { if (!spec()) return; ui.askPlay(m); const who = names.find(n => n && n !== 'Matt') || 'The player';      // the button counts; this says why, with a name (the one human on the court)
     if (m.s === 'no') say(`${who} said no`, null, 2600); else if (m.s === 'expired') say(`No answer from ${who}`, null, 2600); else if (m.s === 'wait' && m.busy) say('Someone else asked first', null, 2600); return; }
   if (m.type === 'promoff') { if (live()) say(`${cleanName(m.name) || 'They'} wasn’t ready. Matt is back.`, null, 2600); return; }
-  if (m.type === 'watcher') { if (live() && !spec()) ui.watcherNote(cleanName(m.name)); return; }      // someone started watching you (the server tells only the players)
+  if (m.type === 'watcher') { if (live() && !spec()) ui.watcherNote(cleanName(m.name)); return; }
+  if (m.type === 'record') { if (!spec()) ui.recordNote?.(m.what, m.v); return; }      // a new personal best, at the end of the point that set it (NOTES 132), to my seat only      // someone started watching you (the server tells only the players)
   if (m.type === 'emote') { if (live() && Number.isInteger(m.e)) ui.emote(m.e, cleanName(m.name)); return; }      // a spectator's reaction, players and spectators alike see it
   if (m.type === 'state') {
     state = m; frozen = !!m.paused; scene.setFrozen(frozen || holding);

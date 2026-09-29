@@ -627,6 +627,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
 
   function point(winner, why) {
     stats.pointEnd(match, winner, why);                          // the rally's length and the play counters, before the score moves (docs/ACCOUNTS.md 4.4, docs/SHARE.md 1)
+    try { for (const r of stats.records(match)) { const p = bySide(r.side); if (p && !p.bot) send(p, { type: 'record', what: r.what, v: r.v }); } } catch { /* a notice never stops a point */ }   // a new personal best, to that player only (NOTES 132)
     score[winner]++; ball.live = false;
     const loser = bySide(1 - winner);
     if (loser && loser.swing && ball.lastHit === winner) send(loser, { type: 'whiff', why: whyMissed(loser.swing, inZone(loser)) });
