@@ -15,13 +15,15 @@ const SPEED_CAP = 45, SPEED_BAD = 48;
 const SMASH_N = 0.76, SMASH_PK = 12;                              // a settled smash (n >= SMASH, server/game.js) under 12 rad/s is a careless forgery (R15)
 const FIX_AGREE = 0.15;                                           // a settled report within this of the bet that struck the ball speaks for that contact
 
-let db = null, cfg = abuse.config({}), links = null, signin = false, sockets = () => [], seq = 0, pruner = null;
+let db = null, cfg = abuse.config({}), links = null, signin = false, sockets = () => [], detached = () => {}, seq = 0, pruner = null;
 const live = new Set();                                           // matches still being played: forget() marks their seats, done/drop removes them
 
-// init({ db, env, signinEnabled, sockets }) -> once at boot. sockets: () => iterable of the open game sockets (for forget).
+// init({ db, env, signinEnabled, sockets, detached }) -> once at boot. sockets: () => iterable of the open game sockets (for forget). detached(ws): forget
+// just took a socket's account away (game.js tells it 'socialoff' and updates its friends' presence at once, docs/SOCIAL.md 4)
 function init(o = {}) {
   db = o.db || null; cfg = abuse.config(o.env || process.env); signin = !!o.signinEnabled;
   if (typeof o.sockets === 'function') sockets = o.sockets;
+  if (typeof o.detached === 'function') detached = o.detached;
   links = abuse.createLinks();
   if (pruner) clearInterval(pruner);
   pruner = setInterval(() => { try { links.prune(); } catch { /* never breaks the server */ } }, 60e3); pruner.unref();   // 24 h hygiene (5.4)
@@ -256,9 +258,11 @@ function forget({ tokenHash = null, accountId = null, devHash = null, deleted = 
     try {
       const tok = !!tokenHash && eqHash(ws.tokenHash, tokenHash), acct = deleted && accountId != null && !!ws.acct && ws.acct.accountId === accountId;
       const dev = deleted && !!devHash && eqHash(ws.devHash, devHash);
+      const had = !!ws.acct;
       if (tok || acct) { ws.acct = null; ws.tokenHash = null; }
       if (dev || acct) ws.devHash = null;
       if ((tok || acct || dev) && ws.pl && !ws.pl.bot) ws.pl.sockIdent = identOf(ws);
+      if ((tok || acct) && had) try { detached(ws); } catch { /* the social panel is best effort */ }
     } catch { /* one odd socket never stops the rest */ }
   }
   if (!deleted) return;

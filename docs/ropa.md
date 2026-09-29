@@ -4,7 +4,9 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card's subset made public for every listed player (all places since NOTES 141); no new data stored); 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks re-derived from stored trophies; Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
+Last reviewed: 2026-09-29 (Friends, slice A: friends, friend requests, search, online status to friends, and the profile card's friend row: section 3b, no invites
+yet; the same day, leaderboard profile cards, NOTES 140: the share card's subset made public for every listed player (all places since NOTES 141), no new data stored, and the same card now
+also opens from Friends with /api/player's rank emblem and leaderboard places); 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks re-derived from stored trophies; Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
 
 ## Recipients common to every activity
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`
@@ -53,6 +55,10 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
   removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, Ranked mode:
   the rank emblem (the rank and its division, e.g. Gold II; never trophies or record) beside the name, to the opponent and to spectators
   of that court (VS card, scoreboard, result card). Basis for that: contract (Art. 6(1)(b)), the mode the player entered.
+  The same profile card also opens from Friends (section 3b, 2026-09-29) and there adds GET /api/player: anyone who knows the username (the endpoint needs no
+  sign-in; the game asks it only for a signed-in viewer with a username) gets the rank emblem and the leaderboard places
+  ({rank} on each of the three boards, the place number only, never the value; for every listed account)
+  of an account with a username that is not lb_hidden; friends and the player see them even when hidden (where it would stand). Basis: legitimate interests, the same switch and objection as the leaderboard.
 - Retention: guest statistics 90 days after the last recorded match, 7 days if only one match was ever recorded;
   account statistics with the account (below). Deleted rows are zeroed (`secure_delete=ON`) and the WAL truncated.
 - Security: device id stored only as a hash; it never travels in a URL; export/delete need the raw id or a session.
@@ -81,6 +87,41 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
 - Security: unknown or malformed slugs get a 404 and nothing is rendered; per-computer render budget; no slug, name or
   id in the logs; the export includes the link (`share: { url, created }`).
 
+## 3b. Friends (docs/SOCIAL.md; accounts with a username only; slice A, 2026-09-29: no invites yet)
+- Data: `friends` (the two account ids, a < b, and since; at most 100 per account) and `friend_reqs` (from, to, created,
+  declined_at, asked_at, sent). created is the sender's clock (expiry, the time the sender sees; a blocked re-send restarts it as
+  a new request would); asked_at is when the request reached the receiver (NULL: a removal's block) and never moves; sent 0 =
+  a row its sender does not see (a removal's block, or a declined request the sender withdrew). A decline is silent (the row is
+  kept with declined_at until expiry, the sender still sees "Requested"); a removal writes a declined-style row FROM the removed
+  person TO the remover so the removed person cannot re-request for 30 days (the remover may still add them back, which deletes
+  that row and sends a normal request, whether or not the removed person tried again). Adding a player whose request to you is
+  still out on their side (pending, or declined by you) accepts it. In memory only: presence (online + a coarse status:
+  Online, Playing Matt, In a game, Watching, Looking for a Ranked match, In a Ranked match, In a tournament; never the court
+  code), each online account's cached friend list, per-account rate buckets (adds 30/hour, searches 60/10 min). Search text
+  (2..12 chars) is used to answer the query, never stored or written to our logs (it rides in the URL, so Fly.io's platform
+  logs, ~7 days, may hold it, as for /api/player?name=). Browser: `poddle.friendsSeen` (one-time notice).
+- Subjects: signed-in players with a username (13+, under 18 with a parent's permission). Guests cannot use it.
+- Basis: contract (Art. 6(1)(b)) for the friends list, requests, and the status, rank and places shown to accepted friends
+  (the feature the player chooses to use). Legitimate interests (Art. 6(1)(f)) for being findable in search (the username is
+  already public on courts; lb_hidden accounts are findable too) and for the profile card's public part (rank emblem + places when
+  not lb_hidden; the eleven stats only for an account on a board, section 3); safeguards: the Show me on the global leaderboard switch, silent declines, the 30-day re-request block,
+  per-account and per-address limits, objection by email.
+- Recipients: the requested player sees the sender's username and the time; accepted friends see username, online status and
+  activity, rank emblem and places; anyone can open the profile card (username, developer badge, and rank + places when listed; the eleven stats when on a board);
+  the card's friend row shows the viewer the relation and, to a friend, the status;
+  other signed-in players see the username in search results with the relation (none, friend, requested, incoming); Fly.io.
+  The wire carries usernames only, never account or owner ids.
+- Retention: requests 30 days after created (the last send), declined or not (sweep step `friendreqs`), deleted at once on accept or
+  cancel (a declined row stays until expiry even if cancelled); friendships until either side removes them or either account is deleted (Delete my data, the 24-month idle
+  sweep; FK cascade on both tables, both FK columns indexed). Presence, caches and rate buckets: memory only, gone on sign-out,
+  deletion or restart.
+- Security: rows keyed on accounts.id, never the username (renames keep friendships); every snapshot re-reads the account
+  and username from the database by id; social log lines carry no names and no ids; the export lists friends (username,
+  since), requests in (username, asked_at, declined) and out (username, when; only rows the sender sees) and the removals
+  (username, when), never ids. A sender's sent 0 rows are left out of their own export, and a received row or a removal past its own 30
+  days that lives on only because the other side re-sent is left out of the receiver's (listing either would reveal the other
+  side's decline, removal or re-send: Art. 15(4), the rights of others); the export's notes and privacy 9 say so.
+
 ## 4. Fair-play checks (the automated counted / did-not-count decision)
 - Data: at match end, the two players' IPs compared in memory; in memory for up to 24 h, keyed hashes of the network
   address linked to device-id hashes, cids, accounts and recent results (link map); in the database, `match_log`:
@@ -108,7 +149,8 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
 - Basis: contract (Art. 6(1)(b)): the account the player asks for. Fair-play checks on accounts: legitimate interests.
 - Recipients: Google LLC (United States; EU-US Data Privacy Framework) learns the player signed in to Poddle and sets
   or reads its own cookies / FedCM in its sign-in window; the username (with a registered-player badge) is shown to
-  opponents, spectators, the court list and tournament brackets; Fly.io.
+  opponents, spectators, the court list and tournament brackets, and is findable by other signed-in players in friend
+  search, and a public profile card exists for it (sections 3, 3b); Fly.io.
 - Retention: until the player deletes the account; deleted after 24 months with no sign-in and no recorded match;
   sessions deleted at sign-out, expiry (180 days) or account deletion; a former username's folded key (no link to any
   account) held 30 days after a rename, 90 days after a deletion. Deleting the account does not remove Poddle from
@@ -122,6 +164,6 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
   copy is deleted within 5 days of creation. No other copies.
 
 ## Data-subject requests
-- Self-serve in the game: Your stats > Download my data (JSON, `poddle-export-1`) and Delete my data (live database at
-  once). By email to hello@danielrltan.com: answered within 30 days (GDPR 1 month, PIPEDA 30 days, CCPA 45 days),
+- Self-serve in the game: Your stats > Download my data (JSON, `poddle-export-1`; includes friends, friend requests and
+  removals by username, except the rows kept only to keep another player's decline or removal silent) and Delete my data (live database at once; cascades friends and friend requests). By email to hello@danielrltan.com: answered within 30 days (GDPR 1 month, PIPEDA 30 days, CCPA 45 days),
   after checking the requester controls the profile (signed in, or the browser holding the device id).

@@ -152,7 +152,30 @@ CREATE TABLE IF NOT EXISTS share (
 );
 CREATE INDEX IF NOT EXISTS ladder_trophies ON ladder(trophies);
 CREATE INDEX IF NOT EXISTS profile_rally ON profile(best_rally);
-CREATE INDEX IF NOT EXISTS profile_hstreak ON profile(h_best_streak);`;   // the global leaderboards (NOTES 126): each board reads one column, highest first
+CREATE INDEX IF NOT EXISTS profile_hstreak ON profile(h_best_streak);
+CREATE TABLE IF NOT EXISTS friends (
+  a      INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  b      INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  since  INTEGER NOT NULL,
+  PRIMARY KEY (a, b),
+  CHECK (a < b)
+);
+CREATE INDEX IF NOT EXISTS friends_b ON friends(b);
+CREATE TABLE IF NOT EXISTS friend_reqs (
+  from_id      INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  to_id        INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  created_at   INTEGER NOT NULL,
+  declined_at  INTEGER,
+  asked_at     INTEGER,
+  sent         INTEGER NOT NULL DEFAULT 1 CHECK (sent IN (0,1)),
+  PRIMARY KEY (from_id, to_id),
+  CHECK (from_id <> to_id)
+);
+CREATE INDEX IF NOT EXISTS friend_reqs_to ON friend_reqs(to_id);`;   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
+// a request from -> to (the PK indexes from_id, friend_reqs_to the other side: an account's cascade never scans). sent 0 = a row its from side never sent
+// (a removal's block, or a declined request its sender cancelled): it still blocks re-requests until it expires, but nobody is ever shown it. created_at is
+// the from side's clock (expiry, the 'at' its sender sees; a blocked re-add restarts it as a real request would); asked_at is the to side's and never moves
+// (when the request reached it: its export; NULL = a removal's block, never a request), so neither side learns what the other did since
 // the rank table as SQL (NOTES 124): tier / div of a trophy count, exactly ladder.js tierOf / divOf (top rank first; Pro has one division; negatives are
 // Bronze I: max(0, ...) matches JS's floor clamp although SQLite's integer division truncates toward zero). Built once from the frozen table (constants, never
 // input), so a new rank or floor needs no SQL edit
@@ -204,7 +227,8 @@ function open(p, opts = {}) {
   const env = process.env;
   cfg = { guestDays: intEnv(env, 'GUEST_DAYS', 90, 1, 3650), guestOneDays: intEnv(env, 'GUEST_ONE_DAYS', 7, 1, 3650), logDays: intEnv(env, 'LOG_DAYS', 30, 1, 3650),
     renameDays: intEnv(env, 'RENAME_DAYS', 30, 0, 3650), mergeMax: intEnv(env, 'MERGE_MAX', 10, 0, 1000), devicesMax: intEnv(env, 'DEVICES_MAX', 50, 0, 10000),
-    maxMb: intEnv(env, 'DB_MAX_MB', 256, 1, 65536), logCap: intEnv(env, 'LOG_CAP_DAY', 100, 1, 100000), mattDay: intEnv(env, 'RK_MATT_DAY', 40, 0, 100000) };   // mattDay: Ranked trophies Matt may pay one owner per UTC day (RANKED.md 5.3)
+    maxMb: intEnv(env, 'DB_MAX_MB', 256, 1, 65536), logCap: intEnv(env, 'LOG_CAP_DAY', 100, 1, 100000), mattDay: intEnv(env, 'RK_MATT_DAY', 40, 0, 100000),   // mattDay: Ranked trophies Matt may pay one owner per UTC day (RANKED.md 5.3)
+    friendMax: intEnv(env, 'FRIEND_MAX', 100, 1, 10000), reqOutMax: intEnv(env, 'REQ_OUT_MAX', 20, 1, 1000) };   // docs/SOCIAL.md 2: friends per account, pending requests out per account (test knobs like the rest)
   const where = p && String(p) !== ':memory:' ? path.resolve(String(p)) : null;
   try {
     if (where) {
@@ -253,6 +277,7 @@ const BOARDS = Object.freeze({
 });
 const LB_WHO = 'a.username IS NOT NULL AND a.lb_hidden = 0';
 const LB_MAX = 100;
+const REQ_DAYS = 30, INC_MAX = 50, SEARCH_MAX = 20;               // docs/SOCIAL.md 2-3: a request lives 30 days (declined or not); the newest 50 incoming are listed; search answers 20
 
 function prepare() {                                             // every statement, once (2.1)
   const q = sql => D.prepare(sql);
@@ -340,6 +365,40 @@ function prepare() {                                             // every statem
     ]).flat()),
     lbMe: q(`SELECT a.username, a.lb_hidden, l.trophies, p.best_rally, p.h_best_streak FROM accounts a JOIN profile p ON p.owner_id = a.owner_id LEFT JOIN ladder l ON l.owner_id = a.owner_id WHERE a.owner_id = ?`),
     lbHide: q('UPDATE accounts SET lb_hidden = ? WHERE owner_id = ?'),
+    // friends (docs/SOCIAL.md 2-3). A request is live while created_at > the expiry cutoff (the caller's now - 30 d): every read filters it, the sweep only tidies
+    acctFresh: q('SELECT id, owner_id, username, lb_hidden FROM accounts WHERE id = ?'),
+    frGet: q('SELECT since FROM friends WHERE a = ? AND b = ?'),
+    frIns: q('INSERT OR IGNORE INTO friends (a, b, since) VALUES (?, ?, ?)'),
+    frDel: q('DELETE FROM friends WHERE a = ? AND b = ?'),
+    frCount: q('SELECT (SELECT count(*) FROM friends WHERE a = ?) + (SELECT count(*) FROM friends WHERE b = ?) AS n'),   // two index reads, not an OR scan
+    frIds: q('SELECT b AS id FROM friends WHERE a = ? UNION ALL SELECT a FROM friends WHERE b = ?'),
+    frList: q(`SELECT x.id, x.since, c.username AS name, l.tier AS tier, l.div AS div FROM (SELECT b AS id, since FROM friends WHERE a = ? UNION ALL SELECT a, since FROM friends WHERE b = ?) x
+      JOIN accounts c ON c.id = x.id LEFT JOIN ladder l ON l.owner_id = c.owner_id WHERE c.username IS NOT NULL`),
+    reqGet: q('SELECT created_at, declined_at, asked_at, sent FROM friend_reqs WHERE from_id = ? AND to_id = ? AND created_at > ?'),
+    reqPut: q(`INSERT INTO friend_reqs (from_id, to_id, created_at, declined_at, asked_at, sent) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT (from_id, to_id) DO UPDATE SET created_at = excluded.created_at, declined_at = excluded.declined_at, asked_at = excluded.asked_at, sent = excluded.sent`),
+    reqDel: q('DELETE FROM friend_reqs WHERE from_id = ? AND to_id = ?'),
+    reqDecline: q('UPDATE friend_reqs SET declined_at = ? WHERE from_id = ? AND to_id = ? AND declined_at IS NULL AND created_at > ?'),
+    reqSent: q('UPDATE friend_reqs SET sent = ? WHERE from_id = ? AND to_id = ?'),
+    reqResend: q('UPDATE friend_reqs SET sent = 1, created_at = ? WHERE from_id = ? AND to_id = ?'),   // a blocked re-add: its sender's clock restarts, declined_at / asked_at stay
+    // whose lists name this account in a request (a rename or a delete changes them): the ones it asked (pending: their inc) and the ones asking it (sent: their out)
+    reqPeers: q(`SELECT to_id AS id FROM friend_reqs WHERE from_id = ? AND sent = 1 AND declined_at IS NULL AND created_at > ?
+      UNION SELECT from_id FROM friend_reqs WHERE to_id = ? AND sent = 1 AND created_at > ?`),
+    reqOutN: q('SELECT count(*) AS n FROM friend_reqs WHERE from_id = ? AND sent = 1 AND created_at > ?'),   // declined ones count: their sender still sees them pending (a decline is silent)
+    reqIn: q(`SELECT c.username AS name, r.created_at AS at FROM friend_reqs r JOIN accounts c ON c.id = r.from_id
+      WHERE r.to_id = ? AND r.declined_at IS NULL AND r.created_at > ? AND c.username IS NOT NULL ORDER BY r.created_at DESC LIMIT ${INC_MAX}`),
+    reqOut: q(`SELECT c.username AS name, r.created_at AS at FROM friend_reqs r JOIN accounts c ON c.id = r.to_id
+      WHERE r.from_id = ? AND r.sent = 1 AND r.created_at > ? AND c.username IS NOT NULL ORDER BY r.created_at DESC`),
+    // search (3): a case-insensitive prefix (LIKE is ASCII case-insensitive; usernames are ASCII) or the exact confusable key, never self; the exact key first
+    frSearch: q(`SELECT id, username AS name FROM accounts WHERE username IS NOT NULL AND id <> ? AND (username LIKE ? ESCAPE '\\' OR username_key = ?)
+      ORDER BY (username_key = ?) DESC, username COLLATE NOCASE LIMIT ${SEARCH_MAX}`),
+    // the export (10.6 + docs/SOCIAL.md 2): by username only, never an id
+    exFriends: q(`SELECT c.username AS name, x.since FROM (SELECT b AS id, since FROM friends WHERE a = ? UNION ALL SELECT a, since FROM friends WHERE b = ?) x JOIN accounts c ON c.id = x.id ORDER BY x.since`),
+    // received: every row addressed to the account, sent or not (a request to it and its own decline, or its own removal's block), by asked_at / declined_at, which
+    // never move: nothing shows what the other side did since, e.g. a blocked re-add. sent: only what its sender sees (a sent 0 row would reveal a silent decline or a removal)
+    exReqIn: q('SELECT c.username AS name, r.asked_at AS at, r.declined_at, r.created_at AS live FROM friend_reqs r JOIN accounts c ON c.id = r.from_id WHERE r.to_id = ? ORDER BY coalesce(r.asked_at, r.declined_at)'),
+    exReqOut: q('SELECT c.username AS name, r.created_at AS at FROM friend_reqs r JOIN accounts c ON c.id = r.to_id WHERE r.from_id = ? AND r.sent = 1 ORDER BY r.created_at'),
+    swReqs: q(`DELETE FROM friend_reqs WHERE rowid IN (SELECT rowid FROM friend_reqs WHERE created_at <= ? LIMIT ${BATCH})`),
     // the leaderboard profile (NOTES 140): the account behind a username key, and whether it sits inside a board's top LB_MAX rows (the same WHERE and ORDER BY as lbTop_)
     lbKey: q(`SELECT a.owner_id, a.username, a.username_key, a.lb_hidden, l.owner_id IS NOT NULL AS ranked, l.trophies, p.best_rally, p.h_best_streak
               FROM accounts a JOIN profile p ON p.owner_id = a.owner_id LEFT JOIN ladder l ON l.owner_id = a.owner_id WHERE a.username_key = ?`),
@@ -604,7 +663,7 @@ const profileOf = guard(null, (o, now = Date.now()) => {
 });
 // exportOf(ownerId, now?) -> the section 10.6 export object | null. Matches from the requester's side, opponents never identified.
 const SHARE_URL = 'https://poddleball.com/c/';                   // a share link's public address (server/share.js makes it; locally the page answers on the test host)
-const NOTES = 'This file contains all personal information that Poddle holds about this profile. Opponents are shown only as Matt or a player. We do not store your IP address, your email address or names typed as a guest. The purposes, recipients and retention periods are described at https://poddleball.com/privacy.html.';
+const NOTES = 'This file contains all personal information that Poddle holds about this profile, except the records kept only so that a declined friend request or a removal stays silent (described in the privacy policy). Opponents in matches are shown only as Matt or a player; friends and friend requests are listed by username. We do not store your IP address, your email address or names typed as a guest. The purposes, recipients and retention periods are described at https://poddleball.com/privacy.html.';
 const exportOf = guard(null, (o, now = Date.now()) => {
   const prof = profileOf(o); if (!prof) return null;
   const w = S.ownerGet.get(o), a = w.kind === 'account' ? S.acctByOwner.get(o) : null, d = w.kind === 'device' ? S.devOfOwner.get(o) : null;
@@ -621,6 +680,11 @@ const exportOf = guard(null, (o, now = Date.now()) => {
       globalLeaderboard: a.lb_hidden === 1 ? 'hidden' : 'shown' };   // NOTES 126: the Show me on the global leaderboard switch
     x.sessions = S.sesOfAcct.all(a.id).map(s => ({ created: iso(s.created_at), expires: iso(s.expires_at), lastUsed: iso(s.seen_at) }));
     x.mergedDevices = S.devsOfAcct.all(a.id).map(v => ({ created: iso(v.created_at), merged: iso(v.merged_at) }));
+    x.friends = S.exFriends.all(a.id, a.id).map(r => ({ username: r.name, since: iso(r.since) }));   // docs/SOCIAL.md 2: by username, never an id; unswept expired requests too (they still name this account)
+    const c = cutOf(now), rin = S.exReqIn.all(a.id).filter(r => !((r.at != null ? r.at : r.declined_at) <= c && r.live > c));   // asked_at NULL: a block my own removal wrote (docs/SOCIAL.md 3), not a
+    // request anyone sent me. A row past its own 30 days that lives on only because the other side re-sent it is left out: listing it would tell of the re-send
+    x.friendRequests = { received: rin.filter(r => r.at != null).map(r => ({ username: r.name, when: iso(r.at), declined: iso(r.declined_at) })), sent: S.exReqOut.all(a.id).map(r => ({ username: r.name, when: iso(r.at) })),
+      removed: rin.filter(r => r.at == null).map(r => ({ username: r.name, when: iso(r.declined_at) })) };   // removed: whom I removed in the last 30 days (their requests reach me again after)
   } else x.device = { created: iso(d ? d.created_at : w.created_at), lastPlayed: iso(w.touched_at), deletedAfter: iso(prof.expiresAt) };
   return x;
 });
@@ -649,9 +713,10 @@ const leaderboard = guard(null, (b, limit = LB_MAX) => {
   S['lbTop_' + b].all(n).forEach((r, i) => { if (r.v !== prev) { rank = i + 1; prev = r.v; } rows.push({ rank, name: r.name, v: r.v, tier: r.tier == null ? null : r.tier, div: r.div == null ? null : r.tier === LAD.TOP ? 1 : r.div }); });
   return { board: b, rows, total: S['lbCount_' + b].get().n };
 });
-// leaderPlaces(ownerId) -> { listed, why, hidden, trophies, rally, streak } | null. listed false: why 'guest' | 'noname' | 'hidden' and no places.
-// Each place is { rank, v } on the same population and order as leaderboard(), or null under the board's minimum
-const leaderPlaces = guard(null, o => {
+// leaderPlaces(ownerId, evenHidden?) -> { listed, why, hidden, trophies, rally, streak } | null. listed false: why 'guest' | 'noname' | 'hidden' and no places.
+// Each place is { rank, v } on the same population and order as leaderboard(), or null under the board's minimum. evenHidden: a hidden account's places anyway
+// (still listed false, why 'hidden'): where it would stand among the listed ones, for the profile card of a friend or its own (docs/SOCIAL.md 3)
+const leaderPlaces = guard(null, (o, evenHidden = false) => {
   if (!isId(o)) return null;
   const w = S.ownerGet.get(o); if (!w) return null;
   const out = { listed: false, why: null, hidden: false, trophies: null, rally: null, streak: null };
@@ -659,8 +724,7 @@ const leaderPlaces = guard(null, o => {
   const r = S.lbMe.get(o); if (!r) return null;
   out.hidden = r.lb_hidden === 1;
   if (!r.username) { out.why = 'noname'; return out; }
-  if (out.hidden) { out.why = 'hidden'; return out; }
-  out.listed = true;
+  if (out.hidden) { out.why = 'hidden'; if (!evenHidden) return out; } else out.listed = true;
   const v = { trophies: r.trophies || 0, rally: r.best_rally || 0, streak: r.h_best_streak || 0 };
   for (const b of Object.keys(BOARDS)) if (v[b] >= BOARDS[b].min) out[b] = { rank: S['lbAbove_' + b].get(v[b]).n + 1, v: v[b] };
   return out;
@@ -677,6 +741,86 @@ const leaderOwnerByKey = guard(undefined, key => {
 });
 // leaderHide(ownerId, hidden) -> true when the account's switch was written (a guest has no switch: false)
 const leaderHide = guard(false, (o, hidden) => isId(o) && S.lbHide.run(hidden ? 1 : 0, o).changes > 0);
+
+// ---- friends (docs/SOCIAL.md 2-3) ----
+// Account ids in (the caller finds a typed name by its key), usernames out: a row the wire may carry never holds an id, except friendsOf's `id` (game.js
+// needs it for presence; api.js strips it). Only accounts WITH a username take part. `now` decides expiry on every read: the sweep only tidies after it
+const REQ_MS = REQ_DAYS * DAY, FR_OPS = new Set(['add', 'accept', 'decline', 'cancel', 'remove']);
+const pairOf = (x, y) => (x < y ? [x, y] : [y, x]);              // one row per pair, a < b (the CHECK)
+const cutOf = now => now - REQ_MS;                               // a request created at or before this has expired, whatever the sweep did yet
+const isFriend = (x, y) => !!S.frGet.get(...pairOf(x, y));
+const nFriends = x => S.frCount.get(x, x).n;
+const rankOf = (tier, div) => (tier == null ? null : { tier, div: tier === LAD.TOP ? 1 : div });   // null: never played Ranked (no ladder row). Pro has no divisions (NOTES 126)
+function relOf(me, o, now) {                                     // me's view of o: friend | out (my request, pending or silently declined) | in (theirs, pending) | none
+  if (isFriend(me, o)) return 'friend';
+  const c = cutOf(now), mine = S.reqGet.get(me, o, c); if (mine && mine.sent) return 'out';
+  const theirs = S.reqGet.get(o, me, c); return theirs && theirs.sent && theirs.declined_at == null ? 'in' : 'none';
+}
+// friendOp(me, other, op, now) -> { r, rel, other } | { err } | null (not open / a failed write). op add | accept | decline | cancel | remove (3), ONE transaction.
+// r: requested | friends | declined | cancelled | removed; err: self | username (me has none) | notfound | full | limit | norequest. cancel / remove with
+// nothing to act on answer as done (idempotent). A declined request, and a removal's block, answer an add exactly as a fresh one would ('full' / 'limit'
+// first, then 'requested', its 'at' now and 30 days to live): the sender can never tell a silent decline from a pending request. Adding someone whose own
+// request to me is out (pending, or declined by me) accepts it, as a pending one would: its sender never learns it was declined. Not a re-add my removal
+// blocked (asked_at NULL): that goes, and a normal request is sent, exactly as when they never tried (the remover must not learn of the attempt, 3)
+// other: true when the other side's own lists changed, so the caller pushes them a snapshot ONLY then (a push after a silent decline or a blocked re-add
+// would tell by its timing alone)
+const friendOp = guard(null, (me, o, op, now) => {
+  if (!isId(me) || !isId(o) || !isNow(now) || !FR_OPS.has(op)) return null;
+  if (me === o) return { err: 'self' };
+  return tx(() => {
+    const A = S.acctFresh.get(me), B = S.acctFresh.get(o);
+    if (!A || !A.username) return { err: 'username' };
+    if (!B || !B.username) return { err: 'notfound' };
+    const c = cutOf(now), mine = S.reqGet.get(me, o, c), theirs = S.reqGet.get(o, me, c), friends = isFriend(me, o);
+    const done = (r, other = false) => ({ r, rel: relOf(me, o, now), other });
+    const full = () => nFriends(me) >= cfg.friendMax || nFriends(o) >= cfg.friendMax;
+    const befriend = () => { S.frIns.run(...pairOf(me, o), now); S.reqDel.run(me, o); S.reqDel.run(o, me); };   // both directions' rows go: a friendship carries no request
+    const pending = theirs && theirs.sent && theirs.declined_at == null;
+    if (op === 'add') {
+      if (friends) return done('friends');
+      if (theirs && theirs.sent && theirs.asked_at != null) { if (full()) return { err: 'full' }; befriend(); return done('friends', true); }   // they asked (still out on their side, even if I declined it): adding them is accepting
+      if (mine && mine.sent) return done('requested');          // already out (pending, or declined silently): nothing changes
+      if (full()) return { err: 'full' };
+      if (S.reqOutN.get(me, c).n >= cfg.reqOutMax) return { err: 'limit' };
+      if (mine) { S.reqResend.run(now, me, o); return done('requested'); }   // cancelled after a decline, or a removal's block, not expired: 'requested' as if sent (at now, as a fresh one), nothing reaches the other side
+      if (theirs) S.reqDel.run(o, me);                            // a declined one they withdrew, or the block my removal wrote (re-added on their side or not): adding them back clears it (3)
+      S.reqPut.run(me, o, now, null, now, 1); return done('requested', true);   // an upsert: my own expired row (still unswept) becomes a fresh request
+    }
+    if (op === 'accept') { if (!pending) return { err: 'norequest' }; if (full()) return { err: 'full' }; befriend(); return done('friends', true); }
+    if (op === 'decline') { if (!pending) return { err: 'norequest' }; S.reqDecline.run(now, o, me, c); return done('declined'); }   // silent: kept until it expires, so it cannot be re-sent
+    if (op === 'cancel') { const live = !!mine && !!mine.sent && mine.declined_at == null; if (live) S.reqDel.run(me, o); else if (mine && mine.sent) S.reqSent.run(0, me, o); return done('cancelled', live); }   // a declined one stays as a block (3), just no longer shown to me
+    if (friends) { S.frDel.run(...pairOf(me, o)); S.reqDel.run(me, o); S.reqPut.run(o, me, now, now, null, 0); }   // remove: silent, and the removed person's re-adds answer 'requested' for 30 days (3)
+    return done('removed', friends);
+  });
+});
+// friendsOf(accountId, now) -> { friends: [{ id, name, since, rank }], inc: [{ name, at }], out: [{ name, at }] } | null. inc: pending, newest INC_MAX;
+// out: every request its sender still sees (a silently declined one included). friends unsorted: the caller orders by presence
+const friendsOf = guard(null, (me, now) => {
+  if (!isId(me) || !isNow(now)) return null;
+  const c = cutOf(now);
+  return { friends: S.frList.all(me, me).map(r => ({ id: r.id, name: r.name, since: r.since, rank: rankOf(r.tier, r.div) })),
+    inc: S.reqIn.all(me, c).map(r => ({ name: r.name, at: r.at })), out: S.reqOut.all(me, c).map(r => ({ name: r.name, at: r.at })) };
+});
+const friendIds = guard(null, me => (isId(me) ? S.frIds.all(me, me).map(r => r.id) : []));   // presence: whom a status change is pushed to. null: the read failed (not 'no friends': game.js must not cache it)
+// friendPeers(accountId, now) -> account ids whose request lists show this account (a rename or a delete changes what they see) | null (a failed read)
+const friendPeers = guard(null, (me, now) => { if (!isId(me) || !isNow(now)) return []; const c = cutOf(now); return S.reqPeers.all(me, c, me, c).map(r => r.id); });
+const friendRel = guard('none', (me, o, now) => (isId(me) && isId(o) && me !== o && isNow(now) ? relOf(me, o, now) : 'none'));
+// friendSearch(me, like, key, now) -> [{ name, rel }] | null. like: an escaped LIKE prefix pattern ('ab%'), key: the confusable key (usernames.skeleton), both from api.js
+const friendSearch = guard(null, (me, like, key, now) => {
+  if (!isId(me) || !isNow(now) || typeof like !== 'string' || typeof key !== 'string' || like.length > 40 || key.length > 64) return null;
+  return S.frSearch.all(me, like, key, key).map(r => ({ name: r.name, rel: relOf(me, r.id, now) }));
+});
+// accountFresh(accountId, ownerId?) -> { id, ownerId, username } | false (gone, or the id now belongs to another owner) | null (not open / an error: UNKNOWN,
+// so a caller never signs anyone out on it). game.js checks a socket's account with it: admin.js deletes and renames from another process, and ids can be reused
+const accountFresh = guard(null, (id, owner) => { if (!isId(id)) return false; const r = S.acctFresh.get(id);
+  return r && (owner == null || r.owner_id === owner) ? { id: r.id, ownerId: r.owner_id, username: r.username } : false; });
+// playerByKey(key) -> { id, ownerId, name, hidden, rank } | null: the profile card's account (/api/player) (a username only), rank {tier, div} | null when never ranked
+const playerByKey = guard(null, key => {
+  if (typeof key !== 'string' || !key.length || key.length > 64) return null;
+  const k = S.acctByKey.get(key), a = k && S.acctFresh.get(k.id); if (!a || !a.username) return null;
+  const L = S.ladTier.get(a.owner_id);
+  return { id: a.id, ownerId: a.owner_id, name: a.username, hidden: a.lb_hidden === 1, rank: L ? rankOf(L.tier, L.div) : null };
+});
 
 // deleteOwner(ownerId, now) -> true when something was deleted. Cascades (profile, bot_record, device/account, sessions, merged device rows),
 // nulls match_log, holds an account's username key for 90 days, then checkpoints the WAL (10.6; secure_delete zeroes the rows).
@@ -730,7 +874,7 @@ const releaseHold = guard(false, key => typeof key === 'string' && S.holdDel.run
 async function sweep(now) {
   if (!D || sweeping) return null;
   sweeping = true;
-  const n = { guests: 0, accounts: 0, sessions: 0, matches: 0, holds: 0, files: 0 };
+  const n = { guests: 0, accounts: 0, sessions: 0, matches: 0, holds: 0, friendreqs: 0, files: 0 };
   const yieldNow = () => new Promise(r => setImmediate(r));
   const batches = async (key, step) => { for (;;) { if (!D) return; const k = tx(step); n[key] += k; if (k < BATCH) return; await yieldNow(); } };
   try {
@@ -741,6 +885,7 @@ async function sweep(now) {
     await batches('matches', () => Number(S.swLog.run(t - cfg.logDays * DAY).changes));
     await batches('matches', () => nearFull() ? Number(S.swOldest.run(BATCH).changes) : 0);   // still near the size cap: the oldest rows go, whatever their age
     await batches('holds', () => Number(S.swHolds.run(t).changes));
+    await batches('friendreqs', () => Number(S.swReqs.run(t - REQ_MS).changes));   // docs/SOCIAL.md 2: 30 days after created, declined or not (friendships go with an account, by the cascade)
     if (!D) return null;
     checkpoint();
     if (file) n.files = cleanBackups(t, path.dirname(file));      // memory databases (every test) never touch the disk
@@ -759,7 +904,7 @@ function cleanBackups(now, dir) {                                // 11.6: /tmp/p
 }
 
 // Operator helpers for admin.js (additions, never reachable over HTTP).
-const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share'];
+const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs'];
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
@@ -767,4 +912,4 @@ const ladderRecomputed = () => recomputed;                       // rows the las
 module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
-  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed };
+  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey };

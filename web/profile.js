@@ -4,7 +4,7 @@
 // stubs ui.js with a fixed list of names, so main.js hands in the few ui calls this needs (init).
 // Every string from the server or the player goes in as textContent. Nothing here logs an id, a name or a token.
 const $ = id => document.getElementById(id);
-const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', LB_SEEN = 'poddle.lbSeen', GSI = 'https://accounts.google.com/gsi/client';
+const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', LB_SEEN = 'poddle.lbSeen', FR_SEEN = 'poddle.friendsSeen', GSI = 'https://accounts.google.com/gsi/client';
 const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];
 const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^[0-9a-f]{32}$/;      // the server's own check (3.1): anything else is no device id
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
@@ -18,7 +18,7 @@ const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/
 const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 
 let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
-let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null, openAt = 0;      // openAt: when a card last opened (the veil ignores the rest of a double click)      // saved: the server has a guest profile for this device (true / false / null = not asked)
+let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null, lastBack = null, openAt = 0, meDone = false, lostP = null;      // openAt: when a card last opened (the veil ignores the rest of a double click). meDone: /api/me has answered (or failed). lostP: acctLost's /api/me check in flight      // saved: the server has a guest profile for this device (true / false / null = not asked)
 let me = { enabled: false, clientId: null, account: null, db: false, rkSignin: false };      // rkSignin (NOTES 133): Ranked is for signed-in players with a username      // GET /api/me: sign-in on or off, the Google client id, who is signed in
 let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
@@ -38,8 +38,8 @@ export function seated() {                                  // a 'welcome' with 
 }
 const forgetDevice = () => { ls.del(DEV_KEY); saved = null; };      // rotated (3.1): sign-out, Delete my data (the privacy page removes it). A fresh one is made at the next seat
 
-// ---------- /api (8): same origin, JSON, the session cookie rides along by itself ----------
-async function api(path, method = 'GET', body) {
+// ---------- /api (8): same origin, JSON, the session cookie rides along by itself. web/social.js calls it too ----------
+export async function api(path, method = 'GET', body) {
   const o = { method, credentials: 'same-origin', cache: 'no-store', headers: {} };
   if (body !== undefined) { o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(body); }      // every POST and DELETE: JSON or the server says 415
   const r = await fetch(path, o); let j = null; if (r.status !== 204) { try { j = await r.json(); } catch { j = null; } }
@@ -54,7 +54,8 @@ export async function loadMe() {                            // once after boot: 
       me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true, rkSignin: j.rkSignin === true };
       if (me.account) { const L = ladderOf(j); if (L) h.ladder(L); }
       const seen = ls.get(LB_SEEN), listed = !!(j.places && j.places.listed === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140)
-      if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
+      if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); else if (me.enabled && me.db && !ls.get(FR_SEEN)) frNotice(); } } catch { /* no answer: a guest with sign-in off */ }
+  meDone = true;      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
   drawAcct(); return me;
 }
 // the notice the privacy page promises (NOTES 126): once per browser, only to a name that can be on a board. It waits until the lobby is up and has sat
@@ -65,7 +66,14 @@ function lbNotice(n = 0, first = true) {
   clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN) === '2') return;      // gives up after ten minutes on the title or in a court: the next load tries again
   if (!h.view()) { lbT = setTimeout(() => lbNotice(n + 1, first), 1000); return; }
   lbT = setTimeout(() => { if (!h.view()) return lbNotice(n + 1, first);
-    h.toast(first ? 'Your username can now appear on the global leaderboard, and anyone can open your profile card from it. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '2'); }, 1200);
+    h.toast(first ? 'Your username can now appear on the global leaderboard, and anyone can open your profile card from it. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '2');
+    if (me.enabled && me.db && !ls.get(FR_SEEN)) lbT = setTimeout(() => frNotice(), 8600); }, 1200);      // the Friends notice waits for this one to go: a second toast would replace it
+}
+// the Friends notice (docs/SOCIAL.md 7): once per browser, wherever the Friends tile shows (guests too: it says Sign in to add friends). The same waiting as above
+function frNotice(n = 0) {
+  clearTimeout(lbT); if (n > 600 || ls.get(FR_SEEN) || !(me.enabled && me.db)) return;
+  if (!h.view()) { lbT = setTimeout(() => frNotice(n + 1), 1000); return; }
+  lbT = setTimeout(() => { if (!h.view()) return frNotice(n + 1); h.toast('New: add friends and see who’s online', 6000); ls.set(FR_SEEN, '1'); }, 1200);
 }
 export async function fetchProfile() {                      // -> the Profile of 8.2, null = nothing saved yet, undefined = the request failed
   if (!on) return undefined; await mePromise; const dev = deviceId(); if (!me.account && !dev) return null;      // who is signed in first (/api/me). Nothing to ask about: no request at all
@@ -274,37 +282,54 @@ async function toggleShow() {
   if (h.view() === 'leaderboard') drawBoard();
 }
 
-// ---------- a player's profile card from the leaderboard (NOTES 140): GET /api/leaderboard/player?u=<name>, exactly what their share card shows. No URL of its own ----------
-let lbpGen = 0, lbpName = '';      // lbpGen: this sheet's own generation (loadGen is sign-in's); lbpName: the row it came from, to find it again (the list redraws under the sheet)
+// ---------- a player's profile card (NOTES 140 + docs/SOCIAL.md 6): ONE card, opened from a leaderboard row, a friends list, search results and On this court.
+// It asks two things at once: GET /api/leaderboard/player?u=<name> (the share card's subset: rank, trophies, the toughest Matt, the eleven stats (NOTES 145); public, any
+// account on a board, else 404) and, when I am signed in with a username, GET /api/player?name=<name> (rank, places, what we are to each other, a friend's status).
+// The friend row under it is web/social.js's (h.friend): it owns the lists and the requests. No URL of its own ----------
+let lbpGen = 0, lbpName = '', lbpFrom = 'board', lbpSaid = null, lbpRow = 'off';      // lbpRow: the friend row's kind now (on | self | off); lbpGen: this sheet's own generation (loadGen is sign-in's); lbpName: the name it shows, to find its row again (a list redraws under the sheet); lbpFrom: 'board' | 'friends' | 'court'; lbpSaid: /api/player's answer
 const STAT_LABELS = ['Win rate', 'On court', 'Best streak', 'Returns', 'Points won', 'Rally', 'Swing', 'Winners', 'Aces', 'Smashes', 'Titles'], HERO_N = 3, MATT = ['Rookie', 'Club', 'Tour', 'Pro'];      // the share card's eleven tags in its order (server/card.js dataOf, NOTES 145): the first three are its headline figures. MATT: difficulty order, as is-lv<i>
 const figB = v => { const b = mk('b'); if (v === '-' || v === '–') { b.textContent = v; b.className = 'is-none'; return b; } for (const r of v.match(/\d[\d,-]*|[^\d]+/g) || [v]) b.append(/^\d/.test(r) ? r : mk('i', '', r)); return b; };      // "72%", "11h 6m": the digits big, % h m small, as the card draws them (textContent stays the whole value)
+const PLACE_BOARDS = [['trophies', 'Trophies'], ['rally', 'Longest rally'], ['streak', 'Win streak']];      // /api/player's places, in the leaderboard's own words
 export const playerOpen = () => cardOpen() && !!$('lbp-card') && !$('lbp-card').hidden;
+export const inLobby = () => !!h.view();      // web/social.js: the lobby is up (not a court, not the title): a sign-in from the card is safe there, never mid-match
 export function closePlayer() { if (playerOpen()) closeCard(); }      // main.js: MATCH FOUND and a tournament's VS card; seated(): a seat of my own
-function openPlayer(btn) {
-  const name = btn.dataset.name; if (!name || !$('lbp-card')) return;
-  if (document.activeElement !== btn) btn.focus({ preventScroll: true });      // Safari does not focus a clicked button: closeCard hands focus back to lastFocus
-  lbpName = name; openCard('lbp-card');
-  loadPlayer(name, btn.dataset.tier ? { tier: +btn.dataset.tier, div: +btn.dataset.div } : null);
+// openPlayer(name, { from, rank, via, back }): from = the element pressed (focus goes back to it; Safari does not focus a clicked button); rank = {tier,div}
+// for the loading face; via = 'board' | 'friends' | 'court'; back() = where focus goes when a redraw replaced `from` (web/social.js: that name's new row)
+export function openPlayer(name, { from = null, rank = null, via = 'board', back = null } = {}) {
+  name = typeof name === 'string' ? name.slice(0, 12) : ''; if (!name || !$('lbp-card')) return;
+  if (from && document.activeElement !== from && from.isConnected) from.focus({ preventScroll: true });
+  lbpName = name; lbpFrom = via; openCard('lbp-card', back);
+  loadPlayer(name, rank && Number.isInteger(rank.tier) ? { tier: rank.tier, div: rank.div } : null);
 }
-async function loadPlayer(name, rank) {      // rank: the row's emblem for the loading face (null: never played Ranked, or a retry: none known)
-  const g = ++lbpGen; drawPlayer({ name, rank }, 'loading');
-  let r = null; try { r = await api('/api/leaderboard/player?u=' + encodeURIComponent(name)); } catch { r = null; }
-  if (g !== lbpGen || !playerOpen()) return;      // closed, or another row opened meanwhile: this answer is stale
-  if (r && r.ok && r.j && typeof r.j.name === 'string') drawPlayer(r.j, 'ok');
-  else drawPlayer({ name }, r && r.status === 404 ? 'gone' : 'error');      // 404: hidden, renamed, deleted or on no board (the server never says which). 429, 503, offline: Try again
+const asked = () => !!(on && me.enabled && me.account && me.account.username);      // /api/player is asked only by a player who can have friends: its rel and st are for them
+async function loadPlayer(name, rank) {      // rank: the opener's emblem for the loading face (null: never played Ranked, or a retry: none known)
+  const g = ++lbpGen; lbpSaid = null; drawPlayer({ name, rank }, 'loading');
+  const get = u => api(u).catch(() => null), both = await Promise.all([get('/api/leaderboard/player?u=' + encodeURIComponent(name)), asked() ? get('/api/player?name=' + encodeURIComponent(name)) : null]);
+  if (g !== lbpGen || !playerOpen()) return;      // closed, or another card opened meanwhile: these answers are stale
+  const [r, q] = both, lb = r && r.ok && r.j && typeof r.j.name === 'string' ? r.j : null, pl = q && q.ok && q.j && typeof q.j.name === 'string' ? q.j : null;
+  lbpSaid = pl ? { rel: pl.rel, st: pl.st } : null;
+  if (lb) drawPlayer({ ...lb, places: pl && pl.places }, 'ok');
+  else if (pl) drawPlayer({ name: pl.name, rank: pl.rank, places: pl.places, open: pl.places !== null && pl.places !== undefined }, r && r.status === 404 ? 'part' : 'partx');      // not on a board (or the stats failed): the rank and places, no stats
+  else drawPlayer({ name }, r && r.status === 404 && (!q || q.status === 404) ? 'gone' : 'error');      // 404 (both, or the only one asked): hidden, renamed, deleted or on no board (the server never says which). 429, 503, offline: Try again
 }
 const strOf = (v, n) => (typeof v === 'string' || Number.isFinite(v) ? String(v).slice(0, n) : '');
 function drawPlayer(p, state) {
   const c = $('lbp-card'); if (!c) return;
   const name = String(p.name || '').slice(0, 12), nm = $('lbp-name'); if (nm) { nm.textContent = name; h.badge(nm, true); }      // the hammer beside the developer's name
-  c.dataset.state = state;      // loading | ok | gone | error. An attribute, not a class: .panel.is-error is the red nudge of a form
+  const part = state === 'part' || state === 'partx';
+  c.dataset.state = part ? 'part' : state;      // loading | ok | part (no stats: not on a board) | gone | error. An attribute, not a class: .panel.is-error is the red nudge of a form
   const rk = p.rank && typeof p.rank === 'object' && Number.isInteger(p.rank.tier) ? { tier: tierNum(p.rank.tier), div: divNum(p.rank.div) } : null;
-  const hero = $('lbp-hero'); if (hero) hero.className = 'lbp-hero well' + (rk ? ' is-' + RANK_NAME[rk.tier - 1].toLowerCase() : ' is-none');
+  const hero = $('lbp-hero'); if (hero) { hero.className = 'lbp-hero well' + (rk ? ' is-' + RANK_NAME[rk.tier - 1].toLowerCase() : ' is-none') + (part ? ' no-matt' : ''); hero.hidden = part && !rk && !p.open; }      // no Matt without the board's answer. A hidden account's rank (not my friend): no hero at all, never 'Not ranked yet'
   h.emblem($('lbp-em'), rk);
-  text('lbp-rank', rk ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rk.tier, rk.div)) : state === 'loading' ? '' : 'Not ranked yet');      // 'Pro #3' only from the server
+  text('lbp-rank', rk ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rk.tier, rk.div)) : state === 'loading' ? '' : 'Not ranked yet');      // 'Pro #3' only from the board's answer
   const tro = num(p.trophies); show('lbp-tro', !!rk && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
   const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi);
   text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
+  const pl = $('lbp-places');      // the place numbers /api/player gave (never the values): one short line
+  if (pl) { pl.textContent = ''; const P = p.places && typeof p.places === 'object' ? p.places : null;
+    for (const [k, l] of PLACE_BOARDS) { const x = P && P[k] && Number.isInteger(P[k].rank) && P[k].rank > 0 ? P[k].rank : 0; if (!x) continue;
+      const li = mk('li', 'lbp-place' + (x <= 3 ? ' is-top' + x : '')); li.append(mk('b', '', '#' + x.toLocaleString('en-US')), mk('span', '', l)); pl.append(li); }
+    pl.hidden = !pl.children.length || (state !== 'ok' && !part); }
   const dl = $('lbp-stats');
   if (dl) {
     const S = Array.isArray(p.stats) && p.stats.length === STAT_LABELS.length && p.stats.every(s => s && typeof s.label === 'string' && (typeof s.value === 'string' || Number.isFinite(s.value))) ? p.stats : null;
@@ -314,11 +339,18 @@ function drawPlayer(p, state) {
       const dt = mk('dt', '', s ? strOf(s.tag, 16) || s.label.slice(0, 24) : l); if (s) dt.title = s.label.slice(0, 32);      // the card's short caps; the long name ("Win rate vs people") on hover
       d.append(dt, dd); if (i < HERO_N) d.append(mk('dd', 'lbp-note', s ? strOf(s.note, 28) : '\u00a0')); dl.append(d); });      // the headline's note: "31-12 vs people", "all modes"
   }
-  const msg = state === 'gone' ? 'This player isn’t on the leaderboard any more' : state === 'error' ? 'Couldn’t load this player' : '';
-  text('lbp-msg', msg); show('lbp-msg', !!msg); show('lbp-retry', state === 'error');
-  const mine = state === 'ok' && !!(me.account && me.account.username) && name.toLowerCase() === me.account.username.toLowerCase();      // my own row: the same public view, and the way to Your stats
+  const msg = state === 'gone' ? (lbpFrom === 'board' ? 'This player isn’t on the leaderboard any more' : 'No player with that username any more') : state === 'error' ? 'Couldn’t load this player' : state === 'partx' ? 'Couldn’t load the stats' : state === 'part' ? 'Stats show for players on the global leaderboard' : '';
+  text('lbp-msg', msg); show('lbp-msg', !!msg); $('lbp-msg')?.classList.toggle('is-note', part); show('lbp-retry', state === 'error' || state === 'partx');
+  const mine = (state === 'ok' || part) && !!(me.account && me.account.username) && name.toLowerCase() === me.account.username.toLowerCase();      // my own card: the same public view, and the way to Your stats
   show('lbp-foot', mine);
+  lbpRow = state === 'ok' || part ? (mine ? 'self' : 'on') : 'off'; drawFriend();
 }
+function drawFriend() {      // the friend row (web/social.js draws it into #lbp-friend): only on a card that loaded, never on my own
+  const f = $('lbp-friend'); if (!f) return;
+  if (lbpRow !== 'on') { f.hidden = true; f.textContent = ''; delete f.dataset.sig; return; }
+  h.friend(f, { name: lbpName, rel: lbpSaid && lbpSaid.rel, st: lbpSaid && lbpSaid.st, gen: lbpGen });      // gen: a new opening (a confirm left open last time starts closed)
+}
+export function friendRow() { if (playerOpen()) drawFriend(); }      // web/social.js: a push, a request answered, a sign-in: the open card's row follows
 function retryPlayer() {
   const c = $('lbp-card'); if (!lbpName || !playerOpen()) return;
   if (c) c.focus({ preventScroll: true });      // Try again hides itself: focus waits on the card, not on <body>
@@ -337,6 +369,21 @@ let rkGen = 0;
 // rkGate() -> '' when this player may play Ranked, else what is missing: 'signin' | 'username' (NOTES 133). Only when the server says Ranked needs a
 // sign-in (/api/me rkSignin; an older server or the test knob RK_GUESTS: '', as before)
 export const rkGate = () => (!on || !me.rkSignin ? '' : !me.account ? 'signin' : !me.account.username ? 'username' : '');
+// acctGate() -> '' when this player can have friends (docs/SOCIAL.md 1), else 'off' (no sign-in or no database here: nobody can) | 'signin' | 'username' |
+// 'wait' (/api/me has not answered yet: until then `me` is its default, which would read as 'off', and a reload on /friends said 'not available')
+export const acctGate = () => (!on ? 'off' : !meDone ? 'wait' : !me.enabled || !me.db ? 'off' : !me.account ? 'signin' : !me.account.username ? 'username' : '');
+export const ready = () => mePromise;      // /api/me has answered (a reload straight onto /friends waits for it)
+// the server answered a signed-in call with 401 signin (the session expired, or was signed out or deleted elsewhere) or 403 username (no username after all):
+// /api/me is asked again first (a busy database answers a session lookup the same way), and only what it confirms is dropped; then this page follows, so the
+// gates (Ranked, Friends) ask for the right step and Sign in / Pick a username work again. web/social.js calls it. -> 'signin' | 'username' (what went) | '' (nothing)
+export function acctLost() {
+  if (!on || !me.account) return Promise.resolve(''); if (lostP) return lostP;
+  lostP = (async () => { let r = null; try { r = await api('/api/me'); } catch { r = null; }
+    if (!me.account || !r || !r.ok || !r.j) return '';      // no answer: unknown, so nothing is dropped
+    const a = acct(r.j.account), what = !a ? 'signin' : !a.username ? 'username' : '';
+    if (what) { me.account = a; drawAcct(); redrawView(); } return what; })().finally(() => { lostP = null; });
+  return lostP;
+}
 const redrawView = () => { const v = h.view(); if (v === 'profile') showProfile(); else if (v === 'leaderboard') showBoard(); else if (v === 'ranked' || v === 'ranks') showRanked(); };      // after a sign-in, sign-out or new username: the open view redraws (Ranked's gate lifts, NOTES 133)
 export const pickName = () => claimCard();      // Pick a username, from the Ranked view
 export async function showRanked() {                       // the Ranked view opened: what is known at once, then /api/stats. Off (no stats server): a fresh Bronze, so the view still reads
@@ -350,16 +397,17 @@ export async function showRanked() {                       // the Ranked view op
 
 // ---------- the account cards (9.5, 9.7): over everything, one at a time. Escape closes; game keys never reach main.js behind them ----------
 export const cardOpen = () => { const l = $('acct-layer'); return !!l && !l.hidden; };
-function openCard(id) {
+function openCard(id, back) {      // back() -> where Close puts the focus if the opener's element is gone (a friends panel redrew: openPlayer's back)
   const l = $('acct-layer'), c = $(id); if (!l || !c) return;
-  if (!cardOpen()) lastFocus = document.activeElement;
+  if (!cardOpen()) { lastFocus = document.activeElement; lastBack = typeof back === 'function' ? back : null; }
   for (const k of l.children) k.hidden = k !== c; l.hidden = false; openAt = performance.now();
   setTimeout(() => { if (!c.hidden) (c.querySelector('[data-first]:not([hidden])') || c).focus({ preventScroll: true }); }, 30);
 }
 export function closeCard() {
   const l = $('acct-layer'); if (!l || l.hidden) return; l.hidden = true; loadGen++; lbpGen++;
-  let f = lastFocus, again = false; lastFocus = null;
+  let f = lastFocus, again = false; const b = lastBack; lastFocus = lastBack = null;
   if (f && !f.isConnected && lbpName) { f = [...($('lb-list')?.querySelectorAll('button.lb-row') || [])].find(b => b.dataset.name === lbpName) || null; again = !!f; }      // the board redrew under the profile sheet: the same player's new row (.find, never a selector built from a name)
+  if ((!f || !f.isConnected || !f.offsetParent) && b) f = b();      // a friends panel redrew under it: back() finds that name's row, or the search (web/social.js)
   lbpName = '';
   if (f && f.isConnected && f.offsetParent) { f.focus({ preventScroll: true }); if (again) f.scrollIntoView({ block: 'nearest' }); }      // back where the player was (the result card's own buttons keep theirs)
 }
@@ -511,20 +559,20 @@ function drawAcct() {
   show('btn-set-signin', en && !a); show('set-account', !!a); text('set-account-name', name ? `Signed in as ${name}` : 'Signed in');
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
-  show('btn-profile', on); show('btn-ranked', on && me.db && (!me.rkSignin || me.enabled)); show('btn-leaderboard', on && me.db); h.gate(); h.tiles();      // Ranked needs sign-in (NOTES 133): no tile where nobody can sign in; the tile's line follows the gate.      // the leaderboard reads the database too (NOTES 126)      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
+  show('btn-profile', on); show('btn-ranked', on && me.db && (!me.rkSignin || me.enabled)); show('btn-leaderboard', on && me.db); show('btn-friends', on && me.db && me.enabled); h.gate(); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // Ranked needs sign-in (NOTES 133): no tile where nobody can sign in; the tile's line follows the gate.      // the leaderboard reads the database too (NOTES 126)      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
 }
 
 // ---------- the site's storage cleared in another tab: the device id went with it. Its socket keeps the old hello, so the next match is on a new one (3.1) ----------
 function storageCleared() { if (!on) return; saved = null; drawAcct(); h.redial(); }
 
 // ---------- wiring: main.js calls init() once, while it loads (before the first socket opens) ----------
-// hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), ranked(), tiles(), rkView(s), queued(), ladder(L), crest(el, r), emblem(el, r), rankBadge(el, r) }. on: this page's server keeps stats
+// hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), ranked(), tiles(), rkView(s), queued(), ladder(L), crest(el, r), emblem(el, r), rankBadge(el, r), acct(), friend(box, p) }. on: this page's server keeps stats
 // (hosted, or ?acctest=1 for test/profile-ui.mjs). Off, nothing here sends a request, makes an id or shows a control.
 let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, emblem: noop, rankBadge: noop, board: noop, gate: noop, cup: noop };
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, emblem: noop, rankBadge: noop, board: noop, gate: noop, cup: noop, acct: noop, friend: noop };      // acct, friend: web/social.js (the account changed; the profile card's friend row)
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
@@ -543,9 +591,9 @@ function wire() {
     tabs.addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); e.stopPropagation();      // a radio group: the arrows move the pick
       const o = [...tabs.children], i = o.findIndex(x => x.dataset.board === board), n = o[(i + (e.key === 'ArrowRight' ? 1 : -1) + o.length) % o.length]; setBoard(n.dataset.board); n.focus(); });
   }
-  { const y = $('lb-you'); if (y) { const go = e => y.classList.contains('is-link') && y.dataset.name && !e.target.closest('button') && openPlayer(y);      // the You card, when I am on the board (NOTES 141)
+  { const y = $('lb-you'); if (y) { const go = e => y.classList.contains('is-link') && y.dataset.name && !e.target.closest('button') && openPlayer(y.dataset.name, { from: y, rank: y.dataset.tier ? { tier: +y.dataset.tier, div: +y.dataset.div } : null });      // the You card, when I am on the board (NOTES 141)
     y.addEventListener('click', go); y.addEventListener('keydown', e => { if (e.target === y && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(e); } }); } }
-  { const list = $('lb-list'); if (list) list.addEventListener('click', e => { const b = e.target.closest('button.lb-row'); if (b && b.dataset.name) openPlayer(b); }); }      // a row opens that player's profile card (NOTES 140): one listener, the rows redraw
+  { const list = $('lb-list'); if (list) list.addEventListener('click', e => { const b = e.target.closest('button.lb-row'); if (b && b.dataset.name) openPlayer(b.dataset.name, { from: b, rank: b.dataset.tier ? { tier: +b.dataset.tier, div: +b.dataset.div } : null }); }); }      // a row opens that player's profile card (NOTES 140): one listener, the rows redraw
   click('btn-lbp-close', () => closeCard()); click('btn-lbp-retry', () => retryPlayer());
   click('btn-lbp-mine', () => { closeCard(); h.stats(); });      // my own row's card: Your stats, one tap away
   click('btn-claim-skip', () => closeCard());

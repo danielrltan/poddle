@@ -15,7 +15,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
-const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats', '/ranked', '/ranks', '/leaderboard']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
+const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats', '/ranked', '/ranks', '/leaderboard', '/friends']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
 const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/changelog': '/changelog.html', '/changelog/': '/changelog.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats' };            // clean URLs: a fixed map, no extension guessing
 let PAGE_404 = null; try { PAGE_404 = fs.readFileSync(path.join(WEB, '404.html')); } catch { /* no page: plain words */ }
 function notFound(req, res) {                                                                           // a miss is a real 404 (never a soft 200) and never indexed
@@ -64,7 +64,8 @@ const wss = new WebSocketServer({ server: httpServer, maxPayload: 4096 });   // 
 try {                                                            // docs/ACCOUNTS.md 11.3: the stats database before the first socket; a failure is one log line and the game plays as before
   db.open(process.env.PODDLE_DB || ':memory:'); db.sweep(Date.now()); setInterval(() => { try { db.sweep(Date.now()); } catch { /* next day */ } }, 24 * 3600e3).unref();
 } catch { /* db logs its own code */ }
-api.init({ env: process.env }); stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients });
+api.init({ env: process.env, social: { status: id => socialStatus(id), changed: (push, drop) => socialChanged(push, drop) } });   // friends (docs/SOCIAL.md 4): the API reads presence and pushes snapshots through these; they run only after boot
+stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients, detached: ws => socialDetached(ws) });
 httpServer.listen(+process.env.PORT || 8080);
 
 const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
@@ -1746,6 +1747,88 @@ function rkTick(ms) {
   for (const [cid, l] of rkLate) if (ms >= l.until) rkLate.delete(cid);
 }
 
+// ---------- friends: online status and the 'social' snapshot (docs/SOCIAL.md 4-5, 8) ----------
+// Memory only, gone on restart. An account is online while it has a live lobby socket (never a phone pad, never a LOCAL socket without lobby=1); its
+// status is the most engaged across those sockets (api.ST_W). Shown to accepted friends only: every SOCIAL_MS the presence is recomputed and diffed, and
+// the online friends of every account whose status (or username: admin.js renames from another process) moved get a fresh snapshot. A snapshot is
+// api.friendsBody read from the database by account id every time, never ws.acct.username; a socket whose account id no longer resolves to its owner
+// (admin.js deleted it; ids can be reused) loses its account like a sign-out. Nothing here logs a name or an id (privacy 7). Slice B's invites use the
+// same maps: who is online, and on which sockets
+const SOCIAL_MS = envNum('SOCIAL_MS', 2000);                      // the presence tick
+const presence = new Map();                                      // account id -> { st, name }: the accounts online at the last tick
+const friendCache = new Map();                                   // account id -> Set of its friends' ids, for accounts seen online; dropped by every friend change of that account
+let socialTimer = null, socialLogAt = -Infinity, socialRetry = new Set();   // socialRetry: accounts whose move could not reach their friends (a failed read): the next tick tells them
+const socialSock = ws => !!ws && !ws.pad && !!ws.viaLobby && !!ws.acct && ws.acct.accountId != null && ws.readyState === 1;   // a socket that puts its account online
+function socialSt(ws) {                                          // one socket's status (spec 4), the most engaged test first
+  const r = ws.room, q = ws.rk && rkQ.get(ws.cid) === ws.rk ? ws.rk : null;
+  if (q && q.series && rkSeries.has(q.series) && !rkSeries.get(q.series).done) return 'ranked';   // the VS card, a live series (seated, or its seat held)
+  if (r && r.tag && r.tag.rk && r.kind === 'match' && ws.pl) return 'ranked';   // the series card after it
+  if (tourActive(ws)) return 'tour';
+  if (r && ws.pl) return r.humans().length >= 2 ? 'playing' : 'matt';   // seated with a person; else vs Matt, or alone waiting for someone (a Ranked warm-up is Matt too)
+  if (r && ws.spec) return 'watching';
+  if (q && q.on) return 'queue';
+  return 'menu';
+}
+const socialStatus = id => { const p = presence.get(id); return p ? p.st : 'off'; };   // api.js: a friend's st (the list, the profile card)
+function friendsOfId(id) { let f = friendCache.get(id); if (!f) { const l = db.friendIds(id); if (!l) return null; f = new Set(l); friendCache.set(id, f); } return f; }   // null: the read failed, never cached as 'no friends'
+// socialPush(ids, only?) -> a fresh snapshot to every lobby socket of those accounts (or to the one socket `only`). The account is read by id first: a socket
+// whose owner no longer matches gets nothing (the tick takes its account away), an account without a username gets nothing (nobody can be its friend)
+function socialPush(ids, only = null) {
+  if (!ids.size) return;
+  const by = new Map();
+  for (const ws of only ? [only] : wss.clients) if (socialSock(ws) && ids.has(ws.acct.accountId)) { const l = by.get(ws.acct.accountId); if (l) l.push(ws); else by.set(ws.acct.accountId, [ws]); }
+  for (const [id, list] of by) {
+    const a = db.accountFresh(id); if (!a || !a.username) continue;
+    const body = api.friendsBody(id); if (!body) continue;
+    const s = JSON.stringify({ type: 'social', ...body });
+    for (const ws of list) if (ws.acct && ws.acct.ownerId === a.ownerId) { ws.socialSent = true; put(ws, s); }
+  }
+}
+function socialTick() {
+  if (socialTimer) { clearTimeout(socialTimer); socialTimer = null; }
+  const cur = new Map(), rows = new Map(), lost = [], first = new Set();
+  for (const ws of wss.clients) {
+    if (!socialSock(ws)) continue;
+    const id = ws.acct.accountId; let a = rows.get(id);
+    if (a === undefined) { a = db.accountFresh(id); rows.set(id, a); }   // false: gone; null: unknown (the database is busy or closed), which never signs anyone out
+    if (a === false || (a && a.ownerId !== ws.acct.ownerId)) { lost.push(ws); continue; }
+    const name = a ? a.username : (presence.get(id) || {}).name; if (!name) continue;   // no username: not online for anyone (it can have no friends)
+    const st = socialSt(ws), c = cur.get(id);
+    if (!c || api.ST_W[st] > api.ST_W[c.st]) cur.set(id, { st, name });
+    if (!ws.socialSent && ws.helloSeen) first.add(id);            // a username claimed after this socket's hello: its first snapshot now
+  }
+  for (const ws of lost) { if (ws.tokenHash) stats.forget({ tokenHash: ws.tokenHash }); if (ws.acct) { ws.acct = null; socialDetached(ws); } }   // forget clears every socket on that session and says socialoff (socialDetached)
+  const moved = [];
+  for (const [id, p] of cur) { const was = presence.get(id); if (!was || was.st !== p.st || was.name !== p.name) moved.push(id); }
+  for (const id of presence.keys()) if (!cur.has(id)) moved.push(id);
+  for (const id of socialRetry) if (!moved.includes(id)) moved.push(id);
+  const gone = [...presence.keys()].filter(id => !cur.has(id));
+  presence.clear(); for (const [id, p] of cur) presence.set(id, p);   // before the snapshots: they read it
+  const to = new Set(first), again = new Set();
+  for (const id of moved) { const fs = friendsOfId(id); if (!fs) { again.add(id); continue; } for (const f of fs) if (presence.has(f)) to.add(f); }
+  socialRetry = again;
+  for (const id of gone) friendCache.delete(id);                  // after its friends were told
+  socialPush(to);
+}
+function socialSoon() { if (!socialTimer) socialTimer = setTimeout(() => { socialTimer = null; try { socialTick(); } catch { socialSays(); } }, 0); }   // sign-out, delete, a close: now, not at the next tick
+function socialSays() { const t = Date.now(); if (t - socialLogAt >= 3600e3) { socialLogAt = t; console.error('social: presence tick failed'); } }   // one fixed line an hour at most, nothing of anyone
+// api.js after a friend change (push: the accounts whose own lists changed; drop: others whose friend sets did), and after an account delete or a new username
+// (push: every account whose lists named it, friends and requests' other sides)
+function socialChanged(push, drop) {
+  for (const id of [...(push || []), ...(drop || [])]) friendCache.delete(id);
+  socialPush(new Set((push || []).filter(id => Number.isSafeInteger(id))));
+}
+function socialDetached(ws) {                                    // stats.forget took this socket's account (sign-out, a deleted account, an evicted session)
+  ws.socialSent = false;
+  if (ws.viaLobby && !ws.pad) tell(ws, { type: 'socialoff' });  // the client clears the panel
+  socialSoon();                                                  // its friends see it go at once
+}
+function socialGet(ws) {                                         // {type:'socialget'}: a fresh snapshot for this socket, at most one a second
+  const t = Date.now(); if (!socialSock(ws) || t - (ws.socialAt || 0) < 1000) return; ws.socialAt = t;
+  socialPush(new Set([ws.acct.accountId]), ws);
+}
+setInterval(() => { try { socialTick(); } catch { socialSays(); } }, SOCIAL_MS);
+
 // ---------- a phone as the paddle (NOTES 34): nothing to install ----------
 // The tab makes up a code (it is in the QR it shows) and names it on its game socket (?pad=CODE). The phone's page opens a
 // socket of its own (?padfor=CODE) and its motion samples are passed on to that tab, which feeds them to the same
@@ -1782,6 +1865,7 @@ function padGone(ws) {
 // is looked up only at match end, so a socket that never finishes a match writes nothing. Never throws, never logs anything of it.
 function helloMsg(ws, m) {
   if (ws.helloSeen || ws.pad || ws.originBad) return; ws.helloSeen = true;
+  if (socialSock(ws)) try { socialPush(new Set([ws.acct.accountId]), ws); } catch { /* friends are best effort */ }   // docs/SOCIAL.md 5: the friends snapshot after a signed-in socket's hello (a username only)
   const h = auth.deviceHash(m.dev); if (!h) return;              // malformed: no device id
   ws.devHash = h; stats.seen(ws);
   if (ws.pl && ws.room && ws.room.identify) ws.room.identify(ws.pl, ws);   // already seated (back=1 / room= in the URL, or the lazy id arriving just after welcome)
@@ -1822,6 +1906,7 @@ wss.on('connection', (ws, req) => {
     if (m.type === 'net') return void (ws.every = num(m.hz, 60) <= 30 ? 2 : 1);   // a struggling link asks for half the state packets; it is the link's, so it follows the socket from room to room
     if (m.type === 'padfx') { const p = ws.padCode && pads.get(ws.padCode); if (p && PAD_FX.has(m.fx)) tell(p, { type: 'fx', fx: m.fx, n: clamp(num(m.n, 0), 0, 1), b: m.b != null ? clamp(num(m.b, 0), 0, 1) : undefined }); return; }      // b: the stroke's force for the buzz, n the colour it shows (a hard lob buzzes hard and glows white)
     if (m.type === 'padcode') return padHost(ws, String(m.code || ''));
+    if (m.type === 'socialget') return socialGet(ws);            // friends (docs/SOCIAL.md 5): before the name line, and never a name field (slice B's invites go here too, with `to`)
     if (typeof m.name === 'string') ws.name = cleanName(m.name);   // rides on quick / create / join / watch / name. Strings only, like every other field
     if (ws.tour && TOUR_MSGS.has(m.type)) return tourMsg(ws, m);   // a tournament's own, wherever its socket is
     if (ws.rk && RK_MSGS.has(m.type)) return rkMsg(ws, m);       // the Ranked queue's own, wherever its socket is (RANKED.md 3.3)
@@ -1837,7 +1922,7 @@ wss.on('connection', (ws, req) => {
       else if (m.type === 'rk') rkQueue(ws);                     // Ranked: into the queue (RANKED.md 3.4)
     }
   } catch (err) { if (!(err instanceof SyntaxError)) console.error('bad message:', err.message); } });
-  ws.on('close', () => { padGone(ws); quit(ws, true); tourGone(ws); rkGone(ws); lobby.delete(ws); lobbyChanged(); });
+  ws.on('close', () => { padGone(ws); quit(ws, true); tourGone(ws); rkGone(ws); lobby.delete(ws); lobbyChanged(); if (ws.acct && ws.viaLobby) socialSoon(); });   // a signed-in tab closing: its friends see it at once
 
   const padFor = String(q.get('padfor') || '').toUpperCase();
   if (q.get('padfor') != null) { if (PAD_CODE.test(padFor)) padJoin(ws, padFor); else { tell(ws, { type: 'padhost', bad: true }); ws.close(); } return; }      // a phone: no lobby, no seat

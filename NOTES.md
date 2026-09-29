@@ -2941,3 +2941,68 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   (the new stat shape, the hero three first), lb-profile-ui.mjs (eleven skeletons under the tags, three hero tiles with
   notes, the widest values on Pickle_Rick uncut at 1440 / 1280 / 390), sweep.mjs (eleven for the lbp shots).
   test/share-shots.mjs gives every sample time and points and adds huge, maxed, matt-only and brand-new.
+
+## 146. Friends: search, requests, a friends list with online status, and the profile card's friend row
+- The owner (docs/SOCIAL.md): "you should be able to search and add friends. u can add from looking at a profile, or search them and add them from the
+  results list. then you should be able to see your friends in a list, and it will show who's online or not. then you can invite them to games / duels /
+  invite to watch from inside a game. this means the social menu should be in the game in the pause menu somewhere. think of edge cases and implement
+  slowly and carefully." This is slice A of docs/SOCIAL.md 9 (friends, requests, search, presence, the card); invites (play / duel / watch) are slice B.
+- Server (db.js EXTRA, no numbered migration): friends(a < b, since) and friend_reqs(from_id, to_id, created_at = the sender's clock, declined_at,
+  asked_at = the receiver's, sent), both ON DELETE CASCADE with both FK columns indexed; db.friendOp / friendsOf / friendIds / friendPeers / friendRel /
+  friendSearch / accountFresh / playerByKey; exportOf lists friends and requests by username (never ids); the sweep step `friendreqs` (30 d after created).
+  api.js: GET/POST /api/friends ({op, name}: add | accept | decline | cancel | remove -> {r, rel, snap}), GET /api/friends/search?q= (2..12 chars,
+  prefix or confusable key, top 20, never self), GET /api/player?name= (handler playerCard: rank + places {rank} + rel + st, SOCIAL.md 8). Every name is
+  found by its skeleton key. game.js: presence (menu | matt | playing | watching | queue | ranked | tour, the most engaged across an account's lobby
+  sockets), a 2 s tick that diffs it and pushes {type:'social'} snapshots to online friends, {type:'socialoff'} when a socket loses its account,
+  socialget for a tab that never says hello. MENU_PATHS gains /friends. Social log lines carry no names and no ids.
+- Merged with NOTES 140 (the peer's leaderboard profile card, same day): there is ONE card, the peer's #lbp-card. web/profile.js openPlayer(name,
+  { from, rank, via, back }) is exported and every opener goes through it: leaderboard rows (unchanged behaviour), friend search results, friends
+  and request rows, On this court. The card asks GET /api/leaderboard/player?u= (the eleven stats since NOTES 145, any account on a board since NOTES 141) and, when I am signed in
+  with a username, GET /api/player?name= at once (Promise.all; a stale pair is dropped by lbpGen). Board answer: the peer's card as before, plus the
+  place pills from /api/player. Board 404 + /api/player: data-state "part": the emblem and rank name from /api/player, no Matt half, no stats, a quiet
+  "Stats show for players on the global leaderboard" (a board error instead: "Couldn't load the stats" + Try again); a hidden stranger (places null)
+  gets no hero at all, never a false "Not ranked yet". Both 404 (or the only one asked): the peer's gone state ("No player with that username any
+  more" when not opened from the board). My own card: the peer's footer, no friend row. The friend row (#lbp-friend) is web/social.js cardRow,
+  called through a new profile hook (friend) and redrawn on every push (profile.friendRow): Add friend / Requested + Cancel / Accept + Decline /
+  Friends + the live status dot and words + Remove behind a Remove Bea? / Keep confirm. It is rebuilt only when what it shows changes (a
+  signature), and a rebuild under the focus puts the focus back on its first button (never <body>: the layer's Esc and Tab trap live there). Our
+  own #player-card (markup, pc-* CSS, social.player / drawCard) is gone; the leaderboard's name buttons from the WIP gave way to the peer's row buttons.
+- Client, the rest: web/social.js (one panel mounted twice: the lobby view /friends and the in-game friends card from Settings > Friends, the tourCard
+  pattern), the home tile (a seventh tile: 3 over 4, 3 / 2 / 2, one column), toasts for new requests only (a socket's first snapshot is silent),
+  poddle.friendsSeen (one notice; it waits for the leaderboard notice when both are due). The More button's tooltip is data-tip, never title: ui.js
+  (NOTES 136) turns a title into data-tip on the live node, so a freshly drawn row never equalled it and every push swapped the buttons.
+- Edge cases and decisions:
+  - Guests: no Friends (the tile, view and card say "Sign in to add friends"); on the profile card a quiet link, which starts sign-in only in the
+    lobby (profile.inLobby: h.view()), plain words in a court (a sign-in there redials: a forfeit). Guests never ask /api/player.
+  - Signed in, no username: "Pick a username to add friends" (the username form in the lobby, words in a court). Nobody can befriend a nameless account.
+  - Sign-out / delete: stats.forget takes the socket's account, socialoff clears the lists, friends see the account go at once (socialSoon). Delete
+    cascades both tables; the delete path reads peersOf BEFORE the cascade and pushes fresh snapshots to former friends and requests' other sides,
+    then boardsChanged() clears the board and profile caches (both kept in api.js del, username and hide).
+  - Rename: boardsChanged() and social.changed(peersOf(...)) both run in the username route: boards, profile cards and every list naming the account
+    change at once. Admin renames / deletes (admin.js, another process): the presence tick reads accounts fresh by id every 2 s, never trusts
+    ws.acct.username; the profile cache waits out its 30 s TTL (NOTES 140's known limit).
+  - Id reuse: an account id that no longer resolves to the socket's owner drops the socket's account like a sign-out.
+  - Reload: a reload on /friends waits for /api/me ('wait' gate: Loading, never "not available"); an open card is not restored (no URL, as NOTES 140).
+  - Silent declines: the sender keeps seeing Requested until expiry; re-adding a decliner answers requested and restarts the sender's clock only.
+    Removal: silent; it writes a block row so the removed player's re-adds are swallowed for 30 d; the remover can still add them back.
+  - Caps: 100 friends (full), 20 pending out (limit), the newest 50 incoming listed. Rate limits: adds 30/h and searches 60/10 min per account in
+    memory, on top of 60 a minute per address per route.
+  - Hidden accounts (Show me off) are searchable (the username is already public on courts); their card shows strangers only the username; friends
+    still see rank + places. Decision to confirm with the owner.
+  - Duel's meaning (a fresh private court, first to 11) is pending for slice B, with the owner.
+- Legal: one vocabulary: "profile card" = the card a name opens (NOTES 140 + the friend row), "share card" = the /c/<slug> link. privacy.html Summary,
+  For teens and parents, 2 (friends, requests, search rows; IP purpose), 4 (Statistics, Rank emblem, Global leaderboard, Usernames, Shared cards, Friends,
+  Profile cards: the eleven stats for any account on a board (NOTES 141); rank + places for every non-hidden account from /api/player, to anyone who knows the username, shown
+  in the game to signed-in players with a username; to friends even when hidden; status to friends only), 5 (poddle.friendsSeen), 7, 9, 11, 13, 15
+  (two dated paragraphs: the peer's and ours); terms.html 4 and 5 (Friends and profile cards); changelog (Sept 29: "Tap a name on the leaderboard"
+  and "Friends"); CLAUDE.md data flows; docs/ropa.md; docs/SOCIAL.md 3 and 6 now name the merged card. Dates stay September 29, 2026 everywhere.
+- Tests: test/friends.test.mjs (new, in-process: every op, caps, silent declines, the removal block, expiry, search escaping, the player
+  card's hidden rule, no ids on the wire, the export), test/social.test.mjs (new, live on SOCIAL_PORT 9510: the snapshot after hello, presence
+  menu -> matt -> watching -> off at a friend, socialoff on sign-out, an admin delete), test/social-ui.mjs (new, SOCIAL_UI_PORT 9520: the tile, the
+  /friends view, search, requests, the in-game card, the merged profile card's friend row, guest and no-username gates, screenshots
+  test/ui-shots/social-*.png); accounts-unit (table list), leaderboard, lb-profile-ui, rksignin, auth, seo pass. profile-ui times out on
+  origin/main too (pre-existing).
+- Decisions made without the owner: one card (the peer's), not two; /api/player is asked only by a viewer who can have friends (its rel and st are
+  for them), although the endpoint itself stays public; place pills from /api/player on the card (one short line, the numbers only); a hidden
+  stranger's card shows no rank at all rather than "Not ranked yet"; "Stats show for players on the global leaderboard" instead of an error when
+  only the board says 404; the friend row lives on the card, not in a second modal; hidden accounts are searchable; Duel waits for slice B.

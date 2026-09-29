@@ -507,7 +507,7 @@ console.log('ladder');
     D.prepare('INSERT INTO owners (id, kind, created_at, touched_at) VALUES (7, ?, ?, ?)').run('device', T0, T0); D.prepare('INSERT INTO profile (owner_id, played, updated_at) VALUES (7, 2, ?)').run(T0);
     D.prepare("INSERT INTO match_log (at, kind, bot_level, owner_a, owner_b, score_a, score_b, winner, ending, ranked, flags, secs) VALUES (?, 'bot', 1, 7, NULL, 11, 3, 0, 'won', 1, '', 60)").run(T0); D.close(); }
   ok(quiet(() => db.open(f1)) && db.ok() && new DatabaseSync(f1).prepare('PRAGMA user_version').get().user_version === 2, 'a v1 file opens and migrates to version 2');
-  ok(eq(Object.keys(db.counts()), ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share']) && db.counts().ladder === 0 && db.counts().match_log === 1, 'counts() includes ladder and share (empty); the old rows are kept');
+  ok(eq(Object.keys(db.counts()), ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs']) && db.counts().ladder === 0 && db.counts().match_log === 1, 'counts() includes ladder, share and the friends tables (docs/SOCIAL.md 2; empty); the old rows are kept');
   ok(eq(db.exportOf(7, T0 + 1).matches.map(m => [m.mode, m.trophyDelta]), [['casual', null]]) && db.ladderOf(7).tier === 1 && db.ladderOf(7).trophies === 0, 'an old row reads as mode casual with no trophy change; an owner without a ladder row is Bronze I, 0');
   db.close();
   ok(fresh({ RK_MATT_DAY: '12' }) && db.ok(), 'open(:memory:) with RK_MATT_DAY 12');

@@ -5,6 +5,7 @@ import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
 import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
 import * as profile from './profile.js';        // player stats (docs/ACCOUNTS.md 9): the device id, the hello, /api, sign-in. Its DOM is its own
+import * as social from './social.js';          // friends (docs/SOCIAL.md 6, 8): search, requests, who is online, the profile card's friend row. Its DOM is its own too
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
@@ -152,6 +153,7 @@ function drawNames() {
   else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [false, regs[1 - side]], rank: [ranks[side], ranks[1 - side]] });      // 'You' is not a name: no badge on it. The emblem is a rank, not a name: yours shows beside You in a Ranked court
 }
 const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' };
+const seatsOn = () => [0, 1].filter(i => (spec() || i !== side) && regs[i] && names[i] && names[i] !== 'Matt').map(i => ({ name: names[i], rank: ranks[i] }));      // On this court (docs/SOCIAL.md 6): the registered SEATS only, never mine, never a spectator (their registration is not on the wire)
 function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDim(); }
 
 // ---------- match end, rematch (docs/SPECTATE.md) ----------
@@ -255,7 +257,7 @@ function pause(on) {
   if (on) ui.setSettings({ canPause: !(noPause = false) }); game.send({ type: 'pause', on });
 }
 let sentName = '', polledName = '', healAt = 0, noPause = false, burstT = 0, struck = false, saidForfeit = false, dim = false;
-const cardOpen = () => ui.settings() || ui.tourCard();      // either card pauses a match against Matt (the tournament card in a warm-up)
+const cardOpen = () => ui.settings() || ui.tourCard() || !!ui.friendsCard?.();      // any card pauses a match against Matt (the tournament card in a warm-up; the friends card, docs/SOCIAL.md 6)
 function setDim() { const on = pausedUi && cardOpen() && !spec(); if (on !== dim) scene.setDim(dim = on); }      // paused against Matt behind the full blur: the menu's cheap picture (it ran at 2560x1440, 52 fps for up to 10 minutes)
 function rename(n) {                               // the settings panel's Name row (docs/NEXT.md 10b): kept, and told to the room
   n = cleanName(n); if (!n) return; ls.set('poddle.name', n);
@@ -319,7 +321,7 @@ function request(m) {                               // one lobby request at a ti
 }
 // the menu's address (NOTES 108): each lobby view has a path the server answers with this same page, so a reload lands back on it instead of the title.
 // replaceState only: the browser's Back button still leaves the site as before. A court keeps '/' with its ?court=CODE (the invite).
-const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', ranked: '/ranked', ranks: '/ranks', leaderboard: '/leaderboard', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile', '/ranked': 'ranked', '/ranks': 'ranks', '/leaderboard': 'leaderboard' };
+const VIEW_PATH = { home: '/play', courts: '/courts', create: '/create', bot: '/bot', profile: '/stats', ranked: '/ranked', ranks: '/ranks', leaderboard: '/leaderboard', friends: '/friends', share: '/courts', tour: '/courts', bracket: '/courts' }, PATH_VIEW = { '/play': 'home', '/courts': 'courts', '/create': 'create', '/bot': 'bot', '/stats': 'profile', '/ranked': 'ranked', '/ranks': 'ranks', '/leaderboard': 'leaderboard', '/friends': 'friends' };
 let routing = false;      // off until the reload's view is back (the boot's title screen must not wipe /stats first)
 function route() { if (!LOBBY || !routing) return; const p = room ? '/' : ui.currentScreen() === 'lobby' ? VIEW_PATH[ui.lobbyView()] || '/play' : ui.currentScreen() === 'title' ? '/' : null;
   if (p && p !== location.pathname && (location.pathname === '/' || PATH_VIEW[location.pathname])) history.replaceState(null, '', p + location.search + location.hash); }      // only ever swaps one of our own paths (a local copy served from /web/index.html keeps its path)
@@ -471,7 +473,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
   const parked = rkRes; rkRes = null; rkWalk = false; clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();      // parked: a series result still waiting for its card behind a set-up screen: it becomes the Ranked view's line below
-  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
+  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
@@ -651,6 +653,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'tour') { if (m.code && typeof m.code === 'string') onTour(m); return; }      // above the guard: between rounds nobody is in a court
   if (m.type === 'tmove') { tourMove(m); return; }
   if (m.type === 'tourfail') { say(m.why === 'busy' ? 'Courts are full right now. Press Start again in a moment.' : `Needs at least 4 players · ${m.n | 0} here now`, null, 3200); return; }
+  if (m.type === 'social') { social.snapIn(m); return; }     // friends, requests in and out, who is online (docs/SOCIAL.md 8), above the guard: the lobby has no court
+  if (m.type === 'socialoff') { social.off(); return; }      // the socket lost its account (sign-out, delete): the lists go
   if (m.type === 'rk') { onRk(m); return; }                 // Ranked (docs/RANKED.md 9), above the guard: the queue outlives any one court
   if (m.type === 'rkfail') { onRkFail(String(m.why || ''), m.warm === true); return; }      // warm: Warm up with Matt was refused, the entry stands
   if (m.type === 'rkend') { endRk(m.why === 'restart' ? 'restart' : 'gone'); return; }
@@ -701,12 +705,12 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (botWant != null) { game.send({ type: 'bot', level: botWant }); botWant = null; } else if (AUTOBOT && !noBot && !tourKind && !rkKind) game.send({ type: 'bot' });      // Play a bot: Matt sits down at once, at the level picked in the menu. Never after taking Matt's seat
     noBot = false; ui.askCard(null); ui.askPlay(null); askSync();
     if (askedFor && spec()) { const who = names.find(n => n && n !== 'Matt'); say(who ? `${who} is playing Matt. We asked if you can play.` : 'We asked the player if you can play.', null, 3200); } askedFor = false;
-    net.rejoined(); ui.setSpectator(spec()); syncSettings(); drawNames();
+    net.rejoined(); ui.setSpectator(spec()); syncSettings(); drawNames(); social.court(seatsOn());
     if (cardOpen() && live()) pause(true);                       // a reconnect with a card still open: the server let time run when the socket dropped
     return;
   }
   if (m.type === 'names') {
-    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); dressSeats(); if (Array.isArray(m.rank)) ranks = cleanRanks(m.rank); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
+    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); dressSeats(); if (Array.isArray(m.rank)) ranks = cleanRanks(m.rank); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync(); social.court(seatsOn());      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }
@@ -787,6 +791,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'launch' && m.by === side && m.n != null && !spec()) { if (m.kind) myKind = m.kind; clearTimeout(myBet); myBet = null; padFx('tint', shownN(+m.n || 0, myKind)); }      // my hit re-aimed on the settled swing: the phone's glow takes that power's colour
   if (SCENE_EVENTS.includes(m.type)) scene.onEvent(m);           // anything else: ignored, no throw
 }, () => { const hi = profile.opened(); if (hi) game.send(hi);      // FIRST on every socket: the device id (docs/ACCOUNTS.md 9.2), never in the URL
+  social.fresh();      // this socket's first friends snapshot is the state, not news: no toast for requests that came while it was down
   if (pending && !room) game.send(pending);       // the request made while the socket was down
   if (tourOn()) { clearTimeout(tourHang); tourHang = setTimeout(() => { if (tourOn()) endTour('restart'); }, 5000); }      // a tournament socket back: no room, tour or tourend in 5 s = the server restarted under it (docs/COURTS-TOURNEY.md 4.5)
   if (rkBusy()) { clearTimeout(rkHang); rkWait = true; rkHang = setTimeout(() => { rkWait = false; if (rkBusy()) endRk('restart'); }, 5000); } });      // the same for the Ranked queue: no room, rk, rkres or rkend in 5 s (docs/RANKED.md 3.10). A spectator of a Ranked court holds no entry: it reconnects to watch like anyone
@@ -839,15 +844,19 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
   profile: () => profile.showProfile(),      // Your stats: web/profile.js fetches and draws it
   leaderboard: () => profile.showBoard(),      // the global leaderboard (NOTES 126): web/profile.js too
+  friends: () => social.showView(),      // Friends (docs/SOCIAL.md 6): web/social.js
   ranked: () => { { const g = profile.rkGate(); if (g === 'signin') return profile.signIn(); if (g === 'username') return profile.pickName(); }      // NOTES 133: the button is the missing step, never the queue
     if (pending || room || rkQueued) return; profile.seated(); ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1), waiting in the lobby. It settles on rk (queued, or a partner at once) or rkfail. profile.seated(): a first visit's device id is made now and its hello goes first, or the entry could never be paired
   rkWarm: () => { if (pending || room || !rkLobbyQ()) return; if (phase === 'title') play(); request({ type: 'rkwarm' }); rkBarSync(); },      // the search bar's Warm up with Matt: the warm-up court (settles on room, or rkfail busy { warm })
   rkCancel: () => { if (!rkLobbyQ()) return; if (pending && pending.type === 'rkwarm') settle(); game.send({ type: 'rkleave' }); },      // the search bar's Cancel: out of the queue (the server answers rk { phase: off })
   rankedOpen: () => { venueSync(); profile.showRanked(); }, ranksOpen: () => profile.showRanked(), view: v => { route(v); venueSync(); } });      // every view change re-picks the venue: the Ranks page stands in the stadium whichever way it was opened      // the Ranked view opened: the stadium builds behind the glass, the head and the road come from /api/stats
+// Friends (docs/SOCIAL.md 6): before profile.init, whose first drawAcct already tells it who is signed in. On where the account features are
+social.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), toast: (t, ms) => say(t, null, ms), badge: (el, on) => ui.regBadge?.(el, on), rankBadge: (el, r) => ui.rankBadge?.(el, r) });
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
 profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), emblem: (el, r) => ui.rankEmblem?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
   gate: () => rkTile(),      // sign-in, sign-out or a new username: the Ranked tile's line follows (NOTES 133)
+  acct: () => social.acct(), friend: (box, p) => social.cardRow(box, p),      // who is signed in: the friends lists (and an open profile card's friend row) follow. The profile card's friend row: web/social.js draws it
   badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), cup: el => ui.cupify?.(el), board: () => { if (!room) ui.lobbyView('leaderboard'); }, rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0, place: Number.isInteger(L.place) ? L.place : rkYou.place }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 rkTile();                                          // the Ranked tile's line before anything is known: the dimmed Bronze emblem and 'Play your first match'
@@ -856,11 +865,12 @@ rkTile();                                          // the Ranked tile's line bef
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
 ui.onSettings({
   open: () => { pause(true); setDim(); loadSinks(); },
-  close: () => { pause(false); setDim(); },
+  close: over => { if (!over) pause(false); setDim(); },      // over: the friends card opens in its place and keeps the pause
   sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
   move: m => { if (!MODES.includes(m)) return; if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); },      // how you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
+ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });
 ui.onRematch(yes => { if (!room || spec()) return;
@@ -872,6 +882,7 @@ ui.onRetry(() => location.reload());
 function esc() { if (ui.championShowing()) { tourCourts(); return; } if (['tour-vs', 'rk-vs', 'rk-game'].includes(ui.currentOverlay())) return;
   if (ui.currentOverlay() === 'match' && rkKind === 'match' && rkSeries && rkSeries.done && !spec()) { leave(); return; }      // the series card (docs/RANKED.md 8.8): Esc is Leave
   if (ui.tourCard()) { ui.tourCard(false); return; }
+  if (ui.friendsCard?.()) { ui.friendsCard(false); return; }      // the friends card: Esc closes it (a profile card over it closed first: profile.js has those keys)
   if ((tourKind === 'match' || rkKind === 'match') && spec() && live() && !ui.currentScreen() && !ui.currentOverlay() && !ui.settings()) { leave(); return; }      // watching one of its matches: Esc (and T) is back to the bracket, or the Ranked view
   if (ui.asking()) ui.askWatch(null); else if (live() && !ui.currentScreen()) { if (!ui.currentOverlay()) ui.settings(!ui.settings()); } else back(); }      // in play and while watching Esc is the hamburger
 addEventListener('keydown', e => {

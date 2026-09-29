@@ -199,6 +199,10 @@
     <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
     <button class="set-row set-switch" id="tog-body" role="switch" aria-checked="true"><span>Show player model</span><i></i></button>
   </div></section>
+  <!-- Friends (docs/SOCIAL.md 6): opens the friends card over the court (a match against a person does not pause). Shown where accounts are on -->
+  <section class="set-group" id="grp-social" hidden><h3 class="set-label">Social</h3><div class="set-list">
+    <button class="set-row set-nav" id="btn-set-friends" aria-haspopup="dialog" aria-controls="friends-card"><span>Friends</span><span class="set-end"><b class="set-badge" id="set-friends-n" hidden></b><small id="set-friends-sub"></small><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M2 2l8 8-8 8"/></svg></span></button>
+  </div></section>
   <!-- the foot is pinned to the bottom of the card: however long the list above gets, leaving is always one full-size tap away -->
   <div class="set-foot" id="set-foot">
     <p class="set-note" id="set-note" hidden>Online games can’t pause</p>
@@ -214,6 +218,13 @@
   <p class="tc-n"><b id="tc-n">0</b> <span id="tc-of">of 16 joined</span></p>
   <ul class="tour-names is-card" id="tc-names" aria-label="Players"></ul>
   <div class="set-foot tc-foot"><p class="tour-why" id="tc-why"></p><button class="btn btn-sm is-tall" id="btn-tc-start" hidden>Start tournament</button><button class="btn btn-sm btn-danger" id="btn-tc-leave">Leave tournament</button></div>
+</div>
+
+<!-- ============================================== FRIENDS CARD (Settings > Friends: docs/SOCIAL.md 6). A card like settings, in its place: against Matt it pauses,
+     against a person it sits over the live rally. "On this court" lists the registered SEATS (never spectators); web/social.js builds the rest ============================================== -->
+<div class="panel settings friends-card" id="friends-card" role="dialog" aria-labelledby="fc-title" tabindex="-1" hidden>
+  <div class="set-head fc-head"><button class="btn btn-icon fc-back" id="btn-fc-back" aria-label="Back to settings"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg></button><h2 id="fc-title">Friends</h2></div>
+  <div class="fc-body" id="fc-body"></div>
 </div>
 
 <!-- ============================================== ACCOUNT CARDS (docs/ACCOUNTS.md 9.5, 9.7): over everything, one at a time. web/profile.js owns them ============================================== -->
@@ -247,8 +258,9 @@
       <p class="share-foot share-confirm" id="share-confirm" role="alert" hidden><span>Stop sharing? This link will stop working.</span><button class="btn btn-sm is-tall btn-danger" id="btn-share-stop-yes">Stop sharing</button><button class="btn btn-sm is-tall btn-quiet" id="btn-share-stop-no">Keep it</button></p>
     </div>
   </div>
-  <!-- A player's profile card from the global leaderboard (NOTES 140): exactly what their share card shows (rank, trophies, the toughest Matt beaten, the eleven card stats: three headline tiles over eight, NOTES 145).
-       web/profile.js openPlayer() fills it from GET /api/leaderboard/player; every value goes in as textContent -->
+  <!-- A player's profile card (NOTES 140, docs/SOCIAL.md 6): opened from the global leaderboard, the friends lists, search results and On this court. Its stats are exactly
+       what their share card shows (rank, trophies, the toughest Matt beaten, the eleven card stats: three headline tiles over eight, NOTES 145), from GET /api/leaderboard/player (any account on a board, NOTES 141); signed in with
+       a username, GET /api/player adds the rank and place numbers for anyone else and the friend row (web/social.js). web/profile.js openPlayer() fills it; every value goes in as textContent -->
   <div class="panel panel-sm acct-card lbp-card" id="lbp-card" role="dialog" aria-modal="true" aria-labelledby="lbp-name" tabindex="-1" data-fit hidden>
     <div class="acct-body">
       <div class="acct-head"><div class="lbp-title"><h2 id="lbp-name"></h2></div><button class="btn btn-icon acct-close" id="btn-lbp-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
@@ -259,9 +271,11 @@
         <div class="lbp-matt st-mbadge is-none" id="lbp-matt" aria-hidden="true"><i class="st-mdisc"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/><path d="M10.25 8.5v.75M13.75 8.5v.75M10.5 17.25h3" style="stroke-width:2.5"/></svg></i><svg class="st-mstar" viewBox="0 0 48 48"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div>
         <div class="lbp-mtext"><p class="caps">Hardest Matt beaten</p><p class="lbp-mbest" id="lbp-mbest">None yet</p></div>
       </section>
+      <ul class="lbp-places" id="lbp-places" aria-label="Global leaderboard places" hidden></ul>
       <dl class="lbp-stats" id="lbp-stats" aria-label="Stats" aria-busy="true"></dl>
       <p class="lbp-msg" id="lbp-msg" role="status" hidden></p>
       <p class="acct-btns lbp-retry" id="lbp-retry" hidden><button class="btn btn-sm is-tall" id="btn-lbp-retry">Try again</button></p>
+      <section class="lbp-friend" id="lbp-friend" aria-label="Friends" hidden></section>
       <p class="share-foot lbp-foot" id="lbp-foot" hidden><span>This is what other players see.</span><button class="share-lnk is-quiet" id="btn-lbp-mine" type="button">Your stats</button></p>
     </div>
   </div>
@@ -326,6 +340,12 @@
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-line" style="stroke-width:4.5"><path d="M29 26h-9v6a11 11 0 0 0 11 11M67 26h9v6a11 11 0 0 1-11 11"/></g><g class="art-fill" style="stroke-width:4.5"><path d="M29 17h38v22a19 19 0 0 1-38 0Z"/><path d="M42 57h12v9H42Z"/><path d="M32 81h32v-7a7 7 0 0 0-7-7H39a7 7 0 0 0-7 7Z"/></g><path class="art-accent-fill" d="M48 24l4.4 7.4 8.4 1.6-5.8 6.3 1.1 8.5L48 44.2l-8.1 3.6 1.1-8.5-5.8-6.3 8.4-1.6Z"/></svg>
           <span class="tile-text"><b>Ranked</b><small class="tile-line" id="ranked-line"><span id="ranked-em"></span><span id="ranked-line-text" data-cup>Play your first match</span></small><span class="rk-bar rk-tile-bar" id="ranked-bar" role="progressbar" aria-label="Progress to the next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><i></i></span></span>
           <small class="tile-sub is-off" id="ranked-n"></small></button>
+        <!-- Friends (docs/SOCIAL.md 6): two people and a plus. The third hero: its line says who is online, the corner badge counts requests (web/social.js draws both).
+             Shows where accounts are on (sign-in AND the database), like the leaderboard: a guest sees it too, with Sign in to add friends -->
+        <button class="tile is-hero" id="btn-friends" data-nav hidden>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M47 80c1.5-15 10-22 22-22s20.5 7 22 22Z"/><circle cx="69" cy="40" r="12.5"/><path d="M5 82c2-18 12.5-26 27-26s25 8 27 26Z"/><circle cx="32" cy="35" r="15.5"/></g><path class="art-accent" d="M77 9v15M69.5 16.5h15" style="stroke-width:5.5"/></svg>
+          <span class="tile-text"><b>Friends</b><small class="tile-line" id="friends-line"><i class="fr-dot" id="friends-dot" hidden></i><span id="friends-line-text">Sign in to add friends</span></small></span>
+          <small class="tile-sub is-off" id="friends-n"></small></button>
         <button class="tile" id="btn-courts" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill" x="12" y="18" width="58" height="60" rx="10" style="stroke-width:4.5"/><path class="art-line" d="M12 48h58M41 18v60" style="stroke-width:3"/><circle cx="63" cy="59" r="13" style="fill:#fff;stroke:var(--line);stroke-width:6.5"/><path class="art-accent" d="m73 69 11 11" style="stroke-width:7"/></svg>
           <b>Courts</b><small class="tile-sub is-off" id="courts-n"></small></button>
@@ -468,6 +488,9 @@
       <div class="lb-you" id="lb-you" hidden><span class="lb-rank" id="lb-you-rank"></span><span class="lb-you-text"><b>You</b><small id="lb-you-cap" data-cup></small></span><span class="lb-v" id="lb-you-v"></span><button class="btn btn-sm is-tall lb-you-go" id="btn-lb-go" hidden></button></div>
       <button class="set-row set-switch lb-show" id="tog-lb-show" role="switch" aria-checked="true" hidden><span>Show me on the global leaderboard</span><i></i></button>
     </div>
+
+    <!-- Friends (docs/SOCIAL.md 6, 8): search, requests in and out, the friends list with who is online. web/social.js builds the panel inside (the same one as the in-game card's) -->
+    <div class="panel panel-mid lobby-view fr-view" id="lobby-friends" data-view="friends" data-fit hidden></div>
 
     <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (the Ranked crest, rank and trophies, streak), the Matt badge (the toughest level beaten, and a chip a level with its record: any level can be played at any time, so it is a badge, not a road), the people strip, the play row (return rate and six figures from profile.play, docs/SHARE.md 3) and three number tiles; Share card in the header opens #share-card. The tile and this view show only where the server keeps stats -->
     <div class="panel panel-wide lobby-view pf-view st" id="lobby-profile" data-view="profile" data-fit hidden>

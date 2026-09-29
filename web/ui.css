@@ -276,7 +276,7 @@ body[data-settings] .corner{z-index:var(--z-screen)}                /* paused + 
 .hud-pill svg{width:1.125rem;height:1.125rem;fill:none;stroke:var(--ink-soft);stroke-width:2.25;stroke-linejoin:round} .hud-pill svg circle{fill:var(--ink-soft);stroke:none}
 .hud-pill.is-tag{display:none;background:linear-gradient(180deg,#2a86ea,#0f5cc0);border-color:#fff;color:#fff;letter-spacing:.08em;text-transform:uppercase}
 .hud-pill.is-paused{background:linear-gradient(180deg,#ffc04d,#e08d00);color:#4a2c00}
-body[data-paused]:not([data-settings]):not([data-tourcard]) #paused-tag{display:inline-flex}
+body[data-paused]:not([data-settings]):not([data-tourcard]):not([data-friendscard]) #paused-tag{display:inline-flex}
 /* big status rows for the connect screen */
 .status-list{display:flex;flex-direction:column;gap:.75rem;margin:0;padding:0;list-style:none;text-align:left}
 .status-row{display:flex;align-items:center;gap:1.125rem;min-height:4.5rem;padding:.75rem 1.5rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff,var(--sky-1));border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
@@ -612,7 +612,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile:active,.tile:nth-child(n):active{transform:scale(.96);rotate:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transition-duration:90ms}      /* the press goes in fast; the 260ms spring plays on release */
 .tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
 .tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
-.tile:nth-child(5){animation-delay:280ms} .tile:nth-child(6){animation-delay:350ms}
+.tile:nth-child(5){animation-delay:280ms} .tile:nth-child(6){animation-delay:350ms} .tile:nth-child(7){animation-delay:420ms}
 @media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="4"]{display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
 @keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
 /* Five entries (docs/RANKED.md 1.1): a hero row (Quick play, Ranked: art left of the label) over a utility row (Courts, Play a bot, Your stats: icon left, the narrow-window look).
@@ -636,6 +636,16 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tiles[data-n="6"] .tile svg{width:5rem;height:5rem} .tiles[data-n="6"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
 .tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
 @media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="6"]{width:min(58rem,94vw)} .tiles[data-n="6"] .tile.is-hero{height:10.5rem} }
+/* Seven (docs/SOCIAL.md 6: + Friends): THREE heroes (Quick play, Ranked, Friends: each with a live line) over the same four utilities. Twelve columns: a hero is four, a utility three.
+   A little wider than six, so 'Sign in to add friends' fits beside its art at 1280x720 */
+.tiles[data-n="7"]{display:grid;grid-template-columns:repeat(12,1fr);width:min(68rem,94vw);gap:var(--s-4)}
+.tiles[data-n="7"] .tile{width:auto}
+.tiles[data-n="7"] .tile.is-hero{grid-column:span 4;height:12rem;flex-direction:row;justify-content:flex-start;text-align:left;padding:0 var(--s-4);gap:var(--s-3)}
+.tiles[data-n="7"] .tile:not(.is-hero){grid-column:span 3;height:8.75rem;padding:0 var(--s-2);gap:var(--s-2);font-size:var(--t-lg)}
+.tiles[data-n="7"] .tile svg{width:4.25rem;height:4.25rem} .tiles[data-n="7"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
+.tiles[data-n="7"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
+@media (min-aspect-ratio:1/1) and (max-width:1000px), (min-aspect-ratio:1/1) and (max-height:620px){ .tiles[data-n="7"] .tile.is-hero{padding:0 var(--s-3);gap:var(--s-2)} .tiles[data-n="7"] .tile.is-hero svg{width:3.75rem;height:3.75rem} }      /* at the 10px rem floor text runs a little wider: the art gives the line its room */
+@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="7"] .tile.is-hero{height:10.5rem} }
 /* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks, Your stats' bars spring up and its tick pops.
    Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
    The hover block comes after the focus one: both match a focused tile under the mouse, and the loop must win */
@@ -752,6 +762,11 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
   .tiles[data-n="6"] .tile.is-hero .tile-text{align-items:center;text-align:center}
   .tiles[data-n="6"] .tile:not(.is-hero){grid-column:span 1;height:6.5rem;flex-direction:row;justify-content:flex-start;padding:0 var(--s-4);gap:var(--s-3);text-align:left}
   .tiles[data-n="6"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
+  .tiles[data-n="7"]{grid-template-columns:repeat(6,1fr);width:min(46rem,100%);gap:var(--s-3)}      /* seven: the three heroes side by side (art over the label), the four utilities two by two as bars */
+  .tiles[data-n="7"] .tile.is-hero{grid-column:span 2;height:12rem;flex-direction:column;justify-content:center;padding:0 var(--s-2);gap:var(--s-2);text-align:center}
+  .tiles[data-n="7"] .tile.is-hero .tile-text{align-items:center;text-align:center}
+  .tiles[data-n="7"] .tile:not(.is-hero){grid-column:span 3;height:6.5rem;flex-direction:row;justify-content:flex-start;padding:0 var(--s-4);gap:var(--s-3);text-align:left}
+  .tiles[data-n="7"] .tile svg{width:4.5rem;height:4.5rem} .tiles[data-n="7"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
   .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
   .tile svg{width:5.5rem;height:5.5rem}
   .name-row .field{width:14rem}
@@ -799,7 +814,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 body[data-settings] .dev-panel{position:fixed;left:calc(var(--edge) + min(23rem, 100vw - 2 * var(--edge)) + .5rem);top:calc(var(--edge) + 4.75rem);max-width:calc(100vw - 2 * var(--edge))}
 .settings::before{display:none}
 body[data-paused] .settings{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}             /* paused: nothing to see through to */
-body[data-settings][data-paused] .glass{opacity:1;visibility:visible;transition-delay:0s}
+body[data-settings][data-paused] .glass,body[data-friendscard][data-paused] .glass{opacity:1;visibility:visible;transition-delay:0s}
 .settings h2{margin:0;font-size:var(--t-lg);font-weight:800;letter-spacing:.03em;color:var(--ink-strong)}
 body[data-paused] .settings h2{color:var(--warn-deep)}
 /* groups: a small caps label, then one white card of rows split by hairlines (a phone's settings, not a pile of pills) */
@@ -907,7 +922,7 @@ body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-eve
 @keyframes notice-in{from{opacity:0;transform:translateX(-1.5rem)} to{opacity:1;transform:none}}
 @keyframes notice-out{to{opacity:0;transform:translateX(-1.5rem)}}
 @media (prefers-reduced-motion: reduce){ .notices .notice,.notices .notice.is-out{animation-duration:1ms} }      /* .notices: a bare .notice is also the server-down / game-full card, which this pill rule squashed */
-body[data-overlay] .notices,body[data-settings] .notices{opacity:0}
+body[data-overlay] .notices,body[data-settings] .notices,body[data-friendscard] .notices{opacity:0}
 .hold-card{position:fixed;left:50%;top:47%;translate:-50% 0;z-index:calc(var(--z-callout) + 1);display:inline-flex;align-items:center;gap:.875rem;height:4rem;padding:0 1.25rem 0 1.5rem;border-radius:var(--r-pill);border:.1875rem solid var(--line);white-space:nowrap;
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:var(--sh-3), var(--inner-hi);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;max-width:calc(100vw - 2 * var(--edge))}
 .hold-card .dots-wait{margin-right:.125rem} .hold-card .dots-wait i{margin-left:0;margin-right:.25rem}
@@ -982,7 +997,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   color:var(--me-ink);font-size:var(--t-sm);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}      /* '5 open': a badge in the corner, so the tile never moves when it comes and goes */
 .tile-sub{transition:opacity var(--d-med) var(--ease-soft), scale var(--d-med) var(--ease-bounce), visibility 0s linear 0s} .tile-sub.is-off{opacity:0;scale:.5;visibility:hidden;transition-delay:0s,0s,var(--d-med)} .tile-sub.pop{animation:num-pop 450ms var(--ease-bounce)}      /* '5 open' pops in, and bumps when the count moves */
 .btn.is-tall,.is-tall{min-height:44px}
-.tiles[data-n="5"] .tile:not(.is-hero) .tile-sub,.tiles[data-n="6"] .tile:not(.is-hero) .tile-sub{top:var(--s-2);right:var(--s-2)}      /* the short utility tiles: clear of the icon (NOTES 139) */
+.tiles[data-n="5"] .tile:not(.is-hero) .tile-sub,.tiles[data-n="6"] .tile:not(.is-hero) .tile-sub,.tiles[data-n="7"] .tile:not(.is-hero) .tile-sub{top:var(--s-2);right:var(--s-2)}      /* the short utility tiles: clear of the icon (NOTES 139) */
 .btn svg{flex:none}
 .courts-code .btn svg,.courts-make .btn svg,.room-watch svg,.ask-play svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
@@ -1066,9 +1081,9 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   #screen-lobby .panel-wide,#lobby-bot{width:100%}      /* narrow portrait: every wide panel fills the s-4 body, on the header's and the tiles' edges, not 92vw here and 94vw there */
 }
 @media (max-width:480px){
-  .tiles,.tiles[data-n="4"],.tiles[data-n="5"],.tiles[data-n="6"]{grid-template-columns:1fr;width:100%}
-  .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero),.tiles[data-n="6"] .tile,.tiles[data-n="6"] .tile.is-hero,.tiles[data-n="6"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg,.tiles[data-n="6"] .tile svg,.tiles[data-n="6"] .tile:not(.is-hero) svg{width:4.5rem;height:4.5rem}
-  .tiles[data-n="5"] .tile-text,.tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
+  .tiles,.tiles[data-n="4"],.tiles[data-n="5"],.tiles[data-n="6"],.tiles[data-n="7"]{grid-template-columns:1fr;width:100%}
+  .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero),.tiles[data-n="6"] .tile,.tiles[data-n="6"] .tile.is-hero,.tiles[data-n="6"] .tile:not(.is-hero),.tiles[data-n="7"] .tile,.tiles[data-n="7"] .tile.is-hero,.tiles[data-n="7"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg,.tiles[data-n="6"] .tile svg,.tiles[data-n="6"] .tile:not(.is-hero) svg,.tiles[data-n="7"] .tile svg,.tiles[data-n="7"] .tile:not(.is-hero) svg{width:4.5rem;height:4.5rem}
+  .tiles[data-n="5"] .tile-text,.tiles[data-n="6"] .tile.is-hero .tile-text,.tiles[data-n="7"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}      /* seven: one column too (the heroes first), as six */
   .menu-glass .menu-body{padding-inline:var(--s-5)} .menu-glass .menu-foot{padding-inline:var(--s-5)} .lobby-online{right:var(--s-5)} .btn-back{left:var(--s-5);height:max(2.75rem,36px)} #screen-lobby .panel.lobby-view{width:100%}      /* phone gutter: head, body and foot share one s-5 inset, and every panel fills the body (NOTES 139) */
   #lobby-bot,#lobby-create,#lobby-share{padding:var(--s-5) var(--s-4)}      /* the phone panel inset, as courts and the rest */
   .bot-levels .btn small{white-space:normal;text-wrap:balance}      /* a two-up card is narrower than "Medium pace, some mistakes": it wraps here */
@@ -1087,6 +1102,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 body.has-toast .ask-card{bottom:calc(var(--edge) + 3.75rem)}
 .ask-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.25rem;background:var(--them)}      /* the keyline, drawn inside: a thick left border on a round box tapers into a crescent */
 body[data-settings] .ask-card{left:calc(var(--edge) + min(23rem, 100vw - 2 * var(--edge)) + .5rem)}
+body[data-friendscard] .ask-card{left:calc(var(--edge) + min(26rem, 100vw - 2 * var(--edge)) + .5rem)}      /* beside the friends card (26rem), never under it */
 @media (min-aspect-ratio: 1/1){ body[data-overlay="match"] .ask-card{width:min(17rem, calc((100vw - min(50rem, 92vw)) / 2 - var(--edge) - .5rem))} body[data-overlay="match"] .ask-card .ask-btns{flex:1 1 100%;grid-template-columns:1fr 1fr} body[data-overlay="match"] .ask-card .ask-btns .btn{padding:0 .5rem} }      /* the result card: nothing is being played, so it stacks narrow (question over the buttons) in the margin left of the centred panel */      /* the settings card is open: beside it, never on its Leave court button */
 .ask-q{flex:1 1 9rem;min-width:0;margin:0;font-size:var(--t-md);font-weight:600;line-height:1.3;color:var(--ink)} .ask-q b{display:inline-block;max-width:6em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;font-weight:800;color:var(--ink-strong)}      /* a long name gives way, 'wants to play' never does */
 .ask-q small{display:block;margin-top:.125rem;font-size:var(--t-sm);font-weight:600;color:var(--ink)}
@@ -1096,8 +1112,8 @@ body[data-settings] .ask-card{left:calc(var(--edge) + min(23rem, 100vw - 2 * var
 .ask-yes{background:linear-gradient(180deg,var(--me-tint),#cfe4fb);border-color:var(--me-ink);color:var(--me-ink)} .ask-yes .keycap{border-color:var(--me-ink)}      /* the primary: blue, Decline stays the plain pill */
 .ask-card .ask-bar{flex-basis:100%;width:100%;height:.375rem}
 @media (max-aspect-ratio: 1/1){ .ask-card{top:calc(var(--edge) + 5.25rem);bottom:auto} body.has-toast .ask-card{bottom:auto} }      /* portrait: up under the Court pill, over sky and trees, clear of the near court where the paddle swings */
-@media (max-width:700px){ body[data-settings] .ask-card{left:auto;right:var(--edge);top:auto;bottom:calc(var(--edge) + 3.75rem)} }
-@media (min-aspect-ratio: 1/1) and (max-height:820px){ body:not([data-settings]):not([data-overlay]) .ask-card{top:calc(var(--edge) + 5.25rem);bottom:auto;width:min(22rem, calc(50vw - 21.5rem - var(--edge)))} body:not([data-settings]):not([data-overlay]) .ask-card .ask-btns{flex:1 1 100%;grid-template-columns:1fr 1fr} }      /* a short landscape window (1280 x 720): the near baseline sits so low the bottom-left corner covers it, so the card goes up under the Court pill over the trees (as in portrait, clear of a corner that wraps to two rows), stacked narrow, and stops short of the scoreboard (the corner's own limit) */
+@media (max-width:700px){ body[data-settings] .ask-card,body[data-friendscard] .ask-card{left:auto;right:var(--edge);top:auto;bottom:calc(var(--edge) + 3.75rem)} }      /* no room beside either card: bottom-right, on screen with its buttons */
+@media (min-aspect-ratio: 1/1) and (max-height:820px){ body:not([data-settings]):not([data-friendscard]):not([data-overlay]) .ask-card{top:calc(var(--edge) + 5.25rem);bottom:auto;width:min(22rem, calc(50vw - 21.5rem - var(--edge)))} body:not([data-settings]):not([data-friendscard]):not([data-overlay]) .ask-card .ask-btns{flex:1 1 100%;grid-template-columns:1fr 1fr} }      /* a short landscape window (1280 x 720): the near baseline sits so low the bottom-left corner covers it, so the card goes up under the Court pill over the trees (as in portrait, clear of a corner that wraps to two rows), stacked narrow, and stops short of the scoreboard (the corner's own limit) */
 @media (max-width:480px) and (max-aspect-ratio: 1/1){ .ask-card{top:auto;bottom:calc(var(--edge) + 5rem)} }      /* a phone-width window: the top is the corner, the scoreboard's own row and the insets, so it sits just above the two-line key strip instead */      /* narrow, settings open: bottom-right, under the panel's end and clear of the camera and AirPod boxes (the game is paused) */
 /* the spectator's button: on the bottom row just left of the emotes (above them it sat on the near baseline and corner), one fixed width so its countdown never moves anything */
 .ask-play{display:none;position:fixed;right:calc(var(--edge) + 20.625rem + .5rem);bottom:calc(var(--edge) + .3125rem);z-index:var(--z-hud);width:16rem;justify-content:flex-start;gap:.625rem;padding:0 .75rem 0 1.125rem;overflow:hidden;font-size:var(--t-md);isolation:isolate}
@@ -1369,7 +1385,7 @@ body[data-tourcard] #btn-tour-go{display:none}      /* the card has its own Star
 .tc-foot .tour-why{text-align:center;font-size:var(--t-sm)}
 .tour-card .btn{min-height:max(2.75rem,44px)}      /* Start and Leave one height: the destructive one is never the smaller target */
 #btn-tc-start{border-color:var(--gold-4);background:linear-gradient(180deg,#fffbe6 0%,#fff3c2 47%,#ffe48a 53%,#ffeaa3 100%)}
-body[data-tourcard] .corner{z-index:var(--z-screen)}      /* the pill that opened it stays sharp above the blur: it is the way back */
+body[data-tourcard] .corner,body[data-friendscard] .corner{z-index:var(--z-screen)}      /* the pill (the tour card) or the hamburger (the friends card, from Settings) that opened it stays sharp above the blur: it is the way back */
 body[data-tourcard][data-paused] .glass{opacity:1;visibility:visible;transition-delay:0s}
 body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 /* ---- VS: the two sides slide in from each edge, VS pops (static under reduced motion: the global rule) */
@@ -1782,7 +1798,7 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 .rk-pill-text{display:flex;flex-direction:column;line-height:1.1;min-width:0} .rk-pill-text b{font-size:var(--t-md);font-weight:800} .rk-pill-text small{font-size:max(.75rem,11px);font-weight:700;letter-spacing:.04em;color:var(--ink-soft)}
 .rk-pill-time{font-size:var(--t-md);font-weight:900;color:var(--me-ink);font-variant-numeric:tabular-nums}
 .rk-pill.ov-pill{animation:rk-pill-in 380ms var(--ease-bounce) both} @keyframes rk-pill-in{from{opacity:.2;transform:translateY(.75rem) scale(.9)}}      /* .2: there from its first frame, like the corner pills */
-body:not([data-screen="hud"]) .rk-pill,body[data-overlay] .rk-pill,body[data-settings] .rk-pill{display:none}
+body:not([data-screen="hud"]) .rk-pill,body[data-overlay] .rk-pill,body[data-settings] .rk-pill,body[data-friendscard] .rk-pill{display:none}
 body.has-toast .rk-pill{bottom:calc(var(--edge) + 3.75rem)}
 /* the stadium behind the glass (7.5): the page goes to night while the Ranked view or one of its courts is up (body[data-venue], set by web/scene.js setVenue).
    The panels and the tiles stay light cards on the dark ground; only the shell (head, foot, the online count) takes light ink */
@@ -2138,3 +2154,103 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .lbp-foot #btn-lbp-mine{color:var(--line-deep);font-weight:800}
 @media (max-width:480px){ .lbp-card{padding:var(--s-4)} .lbp-stat{grid-column:span 6} .lbp-stat.is-hero{grid-column:span 4;padding:.5rem .25rem} .lbp-hero{column-gap:var(--s-3);padding:var(--s-3) var(--s-4) var(--s-3) var(--s-3)} .lbp-em{width:4.75rem;min-height:4.75rem} .lbp-em .st-em{--em-h:4.25rem} .lbp-em .st-em .rank-em{width:4.5rem;height:4.5rem} }
 @media (prefers-reduced-motion:reduce){ .lbp-stat.is-skel::after{animation:none;display:none} }
+/* opened from a friends list, search or On this court (docs/SOCIAL.md 6): not on a board = no stats and no Matt (only /api/player answered), a quiet line instead */
+.lbp-hero.no-matt{grid-template-areas:"em rank"} .lbp-hero.no-matt .lbp-matt,.lbp-hero.no-matt .lbp-mtext{display:none} .lbp-hero[hidden]{display:none}
+.lbp-card[data-state="part"] .lbp-stats{display:none}
+.lbp-card .lbp-msg.is-note{padding:0 var(--s-3);font-size:var(--t-sm);font-weight:700;background:none}      /* a quiet line, not the not-found box */
+.lbp-places{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--s-2)} .lbp-places[hidden]{display:none}      /* the place numbers from /api/player: one short line of pills */
+.lbp-place{display:inline-flex;align-items:baseline;gap:.375rem;padding:.3125rem .75rem;border-radius:var(--r-pill);background:#fff;box-shadow:var(--sh-1),inset 0 0 0 .125rem var(--sky-2);font-size:var(--t-sm);font-weight:700;color:var(--ink-soft);white-space:nowrap}
+.lbp-place b{font-weight:900;color:var(--line-deep);font-variant-numeric:tabular-nums} .lbp-place.is-top1 b{color:var(--gold-4)} .lbp-place.is-top2 b{color:var(--silver-4)} .lbp-place.is-top3 b{color:#b8662a}
+/* the friend row: a figure tile's frame (sky-1, the sky-2 hairline) with what we are on the left and the one thing to do on the right */
+.lbp-friend{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-2) var(--s-3);min-height:4.25rem;padding:var(--s-2) var(--s-2) var(--s-2) var(--s-4);border-radius:var(--r-md);background:var(--sky-1);box-shadow:inset 0 0 0 .125rem var(--sky-2)} .lbp-friend[hidden]{display:none}
+.lbp-friend.is-gate{justify-content:center;min-height:0;padding:0;background:none;box-shadow:none} .lbp-friend.is-gate .lbp-fr-who{flex:none;align-items:center;text-align:center}      /* a guest, no username: one quiet line, not a tile */
+.lbp-friend.is-friend{background:linear-gradient(180deg,#f3fcf6,var(--sky-1));box-shadow:inset 0 0 0 .125rem #cdeed8}
+.lbp-friend.is-confirm{background:linear-gradient(180deg,#fff,#fff7f7);box-shadow:inset 0 0 0 .125rem #f3c4c4}
+.lbp-fr-who{min-width:0;flex:1 1 9rem;display:flex;flex-direction:column;gap:.125rem}
+.lbp-card .lbp-fr-line{margin:0;display:flex;align-items:center;gap:.5rem;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);min-width:0}
+.lbp-friend.is-none .lbp-fr-line,.lbp-friend.is-gate .lbp-fr-line{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
+.lbp-friend.is-confirm .lbp-fr-line{color:var(--bad-deep)}
+.lbp-card .lbp-fr-tag{display:flex;align-items:center;gap:.25rem;color:var(--good-deep)} .lbp-fr-tag svg{width:.875rem;height:.875rem;fill:none;stroke:currentColor;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.lbp-fr-acts{flex:none;display:flex;align-items:center;gap:var(--s-2);margin-left:auto}
+.lbp-fr-acts .btn{padding:0 var(--s-4)} .lbp-fr-acts .btn:hover{scale:none}
+.lbp-fr-go{min-height:44px}
+@media (max-width:480px){ .lbp-friend{padding-left:var(--s-3)} .lbp-fr-acts .btn{padding:0 max(.875rem,12px)} }
+
+
+/* ==========================================================================================================
+   FRIENDS (docs/SOCIAL.md 6): one panel (web/social.js) in two places, the lobby view and the in-game friends card (the settings card's look).
+   Rows are the leaderboard's (white, rounded, a hairline), the dot is the lobby's 'N online' dot: green online, amber in a match, a ring offline.
+   A name opens the profile card (#lbp-card, the leaderboard's): its friend row is styled with that card, below.
+   ========================================================================================================== */
+.fr-dot{flex:none;display:inline-block;width:.75rem;height:.75rem;border-radius:50%;background:none;box-shadow:inset 0 0 0 .15625rem var(--ink-faint)}
+.fr-dot.is-on{background:var(--good);box-shadow:0 0 0 .1875rem rgba(62,207,114,.2)} .fr-dot.is-busy{background:var(--warn);box-shadow:0 0 0 .1875rem rgba(255,181,52,.22)}
+.fr-dot[hidden]{display:none}
+.tile-line .fr-dot{width:.625rem;height:.625rem;margin-right:.1em}      /* the home tile: '2 online' after the lobby's own dot */
+#friends-n:not(.is-off){background:var(--them-tint);border-color:#ffd2ad;color:var(--them-ink)}      /* requests: the other player's orange, so it reads as someone waiting on you */
+
+.fr-panel{display:flex;flex-direction:column;gap:var(--s-3);min-height:0;text-align:left}
+.fr-search{position:relative;display:block;flex:none}
+.fr-search > svg{position:absolute;left:1rem;top:50%;translate:0 -50%;width:1.25rem;height:1.25rem;fill:none;stroke:var(--ink-soft);stroke-width:2.5;stroke-linecap:round;pointer-events:none}
+.fr-q{width:100%;height:3rem;padding:0 3rem 0 2.75rem;font:700 var(--t-md)/1 var(--font);color:var(--ink-strong)} .fr-q::placeholder{color:var(--ink-faint);font-weight:700}
+.fr-clear{position:absolute;right:.5rem;top:50%;translate:0 -50%;display:grid;place-items:center;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;background:var(--sky-2);cursor:pointer;outline:0}
+.fr-clear svg{width:.875rem;height:.875rem;fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round} .fr-clear:hover,.fr-clear:focus-visible{background:var(--sky-3);box-shadow:var(--glow)} .fr-clear[hidden]{display:none}
+.fr-scroll{display:flex;flex-direction:column;gap:var(--s-4);min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:.25rem;margin:-.25rem}      /* a focus glow never clips at the edge */
+.fr-scroll[hidden],.fr-search[hidden],.fr-gate[hidden],.fr-sec[hidden],.fr-list[hidden],.fr-hint[hidden],.fr-empty[hidden]{display:none}
+.fr-sec{display:flex;flex-direction:column;gap:.5rem}
+.fr-label{display:flex;align-items:center;gap:.5rem;margin:0 0 0 .875rem;font-size:var(--t-xs);font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}      /* the settings card's group label */
+.fr-count{min-width:1.375rem;height:1.375rem;padding:0 .375rem;display:inline-grid;place-items:center;border-radius:var(--r-pill);background:var(--them);color:#fff;font-size:max(.75rem,11px);letter-spacing:0} .fr-count:empty{display:none}
+.fr-more-n{margin-left:auto;margin-right:.25rem;font-size:var(--t-xs);letter-spacing:0;text-transform:none;font-weight:700} .fr-more-n:empty{display:none}
+.fr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.fr-row{display:flex;align-items:center;gap:.75rem;min-height:3.5rem;padding:.4375rem .5rem .4375rem 1rem;border-radius:var(--r-lg);background:#fff;border:.125rem solid var(--line-faint);box-shadow:var(--sh-1)}
+.fr-row.is-off .fr-name{color:var(--ink)}      /* offline friends a shade quieter: the online ones lead */
+.fr-row.is-confirm{border-color:#f3a3a3;background:linear-gradient(180deg,#fff,#fff7f7)}
+.fr-who{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;min-width:0}
+.fr-top{display:flex;align-items:center;max-width:100%;min-width:0}
+.fr-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:.125rem .25rem;margin:-.125rem -.25rem;border:0;border-radius:var(--r-xs);background:none;font:800 var(--t-md)/1.2 var(--font);color:var(--ink-strong);cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent}
+@media (hover:hover){ .fr-name:hover{color:var(--line-deep);text-decoration:underline;text-underline-offset:.2em;text-decoration-thickness:.1em} } .fr-name:focus-visible{box-shadow:var(--glow);color:var(--line-deep)}
+.fr-top .reg-badge{margin-left:.3em} .fr-top .rank-badge{margin-left:.35em}
+.fr-st{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
+.fr-row[data-st="off"] .fr-st{color:var(--ink-faint)}
+.fr-acts{flex:none;display:flex;align-items:center;gap:.375rem}
+.fr-invite:empty{display:none}      /* slice B's invite buttons */
+.fr-act{height:2.5rem;min-height:40px;padding:0 1.125rem;font-size:var(--t-sm);gap:.375rem}
+.fr-row .btn:hover{scale:none}      /* in a scroll box: the lift would clip its halo, as in the court list */
+.fr-more{width:max(2.5rem,36px);height:max(2.5rem,36px);box-shadow:var(--sh-1), var(--inner-hi)} .fr-more svg{width:1.25rem;height:1.25rem;fill:var(--ink-soft);stroke:none}
+.fr-tag{display:inline-flex;align-items:center;gap:.3rem;height:2.25rem;padding:0 .875rem;border-radius:var(--r-pill);background:var(--sky-2);color:var(--ink-soft);font-size:var(--t-sm);font-weight:800;white-space:nowrap}
+.fr-tag.is-friend{background:#e8f8ee;color:var(--good-deep)} .fr-tag svg{width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.fr-tag.is-lg{height:max(2.75rem,44px);min-height:44px;padding:0 1.125rem;font-size:var(--t-md)}      /* beside an is-tall button: one height */
+.fr-ask{font-size:var(--t-sm);font-weight:800;color:var(--bad-deep);white-space:nowrap;margin-right:.25rem}
+.fr-hint{margin:0;padding:var(--s-4) var(--s-3);text-align:center;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .fr-hint.is-wait::after,.fr-gate-t.is-wait::after{content:"…"}
+.fr-empty{display:flex;flex-direction:column;align-items:center;gap:.375rem;padding:var(--s-5) var(--s-4);border-radius:var(--r-lg);border:.125rem dashed var(--sky-4);background:rgba(255,255,255,.55);text-align:center}
+.fr-empty b{font-size:var(--t-md);font-weight:800;color:var(--ink-strong)} .fr-empty span{max-width:26rem;font-size:var(--t-sm);font-weight:600;line-height:1.45;color:var(--ink-soft)}
+.fr-gate{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:var(--s-5) var(--s-4);text-align:center}
+.fr-gate-t{margin:0;font-size:var(--t-lg);font-weight:800;color:var(--ink-strong)} .fr-gate-s{margin:0;max-width:28rem;font-size:var(--t-sm);font-weight:600;line-height:1.45;color:var(--ink-soft)} .fr-gate-b{margin-top:var(--s-2)} .fr-gate-b[hidden],.fr-gate-s[hidden]{display:none}
+
+/* the lobby view: the leaderboard's width and height rules; the lists scroll under a fixed search */
+.panel.fr-view{width:min(42rem,92vw);max-height:calc(100dvh - 11rem);min-height:min(26rem,calc(100dvh - 11rem));align-items:stretch;gap:var(--s-4);padding:var(--s-5) var(--s-6)}      /* stretch: a lobby view centres its children, these rows run the card's width */
+.fr-view .fr-panel{flex:1 1 auto}
+.fr-view .fr-gate{flex:1;justify-content:center}
+@media (max-width:480px){ .panel.fr-view{padding:var(--s-4);width:100%} .fr-row{gap:.5rem;padding-left:.75rem} .fr-act,.friends-card .fr-act{padding:0 max(.875rem,12px)} }      /* the 10px rem floor: the buttons keep a real pill's sides */
+
+/* Settings > Friends: a row that goes somewhere (the chevron), its badge and '2 online' at the end */
+.set-nav .set-end{display:inline-flex;align-items:center;gap:.5rem;min-width:0} .set-nav .set-end small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft);white-space:nowrap} .set-nav .set-end small:empty{display:none}
+.set-nav .set-end svg{width:.5rem;height:.875rem;margin-right:.375rem;fill:none;stroke:var(--ink-soft);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.set-badge{min-width:1.375rem;height:1.375rem;padding:0 .375rem;display:inline-grid;place-items:center;border-radius:var(--r-pill);background:var(--them);color:#fff;font-size:max(.75rem,11px);font-weight:800} .set-badge[hidden]{display:none}
+#grp-social[hidden]{display:none}
+
+/* the friends card: the settings card, a little wider for a row with its buttons; its lists scroll inside it */
+.friends-card{width:min(26rem,calc(100vw - 2 * var(--edge)));gap:.75rem}
+.fc-head{flex-direction:row;align-items:center;gap:.5rem;padding:0}
+.fc-back{width:2.25rem;height:2.25rem;box-shadow:var(--sh-1), var(--inner-hi)} .fc-back svg{width:.5rem;height:.875rem;stroke:var(--line-deep);stroke-width:3.25;stroke-linejoin:round}
+.fc-body{display:flex;flex-direction:column;min-height:0}
+.friends-card .fr-panel{gap:.625rem}
+.friends-card .fr-q{height:2.625rem;font-size:var(--t-sm)}
+.friends-card .fr-row{min-height:3rem;padding:.3125rem .375rem .3125rem .75rem;gap:.5rem;border-radius:var(--r-md)}
+.friends-card .fr-name{font-size:var(--t-sm)}
+.friends-card .fr-act{height:2.25rem;min-height:36px;padding:0 .75rem;font-size:var(--t-xs)}
+.friends-card .fr-more{width:max(2.25rem,36px);height:max(2.25rem,36px)}
+.friends-card .fr-tag{height:2rem;padding:0 .625rem;font-size:var(--t-xs)}
+.friends-card .fr-gate{padding:var(--s-4) var(--s-2)} .friends-card .fr-gate-t{font-size:var(--t-md)}
+.friends-card .fr-empty{padding:var(--s-4) var(--s-3)}
+body[data-paused] .friends-card .fr-row{box-shadow:none}
+@media (max-width:520px){ .friends-card{width:calc(100vw - 2 * var(--edge))} }

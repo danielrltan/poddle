@@ -1,6 +1,6 @@
 // Operator CLI for the stats database (docs/ACCOUNTS.md 11.7). Never reachable over HTTP: nothing requires it, it has no routes, and
 // requiring it does nothing. Run on the machine: fly ssh console -C "node server/admin.js <cmd>" (PODDLE_DB is set there by fly.toml).
-//   counts                      rows per table (numbers only)
+//   counts                      rows per table (numbers only; friends and friend_reqs included, docs/SOCIAL.md 2)
 //   rename <username> <new>     operator rename of an offensive name; clears renamed_at so the player may choose their own at once
 //   release <username>          drop a name hold
 //   reset-stats <username>      the account's own stats, Matt record and Ranked ladder back to zero (the owner's request); the account stays
@@ -59,7 +59,8 @@ async function main(argv) {
       const a = find(a1);
       if (!db.deleteOwner(a.owner_id, now)) throw new Error('delete failed');
       // This is a separate process, so it cannot call stats.forget(): a match in progress on the live server finds the owner gone
-      // at record time (recordMatch checks every seat's owner inside its transaction, 4.7) and records that seat as no owner.
+      // at record time (recordMatch checks every seat's owner inside its transaction, 4.7) and records that seat as no owner. Its friendships and
+      // requests go by the cascade; the live server's presence tick finds the account gone within seconds and signs its sockets out (docs/SOCIAL.md 4).
       return console.log('deleted (sessions, stats and merged devices; the name is held for 90 days)');
     }
     if (cmd === 'rename') {

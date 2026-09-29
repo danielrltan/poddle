@@ -49,7 +49,7 @@ function swap(slot, name) {
   const b = document.body, hud = $('hud');
   b.dataset.screen = slots.menu || 'hud';
   if (slots.overlay) b.dataset.overlay = slots.overlay; else delete b.dataset.overlay;
-  if (slots.menu || slots.overlay) { settings(false); tourCard(false); }             // the cards belong to the open court. (Closing fires their callback: a pause must not outlive the panel)
+  if (slots.menu || slots.overlay) { settings(false); tourCard(false); friendsCard(false); }             // the cards belong to the open court. (Closing fires their callback: a pause must not outlive the panel)
   if (slots.menu !== 'lobby') askWatch(null);
   if (slots.overlay === 'match') hold(null); else stopCount();                        // the result replaces the hold card; leaving the result stops its countdown
   if (slots.overlay !== 'rk-game') gameStop(); if (slots.overlay !== 'rk-vs') vsStop();      // the Ranked cards' own clocks stop with them
@@ -503,7 +503,7 @@ function keepName(from) {                                  // typing in one fiel
 }
 function nameGate() {                                      // first visit: the choices are dimmed (and say so to a screen reader) until the name has a letter
   const need = !playerName(); $('screen-lobby')?.classList.toggle('needs-name', need); $('name-row')?.classList.remove('is-bad');
-  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile):not(#btn-leaderboard)')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats and the leaderboard seat nobody: they need no name
+  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile):not(#btn-leaderboard):not(#btn-friends)')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats, the leaderboard and Friends seat nobody: they need no name
 }
 function needName() {                                      // a seat was asked for with no name: the field says so, nothing is sent
   if (playerName()) return false;
@@ -511,7 +511,7 @@ function needName() {                                      // a seat was asked f
 }
 
 // ---------- settings panel (hamburger). A card, not a screen: inPlay() in main.js stays true and the rally goes on behind it ----------
-let setOpen = false, setH = {}, sinkSig = '';
+let setOpen = false, setH = {}, sinkSig = '', handing = false;
 // Why the Output row is not there. browser: no AudioContext.setSinkId (Safari, Firefox). devices: it could move the sound,
 // but the browser will not name a single audio device until the page holds MICROPHONE permission — measured, and a camera
 // grant does NOT do it (NOTES 64). denied: they said no, and only the browser's own site settings can undo that.
@@ -523,11 +523,11 @@ export function settings(open) {
   if (open === undefined) return setOpen;
   open = !!open && !slots.menu && !slots.overlay; if (open === setOpen) return setOpen;
   const el = $('settings'), btn = $('btn-menu'); if (!el) return false;
-  if (open) tourCard(false);                                                         // one card at a time
+  if (open) { tourCard(false); friendsCard(false, true); }                           // one card at a time (the friends card hands over: its Back, the hamburger)
   setOpen = open; el.hidden = !open; btn?.setAttribute('aria-expanded', String(open));
   if (open) { document.body.dataset.settings = 'open'; fullSync(); placeSettings(); const n = $('set-name-input'); if (n) n.value = lockedName || savedName; el.focus({ preventScroll: true }); }      // the card takes focus, not its name field: Esc and the game keys must still reach main.js
   else { delete document.body.dataset.settings; if (el.contains(document.activeElement)) { if (btn && !slots.menu && !slots.overlay) btn.focus({ preventScroll: true }); else document.activeElement.blur(); } }
-  const fn = open ? setH.open : setH.close; if (fn) fn();
+  const fn = open ? setH.open : setH.close; if (fn) fn(handing);      // handing: closed only because the friends card opens in its place (main.js keeps the pause)
   return setOpen;
 }
 function placeSettings() {                                 // under the hamburger; on a narrow window the corner is a column and the scoreboard reaches over the card, so go under those too
@@ -592,6 +592,31 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('settings', 'keydown', e => { const d = { ArrowDown: 1, ArrowUp: -1 }[e.key]; if (!d || document.activeElement?.tagName === 'SELECT') return;      // on the Output row the arrows are the list's own: Tab leaves it
     const nav = [...$('settings').querySelectorAll('button, input, select')].filter(b => !b.disabled && b.offsetParent), i = nav.indexOf(document.activeElement);      // select: Down from the row above still lands on it
     if (!nav.length) return; e.preventDefault(); nav[(i < 0 ? (d > 0 ? 0 : nav.length - 1) : i + d + nav.length) % nav.length].focus({ preventScroll: true }); });
+}
+
+// ---------- the friends card (Settings > Friends, docs/SOCIAL.md 6): the settings card's look and place, one card at a time like the tournament card ----------
+// web/social.js fills #fc-body; this only opens, places and closes it. Against Matt it pauses (main.js), against a person it sits over the live rally
+let fOpen = false, fH = {};
+export function onFriends(h) { fH = h || {}; }      // { open(), close(handover) }: handover = the settings card takes its place (its Back, the hamburger), so the pause stays
+export function friendsCard(open, over = false) {
+  if (open === undefined) return fOpen;
+  open = !!open && !slots.menu && !slots.overlay; if (open === fOpen) return fOpen;
+  const el = $('friends-card'); if (!el) return false;
+  const had = el.contains(document.activeElement);
+  fOpen = open; el.hidden = !open; $('btn-set-friends')?.setAttribute('aria-expanded', String(open));
+  if (open) { handing = true; settings(false); handing = false; tourCard(false); document.body.dataset.friendscard = 'open'; placeCard('friends-card'); el.focus({ preventScroll: true }); }      // the card takes focus, not its search: Esc and the game keys still reach main.js
+  else { delete document.body.dataset.friendscard; if (had && !over) { const b = $('btn-menu'); if (b && !slots.menu && !slots.overlay) b.focus({ preventScroll: true }); else document.activeElement.blur(); } }
+  const fn = open ? fH.open : fH.close; if (fn) fn(over);
+  return fOpen;
+}
+{
+  on2('btn-set-friends', 'click', () => friendsCard(true));
+  on2('btn-fc-back', 'click', () => settings(true));      // back to Settings, where it was opened from
+  addEventListener('pointerdown', e => { if (fOpen && !e.target.closest?.('#friends-card, #btn-menu, #acct-layer')) friendsCard(false); });      // the hamburger swaps it for Settings itself; a player card over it is part of it
+  on2('friends-card', 'keydown', e => {      // Tab stays in the card while it is open (Esc closes it); Up / Down walk its controls, as in Settings
+    const nav = [...$('friends-card').querySelectorAll('button, input')].filter(b => !b.disabled && b.offsetParent), i = nav.indexOf(document.activeElement); if (!nav.length) return;
+    if (e.key === 'Tab') { if (e.shiftKey ? i <= 0 : i === nav.length - 1) { e.preventDefault(); nav[e.shiftKey ? nav.length - 1 : 0].focus({ preventScroll: true }); } return; }
+    const d = { ArrowDown: 1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); nav[(i < 0 ? (d > 0 ? 0 : nav.length - 1) : i + d + nav.length) % nav.length].focus({ preventScroll: true }); });
 }
 
 // ---------- spectators ----------
@@ -706,10 +731,10 @@ on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'Ar
 // main.js owns the socket; this only draws and reports what was chosen. Handlers carry no name: main.js reads playerName().
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
 export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
-const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats', ranked: 'Ranked', ranks: 'Ranks', leaderboard: 'Global leaderboard' };      // the board's title says Global: it is everyone, not friends or a region (NOTES 126)
-const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, ranked: 1, leaderboard: 1, ranks: 2, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
+const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats', ranked: 'Ranked', ranks: 'Ranks', leaderboard: 'Global leaderboard', friends: 'Friends' };      // the board's title says Global: it is everyone, not friends or a region (NOTES 126)
+const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, ranked: 1, leaderboard: 1, friends: 1, ranks: 2, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
 const VIEW_PARENT = { create: 'courts', share: 'courts', tour: 'courts', bracket: 'courts' };      // Back from these goes to Courts, not home (a tournament lives on: T brings it back)
-const NO_NAME = ['share', 'tour', 'bracket', 'profile', 'ranks', 'leaderboard'];                                 // views with no name row above them
+const NO_NAME = ['share', 'tour', 'bracket', 'profile', 'ranks', 'leaderboard', 'friends'];                                 // views with no name row above them
 export const viewParent = v => (v === 'ranks' ? ranksFrom : VIEW_PARENT[v] || null);      // Ranks goes back to where it was opened from (Your stats or Ranked)
 const boxes = () => [...$('code-boxes').children];
 let view = 'home', roomsKey = '', on = {}, deep = null, ranksFrom = 'ranked', lastRank = null;      // lastRank: { tier, div, best } from the last rkView / rankCrest, for the Ranks page                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
@@ -726,6 +751,7 @@ export function lobbyView(name, { code, watch } = {}) {
   if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour(); else if (view === 'profile' && was !== 'profile' && on.profile) on.profile();      // Your stats: main.js asks web/profile.js to fetch and draw it
   else if (view === 'ranked' && was !== 'ranked' && on.rankedOpen) on.rankedOpen();
   else if (view === 'leaderboard' && was !== 'leaderboard' && on.leaderboard) on.leaderboard();      // the global leaderboard: web/profile.js fetches and draws it (NOTES 126)
+  else if (view === 'friends' && was !== 'friends' && on.friends) on.friends();      // Friends (docs/SOCIAL.md 6): web/social.js builds, fetches and draws it
   else if (view === 'ranks') { if (was !== 'ranks' && was !== 'home') ranksFrom = was === 'profile' ? 'profile' : 'ranked'; drawRanks(); if (!lastRank && on.ranksOpen) on.ranksOpen(); }      // a reload on /ranks knows no rank yet: main.js fetches it      // Ranked: the same, and the stadium behind the glass (docs/RANKED.md 2)
   deep = null; for (const b of [$('btn-join'), $('btn-watch-code')]) b?.classList.remove('is-focus');
   if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
@@ -745,7 +771,8 @@ const vis = el => !!el && !el.hidden && !!el.offsetParent;
 const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
-const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]') }[view] || $('btn-quick'));
+const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || $('btn-quick'));
+const friendsFocus = () => { const v = $('lobby-friends'), q = v?.querySelector('.fr-q'); return vis(q) && matchMedia('(pointer: fine)').matches ? q : [...(v?.querySelectorAll('button, input') || [])].find(vis) || v; };      // a mouse: the search. A finger: the first button, so no keyboard pops up
 // The home tiles: how many show (Ranked and Your stats only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
 // tile in DOM slot 2 would make the visible fourth the 4th child. Called on every view change and by web/profile.js when it shows or hides a tile
 export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll('.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }
@@ -907,6 +934,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('btn-watch-code', 'click', () => { const c = getCode(); if (c.length === 4 && !needName() && on.watch) on.watch(c); });
   on2('btn-bot', 'click', () => { if (!needName()) lobbyView('bot'); });
   on2('btn-profile', 'click', () => lobbyView('profile'));      // no name needed: nobody is seated
+  on2('btn-friends', 'click', () => lobbyView('friends'));      // no name needed: nobody is seated
   on2('btn-leaderboard', 'click', () => lobbyView('leaderboard')); on2('st-place', 'click', () => { const t = $('lb-tabs'); if (t) t.dataset.want = 'trophies'; lobbyView('leaderboard'); });      // the global leaderboard, from its tile or from the #301 beside the rank on Your stats
   on2('btn-ranked', 'click', () => { if (!needName()) lobbyView('ranked'); });      // Ranked seats you: it needs a name, like Quick play
   on2('btn-ranked-go', 'click', () => { if (!needName() && on.ranked) on.ranked(); });
@@ -1090,7 +1118,7 @@ export function tourCard(open) {
   if (open === undefined) return tCard;
   open = !!open && !slots.menu && !slots.overlay && !!ts && tKind === 'warm'; if (open === tCard) return tCard;
   const el = $('tour-card'), p = $('tour-pill'); if (!el) return false;
-  if (open) settings(false);
+  if (open) { settings(false); friendsCard(false); }
   const had = el.contains(document.activeElement);      // asked before it hides: a hidden card has already let go of focus, and it went nowhere (the pill never got it back)
   tCard = open; el.hidden = !open; p?.setAttribute('aria-expanded', String(open)); tLeaveAt = 0;
   if (open) { document.body.dataset.tourcard = 'open'; drawCard(); placeCard(); el.focus({ preventScroll: true }); }
@@ -1098,13 +1126,13 @@ export function tourCard(open) {
   tcall(open ? 'cardOpen' : 'cardClose');
   return tCard;
 }
-function placeCard() {                                     // under the corner (it wraps to two rows with the pill), and under the scoreboard where they meet: as settings does
-  const el = $('tour-card'), board = $('board'); if (!el || el.hidden) return; let y = 0;
+function placeCard(id = 'tour-card') {                    // under the corner (it wraps to two rows with the pill), and under the scoreboard where they meet: as settings does. The friends card too
+  const el = $(id), board = $('board'); if (!el || el.hidden) return; let y = 0;
   for (const c of $('corner').children) if (c.id !== 'dev' && c.offsetParent) y = Math.max(y, c.getBoundingClientRect().bottom);
   const r = el.getBoundingClientRect(), b = board ? board.getBoundingClientRect() : null; if (b && b.width && b.left < r.right && b.right > r.left) y = Math.max(y, b.bottom);
   el.style.setProperty('--set-top', `calc(${Math.round(y)}px + .5rem)`);
 }
-addEventListener('resize', placeCard);
+addEventListener('resize', () => { placeCard(); placeCard('friends-card'); });
 // ---- the VS card: m = the server's tmove { round, name, n, of, vs:{ name, bot }, target, final, at } | null
 export function tourVs(m) {
   if (!m || typeof m !== 'object') { if (slots.overlay === 'tour-vs') showOverlay(null); return; }

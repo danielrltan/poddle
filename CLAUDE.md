@@ -21,13 +21,15 @@ Important changes also need a notice on the home page. Open questions for the op
   per IP, ask-to-play cooldown, 2 Ranked queue entries per computer (Ranked only for signed-in accounts with a username, NOTES 133) and never paired within one computer group), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
   level, emotes, pause/rematch, position (~60 Hz, relayed), phone motion (relayed to the paired tab only). Reconnect URL
   carries name, cid, code, score, side, bot (revive()); never the device id or any sign-in value. Logs: activity lines
-  with court codes and ranked/unranked, no names/IPs/cids/device ids/account ids/Google subs/tokens.
+  with court codes and ranked/unranked, no names/IPs/cids/device ids/account ids/Google subs/tokens (friends lines too: no names, no ids).
 - Server memory only, up to 24 h, gone on restart (server/abuse.js): keyed hashes (daily key) of IPs / IPv6 /64s linked
   to device-id hashes, cids and recent results (link map, pair and new-guest counters), and API rate-limit buckets keyed
   the same way (server/api.js, its own key, also replaced every 24 h). SHA-256 of each sign-in nonce issued, 10 min,
   single use. The raw IP is compared in memory at match end and never written to the database. Share cards
   (server/share.js, card.js): a keyed hash (own daily key) of the network address counting card renders a minute; and,
-  until evicted or a restart, the last 64 card PNGs.
+  until evicted or a restart, the last 64 card PNGs. Friends (docs/SOCIAL.md): each online account's presence (online + a coarse
+  status: menu|matt|playing|watching|queue|ranked|tour, from its lobby sockets; never the court code), its cached friend list, and
+  per-account rate buckets (adds 30/h, searches 60/10 min); gone on restart. Search text is answered, never stored or in our logs (it is in the URL: Fly's platform logs may hold it ~7 d).
 - Server database (SQLite `node:sqlite` at PODDLE_DB=/data/poddle.db on the Fly volume poddle_data; server/db.js,
   docs/ACCOUNTS.md 2.2): owners (kind, created, last match/sign-in); devices (SHA-256 of the device id, merge date);
   accounts (Google `sub` only, username + confusable-folded key, created, renamed, merge count, lb_hidden (Show me on the global leaderboard off); NO email, name or
@@ -38,10 +40,15 @@ Important changes also need a notice on the home page. Open questions for the op
   owner, for the guest on a merge, or by the operator: `admin.js unshare <link>` / `unshare-user <username>`);
   match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length, and for
   Ranked mode: mode 'ladder'|'casual', series id, the trophy change per side); ladder (per owner: trophies, rank tier 1..8 and
-  division (Pro: none; tier/div re-derived from the trophy counts at every open, NOTES 124), best rank/division and when, Ranked wins/losses/streaks, Matt queue wins/losses, Matt trophies awarded today).
+  division (Pro: none; tier/div re-derived from the trophy counts at every open, NOTES 124), best rank/division and when, Ranked wins/losses/streaks, Matt queue wins/losses, Matt trophies awarded today);
+  friends (the two account ids a<b + since; max 100 per account) and friend_reqs (from, to, created, declined_at, asked_at, sent; a decline is
+  silent, a removal writes a declined row from the removed person so they cannot re-request for 30 d; created = the sender's clock,
+  asked_at = when it reached the receiver (NULL: a removal's block), sent 0 = a row its sender does not see); both ON DELETE CASCADE,
+  in the export by username (never ids).
   No IPs, no guest display names, no emails. Retention (db.sweep at boot + every 24 h): guests 90 d after last
   recorded match (7 d if only one), accounts 24 months idle, match_log 30 d (sooner, oldest first, near the DB_MAX_MB
-  cap; at most LOG_CAP_DAY=100 rows per owner a day; no row for leaving Matt), sessions at expiry, name holds 30 d
+  cap; at most LOG_CAP_DAY=100 rows per owner a day; no row for leaving Matt), sessions at expiry, friend_reqs 30 d after created (declined or not; sweep step `friendreqs`), friendships until removed or
+  either account is deleted / swept, name holds 30 d
   (rename) / 90 d (deleted account). Fly volume snapshots daily, kept 5 d; admin backups in /tmp, gone within 5 d.
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
@@ -61,8 +68,17 @@ Important changes also need a notice on the home page. Open questions for the op
   time on court over counted matches of every kind, best win streak vs people; return rate, points won %, longest rally, fastest swing, winners, aces,
   smashes, tournament titles), also in the og tags and alt text; the apps it is pasted into fetch it for
   previews and may keep them. Both players are told when a match did not count.
+  Friends (accounts WITH a username only; docs/SOCIAL.md): any such account can search usernames (prefix or confusable match, 2..12
+  chars, top 20, never self; lb_hidden accounts ARE findable) and send requests (the target sees the sender's username + time).
+  Accepted friends see each other's online status + coarse activity (never the court code), rank {tier,div} and leaderboard places.
+  The profile card (NOTES 140's #lbp-card) is the ONE card a name opens: leaderboard rows, friend search, friends lists, On this court. It asks
+  /api/leaderboard/player (above: the eleven stats etc., NOTES 145, any account on a board, NOTES 141; a 404 = no stats line) and, signed in with a username, GET /api/player?name= (public on
+  the server, no sign-in needed): username (+ the developer badge drawn client-side) and, when the account is not lb_hidden or the viewer is a friend (or
+  the player), rank emblem + places ({rank} per board, never the value, for EVERY listed account); rel (none|friend|out|in) and
+  st only to a friend. The card's friend row (web/social.js): Add / Requested + Cancel / Accept + Decline / Friends + Remove (confirm), a friend's live status.
+  The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140), poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140), poddle.friendsSeen (the one-time Friends notice was shown), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat or Ranked queue entry; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
