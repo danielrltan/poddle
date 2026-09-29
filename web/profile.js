@@ -276,7 +276,8 @@ async function toggleShow() {
 
 // ---------- a player's profile card from the leaderboard (NOTES 140): GET /api/leaderboard/player?u=<name>, exactly what their share card shows. No URL of its own ----------
 let lbpGen = 0, lbpName = '';      // lbpGen: this sheet's own generation (loadGen is sign-in's); lbpName: the row it came from, to find it again (the list redraws under the sheet)
-const STAT_LABELS = ['Return rate', 'Longest rally', 'Fastest swing', 'Record vs people', 'Best streak', 'Winners'], MATT = ['Rookie', 'Club', 'Tour', 'Pro'];      // MATT: difficulty order, as is-lv<i>
+const STAT_LABELS = ['Win rate', 'On court', 'Best streak', 'Returns', 'Points won', 'Rally', 'Swing', 'Winners', 'Aces', 'Smashes', 'Titles'], HERO_N = 3, MATT = ['Rookie', 'Club', 'Tour', 'Pro'];      // the share card's eleven tags in its order (server/card.js dataOf, NOTES 145): the first three are its headline figures. MATT: difficulty order, as is-lv<i>
+const figB = v => { const b = mk('b'); if (v === '-' || v === '–') { b.textContent = v; b.className = 'is-none'; return b; } for (const r of v.match(/\d[\d,-]*|[^\d]+/g) || [v]) b.append(/^\d/.test(r) ? r : mk('i', '', r)); return b; };      // "72%", "11h 6m": the digits big, % h m small, as the card draws them (textContent stays the whole value)
 export const playerOpen = () => cardOpen() && !!$('lbp-card') && !$('lbp-card').hidden;
 export function closePlayer() { if (playerOpen()) closeCard(); }      // main.js: MATCH FOUND and a tournament's VS card; seated(): a seat of my own
 function openPlayer(btn) {
@@ -306,11 +307,12 @@ function drawPlayer(p, state) {
   text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
   const dl = $('lbp-stats');
   if (dl) {
-    const S = Array.isArray(p.stats) && p.stats.length === 6 && p.stats.every(s => s && typeof s.label === 'string' && (typeof s.value === 'string' || Number.isFinite(s.value))) ? p.stats : null;
+    const S = Array.isArray(p.stats) && p.stats.length === STAT_LABELS.length && p.stats.every(s => s && typeof s.label === 'string' && (typeof s.value === 'string' || Number.isFinite(s.value))) ? p.stats : null;
     dl.textContent = ''; dl.setAttribute('aria-busy', String(state === 'loading'));
-    STAT_LABELS.forEach((l, i) => { const s = S ? S[i] : null, d = mk('div', 'lbp-stat' + (s ? '' : ' is-skel')), dd = mk('dd');
-      dd.append(mk('b', '', s ? strOf(s.value, 12) || '–' : '–')); if (s && s.unit) dd.append(mk('small', '', strOf(s.unit, 6)));
-      d.append(mk('dt', '', s ? s.label.slice(0, 24) : l), dd); dl.append(d); });
+    STAT_LABELS.forEach((l, i) => { const s = S ? S[i] : null, d = mk('div', 'lbp-stat' + (i < HERO_N ? ' is-hero' : '') + (s ? '' : ' is-skel')), dd = mk('dd');      // a div of dt + dd (+ the note's own dd): the only children a dl allows
+      dd.append(s ? figB(strOf(s.value, 12) || '–') : mk('b', '', '–')); if (s && s.unit) dd.append(mk('small', '', strOf(s.unit, 6)));
+      const dt = mk('dt', '', s ? strOf(s.tag, 16) || s.label.slice(0, 24) : l); if (s) dt.title = s.label.slice(0, 32);      // the card's short caps; the long name ("Win rate vs people") on hover
+      d.append(dt, dd); if (i < HERO_N) d.append(mk('dd', 'lbp-note', s ? strOf(s.note, 28) : '\u00a0')); dl.append(d); });      // the headline's note: "31-12 vs people", "all modes"
   }
   const msg = state === 'gone' ? 'This player isn’t on the leaderboard any more' : state === 'error' ? 'Couldn’t load this player' : '';
   text('lbp-msg', msg); show('lbp-msg', !!msg); show('lbp-retry', state === 'error');

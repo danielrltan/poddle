@@ -70,9 +70,10 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
 
 **Public routes** (server/game.js static handler, before the web/ files; GET/HEAD only):
 - `/c/<slug>` -> an HTML page (`text/html`, `Cache-Control: public, max-age=300`, `X-Robots-Tag: noindex`) with
-  absolute `og:title` ("<Name> on Poddle"), `og:description` (one line of the best stats + "Play free at poddleball.com"),
+  absolute `og:title` ("<Name> on Poddle"), `og:description` (one line, the same figures for everyone: rank, win rate vs people with the record, time on court, best win
+  streak vs people, rally, return rate, Matt; a `-` figure is left out; then "Play free at poddleball.com"; NOTES 145),
   `og:image` (`https://poddleball.com/c/<slug>.png?v=<hash>`), `og:image:width` 1200, `og:image:height` 630,
-  `og:image:alt`, `og:url`, `og:site_name` Poddle, `twitter:card` summary_large_image, `<meta name=robots content=noindex>`.
+  `og:image:alt` (all eleven figures as words: "time on court 11 hours 6 minutes in all modes", a `-` is "none yet"), `og:url`, `og:site_name` Poddle, `twitter:card` summary_large_image, `<meta name=robots content=noindex>`.
   Body: the card image big, a primary "Play Poddle free" button to `/`, and a small "Make your own card: play, then
   open Your stats" line. Same look as the site (web/ui.css tokens and the Poddle Rounded font), phone friendly.
 - `/c/<slug>.png` -> `image/png` 1200x630, `Cache-Control: public, max-age=300`, an ETag from the hash; the query string
@@ -93,9 +94,24 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
   trophies). The emblem artwork is hashed with `CARD_V`, so a redrawn emblem is a new picture URL (NOTES 114).
 - The Matt badge: the toughest Matt beaten in difficulty order (Rookie, Club, Tour, Pro; wire 0, 1, 3, 2), level colour
   as web/ui.css .st-matt (Rookie #3ecf72, Club #3aa0ff, Tour #a77bf3, Pro gold), or nothing if none.
-- The stats: return rate (returns / chances, shown only from 10 chances up; since the review fixes, NOTES 114: a card tile only from 20 chances at 50% or better, the rally from 5 hits; since design round 1: W-L vs people only from 3 wins with more wins than losses, matches played as a chip only, the swing after record / streak / titles), longest rally, fastest swing (deg/s,
-  rounded to 10 like the page), W-L vs people, best win streak, titles, winners/aces if room. Choose what reads best;
-  zero or missing values are left off rather than shown as 0.
+- The stats (NOTES 145, CARD_V 9; the owner's ask: "your winrate, time on court, etc. top win streak, etc."): the SAME eleven
+  figures on every card, in the same places, zeros included (the owner's earlier rule: no selective stats, cards compare at
+  a glance). `-` (drawn as a grey en dash) only where there is nothing to divide or measure yet, never for a real zero.
+  Three headline tiles (white, big figures, a note under each):
+  - WIN RATE: `human.wins / (human.wins + human.losses)`, rounded %: every counted match against a person (kinds `human`
+    and `tour`, db.js HUMAN; tournament games against Matt are `tourbot` and go to the Matt rows). Note: the record,
+    `31-12 vs people` (en-US commas; `0-0 vs people` and a `-` rate when no person was played).
+  - ON COURT: `play.secs` as Your stats' clock() (`11h 6m`, `14m`, `<1m`, `0m`; hours past 100 keep their minutes).
+    Counted matches of every kind (people, Matt, tournaments). Note: `all modes`.
+  - BEST STREAK: `human.bestStreak`, people only: the global leaderboard's Win streak board (the card and the board
+    agree). Until CARD_V 8 it was the best of people and every Matt rung; Matt now shows only as the badge. Note:
+    `wins vs people` (`win` at 1).
+  Then one well of eight, four across: RETURNS (`min(returns, chances) / chances`), POINTS WON (`pointsWon / (pointsWon +
+  pointsLost)`, every kind, Your stats' Points won), RALLY (best rally, `hits`), SWING (fastest swing in deg/s rounded to
+  10, `°/s`), WINNERS, ACES, SMASHES, TITLES (tournament titles). Counts carry en-US commas. The return-rate bar is gone.
+  Digits draw at full size, `%`, `h`, `m` and the units smaller. The leaderboard profile sheet (api.js publicCard) sends the
+  same eleven as `{ label, tag, value, unit?, note?, hero? }` (`note`, never `sub`: the leak check keeps `"sub"` for
+  Google's id) and draws the three headline tiles over the eight.
 - The brand: the Poddle wordmark/ball, "poddleball.com", a plain call to action ("Play free at poddleball.com" over "Pickleball in your browser · your phone is the paddle"; no taunt line, NOTES 118).
 - The look: the game's bright sky/court palette, chunky rounded type (M PLUS Rounded 1c 800/900), gold accents,
   crisp at 1200x630 and legible when a chat app shrinks it to ~400 px wide. It has to make people want to click.

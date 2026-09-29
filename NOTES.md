@@ -2902,3 +2902,42 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
 - Tests: test/scene-next.mjs checks Mae's parts, eyes, hair and colours, that nothing of Dan's stays, and lookFor for Mae /
   MAE / a guest Mae / Maeve; render test/ui-shots/scene-next/mae-front-and-back-1280x720.png. scene-preview.html takes
   `&mae=0|1`. No legal change (derived from the public username on the client; CLAUDE.md's data-flow line updated).
+## 145. The share card shows win rate, time on court and best win streak, and eleven figures in all
+- The owner's ask: "for the share card: please put on it your winrate, time on court, etc. top win streak, etc.". The
+  card (server/card.js, CARD_V 8 -> 9) keeps its left column (wordmark, emblem, rank, the trophy pill with the count and
+  the cup icon, no word; the Matt badge) and the CTA. The right panel now has three white headline tiles over one
+  detail well of eight, four across. Every card still draws the SAME figures in the same places, zeros included (the
+  owner's earlier rule); `-` (a grey en dash) only where there is nothing to divide or measure.
+  - WIN RATE: human.wins / (wins + losses), people only (kinds human + tour, db.js HUMAN; tournament games against Matt
+    are tourbot), with the record under it: "31-12 vs people" (en-US commas).
+  - ON COURT: play.secs as Your stats' clock() ("11h 6m"; past 100 h the minutes stay), note "all modes": counted
+    matches of every kind (not "all matches": uncounted ones add no time).
+  - BEST STREAK: human.bestStreak, people only. BEHAVIOUR CHANGE: until now the card took the best of people and every
+    Matt rung; now it is the global leaderboard's Win streak board's figure, so a card and the board agree. A Matt-only
+    player shows 0 (and a `-` win rate, "0-0 vs people"). Your stats' own streak display is unchanged.
+  - The eight: RETURNS, POINTS WON (every kind, Your stats' st-f-points), RALLY (hits), SWING (°/s), WINNERS, ACES,
+    SMASHES, TITLES. The return-rate bar is gone. Digits full size, % h m and units smaller (runs of text).
+  - Not taken: "N matches played" (`played` also counts uncounted matches, so it would not match the time's basis, and
+    it would make a new figure public).
+  - Sizes at 1200 px: headline figures up to 66 px (one shared size per tier), their labels 24 and notes 22; the
+    detail's labels 22 and figures 36; the smallest typical text is 22 px (7.3 px in a 400 px chat preview, as before).
+    A 4,321-1,234 record shrinks only its own note.
+- server/share.js: og:description is now "Gold II rank · 72% win rate vs people (31-12) · 11h 6m on court · best win
+  streak 7 vs people · 24-hit rally · 86% return rate · beat Tour Matt (the bot)" and the play line; a `-` figure is left
+  out (the old blurb looked up 'Record vs people', which is gone). The alt texts read all eleven as words ("time on
+  court 11 hours 6 minutes in all modes", a `-` is "none yet") and keep "240 trophies" as a word: spoken text has no icon.
+- The leaderboard profile (api.js publicCard) sends the eleven as { label, tag, value, unit?, note?, hero? } ("note",
+  not "sub": the leak check keeps "sub" for Google's id). The sheet (web/profile.js drawPlayer, ui.css .lbp-*) draws
+  three white headline tiles (figure, the card's short tag, the note) over the eight, four across (two at 480 px and
+  under); one dl on a 12-column grid, each tile a div of dt + dd (+ the note's dd). The dt is the card's tag, the long
+  name its title (ui.js turns it into the tooltip and aria-description). Figures fit their tile with cqi units ("277h 46m" at 390 px). The trophies line keeps the number and
+  the cup (data-cup). STAT_LABELS and the guard are eleven (at six every sheet would stay on skeletons).
+- Legal (same change): privacy.html 4 (Global leaderboard and Shared cards list the eleven), 13 (the leaderboard row),
+  15 (a dated September 29 line: the new figures, time counts counted matches only, the streak is people-only), the
+  header comment; terms.html 5 (eleven, not six). Dates already read September 29, 2026. CLAUDE.md data flows
+  (Public), docs/ropa.md, docs/SHARE.md 2, docs/ACCOUNTS.md Q14, the index.html comment, the changelog.
+- Tests: share.test.mjs (the eleven labels and values for weak / fresh / losing, the hero notes, no bar, the people-only
+  streak against a 9-win Matt streak, commas and 999h 59m, CARD_V 9, the new og:description and alt), leaderboard.test.mjs
+  (the new stat shape, the hero three first), lb-profile-ui.mjs (eleven skeletons under the tags, three hero tiles with
+  notes, the widest values on Pickle_Rick uncut at 1440 / 1280 / 390), sweep.mjs (eleven for the lbp shots).
+  test/share-shots.mjs gives every sample time and points and adds huge, maxed, matt-only and brand-new.

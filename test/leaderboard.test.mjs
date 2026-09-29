@@ -81,18 +81,20 @@ console.log('the profile card');
 const share = require('../server/share.js'), ENV = { GOOGLE_CLIENT_ID: 'x.apps.googleusercontent.com', RENAME_DAYS: '0' }, reinit = () => api.init({ env: ENV });   // init clears both caches and the limiter
 const cookieOf = a => require('../server/auth.js').cookieNames().session + '=' + db.session.create(a.id, Date.now());
 const pl = async u => { const r = await call('GET', '/api/leaderboard/player' + (u === undefined ? '' : '?u=' + encodeURIComponent(u))); return { ...r, j: r.body ? JSON.parse(r.body) : null }; };
-const J = JSON.stringify, LABELS = 'Return rate,Longest rally,Fastest swing,Record vs people,Best streak,Winners';
+const J = JSON.stringify, LABELS = 'Win rate vs people,Time on court,Best win streak vs people,Return rate,Points won,Longest rally,Fastest swing,Winners,Aces,Smashes,Tournament titles';
 reinit();
 let p = await pl('Ace');
 ok(p.status === 200 && Object.keys(p.j).join(',') === 'name,rank,trophies,matt,stats', `Ace -> 200, exactly name, rank, trophies, matt, stats (${p.status} ${p.body})`);
 ok(p.j.name === 'Ace' && p.j.rank.tier === 8 && p.j.rank.label === 'Pro #1' && p.j.rank.pro === 1 && p.j.trophies === 1100, `Ace is Pro #1 with 1100 trophies (${J(p.j.rank)} ${p.j.trophies})`);
-ok(p.j.stats.map(s => s.label).join(',') === LABELS && J(p.j.stats[1]) === J({ label: 'Longest rally', value: '30', unit: 'hits' }), `the six card stats in card order; rally 30 hits (${J(p.j.stats[1])})`);
+ok(p.j.stats.map(s => s.label).join(',') === LABELS && J(p.j.stats[5]) === J({ label: 'Longest rally', tag: 'Rally', value: '30', unit: 'hits' }), `the eleven card stats in card order; rally 30 hits (${J(p.j.stats[5])})`);
+ok(J(p.j.stats[0]) === J({ label: 'Win rate vs people', tag: 'Win rate', value: '0%', note: '0-1 vs people', hero: true }) && p.j.stats.map(s => !!s.hero).join() === 'true,true,true,false,false,false,false,false,false,false,false' && p.j.stats[1].note === 'all modes' && p.j.stats[2].note === 'wins vs people',
+  `the three headline figures first, each with its note: Ace lost to Dino, 0% (0-1 vs people) (${J(p.j.stats.slice(0, 3))})`);
 { const d = share.dataOf(A.owner_id);
   ok(J(p.j.stats.map(s => s.value)) === J(d.big.map(b => b.value)) && p.j.rank.label === d.rank && p.j.matt === d.matt, `the same values as Ace's share card (${p.j.stats.map(s => s.value)})`); }
 ok(!/owner|account|"sub"|google|device|"dev"|since|played|expires|slug|guest|"id"|mattI|"bar"|"em"|"v"/i.test(p.body), 'no owner, account, device, date, slug or card internals in the answer');
 ok(p.head['Cache-Control'] === 'no-store' && p.head['X-Robots-Tag'] === 'noindex', 'no-store and noindex, like every /api answer');
 p = await pl('Dino');
-ok(p.status === 200 && p.j.rank === null && p.j.trophies === 0 && p.j.matt === null && p.j.stats.length === 6, `Dino never played Ranked: rank null, 0 trophies, no Matt, still six stats (${p.body})`);
+ok(p.status === 200 && p.j.rank === null && p.j.trophies === 0 && p.j.matt === null && p.j.stats.length === 11 && p.j.stats[0].value === '100%' && p.j.stats[0].note === '2-0 vs people', `Dino never played Ranked: rank null, 0 trophies, no Matt, still the eleven stats (2-0 vs people: 100%) (${p.body})`);
 p = await pl('ACE'); ok(p.status === 200 && p.j.name === 'Ace', `u=ACE -> Ace (${p.status} ${p.j && p.j.name})`);
 ok(U.skeleton('D1no') === U.skeleton('Dino'), 'D1no folds to the same key as Dino');
 p = await pl('D1no'); ok(p.status === 200 && p.j.name === 'Dino', `u=D1no -> the canonical name Dino (${p.j && p.j.name})`);

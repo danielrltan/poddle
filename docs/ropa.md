@@ -48,7 +48,8 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
   boards (Ranked trophies, best rally, best win streak vs people) with username, value, place and rank emblem, for signed-in accounts
   WITH a username only (never guests); on by default, the account's Show me on the global leaderboard switch (accounts.lb_hidden)
   removes it at once; and, by clicking a name on the board (any place since NOTES 141), the profile card (NOTES 140, 2026-09-29): the share card's subset
-  (rank/div/trophies/Pro place, toughest Matt beaten, return rate, rally, swing, record vs people, best streak, winners); the same switch
+  (rank/div/trophies/Pro place, toughest Matt beaten, the card's eleven stats, NOTES 145: win rate + W-L vs people, time on court, best
+  streak vs people, return rate, points won %, rally, swing, winners, aces, smashes, titles); the same switch
   removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, Ranked mode:
   the rank emblem (the rank and its division, e.g. Gold II; never trophies or record) beside the name, to the opponent and to spectators
   of that court (VS card, scoreboard, result card). Basis for that: contract (Art. 6(1)(b)), the mode the player entered.
@@ -62,8 +63,9 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
   renders a minute (server/share.js), and the last 64 rendered PNGs (until replaced or a restart; privacy section 7 says so).
 - Made public to anyone with the link (page /c/<slug> and its PNG, both `noindex`): the username (or "Poddle player";
   guest display names are never stored), the Ranked rank and division with its emblem and the ladder trophies
-  (Bronze I, 0 trophies, before any Ranked game), the toughest Matt beaten, the same six stats on every card, zeros
-  included (return rate, longest rally, fastest swing, W-L vs people, best streak, winners), read from the profile
+  (Bronze I, 0 trophies, before any Ranked game), the toughest Matt beaten, the same eleven stats on every card, zeros
+  included (NOTES 145: win rate vs people with the W-L record under it, time on court over counted matches of every kind, best win
+  streak vs people; return rate, points won %, longest rally, fastest swing, winners, aces, smashes, tournament titles), read from the profile
   at request time.
 - Basis: contract (Art. 6(1)(b)): the sharing feature the player asks for; stopped at any time (Stop sharing).
 - Recipients: anyone the player gives the link to; the servers of the apps it is pasted into (link-preview

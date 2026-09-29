@@ -99,7 +99,7 @@ async function leaderRoute(req, res) {
 // one player's profile card from the board (NOTES 140): exactly the share card's subset (share.dataOf), for any account on a board (NOTES 141: at any place, not only the top 100).
 // Unknown, guest, no username, hidden, on no board, renamed away, deleted and a malformed u: the same 404, and the name is never logged
 const publicCard = (d, ranked) => ({ name: d.name, rank: ranked ? { tier: d.tier, div: d.div, label: d.rank, pro: d.pro } : null, trophies: ranked ? d.trophies : 0, matt: d.matt,
-  stats: d.big.map(b => ({ label: b.label, value: b.value, ...(b.cap ? { unit: b.cap } : {}) })) });   // never v, em, guest, mattI, bar or the slug
+  stats: d.big.map(b => ({ label: b.label, tag: b.tag, value: b.value, ...(b.cap ? { unit: b.cap } : {}), ...(b.sub ? { note: b.sub } : {}), ...(b.hero ? { hero: true } : {}) })) });   // the card's eleven, in its order: the three headline figures first (hero, with their note: '31-12 vs people'). Never v, em, guest, mattI or the slug
 async function playerRoute(req, res) {
   const u = new URL(String(req.url || ''), 'http://x').searchParams.get('u');
   const key = names && typeof u === 'string' && u.length >= 1 && u.length <= 24 ? names.skeleton(u.normalize('NFKC').trim()) : '';   // the fold validate() and claimUsername use

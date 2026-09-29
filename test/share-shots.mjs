@@ -37,11 +37,18 @@ const V = {
   'pro-27': [prof({ ladder: lad(1080), places: { trophies: { rank: 27, v: 1080 } }, played: 410, human: { wins: 160, losses: 44, streak: 11, bestStreak: 17 }, titles: 9, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 58 }, hit: { v: 95 }, speed: { v: 36 } },
     play: { hits: 16000, returns: 11800, chances: 12600, winners: 2300, aces: 540, smashes: 1300 } }), 'Kitchen_Kid'],   // Pro, 27th on the leaderboard
 };
+V.huge = [prof({ ladder: lad(1500), places: { trophies: { rank: 1234, v: 1500 } }, played: 5000, human: { wins: 9999, losses: 999, streak: 50, bestStreak: 999 }, titles: 120, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 999 }, hit: { v: 99 }, speed: { v: 44.9 } },
+  play: { hits: 999999, returns: 99999, chances: 99999, winners: 99999, aces: 99999, smashes: 99999, pointsWon: 99999, pointsLost: 0, secs: 999999 } }), 'WWWWWWWWWWWW'];   // every figure at its widest
+V.maxed = [prof({ ladder: lad(1300), places: { trophies: { rank: 12, v: 1300 } }, played: 5600, human: { wins: 4321, losses: 1234, streak: 3, bestStreak: 1234 }, titles: 1234, matt: matt([1, 1, 1, 1]), bests: { rally: { v: 444 }, hit: { v: 99 }, speed: { v: 44.9 } },
+  play: { hits: 999999, returns: 88888, chances: 99999, winners: 88888, aces: 88888, smashes: 88888, pointsWon: 88888, pointsLost: 77777, secs: 3599999 } }), 'MMMMMMMMMMMM'];   // a 4,321-1,234 record, 999h 59m, 5-digit counts, a 12-M name
+V['matt-only'] = [prof({ ladder: lad(0), played: 30, matt: matt([1, 1, 0, 0]), bests: { rally: { v: 14 }, hit: { v: 50 }, speed: { v: 21 } }, play: { hits: 600, returns: 380, chances: 450, winners: 40, aces: 6, smashes: 9, pointsWon: 180, pointsLost: 150, secs: 5400 } }), 'bot_basher'];   // never played a person: win rate '-', streak 0
+V['brand-new'] = [prof({ played: 1, human: { wins: 1, losses: 0, streak: 1, bestStreak: 1 }, bests: { rally: { v: 6 }, hit: { v: 30 }, speed: { v: 9 } }, play: { hits: 20, returns: 8, chances: 11, winners: 2, aces: 1, smashes: 0, pointsWon: 11, pointsLost: 7, secs: 40 } }), 'first_win'];   // one match: 100%, '<1m', '1 win vs people'
+for (const [, [p]] of Object.entries(V)) if (p.play && p.play.secs == null) Object.assign(p.play, { secs: p.played * 290, pointsWon: Math.round(p.play.hits * 0.3), pointsLost: Math.round(p.play.hits * 0.25) });   // time and points for every sample (the older ones had none)
 for (const [name, [p, user]] of Object.entries(V)) {
   const d = card.dataOf(p, user), svg = card.svgOf(d), t = Date.now();
   const opts = { font: { fontFiles: card.FONTS, loadSystemFonts: false, defaultFontFamily: card.F[800] } };
   const full = new Resvg(svg, opts).render().asPng(), ms = Date.now() - t;
   fs.writeFileSync(path.join(out, name + '.png'), full);
   fs.writeFileSync(path.join(out, name + '-400.png'), new Resvg(svg, { ...opts, fitTo: { mode: 'width', value: 400 } }).render().asPng());
-  console.log(name.padEnd(14), (full.length / 1024).toFixed(0) + ' KB', ms + ' ms', card.hashOf(d), JSON.stringify(d.big.map(b => b.value)), JSON.stringify(d.chips));
+  console.log(name.padEnd(14), (full.length / 1024).toFixed(0) + ' KB', ms + ' ms', card.hashOf(d), JSON.stringify(d.big.map(b => b.value)), JSON.stringify(d.big.filter(b => b.sub).map(b => b.sub)));
 }

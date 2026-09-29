@@ -12,21 +12,24 @@ const J = o => JSON.stringify(o);
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
 // ---------- the fake /api ----------
-const LABELS = ['Return rate', 'Longest rally', 'Fastest swing', 'Record vs people', 'Best streak', 'Winners'];
-const six = (...v) => LABELS.map((label, i) => ({ label, value: v[i], ...(i === 1 ? { unit: 'hits' } : i === 2 ? { unit: '°/s' } : {}) }));
+const LABELS = [['Win rate vs people', 'Win rate'], ['Time on court', 'On court'], ['Best win streak vs people', 'Best streak'], ['Return rate', 'Returns'], ['Points won', 'Points won'], ['Longest rally', 'Rally', 'hits'], ['Fastest swing', 'Swing', '°/s'], ['Winners', 'Winners'], ['Aces', 'Aces'], ['Smashes', 'Smashes'], ['Tournament titles', 'Titles']];
+// eleven(winRate, record, time, streak, returns, points, rally, swing, winners, aces, smashes, titles): server/api.js publicCard's stats, the share card's eleven (NOTES 145)
+const eleven = (wr, rec, ...v) => LABELS.map(([label, tag, unit], i) => ({ label, tag, value: i ? v[i - 1] : wr, ...(unit ? { unit } : {}),
+  ...(i === 0 ? { note: rec + ' vs people', hero: true } : i === 1 ? { note: 'all modes', hero: true } : i === 2 ? { note: v[1] === '1' ? 'win vs people' : 'wins vs people', hero: true } : {}) }));
+const TAGS = LABELS.map(l => l[1]);
 const NAMES = ['Dan', 'Kiko', 'Rallyqueen', 'Paddlebot', 'Mo', 'Ace_Vega', 'Lobster', 'Zed', 'Pickle_Rick', 'Nova', 'Dinkmaster', 'Juno'];
 const ROWS = NAMES.map((name, i) => ({ rank: i + 1, name, v: 60 - i * 4, tier: i < 8 ? 8 - (i >> 1) : null, div: 1 + (i % 3) }));      // Pickle_Rick .. Juno: never played Ranked
 const card = (name, rank, trophies, matt, stats) => ({ name, rank, trophies, matt, stats });
 const PLAYERS = {
-  Dan: { delay: 300, body: card('Dan', { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, 1180, 'Pro', six('81%', '60', '1570', '42-7', '12', '318')) },
-  Kiko: { body: card('Kiko', { tier: 7, div: 2, label: 'Champion II', pro: null }, 964, 'Tour', six('73%', '56', '1340', '18-9', '5', '140')) },
-  Juno: { body: card('Juno', null, 0, null, six('-', '0', '-', '0-0', '0', '0')) },
-  Pickle_Rick: { body: card('Pickle_Rick', null, 0, 'Rookie', six('59%', '28', '980', '3-4', '2', '41')) },
-  Lobster: { delay: 800, body: card('Lobster', { tier: 5, div: 1, label: 'Diamond I', pro: null }, 610, 'Club', six('64%', '36', '1100', '7-7', '3', '60')) },
-  Nova: { delay: 50, body: card('Nova', null, 0, null, six('50%', '32', '-', '1-1', '1', '12')) },
+  Dan: { delay: 300, body: card('Dan', { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, 1180, 'Pro', eleven('81%', '42-7', '31h 12m', '12', '86%', '58%', '60', '1570', '318', '41', '97', '4')) },
+  Kiko: { body: card('Kiko', { tier: 7, div: 2, label: 'Champion II', pro: null }, 964, 'Tour', eleven('67%', '18-9', '9h 40m', '5', '73%', '54%', '56', '1340', '140', '12', '33', '1')) },
+  Juno: { body: card('Juno', null, 0, null, eleven('-', '0-0', '0m', '0', '-', '-', '0', '-', '0', '0', '0', '0')) },
+  Pickle_Rick: { body: card('Pickle_Rick', null, 0, 'Rookie', eleven('78%', '4,321-1,234', '277h 46m', '1,234', '89%', '53%', '444', '2570', '88,888', '88,888', '88,888', '1,234')) },
+  Lobster: { delay: 800, body: card('Lobster', { tier: 5, div: 1, label: 'Diamond I', pro: null }, 610, 'Club', eleven('50%', '7-7', '4h 2m', '3', '64%', '51%', '36', '1100', '60', '9', '14', '0')) },
+  Nova: { delay: 50, body: card('Nova', null, 0, null, eleven('50%', '1-1', '<1m', '1', '71%', '49%', '32', '-', '12', '2', '3', '0')) },
   Mo: { status: 404 }, Zed: { status: 500 },
 };
-const ZED_OK = card('Zed', { tier: 5, div: 3, label: 'Diamond III', pro: null }, 700, 'Club', six('61%', '40', '1200', '9-8', '3', '77'));
+const ZED_OK = card('Zed', { tier: 5, div: 3, label: 'Diamond III', pro: null }, 700, 'Club', eleven('53%', '9-8', '5h 5m', '3', '61%', '52%', '40', '1200', '77', '8', '19', '0'));
 const API = { signin: true, acct: { username: 'Kiko' }, mePlaces: { listed: true }, statsDelay: 0, zedOk: false, log: [] };      // log: [method, url, body, headers]
 const PLACES = { listed: true, hidden: false, rally: { rank: 2, v: 56 }, trophies: { rank: 2, v: 964 }, streak: { rank: 2, v: 5 } };
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { if (r.writableEnded) return; r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
@@ -72,7 +75,7 @@ const sheet = pg => ev(pg, () => { const c = document.getElementById('lbp-card')
   const vis = e => !!e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none';
   return { open: !!c && !c.hidden && !l.hidden, state: c?.dataset.state, name: g('lbp-name')?.textContent, badge: !!g('lbp-name')?.nextElementSibling?.classList.contains('reg-badge'), rank: g('lbp-rank')?.textContent,
     em: !!g('lbp-em')?.querySelector('.rank-em'), emA11y: [g('lbp-em')?.getAttribute('role'), g('lbp-em')?.getAttribute('aria-label')].join('|'), tro: vis(g('lbp-tro')) ? g('lbp-trophies').textContent : null, mbest: g('lbp-mbest')?.textContent, statsShown: vis(g('lbp-stats')),
-    stats: [...document.querySelectorAll('#lbp-stats .lbp-stat')].map(s => ({ l: s.querySelector('dt').textContent, v: s.querySelector('dd b').textContent, skel: s.classList.contains('is-skel') })),
+    stats: [...document.querySelectorAll('#lbp-stats .lbp-stat')].map(s => ({ l: s.querySelector('dt').textContent, v: s.querySelector('dd b').textContent, skel: s.classList.contains('is-skel'), hero: s.classList.contains('is-hero'), note: s.querySelector('dd.lbp-note')?.textContent ?? null, title: s.querySelector('dt').dataset.tip || s.querySelector('dt').title })),
     msg: vis(g('lbp-msg')) ? g('lbp-msg').textContent : '', retry: vis(g('lbp-retry')), foot: vis(g('lbp-foot')) ? g('lbp-foot').textContent : '',
     inCard: !!c && c.contains(a), focusRow: a?.matches?.('button.lb-row') ? a.dataset.name : null, focusConnected: !!a?.isConnected, view: window.__ui.lobbyView(), path: location.pathname }; });
 
@@ -86,12 +89,13 @@ await toBoard(pg);
   ok(/^1\. Dan, Developer, Pro, 60 hits\. Open profile$/.test(r.dan || '') && r.me === 'Kiko', `the developer's row says so ("${r.dan}"); my row is Kiko's`); }
 await pg.focus(rowSel('Dan')); await pg.keyboard.press('Enter'); await sleep(120);
 let s = await sheet(pg);
-ok(s.open && s.state === 'loading' && s.name === 'Dan' && s.badge && s.stats.length === 6 && s.stats.every(x => x.skel) && s.em && s.rank === 'Pro', `Enter on Dan's row: the sheet opens loading (the row's emblem, the hammer, six skeletons): ${J({ state: s.state, name: s.name, badge: s.badge, rank: s.rank, n: s.stats.length })}`);
+ok(s.open && s.state === 'loading' && s.name === 'Dan' && s.badge && s.stats.length === 11 && s.stats.every(x => x.skel) && s.stats.map(x => x.l).join() === TAGS.join() && s.em && s.rank === 'Pro', `Enter on Dan's row: the sheet opens loading (the row's emblem, the hammer, eleven skeletons under the card's tags): ${J({ state: s.state, name: s.name, badge: s.badge, rank: s.rank, n: s.stats.length })}`);
 { const a = await ev(pg, () => { const c = document.getElementById('lbp-card'); return { role: c.getAttribute('role'), modal: c.getAttribute('aria-modal'), by: document.getElementById(c.getAttribute('aria-labelledby'))?.textContent }; });
   ok(a.role === 'dialog' && a.modal === 'true' && a.by === 'Dan', `a modal dialog labelled by the name (${J(a)})`); }
 await sleep(500); s = await sheet(pg);
-ok(s.state === 'ok' && s.rank === 'Pro #1' && s.em && s.tro === '1,180' && s.mbest === 'Pro Matt' && s.stats.map(x => x.l).join() === LABELS.join() && s.stats.map(x => x.v).join() === '81%,60,1570,42-7,12,318' && !s.foot,
-  `loaded: Pro #1, 1,180 trophies, Pro Matt, the six in card order, no own-row footer (${J({ rank: s.rank, tro: s.tro, mbest: s.mbest, v: s.stats.map(x => x.v) })})`);
+ok(s.state === 'ok' && s.rank === 'Pro #1' && s.em && s.tro === '1,180' && s.mbest === 'Pro Matt' && s.stats.map(x => x.l).join() === TAGS.join() && s.stats.map(x => x.v).join() === '81%,31h 12m,12,86%,58%,60,1570,318,41,97,4' && !s.foot
+  && s.stats.map(x => x.hero).join() === 'true,true,true,false,false,false,false,false,false,false,false' && s.stats.slice(0, 3).map(x => x.note).join('|') === '42-7 vs people|all modes|wins vs people' && s.stats.slice(3).every(x => x.note === null) && s.stats[0].title === 'Win rate vs people',
+  `loaded: Pro #1, 1,180 trophies, Pro Matt, the eleven in card order (three headline tiles with their notes, the long name as the tag's tooltip), no own-row footer (${J({ rank: s.rank, tro: s.tro, mbest: s.mbest, foot: s.foot, stats: s.stats })})`);
 ok(s.inCard, 'focus is inside the sheet');
 { let inside = true; for (let i = 0; i < 4; i++) { await pg.keyboard.press('Tab'); await sleep(60); if (!(await sheet(pg)).inCard) inside = false; }
   await pg.keyboard.down('Shift'); for (let i = 0; i < 3; i++) { await pg.keyboard.press('Tab'); await sleep(60); if (!(await sheet(pg)).inCard) inside = false; } await pg.keyboard.up('Shift');
@@ -124,7 +128,7 @@ ok(s.open && s.state === 'error' && s.msg === 'Couldn’t load this player' && s
 API.zedOk = true; await pg.click('#btn-lbp-retry'); await sleep(80); s = await sheet(pg);
 ok(s.inCard, 'Try again keeps focus in the sheet');
 await sleep(400); s = await sheet(pg);
-ok(s.state === 'ok' && s.rank === 'Diamond III' && s.stats.length === 6 && !s.stats.some(x => x.skel) && !s.retry && !s.msg, `Try again: the card draws (${s.rank}, ${s.stats.map(x => x.v)})`);
+ok(s.state === 'ok' && s.rank === 'Diamond III' && s.stats.length === 11 && !s.stats.some(x => x.skel) && !s.retry && !s.msg, `Try again: the card draws (${s.rank}, ${s.stats.map(x => x.v)})`);
 await pg.keyboard.press('Escape'); await sleep(250); s = await sheet(pg); ok(s.focusRow === 'Zed', `and Esc hands focus back to Zed's row (${s.focusRow})`);
 
 // ---------- 9: a stale answer never draws; a double click opens one sheet ----------
@@ -133,7 +137,7 @@ ok(s.open && s.name === 'Nova' && s.state === 'ok' && s.stats[0].v === '50%', `L
 await pg.keyboard.press('Escape'); await sleep(200);
 await pg.click(rowSel('Juno'), { clickCount: 2 }); await sleep(600); s = await sheet(pg);
 ok(s.open && s.name === 'Juno' && s.state === 'ok', `a double click opens the sheet once and leaves it open (${J({ open: s.open, state: s.state })})`);
-ok(s.rank === 'Not ranked yet' && !s.em && s.emA11y === '|' && s.tro === null && s.mbest === 'None yet' && s.stats.map(x => x.v).join() === '-,0,-,0-0,0,0', `never played Ranked: no emblem, "Not ranked yet", no trophies, the zeros and dashes as the card has them (${J({ rank: s.rank, v: s.stats.map(x => x.v) })})`);
+ok(s.rank === 'Not ranked yet' && !s.em && s.emA11y === '|' && s.tro === null && s.mbest === 'None yet' && s.stats.map(x => x.v).join() === '-,0m,0,-,-,0,-,0,0,0,0' && s.stats[0].note === '0-0 vs people', `never played Ranked: no emblem, "Not ranked yet", no trophies, the zeros and dashes as the card has them (${J({ rank: s.rank, v: s.stats.map(x => x.v) })})`);
 await pg.keyboard.press('Escape'); await sleep(250); s = await sheet(pg); ok(!s.open && s.focusRow === 'Juno', `Esc after the double click: focus on Juno's row (${s.focusRow})`);
 
 // ---------- 16: MATCH FOUND closes the sheet (main.js rkMove) ----------
@@ -166,8 +170,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [390, 844]]) {
   await ev(pg, n => [...document.querySelectorAll('button.lb-row')].find(b => b.dataset.name === n).click(), 'Pickle_Rick'); await sleep(600);
   const r = await ev(pg, () => { const c = document.getElementById('lbp-card'), b = c.getBoundingClientRect();
     return { in: b.left >= -0.5 && b.top >= -0.5 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5, wide: [...c.querySelectorAll('*')].filter(e => { const q = e.getBoundingClientRect(); return q.width && (q.left < b.left - 1 || q.right > b.right + 1); }).map(e => e.id || e.className.baseVal || e.className).slice(0, 4),
-      side: document.documentElement.scrollWidth > innerWidth, name: document.getElementById('lbp-name').textContent, state: c.dataset.state }; });
-  ok(r.in && !r.wide.length && !r.side && r.name === 'Pickle_Rick' && r.state === 'ok', `${w}x${h}: the sheet is inside the window, nothing pokes out, no sideways scroll (${J(r)})`);
+      side: document.documentElement.scrollWidth > innerWidth, name: document.getElementById('lbp-name').textContent, state: c.dataset.state,
+      clipped: [...c.querySelectorAll('.lbp-stat dd, .lbp-stat dt')].filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > e.closest('.lbp-stat').getBoundingClientRect().right + 0.5).map(e => e.textContent) }; });
+  ok(r.in && !r.wide.length && !r.side && !r.clipped.length && r.name === 'Pickle_Rick' && r.state === 'ok', `${w}x${h}: the sheet is inside the window, nothing pokes out, no sideways scroll, the widest figures ('277h 46m', '4,321-1,234 vs people', '88,888') uncut (${J(r)})`);
   await pg.close(); }
 
 // ---------- 14: reduced motion: no lift on hover, nothing breaks ----------

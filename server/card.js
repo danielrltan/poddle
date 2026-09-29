@@ -5,7 +5,7 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 8;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 9;                                                // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
@@ -46,28 +46,34 @@ function rankOf(p) {
 const mattOf = p => rows(p).map(beaten).lastIndexOf(true);      // the toughest Matt beaten, in difficulty order (0 Rookie .. 3 Pro), -1 for none
 
 // dataOf(profile, username, play?) -> exactly what the card draws (the hash is taken over this object). play: defaults to profile.play
-// (db.profileOf; the tests pass their own). Every card draws the same six figures (zeros too).
+// (db.profileOf; the tests pass their own). Every card draws the same eleven figures, in the same places, zeros included.
+const clock = s => s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m` : s ? '<1m' : '0m';   // web/profile.js clock: Your stats' "On court"
 function dataOf(p, username, play) {
   p = p && typeof p === 'object' ? p : {};
   const P = play && typeof play === 'object' ? play : p.play && typeof p.play === 'object' ? p.play : {};
   const Hm = p.human && typeof p.human === 'object' ? p.human : {}, B = p.bests && typeof p.bests === 'object' ? p.bests : {};
   const best = k => B[k] && typeof B[k] === 'object' && Number.isFinite(B[k].v) && B[k].v > 0 ? B[k].v : 0;
-  const rank = rankOf(p), w = num(Hm.wins), l = num(Hm.losses), streak = Math.max(num(Hm.bestStreak), ...rows(p).map(r => num(r.bestStreak)));
+  const rank = rankOf(p), w = num(Hm.wins), l = num(Hm.losses), streak = num(Hm.bestStreak);   // people only (kinds human + tour, db.js HUMAN): the global leaderboard's Win streak board, so the card and the board agree. Matt games are the badge's
   const chances = num(P.chances), returns = Math.min(num(P.returns), chances), rally = Math.round(best('rally')), speed = best('speed') ? degs(best('speed')) : 0;
-  const titles = num(p.titles), aces = num(P.aces), winners = num(P.winners), smashes = num(P.smashes), played = num(p.played);
-  // The SAME six figures on every card, in the same places, zeros included (the owner: no selective stats, so cards compare at a glance).
-  // label: the long name (share.js words the og tags from it); tag + cap: what the tile draws. '-' only where there is no data at all
-  // (no chance to return a ball yet, no measured swing), never for a real zero.
-  const rate = chances ? Math.round(100 * returns / chances) : null;
+  const pw = num(P.pointsWon), pl = num(P.pointsLost), titles = num(p.titles), secs = num(P.secs);
+  const n3 = v => v.toLocaleString('en-US');   // 1,200 as Your stats shows counts
+  const pct = (a, n) => n ? Math.round(100 * a / n) + '%' : '-';   // '-' only where there is nothing to divide yet, never for a real 0%
+  // The SAME figures on every card, in the same places, zeros included (the owner: no selective stats, so cards compare at a glance).
+  // hero: the three drawn big, each with its sub line; the rest are the detail grid. label: the long name (share.js words the og tags
+  // from it, api.js playerRoute sends it); tag: the tile's short caps; cap: a short unit after the figure.
   const all = [
-    { label: 'Return rate', tag: 'Returns', value: rate == null ? '-' : rate + '%', bar: rate == null ? 0 : rate },
+    { label: 'Win rate vs people', tag: 'Win rate', value: pct(w, w + l), sub: `${n3(w)}-${n3(l)} vs people`, hero: true },
+    { label: 'Time on court', tag: 'On court', value: clock(secs), sub: 'all modes', hero: true },   // every counted match of every kind (people, Matt, tournaments): what Your stats' "On court" adds up
+    { label: 'Best win streak vs people', tag: 'Best streak', value: n3(streak), sub: streak === 1 ? 'win vs people' : 'wins vs people', hero: true },
+    { label: 'Return rate', tag: 'Returns', value: pct(returns, chances) },
+    { label: 'Points won', tag: 'Points won', value: pct(pw, pw + pl) },
     { label: 'Longest rally', tag: 'Rally', value: String(rally), cap: 'hits' },
     { label: 'Fastest swing', tag: 'Swing', value: speed ? String(speed) : '-', cap: '°/s' },
-    { label: 'Record vs people', tag: 'Vs people', value: `${w}-${l}` },
-    { label: 'Best streak', tag: 'Best streak', value: String(streak) },
-    { label: 'Winners', tag: 'Winners', value: String(winners) },
+    { label: 'Winners', tag: 'Winners', value: n3(num(P.winners)) },
+    { label: 'Aces', tag: 'Aces', value: n3(num(P.aces)) },
+    { label: 'Smashes', tag: 'Smashes', value: n3(num(P.smashes)) },
+    { label: 'Tournament titles', tag: 'Titles', value: n3(titles) },
   ];
-  void titles; void aces; void smashes; void played;               // on Your stats, not on the card: six fixed figures fit the panel legibly
   const top = mattOf(p);
   const E = emblems();
   return { v: CARD_V, em: E ? E.v : null, name: username || 'Poddle player', guest: !username, rank: rank.name, tier: rank.tier, div: rank.div, pro: rank.pro, trophies: rank.trophies,
@@ -169,24 +175,44 @@ ${E ? E.defs : ''}
     out.push(`<circle cx="${r2(x0 + 34)}" cy="${ly + 32}" r="24" fill="${lv[0]}" stroke="${lv[1]}" stroke-width="3"/><g transform="translate(${r2(x0 + 34 - 15)} ${ly + 16}) scale(1.25)" fill="#ffffff">${MATT}</g>`);
     out.push(text(x0 + 70, ly + 32 + fs * 0.36, s, { size: fs, wt: 900, fill: lv[1] }));
   }
-  // right: the panel with the name, the big figures, the chips and the call to action
+  // right: the panel with the name, the three headline figures, the detail grid and the call to action
   const px = 388, py = 36, pw = 776, ph = 558, x0 = px + 36, iw = pw - 72;
   out.push(`<rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="40" fill="url(#panel)" stroke="#ffffff" stroke-width="4" filter="url(#sh)"/>`);
-  out.push(text(x0, py + 52, 'PLAYER CARD', { size: 24, wt: 800, fill: ink, ls: 4 }));
-  if (d.guest) out.push(text(x0, py + 122, d.name, { size: 56, wt: 900, fill: '#65717b' }));   // no username: the generic words stay small and grey, the stats are the hero
-  else out.push(text(x0, py + 124, d.name, { size: fit(d.name, 900, 78, iw), wt: 900, fill: '#39434d' }));   // its descenders (p, g, y) clear the tiles at py + 150
-  // six equal tiles, two rows of three, the same on every card; the call to action on the panel's floor
-  const gap = 16, cols = 3, tw1 = (iw - gap * (cols - 1)) / cols, pad = 20, bh = 94, by = py + ph - 34 - bh, ty = py + 150, th = (by - 20 - ty - gap) / 2;
-  const vs = Math.min(...d.big.map(b => fit(b.value, 900, 58, tw1 - 2 * pad - (b.cap ? measure(b.cap, 800, 26) + 8 : 0))), 58);   // one figure size for all six: they read as a set
-  d.big.forEach((b, i) => {
-    const x = x0 + (i % cols) * (tw1 + gap), y = ty + Math.floor(i / cols) * (th + gap), lab = (b.tag || b.label).toUpperCase(), fy = y + th - 30;
-    out.push(`<rect x="${r2(x)}" y="${r2(y)}" width="${r2(tw1)}" height="${r2(th)}" rx="24" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
-    out.push(text(x + pad, y + 38, lab, { size: fit(lab, 800, 26, tw1 - 2 * pad, 1.5), wt: 800, fill: '#65717b', ls: 1.5 }));
-    out.push(text(x + pad, fy, b.value, { size: vs, wt: 900, fill: '#1b63b8' }));
-    if (b.bar != null) { const bw = tw1 - 2 * pad, f = Math.max(0, Math.min(1, b.bar / 100));
-      out.push(`<rect x="${r2(x + pad)}" y="${r2(y + th - 20)}" width="${r2(bw)}" height="8" rx="4" fill="#cfe3ef"/>` + (f ? `<rect x="${r2(x + pad)}" y="${r2(y + th - 20)}" width="${r2(Math.max(8, bw * f))}" height="8" rx="4" fill="url(#bar)"/>` : '')); }
-    else if (b.cap) out.push(text(x + pad + measure(b.value, 900, vs) + 8, fy, b.cap, { size: 26, wt: 800, fill: '#1b63b8' }));   // short units only (hits, °/s): a long caption would shrink all six figures
+  out.push(text(x0, py + 44, 'PLAYER CARD', { size: 24, wt: 800, fill: ink, ls: 4 }));
+  if (d.guest) out.push(text(x0, py + 100, d.name, { size: 50, wt: 900, fill: '#65717b' }));   // no username: the generic words stay small and grey, the stats are the hero
+  else out.push(text(x0, py + 102, d.name, { size: fit(d.name, 900, 62, iw), wt: 900, fill: '#39434d' }));   // its descenders (p, g, y) clear the headline tiles at py + 122
+  const hero = d.big.filter(b => b.hero), rest = d.big.filter(b => !b.hero);
+  // a figure is drawn in runs: digits (and a record's dash) at the full size, units and letters (% h m) at half, then the unit caption.
+  // No data at all ('-') is drawn as an en dash with no unit
+  const runs = s => String(s) === '-' ? ['–'] : String(s).match(/\d[\d,-]*|[^\d]+/g) || [''];
+  const uk = s => s >= 50 ? 0.52 : 0.6, small = (r, s) => r === '–' || /^\d/.test(r) ? s : Math.round(s * uk(s));   // the detail's units a touch bigger: they must stay readable at 400 px
+  const widthOf = (b, s) => runs(b.value).reduce((a, r) => a + measure(r, 900, small(r, s)), 0) + (b.cap && b.value !== '-' ? 6 + measure(b.cap, 800, Math.round(s * uk(s))) : 0);
+  const figure = (x, y, b, s, fill) => { let o = '', cx2 = x; for (const r of runs(b.value)) { const z = small(r, s); o += text(cx2, y, r, { size: z, wt: 900, fill: r === '–' ? '#9aa7b0' : fill }); cx2 += measure(r, 900, z); }   // no data: a grey en dash
+    if (b.cap && b.value !== '-') o += text(cx2 + 6, y, b.cap, { size: Math.round(s * uk(s)), wt: 800, fill }); return o; };
+  const sizeFor = (list, s, max) => Math.min(s, ...list.map(b => Math.floor(s * max / Math.max(1, widthOf(b, s)))));   // one size per tier: each set reads as a set
+  // the headline: three tiles, the same three on every card
+  const gap = 14, ty = py + 122, th = 124, hw = (iw - gap * 2) / 3, pad = 20;
+  const hs = sizeFor(hero, 66, hw - 2 * pad), hl = Math.min(...hero.map(b => fit((b.tag || b.label).toUpperCase(), 800, 24, hw - 2 * pad, 1.5)));   // the labels: one size too; each sub line fits its own tile
+  hero.forEach((b, i) => {
+    const x = x0 + i * (hw + gap), lab = (b.tag || b.label).toUpperCase();
+    out.push(`<rect x="${r2(x)}" y="${ty}" width="${r2(hw)}" height="${th}" rx="26" fill="#ffffff" stroke="#bfe3f6" stroke-width="3"/>`);
+    out.push(`<rect x="${r2(x + 3)}" y="${ty + 3}" width="${r2(hw - 6)}" height="${th - 6}" rx="23" fill="url(#tile)" opacity=".55"/>`);
+    out.push(text(x + pad, ty + 33, lab, { size: hl, wt: 800, fill: '#65717b', ls: 1.5 }));
+    out.push(figure(x + pad, ty + 88, b, hs, '#1b63b8'));
+    out.push(text(x + pad, ty + 111, b.sub || '', { size: fit(b.sub || '', 800, 22, hw - 2 * pad), wt: 800, fill: '#65717b' }));
   });
+  // the detail: one well, four across, two rows, hairlines between
+  const cols = 4, dy = ty + th + 10, by = py + ph - 34 - 94, dh = by - 10 - dy, rh = dh / 2, cw = iw / cols, cp = 14;
+  out.push(`<rect x="${x0}" y="${r2(dy)}" width="${iw}" height="${r2(dh)}" rx="22" fill="url(#tile)" stroke="#d6f0fa" stroke-width="2"/>`);
+  for (let c = 1; c < cols; c++) out.push(`<rect x="${r2(x0 + c * cw - 1)}" y="${r2(dy + 14)}" width="2" height="${r2(dh - 28)}" rx="1" fill="#cfe3ef"/>`);
+  out.push(`<rect x="${r2(x0 + 14)}" y="${r2(dy + rh - 1)}" width="${iw - 28}" height="2" rx="1" fill="#cfe3ef"/>`);
+  const ds = sizeFor(rest, 36, cw - 2 * cp), dl = Math.min(...rest.map(b => fit((b.tag || b.label).toUpperCase(), 800, 22, cw - 2 * cp, 0.6)));
+  rest.forEach((b, i) => {
+    const x = x0 + (i % cols) * cw + cp, y = dy + Math.floor(i / cols) * rh, lab = (b.tag || b.label).toUpperCase();
+    out.push(text(x, y + 29, lab, { size: dl, wt: 800, fill: '#65717b', ls: 0.6 }));
+    out.push(figure(x, y + rh - 13, b, ds, '#1b63b8'));
+  });
+  const bh = 94;
   out.push(`<rect x="${x0}" y="${by}" width="${iw}" height="${bh}" rx="32" fill="url(#cta)" stroke="#0e3f8c" stroke-opacity=".22" stroke-width="2"/>`);
   out.push(`<rect x="${x0 + 14}" y="${by + 6}" width="${iw - 28}" height="${bh / 2 - 8}" rx="${bh / 2 - 12}" fill="#ffffff" opacity=".14"/>`);
   out.push(ball(x0 + 48, by + bh / 2, 30));

@@ -32,14 +32,17 @@ const STATES = {      // the You card's states (web/profile.js drawYou)
 };
 let STATE = STATES.guest;
 // the leaderboard profile (NOTES 140): GET /api/leaderboard/player?u=<name> as server/api.js publicCard answers it. status: 404 / 500; delay: ms before the answer
-const six = (ret, rally, swing, rec, streak, win) => [['Return rate', ret], ['Longest rally', rally, 'hits'], ['Fastest swing', swing, '°/s'], ['Record vs people', rec], ['Best streak', streak], ['Winners', win]].map(([label, value, unit]) => ({ label, value, ...(unit ? { unit } : {}) }));
+const LABELS = [['Win rate vs people', 'Win rate'], ['Time on court', 'On court'], ['Best win streak vs people', 'Best streak'], ['Return rate', 'Returns'], ['Points won', 'Points won'], ['Longest rally', 'Rally', 'hits'], ['Fastest swing', 'Swing', '°/s'], ['Winners', 'Winners'], ['Aces', 'Aces'], ['Smashes', 'Smashes'], ['Tournament titles', 'Titles']];
+// eleven(winRate, record, time, streak, returns, points, rally, swing, winners, aces, smashes, titles): server/api.js publicCard's stats, the share card's eleven (NOTES 145)
+const eleven = (wr, rec, ...v) => LABELS.map(([label, tag, unit], i) => ({ label, tag, value: i ? v[i - 1] : wr, ...(unit ? { unit } : {}),
+  ...(i === 0 ? { note: rec + ' vs people', hero: true } : i === 1 ? { note: 'all modes', hero: true } : i === 2 ? { note: v[1] === '1' ? 'win vs people' : 'wins vs people', hero: true } : {}) }));
 const PLAYERS = {
-  Dan: { body: { name: 'Dan', rank: { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, trophies: 1180, matt: 'Pro', stats: six('81%', '60', '1570', '42-7', '12', '318') } },
-  Kiko: { body: { name: 'Kiko', rank: { tier: 7, div: 2, label: 'Champion II', pro: null }, trophies: 964, matt: 'Tour', stats: six('73%', '56', '1340', '18-9', '5', '140') } },
-  Rallyqueen: { body: { name: 'Rallyqueen', rank: { tier: 7, div: 1, label: 'Champion I', pro: null }, trophies: 912, matt: 'Club', stats: six('68%', '52', '1210', '11-6', '4', '97') } },
-  Pickle_Rick: { body: { name: 'Pickle_Rick', rank: null, trophies: 0, matt: 'Rookie', stats: six('59%', '28', '980', '3-4', '2', '41') } },
-  Juno: { body: { name: 'Juno', rank: null, trophies: 0, matt: null, stats: six('-', '0', '-', '0-0', '0', '0') } },
-  Mo: { status: 404 }, Zed: { status: 500 }, Lobster: { delay: 5000, body: { name: 'Lobster', rank: { tier: 5, div: 1, label: 'Diamond I', pro: null }, trophies: 610, matt: 'Club', stats: six('64%', '36', '1100', '7-7', '3', '60') } },
+  Dan: { body: { name: 'Dan', rank: { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, trophies: 1180, matt: 'Pro', stats: eleven('81%', '42-7', '31h 12m', '12', '86%', '58%', '60', '1570', '318', '41', '97', '4') } },
+  Kiko: { body: { name: 'Kiko', rank: { tier: 7, div: 2, label: 'Champion II', pro: null }, trophies: 964, matt: 'Tour', stats: eleven('67%', '18-9', '9h 40m', '5', '73%', '54%', '56', '1340', '140', '12', '33', '1') } },
+  Rallyqueen: { body: { name: 'Rallyqueen', rank: { tier: 7, div: 1, label: 'Champion I', pro: null }, trophies: 912, matt: 'Club', stats: eleven('65%', '11-6', '6h 18m', '4', '68%', '53%', '52', '1210', '97', '15', '21', '2') } },
+  Pickle_Rick: { body: { name: 'Pickle_Rick', rank: null, trophies: 0, matt: 'Rookie', stats: eleven('78%', '4,321-1,234', '277h 46m', '1,234', '89%', '53%', '444', '2570', '88,888', '88,888', '88,888', '1,234') } },
+  Juno: { body: { name: 'Juno', rank: null, trophies: 0, matt: null, stats: eleven('-', '0-0', '0m', '0', '-', '-', '0', '-', '0', '0', '0', '0') } },
+  Mo: { status: 404 }, Zed: { status: 500 }, Lobster: { delay: 5000, body: { name: 'Lobster', rank: { tier: 5, div: 1, label: 'Diamond I', pro: null }, trophies: 610, matt: 'Club', stats: eleven('50%', '7-7', '4h 2m', '3', '64%', '51%', '36', '1100', '60', '9', '14', '0') } },
 };
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   if (u === '/api/me') return send(200, { db: true, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: STATE.acct });

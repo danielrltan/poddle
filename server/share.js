@@ -55,14 +55,21 @@ function allowRender(req) {                                      // -> { wait (s
   b.n++; return { wait: 0, b };
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// the card's figures as words (og:description, the alt texts): '-' is "none yet" in the alt and left out of the description (the picture shows a dash)
+const fig = (d, label) => d.big.find(b => b.label === label) || { value: '-' };
+const spokenTime = v => { const m = /^(?:(\d+)h )?(\d+)m$/.exec(v), u = (n, w) => `${n} ${w}${n === '1' ? '' : 's'}`; return v === '<1m' ? 'under a minute' : !m ? v : m[1] ? `${u(m[1], 'hour')} ${u(m[2], 'minute')}` : u(m[2], 'minute'); };   // clock()'s "11h 6m" read aloud
 function blurb(d) {                                              // og:description: the same figures for everyone (no picking the flattering ones), then where to play
-  const f = k => d.big.find(b => b.label === k) || { value: '-' };
-  const v = (k, s) => (f(k).value === '-' ? null : s(f(k).value));   // no data yet: left out of the sentence (the picture shows '-')
-  const bits = [`${d.rank} rank`, v('Return rate', x => `${x} return rate`), v('Longest rally', x => `${x}-hit rally`), v('Record vs people', x => `${x} vs people`), d.matt ? `beat ${d.matt} Matt (the bot)` : null].filter(Boolean);
+  const v = (k, s) => (fig(d, k).value === '-' ? null : s(fig(d, k).value, fig(d, k)));
+  const bits = [`${d.rank} rank`, v('Win rate vs people', (x, b) => `${x} win rate vs people (${String(b.sub || '').replace(/ vs people$/, '')})`), v('Time on court', x => `${x} on court`),
+    v('Best win streak vs people', x => `best win streak ${x} vs people`), v('Longest rally', x => `${x}-hit rally`), v('Return rate', x => `${x} return rate`), d.matt ? `beat ${d.matt} Matt (the bot)` : null].filter(Boolean);
   return bits.join(' · ') + '. Pickleball with your phone as the paddle. Play free at poddleball.com';   // what the game is: most people who see the preview never open the page
 }
+function said(b) {                                               // one figure for a screen reader: "win rate vs people 72% (31-12)", "time on court 11 hours 6 minutes in all modes"
+  const v = b.value === '-' ? 'none yet' : b.label === 'Time on court' ? spokenTime(b.value) : b.value + (b.cap === '°/s' ? ' degrees a second' : b.cap ? ' ' + b.cap : '');
+  return `${b.label.toLowerCase()} ${v}${b.label === 'Win rate vs people' && b.sub ? ` (${b.sub.replace(/ vs people$/, '')})` : b.label === 'Time on court' ? ' in all modes' : ''}`;
+}
 function html(d, url, image, img) {
-  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, d.trophies ? `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}` : '', ...d.big.map(b => `${b.label.toLowerCase()} ${b.value}${b.label === 'Fastest swing' ? ' degrees a second' : ''}`), d.matt ? `beat the ${d.matt} bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
+  const title = d.guest ? 'A player on Poddle' : `${d.name} on Poddle`, desc = blurb(d), alt = `${d.guest ? 'A Poddle player card' : `${d.name}'s Poddle player card`}: ${[`${d.rank} rank`, d.trophies ? `${d.trophies} ${d.trophies === 1 ? 'trophy' : 'trophies'}` : '', ...d.big.map(said), d.matt ? `beat the ${d.matt} bot` : ''].filter(Boolean).join(', ')}`;   // what a screen reader hears in place of the picture
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
