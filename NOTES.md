@@ -2711,3 +2711,33 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
 - A filled gold trophy (svg .cup-ic, aria-label "trophies") stands for the word: after the number on the leaderboard's
   Trophies board (rows and the You card) and on Your stats' rank line ("240 [cup] · 10 to Silver III", was an outline
   cup before the number and the word). The Ranked view's big count and the match-end trophy roll still say "trophies".
+## 137. The username Dan plays as its own character: plain white, glowing orange eyes, an orange headband
+- The owner's ask: the developer's account (registered username Dan) always plays as a fixed character, overriding the
+  side's shirt, skin and hair: an all-white figure (body, head, hands, shorts, shoes: 0xf0f0f0, off-white so the park sun
+  does not clip it), no hair, the default eye shape lit from inside in orange (a near-black base with an orange emissive,
+  so it glows the same in sun and floodlight and never washes to yellow), and an orange headband around the forehead
+  (an open cone cut to the head sphere, above the eyes) tied at the back with a knot and two short tails.
+- TEMPORARY, until cosmetics exist. Everything lives in web/scene.js `LOOKS` / `LOOK_NAMES` / `lookFor(name, reg)` under a
+  "named looks" comment. To remove it: empty LOOKS (or drop the `dan` entry). To turn it into cosmetics: have the server
+  send each seat's look id beside `names` / `reg`, and feed that to `scene.setLooks` in main.js `dressSeats()` instead of
+  `lookFor`; buildAvatar's `danFace` parts are the pattern for more.
+- How it works: main.js `dressSeats()` runs whenever names or regs change (welcome, `names`, leaving a court) and calls
+  `scene.setLooks([look0, look1])`; `paint(pd, matt)` composes Matt, the named look and the default and resets every
+  part both ways. Shorts and shoes got their own material (`kit`, was the eyes' `dark`). `ghostify` now lerps each
+  material's own emissive toward the paused grey instead of setting every emissive to 0.3 k (the old code zeroed any
+  glow; every existing pad material has a black emissive, so nothing else changes).
+- Edge cases, decided without asking:
+  - Only a REGISTERED username counts (`reg === true`, any case). A guest who types "Dan" gets the normal look. Usernames
+    are unique and confusable-folded on the server, so only the owner's account can carry it (the same rule as ui.js
+    DEV_NAMES and the hammer badge).
+  - Matt's seat never takes a named look; the menu's attract rally is nobody's (it comes back when the rally stops).
+  - Everyone sees it: the opponent, spectators, every view (broadcast, split, pov, free), both venues, Ranked and
+    tournament courts. Dan's own POV shows it at the usual see-through SELF_A, and Show player model off hides it as before.
+  - Paused / calibrating / reconnecting: the usual pale ghost; the eyes' glow fades to the same grey as everything else.
+  - Signing in mid-court: the seat's name becomes the username at the next join, so the look appears then (as the badge
+    does). Renaming the username away from Dan drops the look.
+  - Legal: nothing new is sent, stored or shown beyond the already public username; the look is computed on each
+    client. No change to privacy.html / terms.html; CLAUDE.md's data-flow line notes it.
+- Tests: test/scene-next.mjs "named look: Dan" (colours, hair and eyes hidden, glow intact after ghostify, Matt unchanged,
+  setLooks([null, null]) restores, attract rally, lookFor cases) and a front / back / Matt render
+  (test/ui-shots/scene-next/dan-front-back-and-matt-1280x720.png). scene-preview.html takes `&dan=0|1`.

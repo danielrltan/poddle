@@ -46,7 +46,8 @@ Important changes also need a notice on the home page. Open questions for the op
 - Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
   (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a hammer badge
-  (tooltip "Developer"). In Ranked courts the rank emblem (the rank's tier and division only, never trophies or record) beside a
+  (tooltip "Developer") and always plays as its own fixed character (scene.js LOOKS, NOTES 137: derived from the public
+  username on the client, nothing new sent or stored). In Ranked courts the rank emblem (the rank's tier and division only, never trophies or record) beside a
   name, to the opponent and spectators (VS card, scoreboard, result card). The global leaderboard (NOTES 126; GET /api/leaderboard, public, no sign-in): the top 100 of three boards (Ranked
   trophies, best rally, best win streak vs people), each row place + username + value + rank emblem (tier/div), accounts WITH a
   username only, never guests, never an owner id; accounts.lb_hidden = 1 (Show me on the global leaderboard off) takes a name off

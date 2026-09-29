@@ -155,6 +155,28 @@ console.log('Matt + hiss');
       const i = window.__ramps.findIndex(r => r[0] === 'set' && r[1] === 5200); out[spin] = i < 0 ? null : window.__ramps.slice(i).find(r => r[0] === 'ramp' && r[1] < 1)[1]; } return out; });
   ok(hiss[0] === null && hiss[0.1] === null && hiss[0.13] > 0 && Math.abs(hiss[0.5] - 0.0707) < 0.001 && Math.abs(hiss[0.8] - 0.1431) < 0.001 && Math.abs(hiss[1] - 0.2) < 1e-9, `hiss gain by spin: ${JSON.stringify(hiss)}`); await page.close(); }
 
+// ---------- 6b. the username Dan's named look (NOTES 137) ----------
+console.log('named look: Dan');
+{ const page = await open('spectate=1&view=free&matt=1&dan=0&t=2.5', 1280, 720); await settle(page);
+  await page.evaluate(() => { const d = __scene._dbg, R = d.renderer, c = d.camera; R.setScissorTest(true);           // Dan (front and back) beside Matt
+    [[0, 1], [0, -1], [1, 1]].forEach(([i, f], k) => { const a = d.pads[i].avatar.position, s = (i ? -1 : 1) * f; c.position.set(a.x + 0.6 * s, 2.1, a.z - 2.4 * s); c.lookAt(a.x, 1.75, a.z); c.fov = 38; c.aspect = 427 / 720; c.updateProjectionMatrix();
+      R.setViewport(k * 427, 0, 427, 720); R.setScissor(k * 427, 0, 427, 720); R.render(d.scene, c); }); R.setScissorTest(false); R.setViewport(0, 0, 1280, 720); });
+  await page.screenshot({ path: `${shots}dan-front-back-and-matt-1280x720.png` });
+  const read = () => page.evaluate(() => __scene._dbg.pads.map(p => { const u = p.avatar.userData, glow = u.danFace[0].material;
+    return { skin: u.skin.color.getHex(), shirt: u.shirt.color.getHex(), kit: u.kit.color.getHex(), hand: p.handM.color.getHex(), hair: u.hair.visible, eyes: u.eyes[0].visible, dan: u.danFace.every(o => o.visible), matt: u.mattFace[0].visible, glow: glow.emissive.getHex() }; }));
+  let c = await read();
+  ok(c[0].dan && !c[0].hair && !c[0].eyes && c[0].skin === 0xf0f0f0 && c[0].shirt === 0xf0f0f0 && c[0].kit === 0xf0f0f0 && c[0].hand === 0xf0f0f0 && c[0].glow === 0xff6f12, `Dan: all white, no hair, the default eyes swapped for glowing orange ones and the headband (${JSON.stringify(c[0])})`);
+  ok(c[1].matt && !c[1].dan && c[1].skin === 0x6b4226, 'Matt opposite keeps his own look');
+  c = await page.evaluate(() => { const sc = __scene; sc.setLooks(['dan', 'dan']); return { mattDan: sc._dbg.pads[1].avatar.userData.danFace[0].visible }; });
+  ok(!c.mattDan, "Matt's seat never takes a named look");
+  c = await page.evaluate(() => { const sc = __scene, pd = sc._dbg.pads[0]; sc.setLooks([null, null]); const u = pd.avatar.userData; return { hair: u.hair.visible, eyes: u.eyes[0].visible, dan: u.danFace.some(o => o.visible), skin: u.skin.color.getHex(), shirt: u.shirt.color.getHex(), kit: u.kit.color.getHex() }; });
+  ok(c.hair && c.eyes && !c.dan && c.skin === 0xf2c9a0 && c.shirt === 0xe5484d && c.kit === 0x20222c, 'setLooks([null, null]) gives the seat back its default look');
+  c = await page.evaluate(() => { const sc = __scene; sc.setLooks(['dan', null]); sc.startAttract(); const u = sc._dbg.pads[0].avatar.userData, a = u.danFace[0].visible; sc.stopAttract(); return { attract: a, after: u.danFace[0].visible }; });
+  ok(!c.attract && c.after, 'the attract rally is nobody: no named look there, and it comes back when the rally stops');
+  c = await page.evaluate(async () => { const { lookFor } = await import('../web/scene.js'); return [lookFor('Dan', true), lookFor(' dAN ', true), lookFor('Dan', false), lookFor('Dan', undefined), lookFor('Danny', true), lookFor(null, true)]; });
+  ok(JSON.stringify(c) === '["dan","dan",null,null,null,null]', `lookFor: only the registered username Dan (any case); a guest called Dan, Danny or an empty seat get none (${JSON.stringify(c)})`);
+  await page.close(); }
+
 // ---------- 7. ball contrast, both ends (WCAG relative luminance, (L1 + 0.05) / (L2 + 0.05), mean over the ball's disc vs the same pixels without it) ----------
 console.log('ball contrast');
 { let worst = { old: 99, now: 99 }, where = {};

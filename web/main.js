@@ -1,6 +1,6 @@
 // Glue: AirPod bridge -> MotionModel -> scene + game server.
 import { MotionModel, qrot } from './motion.js';
-import { createScene, shownN } from './scene.js';
+import { createScene, shownN, lookFor } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
 import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
@@ -137,6 +137,7 @@ const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'Press B to play Ma
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].replace(BADGE_OUT, '').slice(0, 24) || null : null);      // untrusted text: ui.js writes it with textContent only
 const cleanRegs = a => [0, 1].map(i => Array.isArray(a) && a[i] === true);      // only a literal true draws a badge (an old server sends none)
+const dressSeats = () => scene.setLooks?.([0, 1].map(i => lookFor(names[i], regs[i])));      // a registered username with its own character (scene.js LOOKS, NOTES 137): whenever names or regs change
 const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r }; return Number.isInteger(o.tier) && o.tier >= 1 && o.tier <= 8 ? { tier: o.tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // { tier 1..8 (server/ladder.js TIERS: Master since NOTES 124), div 1..3 } or nothing (a bare tier reads as division I)
 const cleanRanks = a => [0, 1].map(i => Array.isArray(a) ? rankRef(a[i]) : null);      // only a rank draws an emblem (a plain court sends [null, null] or nothing)
 // Who is on the scoreboard. A player reads 'You' on the left and the other seat on the right; a spectator reads side 0 on the
@@ -469,7 +470,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
-  const parked = rkRes; rkRes = null; rkWalk = false; clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();      // parked: a series result still waiting for its card behind a set-up screen: it becomes the Ranked view's line below
+  const parked = rkRes; rkRes = null; rkWalk = false; clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();      // parked: a series result still waiting for its card behind a set-up screen: it becomes the Ranked view's line below
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true });
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
@@ -688,7 +689,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
   if (m.type === 'welcome') {
-    ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); ranks = cleanRanks(m.rank); holding = false;
+    ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); ranks = cleanRanks(m.rank); holding = false; dressSeats();
     if (m.series && typeof m.series === 'object') rkSeries = { bestOf: Math.max(1, m.series.bestOf | 0) || 3, game: Math.max(1, m.series.game | 0), games: Array.isArray(m.series.games) ? [m.series.games[0] | 0, m.series.games[1] | 0] : [0, 0], done: false };      // a Ranked series (docs/RANKED.md 9): where it stands (a reconnect lands mid-series)
     drawSeries(); ui.setPressure?.(null);
     setVenue(m.venue === 'stadium' ? 'stadium' : 'park');      // the court's venue: the stadium for Ranked, the park for everything else
@@ -705,7 +706,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     return;
   }
   if (m.type === 'names') {
-    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); if (Array.isArray(m.rank)) ranks = cleanRanks(m.rank); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
+    const was = names, bot = n => n == null || n === 'Matt'; names = cleanNames(m.names); regs = cleanRegs(m.reg); dressSeats(); if (Array.isArray(m.rank)) ranks = cleanRanks(m.rank); if ([0, 1].some(i => bot(names[i]) !== bot(was[i]))) { struck = false; if (spec()) ui.askPlay(null); } drawNames(); showView(); askSync();      // a seat changed hands: a fresh match (and a 'refused' Ask to play may be askable again)
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }

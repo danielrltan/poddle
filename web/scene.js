@@ -78,7 +78,7 @@ const COL = {
   grass: 0x4f9a4a, apron: 0x2e7d56, court: 0x2a66b3, kitchen: 0xe0813f, line: 0xffffff,
   screen: 0x17513a, skin: 0xf2c9a0,
   matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a Black man in an orange shirt, whichever end he plays
-  shirt: [0xe5484d, 0xf5b324], hair: [0x3a2a1e, 0x1d1d26], face: ['#e5484d', '#f5b324'],
+  shirt: [0xe5484d, 0xf5b324], hair: [0x3a2a1e, 0x1d1d26], face: ['#e5484d', '#f5b324'], kit: 0x20222c,      // kit: shorts and shoes
 };
 // Venues (setVenue): what the court and the plain fallback look (sky, fog, lights: the values web/scenery/ replaces when it arrives) are made of.
 // 'park' is exactly the scene as it always was; 'stadium' is the ranked evening arena (web/scenery/stadium.js): darker blue court, lighter
@@ -232,6 +232,17 @@ function buildPaddle(side) {
   return g;
 }
 
+// ---------- named looks (NOTES 137): a character reserved for one registered username ----------
+// TEMPORARY, until cosmetics exist. The username Dan (the developer's account, the same one ui.js DEV_NAMES gives the hammer
+// badge) always plays as a plain white figure with glowing orange eyes and an orange headband tied at the back, no hair. It
+// overrides the side's shirt and hair in every view and venue, for everyone who sees that seat. Only a REGISTERED username
+// counts (a guest typing "Dan" gets the normal look); usernames are unique and confusable-folded on the server, so only the
+// owner's account can carry it. Matt's seat and the menu's attract rally never take a named look.
+// To remove it: empty LOOKS. To turn it into cosmetics: have the server send each seat's look id instead of lookFor() here.
+export const LOOKS = { dan: { body: 0xf0f0f0, band: 0xff7a1a, glow: 0xff6f12 } };
+const LOOK_NAMES = { dan: 'dan' };                         // lower-cased registered username -> LOOKS key
+export const lookFor = (name, reg) => (reg === true && typeof name === 'string' && LOOK_NAMES[name.trim().toLowerCase()]) || null;
+
 // ---------- Mii-ish avatar, built facing -z (the net, in the player frame) ----------
 function buildAvatar(side) {
   const g = new THREE.Group();
@@ -239,7 +250,8 @@ function buildAvatar(side) {
   const shirt = new THREE.MeshStandardMaterial({ color: COL.shirt[side], roughness: 0.75 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x20222c, roughness: 0.8 });
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.42, 6, 20), shirt); body.position.y = 0.74;
-  const shorts = new THREE.Mesh(new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), dark); shorts.position.y = 0.55;
+  const kit = new THREE.MeshStandardMaterial({ color: COL.kit, roughness: 0.8 });      // shorts and shoes: their own material (not `dark`, the eyes'), so a named look can repaint them
+  const shorts = new THREE.Mesh(new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), kit); shorts.position.y = 0.55;
   const head = new THREE.Group(); head.position.y = 1.47;
   const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [], eyes = [], mattFace = [], feet = [];      // whites: kept (empty) for callers that loop over it
   const halfEye = new THREE.SphereGeometry(0.036, 16, 10, 0, Math.PI * 2, Math.PI * 0.44, Math.PI * 0.56);      // an eye with its top cut off flat
@@ -257,16 +269,28 @@ function buildAvatar(side) {
     const lidLine = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.013, 0.024), dark); lidLine.position.set(sx * 0.096, 0.014, -0.2475); lidLine.rotation.set(0, sx * -0.36, sx * -0.05);
     const brow = new THREE.Mesh(new THREE.BoxGeometry(0.112, 0.03, 0.03), dark); brow.position.set(sx * 0.098, 0.068, -0.244); brow.rotation.set(0.26, sx * -0.36, sx * 0.07);
     for (const o of [mEye, mWhite, lidLine, brow]) { o.visible = false; head.add(o); mattFace.push(o); }
-    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), dark);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), kit);
     foot.scale.set(1, 0.6, 1.5); foot.position.set(sx * 0.15, 0.065, -0.04); g.add(foot); feet.push(foot);
   }
+  // Dan's face (LOOKS.dan): the default eyes' shape, lit from inside (a near-black base, so the sun adds nothing and the orange
+  // never washes to yellow), and a headband. The band is an open cone cut to the head sphere (r 0.27) between y 0.085 and 0.145,
+  // a hair proud of it, above the eyes (their tops are at 0.056); the knot and two short tails hang at the back (+z).
+  const danFace = [], D = LOOKS.dan, glowM = new THREE.MeshStandardMaterial({ color: 0x140800, roughness: 0.4, emissive: D.glow, emissiveIntensity: 1 });
+  const bandM = new THREE.MeshStandardMaterial({ color: D.band, roughness: 0.7, side: THREE.DoubleSide });
+  for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.036, 14, 10), glowM); e.scale.set(1.08, 1.6, 0.5); e.position.set(sx * 0.095, 0.0, -0.25); danFace.push(e); }
+  const rAt = y => Math.sqrt(0.27 * 0.27 - y * y) + 0.007;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(rAt(0.145), rAt(0.085), 0.06, 40, 1, true), bandM); band.position.y = 0.115;
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 10), bandM); knot.scale.set(1.25, 0.9, 0.7); knot.position.set(0, 0.112, rAt(0.112) + 0.012);
+  danFace.push(band, knot);
+  for (const sx of [-1, 1]) { const tail = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.17, 0.012), bandM); tail.geometry.translate(0, -0.085, 0); tail.position.set(sx * 0.022, 0.11, rAt(0.112) + 0.02); tail.rotation.set(0.38, 0, sx * 0.3); danFace.push(tail); }
+  for (const o of danFace) { o.visible = false; head.add(o); }
   const offHand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), skin); offHand.position.set(-0.42, 0.85, -0.12);
   // Everything above the ankles hangs off `upper`, so a crouch can sink and squash the body while the feet stay on the
   // court. Sinking the whole group instead would push the shoes through the paint.
   const upper = new THREE.Group(); upper.add(body, shorts, head, offHand); g.add(upper);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.scale.setScalar(1.3);
-  g.userData = { head, body, offHand, upper, feet, skin, shirt, hairM, whites, hair, eyes, mattFace };
+  g.userData = { head, body, offHand, upper, feet, skin, shirt, kit, hairM, whites, hair, eyes, mattFace, danFace };
   return g;
 }
 
@@ -661,7 +685,7 @@ export function createScene(containerEl) {
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, toneMapped: false }));      // the status tag over the head: a billboard by nature (each split half faces its own camera), one size at any distance, over the scenery
     tag.center.set(0.5, 0); tag.renderOrder = 50;
     for (const o of [group, avatar, hand, forearm, tag]) { o.visible = false; scene.add(o); }
-    return { side, group, avatar, hand, forearm, tag, status: null, tagFor: null, ghost: 0, mats: [], handM: skinM, ghostM, sleeveM, has: false, init: false, bot: false, matt: false,      // bot: canned swing, no q. matt: Matt's look. Only the attract rally's side 0 has the first without the second
+    return { side, group, avatar, hand, forearm, tag, status: null, tagFor: null, ghost: 0, mats: [], handM: skinM, ghostM, sleeveM, has: false, init: false, bot: false, matt: false, look: null,      // look: a LOOKS key from setLooks (the seat's registered username)      // bot: canned swing, no q. matt: Matt's look. Only the attract rally's side 0 has the first without the second
       tgt: { x: 0, y: 1, z: sgn(side) * 6.5, q: new THREE.Quaternion(), off: null },
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
       lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
@@ -671,12 +695,12 @@ export function createScene(containerEl) {
   const casters = []; for (const pd of pads) for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.castShadow) casters.push(m); });
   // ---------- seat status (docs/NEXT.md 14a): calibrating / paused / away. The character and its paddle go pale and see-through, a tag floats over the head ----------
   // One tween value per pad (pd.ghost, 0.25 s each way) drives the SAME materials toward white: nothing is swapped, nothing is allocated per frame.
-  const WHITE = new THREE.Color(0xffffff), TAG_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' }, tagTex = {};
+  const WHITE = new THREE.Color(0xffffff), GLOW_GHOST = new THREE.Color(0.3, 0.3, 0.3), TAG_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' }, tagTex = {};
   for (const pd of pads) { const seen = new Set(); for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (!seen.has(mt)) { seen.add(mt); pd.mats.push(mt); } }); rebase(pd); }      // (the paddle's face is a mesh with several materials)
-  function rebase(pd) { for (const m of pd.mats) m.userData.base = { c: (m.userData.base ? m.userData.base.c : new THREE.Color()).copy(m.color), o: m.userData.base ? m.userData.base.o : m.opacity, t: m.userData.base ? m.userData.base.t : m.transparent }; }   // the colours to come back to (paint() changes them when Matt takes a seat)
+  function rebase(pd) { for (const m of pd.mats) { const b = m.userData.base; m.userData.base = { c: (b ? b.c : new THREE.Color()).copy(m.color), o: b ? b.o : m.opacity, t: b ? b.t : m.transparent, e: b ? b.e : m.emissive ? m.emissive.clone() : null }; } }   // the colours to come back to (paint() changes them when Matt or a named look takes a seat). e: the emissive, taken once (paint never changes it)
   function ghostify(pd) {
     const k = ease(pd.ghost);
-    for (const m of pd.mats) { const b = m.userData.base, t = b.t || k > 0 || pd.bodyM.has(m); m.color.copy(b.c).lerp(WHITE, 0.86 * k); if (m.emissive) m.emissive.setScalar(0.3 * k); m.opacity = b.o * (1 - 0.5 * k) * (pd.self && pd.bodyM.has(m) ? SELF_A : 1); if (m.transparent !== t) { m.transparent = t; m.needsUpdate = true; } }
+    for (const m of pd.mats) { const b = m.userData.base, t = b.t || k > 0 || pd.bodyM.has(m); m.color.copy(b.c).lerp(WHITE, 0.86 * k); if (b.e) m.emissive.copy(b.e).lerp(GLOW_GHOST, k); m.opacity = b.o * (1 - 0.5 * k) * (pd.self && pd.bodyM.has(m) ? SELF_A : 1); if (m.transparent !== t) { m.transparent = t; m.needsUpdate = true; } }
   }
   // Your own body, seen from behind it: there, but barely (SELF_A), so it never hides the ball or your paddle. Its materials stay
   // `transparent` for good, so flipping between halves of a split each frame only moves opacity and depthWrite: no recompile.
@@ -711,9 +735,9 @@ export function createScene(containerEl) {
     pd.tag.scale.set(2 * px * 4 / (vpW * e[0]), 2 * px / (vpH * e[5]), 1); pd.tag.material.opacity = ease(pd.ghost);
     pd.tag.position.set(pd.avatar.position.x, pd.avatar.position.y + 2.42, pd.avatar.position.z);
   }
-  function paint(pd, matt) {                                // a seat changes hands between a person and Matt: repaint, don't rebuild
-    pd.matt = matt; const u = pd.avatar.userData, m = matt ? COL.matt : null, skin = m ? m.skin : COL.skin, shirt = m ? m.shirt : COL.shirt[pd.side];
-    u.skin.color.setHex(skin); u.shirt.color.setHex(shirt); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); for (const w of u.whites) w.visible = matt; u.hair.visible = !matt; for (const e of u.eyes) e.visible = !matt; for (const o of u.mattFace) o.visible = matt;      // Matt is bald, with his own eyes
+  function paint(pd, matt) {                                // a seat changes hands between a person and Matt, or a named look (LOOKS) sits down: repaint, don't rebuild
+    pd.matt = matt; const u = pd.avatar.userData, m = matt ? COL.matt : null, L = !matt && !at.on && LOOKS[pd.look] || null, skin = L ? L.body : m ? m.skin : COL.skin, shirt = L ? L.body : m ? m.shirt : COL.shirt[pd.side];      // Matt beats a look; the attract rally is nobody's
+    u.skin.color.setHex(skin); u.shirt.color.setHex(shirt); u.kit.color.setHex(L ? L.body : COL.kit); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); for (const w of u.whites) w.visible = matt; u.hair.visible = !matt && !L; for (const e of u.eyes) e.visible = !matt && !L; for (const o of u.mattFace) o.visible = matt; for (const o of u.danFace) o.visible = !!L;      // Matt is bald, with his own eyes; so is Dan, with his headband
     pd.handM.color.setHex(skin); pd.ghostM.color.setHex(skin); pd.sleeveM.color.setHex(shirt);       // the hand on his paddle, and his forearm when a spectator looks through his eyes
     rebase(pd); if (pd.ghost > 0) ghostify(pd);
   }
@@ -1368,6 +1392,7 @@ export function createScene(containerEl) {
       setSink(id) { unlockAudio(); return !ac || typeof ac.setSinkId !== 'function' ? Promise.resolve(false) : ac.setSinkId(id || '').then(() => true, () => false); },
     },
     setSelfBody(on) { selfBody = !!on; },                   // Settings > Show player model (dress() reads it every frame)
+    setLooks(a) { for (const pd of pads) { const k = Array.isArray(a) && LOOKS[a[pd.side]] ? a[pd.side] : null; if (k !== pd.look) { pd.look = k; paint(pd, pd.matt); } } },      // [side 0, side 1]: LOOKS keys (main.js, from lookFor(name, reg)) or null
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at,               // test harness only
       view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }) },
   };
