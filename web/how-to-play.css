@@ -59,15 +59,17 @@ a:focus-visible{outline-color:var(--line);outline-offset:.1875rem;border-radius:
   color:var(--ink-soft);font-size:.9375rem;object-fit:cover}
 h1{margin:1.5rem 0 .5rem;font-size:clamp(2rem,7vw,2.75rem);font-weight:900;line-height:1.15;letter-spacing:.01em;color:var(--ink-strong)}
 .lead{margin:0;font-size:1.1875rem}
-.note{margin:1rem 0 0;padding:.875rem 1.125rem;border-radius:var(--r-md);border:.125rem solid var(--line-soft);background:var(--white);color:var(--ink-strong)}
+.note{margin:1rem 0 0;padding:1rem 1.25rem;border-radius:var(--r-md);border:.125rem solid var(--line-soft);background:var(--white);color:var(--ink-strong)}
 .cta{margin:1.25rem 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.25rem}
 .cta small{font-size:.9375rem;color:var(--ink-soft)}
 
 /* sections: white rounded panels */
-.card{margin:1rem 0;padding:1.25rem 1.25rem 1.375rem;border-radius:var(--r-lg);border:.125rem solid var(--line-soft);background:linear-gradient(180deg,#fff,var(--sky-1));box-shadow:var(--sh-2)}
+.card{margin:1.5rem 0;padding:1.25rem 1.25rem 1.375rem;border-radius:var(--r-lg);border:.125rem solid var(--line-soft);background:linear-gradient(180deg,#fff,var(--sky-1));box-shadow:var(--sh-2)}
 h2{margin:0 0 .625rem;font-size:1.5rem;font-weight:800;line-height:1.25;color:var(--ink-strong)}
 h3{margin:1.25rem 0 .25rem;font-size:1.125rem;font-weight:800;line-height:1.35;color:var(--ink-strong)}
 h2 + h3{margin-top:.5rem}
+.intro ~ section:not(.card){margin-top:2rem}      /* the changelog's bare date sections: a new day starts further from the last than an h3 does */
+.intro ~ section:not(.card):last-child{margin-bottom:1.5rem}      /* the last day ends 24px above the footer, as the card pages' last card does */
 p{margin:0 0 .75rem} .card > :last-child{margin-bottom:0}
 ul,ol{margin:0 0 .75rem;padding-left:1.375rem} li{margin:.375rem 0;padding-left:.25rem}
 li::marker{color:var(--line-deep);font-weight:800}
@@ -79,11 +81,11 @@ kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.43
   color:var(--ink-strong);font:800 .875rem/1.5 var(--font);text-align:center;transition:transform .12s var(--ease-out),border-bottom-color .12s linear}
 @media (hover:hover){kbd:hover{transform:translateY(.0625rem);border-bottom-color:var(--line)}}      /* a key that 'presses' */
 
-.end{padding:1rem 0 3rem;text-align:center}
+.end{padding-block:1rem 3rem;text-align:center}
 .end p{margin:.875rem 0 0;font-size:.9375rem;color:var(--ink-soft)}
 
 @media (min-width:40rem){
-  .wrap{padding:0 1.5rem}
+  .wrap{padding-inline:1.5rem}
   .card{padding:1.5rem 1.75rem 1.625rem}
   .intro{padding-top:2rem}
 }
@@ -112,7 +114,8 @@ kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.43
 @media print{ body{background:#fff} .card,.hero,.btn{box-shadow:none} }
 
 /* the privacy page's Your data box (web/data-tools.js): download or delete what this browser holds */
-.data-tools{margin:1.25rem 0 0;padding:1rem 1.25rem 1.125rem;border-radius:1rem;background:rgba(255,255,255,.7);border:.125rem solid rgba(255,255,255,.95)}
+.data-tools{margin:1.25rem 0;padding:1rem 1.25rem;border-radius:1rem;background:rgba(255,255,255,.7);border:.125rem solid rgba(255,255,255,.95)}
 .data-tools h3{margin:0 0 .375rem} .data-tools p{margin:.5rem 0 0}
 .data-btns{display:inline-flex;flex-wrap:wrap;gap:.75rem;margin-top:.75rem} .data-confirm{font-weight:700} .data-confirm .data-btns{display:flex;margin-top:.625rem}
+.data-tools > .data-btns{margin-top:.75rem}      /* p.data-btns: beats .data-tools p */
 .data-status{font-weight:700;color:var(--ink-strong)} .data-status:empty{display:none}

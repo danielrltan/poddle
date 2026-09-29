@@ -172,7 +172,7 @@ body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}       
 .keyhints li{display:inline-flex;align-items:center;gap:.375rem;white-space:nowrap}
 .keyhints p{display:none}
 .menu-foot .keyhints-inline{display:flex;gap:var(--s-5);list-style:none;margin:0;padding:0;font-weight:700;font-size:var(--t-sm);color:var(--ink)}
-.menu-foot .keyhints-inline li{display:inline-flex;align-items:center;gap:.5rem}
+.menu-foot .keyhints-inline li{display:inline-flex;align-items:center;gap:.5rem;white-space:nowrap}
 
 /* ==========================================================================================================
    HUD
@@ -265,7 +265,7 @@ body[data-overlay] .toast.on{opacity:0}
 .light-lg{width:1.125rem;height:1.125rem}
 /* HUD corner, top-left: hamburger, room code, then the spectator bits. No status pills any more: the three statuses are rows in the settings panel. */
 .corner-br{flex-basis:100%;height:0}                                 /* the stats panel always starts its own row */
-.corner{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:calc(50vw - 21.5rem - var(--edge))}   /* never under the scoreboard (40.3rem, centred, drawn above): it wraps to a second row first */
+.corner{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;align-items:center;flex-wrap:wrap;gap:.375rem var(--s-2);max-width:calc(50vw - 21.5rem - var(--edge))}   /* never under the scoreboard (40.3rem, centred, drawn above): it wraps to a second row first */
 body[data-settings] .corner{z-index:var(--z-screen)}                /* paused + open: the hamburger stays sharp above the blur, it is the way back */
 .btn-icon{width:2.75rem;height:2.75rem;padding:0;flex:none;box-shadow:var(--sh-hud), var(--inner-hi)}
 .btn-icon svg{width:1.5rem;height:1.5rem;fill:none;stroke:var(--ink-strong);stroke-width:2.75;stroke-linecap:round}
@@ -539,7 +539,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 /* the extra-large pill: Play */
 .btn-xl{height:5.75rem;min-width:21rem;padding:0 4.5rem;font-size:var(--t-2xl);font-weight:800;letter-spacing:.04em;border-width:.25rem}
 .btn:disabled{opacity:.5;cursor:default;box-shadow:var(--sh-1)} .btn:disabled::after{display:none}
-.btn-back{position:absolute;left:var(--s-5);top:50%;translate:0 -50%;padding:0 1.25rem 0 1rem;gap:.5rem}
+.btn-back{position:absolute;left:var(--s-7);top:50%;translate:0 -50%;padding:0 1.25rem 0 1rem;gap:.5rem}
 .btn-back svg{width:.625rem;height:1rem;fill:none;stroke:var(--line-deep);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
 .btn-back svg{transition:translate 240ms var(--ease-bounce)} @media (hover:hover){ .btn-back:hover svg{translate:-.25rem 0} } .btn-back:focus-visible svg{translate:-.1875rem 0} .btn-back:active svg{translate:-.375rem 0}      /* the arrow leans the way it goes */
 #title-room{animation:hm-pop var(--d-med) var(--ease-bounce) 200ms backwards} @keyframes hm-pop{from{opacity:0;scale:.8}}
@@ -573,7 +573,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 #screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;rotate:none;background-position:100% 0,0 0;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
 
 /* name: one field above every lobby view but the share card. Also the look of the name field in the settings panel (.field) */
-.name-row{flex:none;display:flex;align-items:center;gap:var(--s-3);padding:.375rem .375rem .375rem 1.5rem;border-radius:var(--r-pill);background:rgba(255,255,255,.72);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1);position:relative;transition:background-color var(--d-med) var(--ease-soft), border-color var(--d-med) var(--ease-soft)}
+.name-row{flex:none;display:flex;align-items:center;gap:var(--s-3);padding:var(--s-2) var(--s-2) var(--s-2) 1.5rem;border-radius:var(--r-pill);background:rgba(255,255,255,.72);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1);position:relative;transition:background-color var(--d-med) var(--ease-soft), border-color var(--d-med) var(--ease-soft)}
 .name-row label{font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
 .field{width:17rem;height:3rem;padding:0 1.25rem;border-radius:var(--r-pill);border:.1875rem solid var(--sky-4);background:linear-gradient(180deg,var(--sky-1),#fff);box-shadow:inset 0 .125rem .375rem rgba(120,170,200,.25);
   color:var(--ink-strong);font:700 var(--t-lg)/1 var(--font);letter-spacing:.02em;caret-color:var(--line);outline:0;min-width:0}
@@ -588,7 +588,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 @media (max-width:700px){ .bot-levels{grid-template-columns:repeat(2,1fr)} }
 #bot-seg .seg-opt{min-width:0;padding:0 .75rem}
 .bot-levels .btn{min-width:0;height:auto;min-height:max(6rem,44px);padding:.75rem 1rem;flex-direction:column;justify-content:flex-start;gap:.25rem} .bot-levels .btn small{font-size:var(--t-sm);font-weight:600;letter-spacing:0;color:var(--ink-soft);white-space:nowrap}      /* one line each: four titles on one baseline */
-#lobby-bot{width:min(64rem,94vw)}
+#lobby-bot{width:min(68rem,94vw)}      /* 68: the Club card's nowrap 'Medium pace, some mistakes' keeps the card's 1rem side padding */
 #bot-title{margin:0 0 var(--s-4);text-align:center}
 
 /* "Court is full. Watch instead?": a notice over the lobby. Its own spread shadow is the scrim; the lobby behind it is inert (ui.js) */
@@ -792,7 +792,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
    ========================================================================================================== */
 /* --set-top: ui.js measures it on open. Under the hamburger on a wide window; on a narrow one also under the room code and the scoreboard, which it would otherwise cover */
 .settings{--set-top:calc(var(--edge) + 3.25rem);--set-floor:0rem;position:fixed;left:var(--edge);top:var(--set-top);z-index:calc(var(--z-screen) - 1);width:min(23rem, calc(100vw - 2 * var(--edge)));max-height:calc(100dvh - var(--set-top) - var(--edge) - var(--set-floor));overscroll-behavior:contain;overflow-y:auto;
-  display:flex;flex-direction:column;gap:.625rem;padding:.875rem .875rem .875rem;border-radius:var(--r-lg);border-width:.15625rem;text-align:left;outline:0;
+  display:flex;flex-direction:column;gap:var(--s-3);padding:var(--s-4);border-radius:var(--r-lg);border-width:.15625rem;text-align:left;outline:0;
   background:linear-gradient(180deg,rgba(246,250,252,.84),rgba(231,241,246,.74));box-shadow:var(--sh-3), inset 0 0 0 .125rem rgba(255,255,255,.9);animation:panel-in var(--d-med) var(--ease-out) both}
 /* Show stats is switched from this card, so the stats step out from under it while it is open: beside it, below the scoreboard */
 body[data-settings] .dev-panel{position:fixed;left:calc(var(--edge) + min(23rem, 100vw - 2 * var(--edge)) + .5rem);top:calc(var(--edge) + 4.75rem);max-width:calc(100vw - 2 * var(--edge))}
@@ -803,13 +803,15 @@ body[data-settings][data-paused] .glass{opacity:1;visibility:visible;transition-
 body[data-paused] .settings h2{color:var(--warn-deep)}
 /* groups: a small caps label, then one white card of rows split by hairlines (a phone's settings, not a pile of pills) */
 .set-head{display:flex;flex-direction:column;align-items:flex-start;gap:.4375rem;padding:0 .375rem}
+#settings .set-head{padding:0 var(--s-4)}      /* the heading, the group labels and the rows' text share one left edge (NOTES 139) */
 .set-group{display:flex;flex-direction:column;gap:.25rem}
-.set-label{margin:0 0 0 .875rem;font-size:var(--t-xs);font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.set-label{margin:0 0 0 var(--s-4);font-size:var(--t-xs);font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
 .set-list{display:flex;flex-direction:column;border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:0 .0625rem .1875rem rgba(40,80,110,.1), inset 0 0 0 .0625rem rgba(255,255,255,.9);overflow:hidden}
 body[data-paused] .set-list{background:#fff}
 .set-list > .set-row + .set-row:not([hidden]){box-shadow:inset 0 .0625rem 0 rgba(40,80,110,.1)}
 .set-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:2.75rem;width:100%;padding:0 .5rem 0 .875rem;border:.125rem solid transparent;border-radius:0;background:none;
   color:var(--ink-strong);font:700 var(--t-md)/1.2 var(--font);text-align:left}
+@media (max-width:700px){ .set-row{min-height:max(2.75rem,40px)} }      /* at the 10px root (all of 700px and under) a row was 28px: too small to tap (NOTES 139) */
 button.set-row{cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;position:relative;isolation:isolate}
 button.set-row::before{content:"";position:absolute;inset:.0625rem 0 0;border-radius:inherit;background:#fff;opacity:0;z-index:-1;pointer-events:none;transition:opacity var(--d-fast) linear}      /* the hover wash is a layer that fades (opacity), not a background swap: the card can sit over a live rally. The top inset keeps the hairline */
 @media (hover:hover){ button.set-row:hover::before{opacity:.9} } button.set-row:active::before{opacity:1;transition-duration:60ms}
@@ -831,11 +833,12 @@ button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--lin
 .set-switch:active i::after{width:1.875rem} .set-switch[aria-checked="true"]:active i::after{transform:translateX(1.0625rem)}      /* the knob slides with a little overshoot and stretches while pressed, like a real toggle */
 @media (hover:hover){ .set-switch:hover i::after{translate:.125rem 0} .set-switch[aria-checked="true"]:hover i::after{translate:-.125rem 0} }      /* the knob leans toward where a click sends it (translate: composes with the slide) */
 .settings > *{flex-shrink:0}      /* the card scrolls; it never squeezes a row (it squashed Leave court to 13 px in a short window) */
-.set-foot{position:sticky;bottom:-.875rem;z-index:1;display:flex;flex-direction:column;gap:.5rem;margin:0 -.875rem -.875rem;padding:.75rem .875rem .875rem;
+.set-foot{position:sticky;bottom:-1rem;z-index:1;display:flex;flex-direction:column;gap:.5rem;margin:0 -1rem -1rem;padding:.75rem var(--s-4) var(--s-4);
   border-radius:0 0 var(--r-lg) var(--r-lg);background:linear-gradient(180deg,rgba(236,244,248,0),rgba(236,244,248,.96) .75rem)}      /* pinned under the list, a soft fade where the rows scroll beneath it */
 .set-foot:not(:has(> :not([hidden]))){display:none}      /* nothing to leave and nothing to say: no empty strip */
 body[data-paused] .set-foot{background:linear-gradient(180deg,rgba(231,241,246,0),#e9f2f7 .75rem)}
 .set-foot .btn{width:100%;height:2.875rem;margin:0;flex:none}
+@media (max-height:760px){ .settings{gap:.625rem;padding:.875rem} .set-foot{bottom:-.875rem;margin:0 -.875rem -.875rem;padding:.75rem .875rem .875rem} }      /* a short window: the old, tighter card, so the match sheet still fits without scrolling (NOTES 139) */
 body:not([data-screen="hud"]) .settings{--set-floor:4.75rem}
 @media (max-width:520px){.settings{width:calc(100vw - 2 * var(--edge))}}      /* a phone: the whole width, not a 23rem card that 10px rems shrink to 230 px */      /* every menu screen has a footer bar: the card stops above it instead of running under it */
 .set-pick{flex-wrap:wrap;row-gap:.25rem;padding:.4375rem .5rem .4375rem .875rem} .set-pick small{flex-basis:100%;font-size:var(--t-xs);font-weight:700;color:var(--warn-deep)}      /* Move, Difficulty: a small segmented control in the row */
@@ -929,7 +932,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 
 /* title screen: the one line a visitor needs before anything else, centred in the footer */
 .menu-foot-note{justify-content:center;text-align:center;font-weight:700;font-size:max(14px,var(--t-sm));color:var(--ink)}      /* a px floor: in a small window 1rem is 10px and this line, the one that says Mac, fell to 9 px there */
-.menu-glass .menu-foot-note{flex-wrap:wrap;height:auto;min-height:3.5rem;row-gap:.125rem;column-gap:var(--s-4);padding-top:.375rem;padding-bottom:.375rem}
+.menu-glass .menu-foot-note{flex-wrap:wrap;height:auto;min-height:3.5rem;row-gap:var(--s-1);column-gap:var(--s-4);padding-top:var(--s-3);padding-bottom:var(--s-3)}
 .foot-link{flex:none;color:var(--line-deep);font-weight:800;font-size:max(14px,var(--t-sm));text-decoration:none;white-space:nowrap;background:linear-gradient(currentColor,currentColor) 0 100%/0 .125rem no-repeat;transition:background-size var(--d-med) var(--ease-out)}
 .t-note.is-loud{font-size:max(14px,var(--t-sm));font-weight:700}      /* not on a Mac (main.js): the note under Play says so, at a size a phone can read */
 .foot-link:focus-visible{background-size:100% .125rem} @media (hover:hover){ .foot-link:hover{background-size:100% .125rem} }      /* the underline draws in from the left */
@@ -937,7 +940,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .foot-links{flex:none;display:inline-flex;align-items:center;gap:var(--s-4)}
 .foot-link.foot-legal{color:var(--ink-soft);font-weight:700}
 .foot-agree{font-size:max(13px,var(--t-xs));color:var(--ink-soft);line-height:1.35} .foot-agree .foot-link{font-size:inherit;font-weight:800}
-.menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:.5rem;padding-bottom:.5rem}      /* the line may wrap: the bar grows with it, never clips it */
+.menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:var(--s-3);padding-bottom:var(--s-3)}      /* the line may wrap: the bar grows with it, never clips it */
 @media (max-width:520px){ .foot-agree ~ .keyhints-inline{display:none} .foot-agree{flex:1;text-align:center} }      /* a phone has no Esc or F key: the legal line gets the whole bar */
 /* the logo is the page's h1 and reads "Poddle" to crawlers and screen readers: the ball that is drawn for the o holds a real o */
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -978,6 +981,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   color:var(--me-ink);font-size:var(--t-sm);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}      /* '5 open': a badge in the corner, so the tile never moves when it comes and goes */
 .tile-sub{transition:opacity var(--d-med) var(--ease-soft), scale var(--d-med) var(--ease-bounce), visibility 0s linear 0s} .tile-sub.is-off{opacity:0;scale:.5;visibility:hidden;transition-delay:0s,0s,var(--d-med)} .tile-sub.pop{animation:num-pop 450ms var(--ease-bounce)}      /* '5 open' pops in, and bumps when the count moves */
 .btn.is-tall,.is-tall{min-height:44px}
+.tiles[data-n="5"] .tile:not(.is-hero) .tile-sub,.tiles[data-n="6"] .tile:not(.is-hero) .tile-sub{top:var(--s-2);right:var(--s-2)}      /* the short utility tiles: clear of the icon (NOTES 139) */
 .btn svg{flex:none}
 .courts-code .btn svg,.courts-make .btn svg,.room-watch svg,.ask-play svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
@@ -1050,22 +1054,31 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 .tour-note em{display:block;font-style:normal;font-weight:700;color:var(--ink-strong)}
 
 @media (max-width:700px){
-  .panel.lobby-view.courts{grid-template-columns:1fr;gap:var(--s-4);padding:var(--s-4)}
+  .panel.lobby-view.courts{grid-template-columns:1fr;gap:var(--s-4);padding:var(--s-5) var(--s-4)}
   .court-wrap{height:min(30rem,40dvh)}
   .court-row{grid-template-columns:5rem minmax(0,1fr) auto;row-gap:0;padding:.375rem .5rem .375rem 1rem}
   .court-who{grid-column:2;grid-row:1;align-self:end} .court-meta{grid-column:2;grid-row:2;align-self:start} .court-code{grid-row:1 / span 2} .court-go{grid-column:3;grid-row:1 / span 2}
   .court-meta:empty{display:none} .court-row:has(.court-meta:empty) .court-who{grid-row:1 / span 2;align-self:center}
   .courts-code{width:min(24rem,100%);align-self:center}
   .courts-make{grid-template-columns:1fr 1fr} .tour-note{grid-column:1 / -1}
+  .code-hint{margin:-.375rem 0 var(--s-2)}      /* a gap under the hint: it reads as the field's note, not the buttons' label (NOTES 139) */
+  #screen-lobby .panel-wide,#lobby-bot{width:100%}      /* narrow portrait: every wide panel fills the s-4 body, on the header's and the tiles' edges, not 92vw here and 94vw there */
 }
 @media (max-width:480px){
   .tiles,.tiles[data-n="4"],.tiles[data-n="5"],.tiles[data-n="6"]{grid-template-columns:1fr;width:100%}
   .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero),.tiles[data-n="6"] .tile,.tiles[data-n="6"] .tile.is-hero,.tiles[data-n="6"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg,.tiles[data-n="6"] .tile svg,.tiles[data-n="6"] .tile:not(.is-hero) svg{width:4.5rem;height:4.5rem}
   .tiles[data-n="5"] .tile-text,.tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
+  .menu-glass .menu-body{padding-inline:var(--s-5)} .menu-glass .menu-foot{padding-inline:var(--s-5)} .lobby-online{right:var(--s-5)} .btn-back{left:var(--s-5);height:max(2.75rem,36px)} #screen-lobby .panel.lobby-view{width:100%}      /* phone gutter: head, body and foot share one s-5 inset, and every panel fills the body (NOTES 139) */
+  #lobby-bot,#lobby-create,#lobby-share{padding:var(--s-5) var(--s-4)}      /* the phone panel inset, as courts and the rest */
+  .bot-levels .btn small{white-space:normal;text-wrap:balance}      /* a two-up card is narrower than "Medium pace, some mistakes": it wraps here */
+  .tiles .tile-sub,.tiles[data-n] .tile:not(.is-hero) .tile-sub{top:var(--s-3);right:var(--s-5)}      /* the chip lines up with the tile's side padding */
+  body.is-rk-search #lobby-courts{padding-block:var(--s-4)}      /* the search bar takes 100px off the top: the courts card keeps its old inset there, so it still fits */
+  .search{flex-basis:14.5rem}      /* a 375px phone: the s-5 gutter took 7px, and the Open/Full switch still shares the search's line */
+  .court-wrap{height:min(29rem,40dvh)} .code-hint{margin-bottom:0} .menu-glass .menu-foot:has(.foot-agree){padding-block:var(--s-2)}      /* the s-5 inset: the list gives up 10px, the hint and the agree footer their extra few, so the card clears the footer as before */
 }
 
 /* the player's card: bottom-left, outside #hud so it survives the settings card, the pause blur and the result card */
-.ask-card{position:fixed;left:var(--edge);bottom:var(--edge);width:min(32rem, calc(100vw - 2 * var(--edge)));z-index:calc(var(--z-toast) - 1);display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.625rem .75rem .75rem 1rem;overflow:hidden;
+.ask-card{position:fixed;left:var(--edge);bottom:var(--edge);width:min(32rem, calc(100vw - 2 * var(--edge)));z-index:calc(var(--z-toast) - 1);display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:var(--s-3) var(--s-3) var(--s-3) var(--s-4);overflow:hidden;
   border-radius:var(--r-lg);border:2px solid var(--line-soft);background:linear-gradient(180deg,#fff,var(--sky-1));box-shadow:var(--sh-hud);
   opacity:0;transform:translateY(1rem);transition:opacity 200ms linear, transform 200ms linear}
 .ask-card.is-on{opacity:1;transform:none;transition:opacity 320ms var(--ease-out), transform 420ms var(--ease-bounce)}      /* arrives with a small spring */
@@ -1376,13 +1389,13 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 @keyframes chip-in{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:none}}
 /* ---- the bracket */
 .panel.lobby-view.bracket-view{width:min(74rem,94vw);max-height:100%;display:flex;flex-direction:column;align-items:stretch;gap:var(--s-3);padding:var(--s-5) var(--s-6);text-align:left}
-.br-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1.5rem}
+.br-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1.5rem;padding-inline:.375rem}
 .br-you{margin:0;font-size:var(--t-lg);font-weight:800;color:var(--ink-strong)} .br-you.is-out{color:var(--ink)}
 .br-next{display:flex;align-items:center;gap:.75rem;margin:0;font-size:var(--t-md);font-weight:800;color:var(--ink-strong);font-variant-numeric:tabular-nums} .br-next .br-bar{width:9rem}
 .br-tabs{display:none;align-self:center;margin:0}
 .bracket{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(13rem,1fr);gap:var(--s-5);padding:.25rem .375rem .5rem;outline:0;overscroll-behavior:contain;scroll-padding-top:2.75rem}      /* scroll-padding: the sticky round header's height, so a card scrolled to never lands under it */
 .br-col{display:flex;flex-direction:column;gap:.5rem;min-width:0}
-.br-round{position:sticky;top:-.25rem;z-index:2;display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin:0;padding:.375rem .25rem;background:#f1f7fa;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-strong)}
+.br-round{position:sticky;top:-.25rem;z-index:2;display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin:0;padding:.375rem .75rem;background:#f1f7fa;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-strong)}
 .br-round small{font-size:var(--t-xs);font-weight:700;letter-spacing:0;text-transform:none;color:var(--ink)}
 .br-col.is-current .br-round{color:var(--me-ink)}
 .br-list{flex:1;display:grid;grid-auto-rows:1fr;align-items:center;gap:.625rem;list-style:none;margin:0;padding:0}      /* equal rows, each as tall as the column's tallest card (a live one, with its Watch row): the cards' middles line up with the next round's, and the connector lines meet */
@@ -1401,14 +1414,14 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .br-match.is-tbd{background:rgba(255,255,255,.55);border-style:dashed;box-shadow:none} .br-match.is-tbd .br-name{color:var(--ink-soft)}
 .br-match.is-live{border-color:#f3a3a3}
 .br-tag{flex:none;padding:0 .375rem;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--gold-1),var(--gold-2));border:.09375rem solid var(--gold-4);color:var(--ink-strong);font-size:var(--t-xs);font-weight:800;line-height:1.35}
-.br-live{display:flex;align-items:center;gap:.5rem;padding:.25rem .25rem .25rem .75rem;border-top:.0625rem solid var(--sky-3);font-size:var(--t-sm);font-weight:800;color:var(--bad-deep)}
+.br-live{display:flex;align-items:center;gap:.5rem;padding:var(--s-2) var(--s-2) var(--s-2) .75rem;border-top:.0625rem solid var(--sky-3);font-size:var(--t-sm);font-weight:800;color:var(--bad-deep)}
 .br-live > span{display:flex;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .br-eye{display:inline-flex;margin:0 .1875rem 0 .25rem} .br-eye svg{width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .br-dot{flex:none;width:.625rem;height:.625rem;border-radius:50%;background:var(--bad-deep);animation:dot-live 1200ms var(--ease-soft) infinite}      /* deep red, and it never fades below .7: a status mark keeps 3:1 on the card at its faintest (1.4.11) */
 @keyframes dot-live{0%,100%{opacity:1}50%{opacity:.7}}
 .tour-wait .dots-wait i{background:var(--me-ink)}
 .br-watch{margin-left:auto;height:2.5rem;padding:0 .875rem;gap:.375rem;font-size:var(--t-sm)}
 .bracket.is-big .br-p{height:1.625rem} .bracket.is-big .br-list{gap:.5rem}      /* 16 players: eight matches in the first column */
-.br-foot{display:flex;justify-content:flex-end}
+.br-foot{display:flex;justify-content:flex-end;padding-inline:.375rem}
 /* ---- the tournament result and the champion (the result card) */
 .tour-res .btn{min-width:13rem} .tour-res .btn,#champ-acts .btn{min-height:44px}
 .result-card.is-champion{border-color:var(--gold-3);background:linear-gradient(180deg,#fff 0%,#fffdf3 45%,#fbf1d2 100%)}
@@ -1419,7 +1432,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .result-card.is-champion .result-stats{display:none}      /* a safety net: champion() hides the row too */
 .medal-trophy{display:none} .medal.is-champion .medal-star{display:none} .medal.is-champion .medal-trophy{display:block;fill:#fff7c9;stroke:var(--gold-4);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
 .medal.is-champion{scale:1.35}
-.road{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;list-style:none;margin:0 auto var(--s-5);padding:0}
+.road{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s-3);list-style:none;margin:0 auto var(--s-5);padding:0}
 .road-step{display:inline-flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:.25rem 1rem;border-radius:var(--r-pill);background:#fff;border:.125rem solid var(--gold-2);box-shadow:var(--sh-1);font-size:var(--t-md);font-weight:700;color:var(--ink-strong)}
 .road-step small{font-size:var(--t-xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a5200} .road-step b{font-weight:900;font-variant-numeric:tabular-nums}
 #champ-acts .btn{min-width:12rem}
@@ -1437,7 +1450,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
   .br-col{display:none} .br-col.is-shown{display:flex} .br-match::before,.br-match::after{display:none} .br-list{grid-auto-rows:auto;align-content:start}      /* one round at a time: no neighbour to line up with, so the cards stack at their own heights */
   .br-tab-long{display:inline} .br-tab-short{display:none}
   .br-p{height:max(1.875rem,30px)} .bracket.is-big .br-p{height:max(1.875rem,30px)}
-  .panel.lobby-view.bracket-view{padding:var(--s-4)}
+  .panel.lobby-view.bracket-view{padding:var(--s-5) var(--s-4)}
   .tour-names{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tour-chip,.tour-why,.tour-copied,.tour-rules,.br-name,.br-sc,.br-live,.br-watch,.br-round,.br-next,.road-step,.tc-n,.tour-full,.tp-text{font-size:max(var(--t-sm),12px)}
   .tour-tag,.br-tag,.br-round small,.tc-code small,.road-step small,.tour-n small,.tour-link-row .addr{font-size:max(var(--t-xs),12px)} .br-tabs .seg-opt{min-width:44px;font-size:max(var(--t-sm),12px)} #btn-br-leave,#btn-tour-ended-ok,.tour-res .btn,#champ-acts .btn{font-size:max(var(--t-md),13px)}
@@ -1450,7 +1463,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
   .vs-round{font-size:max(var(--t-md),13px)} .vs-target{font-size:max(var(--t-lg),15px)} .rematch-count,.tally-side b{font-size:max(var(--t-md),13px)}      /* the VS card's round line, 'Bracket in 6', the result card's names */
   .stat b{font-size:max(1.4rem,14px)} .stat span{font-size:max(var(--t-md),13px)}      /* the stats pills: nothing under 13 px */
   .tally-crown{width:2.1rem;height:1.6rem;margin-left:-1.05rem} .tally-clap{left:calc(50% + 1.5rem)}      /* the chip is smaller here */
-  .notices{top:auto;bottom:calc(var(--edge) + 5.25rem);translate:none} .notice{font-size:max(var(--t-sm),12px);height:auto;min-height:max(2.25rem,28px);max-width:calc(100vw - 2 * var(--edge))} body:has(.ask-card.is-on) .notices{opacity:0}      /* portrait: half way down is the net and the far service box, where the ball is: the cards sit above the key hints instead */
+  .notices{top:auto;bottom:calc(var(--edge) + 5.25rem);translate:none} .notice{font-size:max(var(--t-sm),12px);height:auto;min-height:max(2.25rem,28px);max-width:calc(100vw - 2 * var(--edge))} .ask.notice{height:fit-content;min-height:0} body:has(.ask-card.is-on) .notices{opacity:0}      /* portrait: half way down is the net and the far service box, where the ball is: the cards sit above the key hints instead */
 }
 @media (max-width:480px){
   .br-tab-long{display:none} .br-tab-short{display:inline}
@@ -1504,12 +1517,13 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 #row-camera:has(> .cam-on:not([hidden])) .status-state{display:none}      /* the button says it's off: the word 'Off' only took the text's room */
 @media (max-aspect-ratio: 1/1){
   .cam-body{padding:var(--s-4)}
-  .cam-card{padding:var(--s-5) var(--s-4);width:100%}
+  .cam-card{padding:var(--s-5);width:100%}
   .cam-btns{flex-direction:column;align-items:stretch;width:100%} .cam-btns .btn:not(.btn-sm){min-width:0}
   .cam-btns .cam-skip,.cam-btns .cam-skip:hover{align-self:center;min-height:40px;background:none;border-color:transparent;box-shadow:none;color:var(--line-deep);text-decoration:underline;text-underline-offset:.2em} .cam-btns .cam-skip::before{display:none}      /* stacked, Allow is the one big pill; the way out reads as a link under it (no gloss either) */
   #row-camera:has(> .cam-on:not([hidden])){flex-wrap:wrap} #row-camera .cam-on{flex-basis:100%}      /* phone width: Turn on gets its own line, the text keeps the row's width */
   #screen-camera .menu-foot{height:auto;min-height:3.5rem;padding:.5rem var(--s-4)} #screen-camera .menu-foot .keyhints-inline{display:none}
 }
+@media (max-width:480px){ .cam-body{padding-inline:var(--s-5)} #screen-camera .menu-foot{padding-inline:var(--s-5)} }      /* a phone: the lobby's s-5 gutter (NOTES 139) */
 @media (min-aspect-ratio: 1/1){      /* a computer's window: everything, Allow included, above the fold. The three points side by side */
   .cam-card{width:min(64rem,92vw);gap:var(--s-3);padding-top:var(--s-4)}
   .cam-card[data-view="help"]{gap:var(--s-2)} .cam-card[data-view="help"] .cam-how{padding:.625rem 1.125rem}      /* the help, and a 'Still not working' line, fit above the footer */
@@ -1626,7 +1640,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .st-streak small{font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .st-streak small b{color:var(--warn-deep)}
 /* the Matt badge: the toughest level beaten on a disc in that level's colour, then a chip a level with its record. Any level can be played at any
    time, so nothing here is locked or ordered like a climb: a won chip is ticked, the badge's level is outlined in its colour */
-.st-matt{position:relative;isolation:isolate;width:100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:var(--s-4);padding:.5rem .875rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 300ms backwards;
+.st-matt{position:relative;isolation:isolate;width:100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:var(--s-4);padding:var(--s-2) var(--s-4);border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 300ms backwards;
   --lv:#8fa3b1;--lv-deep:#5d6f7c;--lv-tint:var(--sky-2)}
 .st-matt:has(.is-lv0){--lv:#3ecf72;--lv-deep:#13803f;--lv-tint:#e2f8ea} .st-matt:has(.is-lv1){--lv:#3aa0ff;--lv-deep:#1b63b8;--lv-tint:#e3f1ff} .st-matt:has(.is-lv2){--lv:#a77bf3;--lv-deep:#6a3fc2;--lv-tint:#f1e9ff} .st-matt:has(.is-lv3){--lv:var(--gold-2);--lv-deep:var(--warn-deep);--lv-tint:#fff4c9}      /* Rookie green, Club blue, Tour purple, Pro gold (the difficulty order) */
 .st-mbadge{position:relative;width:4rem;height:4rem;flex:none}
@@ -1644,7 +1658,7 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .st-chip.is-gold{background:linear-gradient(180deg,#fff8d0,var(--gold-1));color:var(--warn-deep);box-shadow:inset 0 0 0 .0625rem rgba(201,127,8,.35)}
 .st-mlv.is-top{background:var(--lv-tint);box-shadow:inset 0 0 0 .125rem var(--lv)} .st-mlv.is-top b{color:var(--lv-deep)}
 /* the tile surface (the home tiles' gloss): the people strip and the three number tiles. White tiles with a gold chip, never gold tiles: gold keeps meaning "best" */
-.st-people,.st-tile{position:relative;isolation:isolate;width:100%;padding:.5rem .875rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 400ms backwards}
+.st-people,.st-tile{position:relative;isolation:isolate;width:100%;padding:var(--s-2) var(--s-4);border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 400ms backwards}
 .st-people::before,.st-tile::before{content:"";position:absolute;inset:.25rem .25rem auto;height:46%;border-radius:calc(var(--r-lg) - .375rem) calc(var(--r-lg) - .375rem) 50% 50% / calc(var(--r-lg) - .375rem) calc(var(--r-lg) - .375rem) 1rem 1rem;background:linear-gradient(180deg,#fff,rgba(255,255,255,.3));pointer-events:none;z-index:-1}
 .st-people{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"h h h" "wl bar chips";align-items:center;column-gap:var(--s-4);row-gap:.25rem} .st-people .caps{grid-area:h}
 .st-wl{grid-area:wl;margin:0;display:flex;align-items:baseline;gap:.5rem;line-height:1;font-variant-numeric:tabular-nums} .st-wl b{font-size:2.25rem;font-weight:900;animation:num-pop 500ms var(--ease-bounce) 800ms both} .st-wl .is-me{color:var(--me-ink)} .st-wl .is-them{color:var(--them-ink)}
@@ -1655,12 +1669,12 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .st-bar-l,.st-bar-r,.st-hint{position:absolute;top:100%;margin-top:.125rem;font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap} .st-bar-l,.st-hint{left:0;color:var(--me-ink)} .st-bar-r{right:0} .st-bar-r b{color:var(--ink-strong)}      /* the hint sits in "60% won"'s slot at its size: the same air under the bar either way */
 .st-chips{grid-area:chips;margin:0;display:flex;flex-wrap:wrap;gap:.375rem} .st-chip{display:inline-flex;align-items:center;gap:.3rem;height:1.75rem;padding:0 .75rem;border-radius:var(--r-pill);background:var(--sky-2);font-size:var(--t-xs);font-weight:800;color:var(--ink-soft);white-space:nowrap} .st-chip b{color:var(--ink-strong);font-variant-numeric:tabular-nums} .st-chip .st-flame{width:1rem;height:1rem}
 .st-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-3);width:100%} .st-tile{display:flex;flex-direction:column;gap:.125rem} .st-tile:nth-child(3){animation-delay:470ms} .st-tile:nth-child(4){animation-delay:540ms}
-.st-badge{position:absolute;top:.5rem;right:.625rem;width:2.25rem;height:2.25rem;border-radius:50%;display:grid;place-items:center;background:var(--me-tint);box-shadow:inset 0 0 0 .125rem #fff, var(--sh-1)} .st-badge svg{width:1.25rem;height:1.25rem;fill:none;stroke:var(--me-ink);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.st-badge{position:absolute;top:.5rem;right:var(--s-4);width:2.25rem;height:2.25rem;border-radius:50%;display:grid;place-items:center;background:var(--me-tint);box-shadow:inset 0 0 0 .125rem #fff, var(--sh-1)} .st-badge svg{width:1.25rem;height:1.25rem;fill:none;stroke:var(--me-ink);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .st-num{margin:0;display:flex;align-items:baseline;gap:.125rem;line-height:1;font-variant-numeric:tabular-nums} .st-num b{font-size:2.25rem;font-weight:900;color:var(--me-ink);animation:num-pop 500ms var(--ease-bounce) 800ms both} .st-num small{font-size:var(--t-md);font-weight:800;color:var(--ink-soft);margin-left:.25rem}
 .st-cap{margin:0;display:flex;align-items:center;gap:.5rem;min-width:0;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)} .st-cap > span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .st-cap.is-hint{color:var(--me-ink)} .st-tile .st-chip{flex:none;height:1.5rem}      /* is-hint: the coaching line of an empty tile, in the player's blue, never grey */
 #screen-lobby .menu-body:has(#lobby-profile:not([hidden])){overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}      /* a short window (1366x500, 760x600): the card scrolls instead of running under the footer. 1280x800 still fits whole */
 /* the play row (docs/SHARE.md 3): the return rate is its headline (a ring and the big %), then six compact figures. Hidden when the server sends no profile.play */
-.st-play{position:relative;isolation:isolate;container-type:inline-size;width:100%;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:var(--s-4);padding:.5rem .875rem;border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 440ms backwards}
+.st-play{position:relative;isolation:isolate;container-type:inline-size;width:100%;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:var(--s-4);padding:var(--s-2) var(--s-4);border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#f7fbfd 60%,#eef5f9 100%);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-2);animation:hm-tile 560ms var(--ease-bounce) 440ms backwards}
 .st-ret{display:flex;align-items:center;gap:.75rem;min-width:0;padding-right:var(--s-4);border-right:.125rem solid var(--sky-2)}      /* the headline, its own zone: a hairline to the figures */
 .st-ring{position:relative;width:4rem;height:4rem;flex:none;display:grid;place-items:center}
 .st-ring svg:first-child{position:absolute;inset:0;width:100%;height:100%;rotate:-90deg} .st-ring circle{fill:none;stroke:var(--sky-3);stroke-width:5}
@@ -1682,18 +1696,19 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 /* a phone: one column. The hero stacks, the Matt chips drop under the badge, the tiles become rows */
 @media (max-width:760px){
   .st{padding:var(--s-5) var(--s-4)!important;gap:var(--s-2)!important}
-  .st-hero{grid-template-columns:auto minmax(0,1fr);padding:var(--s-4) var(--s-3)} .st-crest{width:5.5rem;height:5.5rem} .st-crest .st-disc{width:5rem;height:5rem} .st-rank-name{font-size:var(--t-xl);white-space:normal} .st-streak{grid-column:1/-1;min-width:0} .st-ribbon{font-size:var(--t-md);padding:0 1.25rem}
+  .st-hero{grid-template-columns:auto minmax(0,1fr);padding:var(--s-4)} .st-crest{width:5.5rem;height:5.5rem} .st-crest .st-disc{width:5rem;height:5rem} .st-rank-name{font-size:var(--t-xl);white-space:normal} .st-streak{grid-column:1/-1;min-width:0} .st-ribbon{font-size:var(--t-md);padding:0 1.25rem}
   .st-matt{grid-template-columns:auto minmax(0,1fr);row-gap:.5rem} .st-mlevels{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))} .st-mlv{min-width:0}
   .st-people{grid-template-columns:1fr;grid-template-areas:"h" "wl" "bar" "chips"} .st-bar{margin-bottom:1.25rem}
-  .pf-acct{flex-wrap:wrap} .pf-acct > .pf-share,.pf-acct > .pf-signin{flex:1 1 100%}      /* a phone: Google's button and Share card each get a full-width row, label and all */
+  .pf-acct{flex-wrap:wrap;flex:1 1 auto} .pf-acct > .pf-signout,.pf-acct > .pf-share,.pf-acct > .pf-signin{flex:1 1 auto}      /* a phone: the buttons share a row, wrapping when they must, and stretch to the cards' right edge (NOTES 139) */
   .st-play{grid-template-columns:1fr;row-gap:.5rem} .st-ret{padding:0 0 .5rem;border-right:0;border-bottom:.125rem solid var(--sky-2)}      /* the ring over the figures */
-  .st-tiles{grid-template-columns:1fr} .st-tile{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto;grid-template-areas:"b l n" "b c n";column-gap:.75rem;align-items:center;min-height:4.5rem;padding:.5rem .875rem}
+  .st-tiles{grid-template-columns:1fr} .st-tile{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto;grid-template-areas:"b l n" "b c n";column-gap:.75rem;align-items:center;min-height:4.5rem;padding:var(--s-2) var(--s-4)}
   .st-badge{position:static;grid-area:b} .st-tile .caps{grid-area:l} .st-cap{grid-area:c} .st-num{grid-area:n;margin:0} .st-num b{font-size:2.25rem} .st-cap{flex-wrap:wrap;row-gap:.25rem}      /* a row keeps its gold chip (a best has to look won); it wraps under the caption when the row is too narrow for both */
 }
 
 /* the account cards (9.5, 9.7): one at a time, over everything (the result card too, which keeps its own buttons), on the lobby's frosted veil like .ask */
 .acct-layer{position:fixed;inset:0;z-index:calc(var(--z-toast) + 1);display:grid;place-items:center;padding:var(--edge);background:rgba(232,243,249,.72);overscroll-behavior:contain}
 .acct-card{position:relative;width:min(30rem,100%);max-height:calc(100dvh - 2 * var(--edge));overflow-y:auto;padding:var(--s-5);text-align:left;outline:0;box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff}
+@media (max-width:480px){ .acct-card{width:min(100%,calc(100vw - 2 * var(--s-5)))} }      /* a phone: the lobby panels' edges (NOTES 139) */
 .acct-body{display:flex;flex-direction:column;gap:var(--s-3)}
 .acct-body h2{margin:0;font-size:var(--t-lg);font-weight:800;line-height:1.2;color:var(--ink-strong)}
 .acct-body p{margin:0;font-size:var(--t-sm);line-height:1.5;color:var(--ink)}
@@ -1716,8 +1731,8 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .share-btns{display:flex;flex-wrap:wrap;gap:var(--s-2)} .share-btns .btn{flex:1 1 auto;gap:.5rem;padding:0 1rem;font-size:var(--t-sm)} .share-btns svg{width:1.125rem;height:1.125rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .share-lnk{appearance:none;border:0;background:none;padding:.25rem 0;min-height:44px;font:800 var(--t-sm)/1.3 var(--font);color:var(--line-deep);text-align:left;text-decoration:underline;text-decoration-thickness:.125rem;text-underline-offset:.2em;cursor:pointer;outline:0} .share-lnk:focus-visible{border-radius:.25rem;box-shadow:var(--glow)}
 .share-lnk.is-quiet{flex:none;font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)}
-.acct-body .share-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0 var(--s-3);padding-top:var(--s-2);border-top:.125rem solid var(--sky-2);font-size:var(--t-xs);color:var(--ink-soft)}      /* the quiet end of the card: who can see it, and the way out */
-.acct-body .share-confirm{justify-content:flex-end;gap:var(--s-2)} .share-confirm span{flex:1 1 100%;padding:.25rem 0;font-weight:700;color:var(--ink)}
+.acct-body .share-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0 var(--s-3);padding-top:0;border-top:.125rem solid var(--sky-2);font-size:var(--t-xs);color:var(--ink-soft)}      /* the quiet end of the card: who can see it, and the way out */
+.acct-body .share-confirm{justify-content:flex-end;gap:var(--s-2);padding-top:var(--s-2)} .share-confirm span{flex:1 1 100%;padding:.25rem 0;font-weight:700;color:var(--ink)}
 body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}      /* "Link copied" shows over the sheet, not under its veil */
 @media (prefers-reduced-motion:reduce){ .share-prev.is-loading::after,.pf-share:hover .pf-share-ic svg{animation:none} }
 
@@ -1756,11 +1771,12 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 .rk-rules{max-width:40rem;line-height:1.45}
 #btn-ranked-go{min-width:18rem} #btn-ranked-go:disabled{opacity:.5;pointer-events:none}
 @media (max-width:700px){ .rk-head{flex-direction:column;text-align:center} .rk-lines{align-items:center} .rk-step{width:calc(25% - var(--s-2) * 3 / 4)} }      /* eight steps (NOTES 124): two rows of four */
-@media (max-aspect-ratio:1/1){ .ranked-view{padding:var(--s-4)!important} .rk-tier{font-size:var(--t-xl)} .rk-emblem .rank-em.is-xl{width:6rem;height:6rem} .rk-emblem .rank-card-em{--em-h:6rem} #btn-ranked-go{width:min(26rem,100%);height:4.75rem;padding:0 2rem;font-size:var(--t-xl)} }      /* 'Find a match' on one line at 600 px */
+@media (max-aspect-ratio:1/1){ .ranked-view{padding:var(--s-5) var(--s-4)!important} .rk-tier{font-size:var(--t-xl)} .rk-emblem .rank-em.is-xl{width:6rem;height:6rem} .rk-emblem .rank-card-em{--em-h:6rem} #btn-ranked-go{width:min(26rem,100%);height:4.75rem;padding:0 2rem;font-size:var(--t-xl)} }      /* 'Find a match' on one line at 600 px */
 @media (max-height:560px){ .ranked-view{gap:var(--s-3)!important;padding:var(--s-4) var(--s-5)!important} .rk-emblem .rank-em.is-xl{width:5.5rem;height:5.5rem} .rk-emblem .rank-card-em{--em-h:5.5rem} .rk-tier{font-size:var(--t-xl)} .rk-step{padding:.375rem .25rem} .rk-step .rank-em.is-md{width:2rem;height:2rem} .rk-rules{display:none} #btn-ranked-go{height:3.25rem} }      /* 1366x500: the head and the road shrink, the rules line goes (Find a match stays a full-size press) */
 /* the queue pill (8.2): bottom centre, above the key hints, in the rally lozenge's dress. Hidden under any overlay like the toast; the dot breathes */
 .rk-pill{position:fixed;left:50%;bottom:calc(var(--edge) + .25rem);translate:-50% 0;z-index:var(--z-hud);display:flex;align-items:center;gap:.625rem;height:2.75rem;padding:0 .875rem 0 .75rem;border-radius:var(--r-pill);
   background:rgba(255,255,255,.9);border:.125rem solid #fff;box-shadow:var(--sh-hud);color:var(--ink-strong);white-space:nowrap;max-width:calc(100vw - 2 * var(--edge))}
+@media (max-width:560px){ .rk-pill{bottom:calc(var(--edge) + 2.75rem)} }      /* a phone: above the key hints, not on them (NOTES 139) */
 .rk-pill .rk-dot{flex:none;width:.75rem;height:.75rem;border-radius:50%;background:var(--me);box-shadow:0 0 0 .125rem #fff, 0 0 .5rem rgba(58,160,255,.8);animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
 .rk-pill-text{display:flex;flex-direction:column;line-height:1.1;min-width:0} .rk-pill-text b{font-size:var(--t-md);font-weight:800} .rk-pill-text small{font-size:max(.75rem,11px);font-weight:700;letter-spacing:.04em;color:var(--ink-soft)}
 .rk-pill-time{font-size:var(--t-md);font-weight:900;color:var(--me-ink);font-variant-numeric:tabular-nums}
@@ -1892,7 +1908,7 @@ body[data-overlay="rk-vs"] #screen-tour-vs{z-index:calc(var(--z-screen) + 1);bac
 /* ---- rank up (8.10): the stamp in the rank's colour, rays behind the new emblem */
 .result-slam.is-rank{color:var(--rank-c,var(--gold-2));text-shadow:0 .5rem 0 var(--rank-deep,#8a5200);font-size:min(8rem,11vw)}
 .trophy-em .medal-rays.is-on{animation:ov-rays-in 420ms var(--ease-bounce) both, ov-spin 8s linear 420ms infinite;background:repeating-conic-gradient(var(--rank-ray,rgba(255,211,74,.55)) 0 7deg,transparent 7deg 20deg)}
-@media (max-width:700px){ .rk-acts .btn{min-height:44px} .round-card{padding:var(--s-5) var(--s-4)} .game-num{font-size:4rem;min-width:4rem} .round-card h2{font-size:var(--t-xl)} .pip-row b,.game-next small,.trophy-note,.tally-games,.result-note-sub{font-size:max(var(--t-sm),12px)} .vs-card.is-ranked .vs-round{font-size:var(--t-lg)} .vs-bar{width:14rem} .result-card.is-rk h2{font-size:3rem} }
+@media (max-width:700px){ .rk-acts .btn{min-height:44px} .round-card{padding:var(--s-6) var(--s-5)} .game-num{font-size:4rem;min-width:4rem} .round-card h2{font-size:var(--t-xl)} .pip-row b,.game-next small,.trophy-note,.tally-games,.result-note-sub{font-size:max(var(--t-sm),12px)} .vs-card.is-ranked .vs-round{font-size:var(--t-lg)} .vs-bar{width:14rem} .result-card.is-rk h2{font-size:3rem} }
 @media (max-height:560px){ .round-card{gap:var(--s-3);padding:var(--s-4) var(--s-5)} .game-num{font-size:3.5rem} .vs-em:not([hidden]){min-height:4rem} }
 
 /* ==================== RANKED: the polish pass (NOTES 117). The drama is the emblem, light, motion and layout; never a text slam (NOTES 104) ==================== */
@@ -1987,7 +2003,7 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .rkx-card.is-done{border-color:var(--line-soft)}
 .rkx-note{margin:0;text-align:center}
 .rkx-go{align-self:center}
-@media (max-width:900px){ .rkx-card .rank-em{width:4.25rem;height:4.25rem} .ranks-view{padding:var(--s-4)!important} }
+@media (max-width:900px){ .rkx-card .rank-em{width:4.25rem;height:4.25rem} .ranks-view{padding:var(--s-5) var(--s-4)!important} }
 @media (prefers-reduced-motion: reduce){ .rkx-card{animation:none} .rkx-card.is-now{transform:none} }
 /* the medal is a link to the Ranks page: a pointer, a small lift on hover, the focus halo on the keyboard */
 .st-crest.is-link,.rk-emblem.is-link{cursor:pointer;border-radius:var(--r-lg);transition:scale var(--d-fast) var(--ease-bounce)}
@@ -2015,7 +2031,7 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
    Matt and Cancel. It drops in once each time it appears. Gone under any overlay (MATCH FOUND) and on every other screen (the court has #rk-pill)
    ========================================================================================================== */
 .rk-search{position:fixed;top:0;left:50%;translate:-50% 0;z-index:calc(var(--z-screen) + 1);display:flex;align-items:center;gap:.875rem;width:max-content;max-width:calc(100vw - 2 * max(var(--edge), 16px));
-  padding:.5rem .625rem .5rem .875rem;border:.125rem solid var(--line);border-top:0;border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--tex-diag), linear-gradient(180deg,#fff,var(--sky-2));
+  padding:var(--s-2) var(--s-3) var(--s-2) var(--s-4);border:.125rem solid var(--line);border-top:0;border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--tex-diag), linear-gradient(180deg,#fff,var(--sky-2));
   box-shadow:var(--sh-3);color:var(--ink-strong);animation:rk-search-in 420ms var(--ease-out) both}
 @keyframes rk-search-in{from{transform:translateY(-110%)}}      /* from above the window: the bar is there, it just slides down */
 .rk-search[hidden],body:not([data-screen="lobby"]):not([data-screen="title"]) .rk-search,body[data-overlay] .rk-search{display:none}
@@ -2040,7 +2056,7 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 
 /* ---------- the global leaderboard (NOTES 126): a Global line, three tabs, the top 100 in a scrolling list, the You bar, the show-me switch ---------- */
 .lb-view{gap:var(--s-3)!important;padding:var(--s-5) var(--s-6)!important;max-height:calc(100dvh - 11rem);min-height:0;align-items:center}
-.lb-scope{margin:0;display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .9rem .3rem .5rem;border-radius:var(--r-pill);background:var(--sky-2);color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
+.lb-scope{margin:0;display:inline-flex;align-items:center;gap:.5rem;padding:var(--s-1) var(--s-4) var(--s-1) var(--s-2);border-radius:var(--r-pill);background:var(--sky-2);color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
 .lb-scope b{color:var(--line-deep);font-weight:900;letter-spacing:.08em;text-transform:uppercase}
 .lb-globe,.st-place svg{width:1.35rem;height:1.35rem;flex:none;fill:none;stroke:var(--line-deep);stroke-width:2;stroke-linecap:round}
 .lb-tabs{align-self:center;margin:0 auto} .lb-tabs .seg-opt{min-width:0;padding:0 1.5rem}
@@ -2065,12 +2081,13 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .lb-row.is-me,.lb-you.is-on{border-color:var(--line);background:linear-gradient(180deg,#fff,#eef7fc);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 30%,transparent)}
 .lb-state{position:absolute;inset:0;margin:0;display:grid;place-items:center;text-align:center;color:var(--ink-soft);font-weight:700}
 .lb-you{width:min(39.5rem,calc(100% - .5rem));grid-template-columns:auto minmax(0,1fr) auto auto;min-height:4rem;padding:var(--s-3) var(--s-4) var(--s-3) var(--s-2)}      /* the list's rows sit .25rem inside it: the same width. Its own padding, not a row's (NOTES 134) */
+.lb-you:has(> .lb-you-go[hidden]){grid-template-columns:auto minmax(0,1fr) auto}      /* no button: no empty fourth track and its gap, the value lines up with the rows' (NOTES 139) */
 .lb-you:not(.is-on){padding-left:var(--s-5)}      /* no rank badge on the left: the text needs its own inset */
 .lb-you .lb-rank{min-width:3.25rem;color:var(--line-deep)} .lb-you .lb-rank:empty{display:none}
 .lb-you-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0} .lb-you-text small{color:var(--ink-soft);font-weight:700;font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis}
 .lb-you:not(.is-on) .lb-you-text{grid-column:1 / 3}
-.lb-show{width:min(39.5rem,calc(100% - .5rem));border-radius:var(--r-lg)}
+.lb-show{width:min(39.5rem,calc(100% - .5rem));border-radius:var(--r-lg);padding-right:var(--s-4)}
 .st-rank-row{display:flex;align-items:center;gap:.625rem;min-width:0}
 .st-place{flex:none;display:inline-flex;align-items:center;gap:.3rem;height:2.25rem;padding:0 .75rem 0 .5rem;border-radius:var(--r-pill);border:.125rem solid var(--line-faint);background:#fff;box-shadow:var(--sh-1);color:var(--line-deep);font:900 var(--t-lg)/1 var(--font);font-variant-numeric:tabular-nums;cursor:pointer;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}
 .st-place:hover,.st-place:focus-visible{border-color:var(--line);box-shadow:var(--glow);transform:translateY(-.0625rem)}
-@media (max-width:480px){ .lb-view{padding:var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row{padding-right:.625rem;gap:.5rem} .lb-you{padding-right:var(--s-3);gap:var(--s-2)} .lb-you:not(.is-on){padding-left:var(--s-4)} }
+@media (max-width:480px){ .lb-view{padding:var(--s-5) var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row{padding-right:.625rem;gap:.5rem} .lb-you{padding-right:var(--s-3);gap:var(--s-2)} .lb-you:not(.is-on){padding-left:var(--s-4)} .lb-show{padding-right:.625rem} .lb-tabs .seg-opt{height:max(2.125rem,32px)} }

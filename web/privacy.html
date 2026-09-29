@@ -58,10 +58,10 @@
 <style>
   /* A legal page is meant to be read, quoted and copied: undo the game's no-select rule from how-to-play.css. */
   html{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
-  .updated{margin:.25rem 0 0;font-size:.9375rem;color:var(--ink-soft)}
-  .toc ol{columns:2 15rem;column-gap:2rem;margin-bottom:0} .toc li{break-inside:avoid}
+  .updated{margin:.25rem 0 1rem;font-size:.9375rem;color:var(--ink-soft)}
+  .toc ol{columns:2 15rem;column-gap:3rem;margin-bottom:0} .toc li{break-inside:avoid;margin:0;padding-block:.1875rem}
   .summary ul{margin-bottom:0}
-  .tbl{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem 0 .75rem}
+  .tbl{width:calc(100% + 1.25rem);overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem -.625rem .75rem}
   table{width:100%;border-collapse:collapse;font-size:.9375rem;line-height:1.45}
   th,td{text-align:left;vertical-align:top;padding:.5rem .625rem;border-bottom:.0625rem solid var(--line-soft)}
   th{font-weight:800;color:var(--ink-strong);background:var(--sky-2)}

@@ -14,7 +14,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 html,body{height:100%}
 body{margin:0;color:var(--ink);background:var(--bg) linear-gradient(180deg,#f7fbfd 0,#eaf3f8 45%,var(--bg) 100%) fixed;font:500 1.0625rem/1.5 var(--font);-webkit-font-smoothing:antialiased;
   -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
-main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:max(1.25rem,env(safe-area-inset-top)) 1.5rem max(1.5rem,env(safe-area-inset-bottom));text-align:center}
+main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:max(1.5rem,env(safe-area-inset-top)) max(1.5rem,env(safe-area-inset-right)) max(1.5rem,env(safe-area-inset-bottom)) max(1.5rem,env(safe-area-inset-left));text-align:center}
 .logo-mark{display:inline-flex;align-items:center;margin:0 0 .5rem;font-size:2.75rem;font-weight:900;line-height:1;color:var(--ink-strong);filter:drop-shadow(0 .05em 0 rgba(90,150,185,.28))}
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 50.0% 23.0%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 73.4% 36.5%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 73.4% 63.5%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 50.0% 77.0%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 26.6% 63.5%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 26.6% 36.5%,var(--ball-deep) 0 .047em,transparent .052em),radial-gradient(circle at 34% 28%,#fbffa8,var(--ball) 58%,#c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35),0 .03em .06em rgba(40,80,110,.25)}
 .view{display:none;flex-direction:column;align-items:center;gap:1rem;width:100%;max-width:24rem}
@@ -23,6 +23,8 @@ h2{margin:0;font-size:1.625rem;font-weight:900;line-height:1.2;color:var(--ink-s
 p{margin:0}
 b{font-weight:800;color:var(--ink-strong)}
 .note{font-size:.9375rem;color:var(--ink-soft);min-height:1.4em}
+[data-name="live"] .note:empty{display:none}      /* live-stats and an unset live-note: no reserved line or flex gap (live-note is set once at load) */
+[data-name="live"] .row + .note{margin-top:-.25rem}      /* the hold caption sits with the buttons it describes */
 .legal{font-size:.8125rem;line-height:1.4;color:var(--ink-soft);max-width:20rem} .legal a{font-weight:700}      /* the Terms and Privacy links, under Start: small, before the motion prompt (web/terms.html) */
 a{color:var(--link);font-weight:800}
 .art{width:12rem;height:auto}
@@ -40,7 +42,7 @@ form{display:flex;flex-direction:column;align-items:center;gap:1rem;width:100%}
 input{width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem solid var(--line-soft);background:#fff;color:var(--ink-strong);font:900 2rem/1 var(--font);letter-spacing:.25em;text-align:center;text-transform:uppercase;-webkit-user-select:text;user-select:text}
 input::placeholder{color:#c3dbe8}
 /* the code box: P- is printed in it, you type the four after it (NOTES 81). The box is the label; the input inside it is bare */
-.code-field{display:flex;align-items:center;justify-content:center;gap:.125em;width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem solid var(--line-soft);background:#fff;font:900 2rem/1 var(--font);letter-spacing:.25em;cursor:text}
+.code-field{display:flex;align-items:center;justify-content:center;gap:.125em;width:100%;max-width:16rem;height:4rem;border-radius:1rem;border:.1875rem solid var(--line-soft);background:#fff;font:900 2rem/1 var(--font);letter-spacing:.25em;cursor:text;padding-left:.5em}
 .code-field{outline:.1875rem solid transparent;outline-offset:.5rem;transition:outline-color .2s linear,outline-offset .24s var(--ease-out)}      /* the ring tightens onto the box */
 .code-field:focus-within{outline-color:var(--line);outline-offset:.1875rem}
 @media (forced-colors:active){.btn,.code-field{outline-style:none} .btn:focus-visible,.code-field:focus-within{outline-style:solid}}      /* the system colours a transparent outline in: no ring at rest */

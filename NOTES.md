@@ -2754,3 +2754,34 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
 - The share card PNG (server/card.js) draws the number and a gold trophy in its pill instead of "815 trophies";
   CARD_V 7 -> 8 so link previews fetch the new picture. The og tags, aria-labels and the static pages (How to play,
   changelog, Terms, Privacy) keep the word: they are text for other apps, screen readers and legal reading.
+
+## 139. Site-wide spacing sweep: one padding standard
+Five area audits (lobby menus, Stats / Ranked / Leaderboard, in-game, static pages, phone), one standard, then
+fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 and 375-wide phones. Spacing only.
+- Standard: the page gutter is one inset for header, body and footer (desktop --s-7: Back now matches the online
+  count; phones <=480 --s-5, was 10px); lobby panels --s-6 on desktop and --s-5 --s-4 on phones; a card inside a panel
+  --s-3 --s-4 (the NOTES 134 You card); list / settings rows start their text --s-4 from the card edge, and group
+  labels and the sheet heading line up with it; --s-3 between sibling cards; sheets --s-4 with --s-3 between groups.
+- Lobby: phone gutters on body, footer, Back and online count; at 481-700px and <=480 every wide panel fills the body
+  (Courts, Bot, Your stats, Ranks, Leaderboard all share one edge instead of three); Courts / bracket / ranked /
+  ranks / bot / create / share panels get the phone panel padding; the courts list trims 1rem on phones so the panel
+  keeps its gap above the footer; the tile counters ("2 open") clear the tile icons; Play a bot is 68rem wide so
+  Club's subline no longer runs through its card padding, and on phones the sublines wrap; the key-hint items never
+  break mid-label; the footer notes get even top/bottom padding.
+- Settings sheet: heading, group labels and row text on one edge; --s-4 padding (short windows keep .875rem so it
+  does not scroll at 1280x720); rows are at least 40px tall below 700px (tap targets).
+- Your stats: the cards' side inset is --s-4 everywhere; on phones Sign out and Share card share a row, so the view
+  now fits at 390x844. Ranked search bar, leaderboard scope pill, the You card's value column (it lines up with the
+  rows when it has no button), the Show me row and the phone leaderboard tabs.
+- In game: the watch-request card no longer stretches to the full phone height (.ask.notice), the ask card's inset,
+  bracket headline / round strip / names / Leave on one column edge, the round card on phones, the Ranked queue pill
+  lifted clear of the key strip on narrow screens, the camera card's phone gutter.
+- Static pages: 24px between cards (was 16), changelog days further apart and 24px above the footer, the footer's
+  own padding restored from 40rem up (a shorthand was zeroing it), notes and the data-tools box get even padding,
+  Privacy / Terms: space under "Last updated", a wider table-of-contents column gap, table text flush with the
+  paragraphs; 404 button centred in its space; the phone paddle page gets 1.5rem on all four sides and no reserved
+  empty note line.
+- Not changed (deliberate): button shapes, HUD score tabs and rally chips (sized for the game), the Ranked series
+  card's height budget, the Ranks page's own scroll. Known and left for the owner: the "Getting ready" (connect)
+  panel is taller than the window at 1440x900 and 1280x720 and on phones covers the header title; fixing it needs a
+  layout change, not padding.
