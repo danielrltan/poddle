@@ -177,9 +177,17 @@ console.log('named look: Dan');
     pd.ghost = 1; sc.setLooks(['dan', null]); sc.setLooks([null, null]); let ms = 1e7; for (let i = 0; i < 60 && pd.ghost > 0; i++) sc.render(ms += 17);
     return { ghost: pd.ghost, eye: u.eyes[0].material.color.getHex(), glow: u.danFace[0].material.color.getHex(), edge: edge ? edge.color.getHex() : -1, skin: u.skin.color.getHex() }; });
   ok(c.ghost === 0 && c.eye === 0x20222c && c.glow === 0 && c.edge === 0x1b1d24 && c.skin === 0xf2c9a0, `a look changed while faded: the eyes, glow, paddle edge and skin all come back (${JSON.stringify(c)})`);
-  c = await page.evaluate(async () => { const { lookFor } = await import('../web/scene.js'); return [lookFor('Dan', true), lookFor(' dAN ', true), lookFor('Dan', false), lookFor('Dan', undefined), lookFor('Danny', true), lookFor(null, true)]; });
-  ok(JSON.stringify(c) === '["dan","dan",null,null,null,null]', `lookFor: only the registered username Dan (any case); a guest called Dan, Danny or an empty seat get none (${JSON.stringify(c)})`);
+  c = await page.evaluate(() => { const sc = __scene, u = sc._dbg.pads[0].avatar.userData; sc.setLooks(['dan', null]); sc.setLooks(['mae', null]);      // Dan's seat handed to Mae: nothing of his stays
+    return { mae: u.looks.mae.every(o => o.visible), dan: u.looks.dan.some(o => o.visible), eyes: u.eyes[0].visible, hair: u.hair.visible, skin: u.skin.color.getHex(), kit: u.kit.color.getHex() }; });
+  ok(c.mae && !c.dan && c.eyes && !c.hair && c.skin === 0xf3f1ef && c.kit === 0xf3f1ef, `Mae: the white lop-eared bunny (ears, nose, cheeks, bow, tail), her own dark eyes, no hair, nothing of Dan's (${JSON.stringify(c)})`);
+  c = await page.evaluate(async () => { const { lookFor } = await import('../web/scene.js'); return [lookFor('Dan', true), lookFor(' dAN ', true), lookFor('Dan', false), lookFor('Dan', undefined), lookFor('Danny', true), lookFor(null, true), lookFor('Mae', true), lookFor('MAE', true), lookFor('Mae', false), lookFor('Maeve', true)]; });
+  ok(JSON.stringify(c) === '["dan","dan",null,null,null,null,"mae","mae",null,null]', `lookFor: only the registered usernames Dan and Mae (any case); a guest called Dan or Mae, Danny, Maeve or an empty seat get none (${JSON.stringify(c)})`);
   await page.close(); }
+{ const page = await open('spectate=1&view=free&matt=1&mae=0&t=2.5', 1280, 720); await settle(page);      // Mae, front and back
+  await page.evaluate(() => { const d = __scene._dbg, R = d.renderer, c = d.camera, a = d.pads[0].avatar.position; R.setScissorTest(true);
+    [1, -1].forEach((f, k) => { c.position.set(a.x + 0.5 * f, 2.2, a.z - 2.6 * f); c.lookAt(a.x, 1.7, a.z); c.fov = 38; c.aspect = 640 / 720; c.updateProjectionMatrix();
+      R.setViewport(k * 640, 0, 640, 720); R.setScissor(k * 640, 0, 640, 720); R.render(d.scene, c); }); R.setScissorTest(false); R.setViewport(0, 0, 1280, 720); });
+  await page.screenshot({ path: `${shots}mae-front-and-back-1280x720.png` }); await page.close(); }
 
 // ---------- 7. ball contrast, both ends (WCAG relative luminance, (L1 + 0.05) / (L2 + 0.05), mean over the ball's disc vs the same pixels without it) ----------
 console.log('ball contrast');

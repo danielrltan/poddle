@@ -232,16 +232,22 @@ function buildPaddle(side) {
   return g;
 }
 
-// ---------- named looks (NOTES 137): a character reserved for one registered username ----------
+// ---------- named looks (NOTES 137, 144): a character reserved for one registered username ----------
 // TEMPORARY, until cosmetics exist. The username Dan (the developer's account, the same one ui.js DEV_NAMES gives the hammer
-// badge) always plays as a plain white figure with glowing orange eyes and an orange headband tied at the back, no hair. It
+// badge) always plays as a plain white figure with glowing orange eyes and an orange headband tied at the back, no hair. The
+// username Mae plays as a white lop-eared bunny: pink inside the ears, pink nose and cheeks, a pink bow on top, a cotton tail. It
 // overrides the side's shirt and hair in every view and venue, for everyone who sees that seat. Only a REGISTERED username
 // counts (a guest typing "Dan" gets the normal look); usernames are unique and confusable-folded on the server, so only the
-// owner's account can carry it. Matt's seat and the menu's attract rally never take a named look.
+// account holding that username can carry it. Matt's seat and the menu's attract rally never take a named look.
 // To remove it: empty LOOKS. To turn it into cosmetics: have the server send each seat's look id instead of lookFor() here.
-export const LOOKS = { dan: { body: 0xf0f0f0, band: 0xff7a1a, bandGlow: 0x4d2408, glow: 0xff6f12 } };      // bandGlow: a little self-light, so the band stays orange on its shaded side
-const LOOK_NAMES = { dan: 'dan' };                         // lower-cased registered username -> LOOKS key
+export const LOOKS = {      // body: skin, shirt, shorts, shoes and hands. eyes: the default eyes stay
+  dan: { body: 0xf0f0f0, band: 0xff7a1a, bandGlow: 0x4d2408, glow: 0xff6f12, eyes: false },      // bandGlow: a little self-light, so the band stays orange on its shaded side
+  mae: { body: 0xf3f1ef, pink: 0xffb3c6, blush: 0xffc6d6, bow: 0xff6f9f, eyes: true },
+};
+const LOOK_NAMES = { dan: 'dan', mae: 'mae' };                         // lower-cased registered username -> LOOKS key
 export const lookFor = (name, reg) => (reg === true && typeof name === 'string' && LOOK_NAMES[name.trim().toLowerCase()]) || null;
+
+const MAE_EAR = [0.2, 0.19, -0.04, 0, -0.2, 0.55];     // Mae's ear: tip x (mirrored), y, z; then rotation x, y (mirrored: + turns the lining to face out), z (mirrored: + swings the bottom out)
 
 // ---------- Mii-ish avatar, built facing -z (the net, in the player frame) ----------
 function buildAvatar(side) {
@@ -284,13 +290,36 @@ function buildAvatar(side) {
   danFace.push(band, knot);
   for (const sx of [-1, 1]) { const tail = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.19, 0.012), bandM); tail.geometry.translate(0, -0.095, 0); tail.position.set(sx * 0.022, 0.11, rAt(0.112) + 0.02); tail.rotation.set(-0.12, 0, sx * 0.22); danFace.push(tail); }      // a negative x tips the hanging end out, away from the head
   for (const o of danFace) { o.visible = false; head.add(o); }
+  // Mae (LOOKS.mae), a lop-eared bunny: the default eyes, and fur that is the skin material (white while she sits). Each ear
+  // is a flattened ellipsoid hung from the top of the head by its tip, broad face forward, the bottom swung out; its pink lining
+  // is on the front. A pink nose, two blush discs laid on the cheeks (lookAt the outward normal), a pink bow on top between the
+  // ears, and a cotton tail on the back of the body (on `upper`, so it crouches with her).
+  const maeParts = [], maeHead = [], M = LOOKS.mae, pinkM = new THREE.MeshStandardMaterial({ color: M.pink, roughness: 0.8 });
+  const blushM = new THREE.MeshStandardMaterial({ color: M.blush, roughness: 0.9 }), bowM = new THREE.MeshStandardMaterial({ color: M.bow, roughness: 0.55 });
+  const blob = new THREE.SphereGeometry(1, 20, 14), hang = new THREE.SphereGeometry(1, 20, 14).translate(0, -1, 0);      // hang: its top at the origin
+  for (const sx of [-1, 1]) {
+    const ear = new THREE.Group(); ear.position.set(sx * MAE_EAR[0], MAE_EAR[1], MAE_EAR[2]); ear.rotation.set(MAE_EAR[3], sx * MAE_EAR[4], sx * MAE_EAR[5]);
+    const fur = new THREE.Mesh(hang, skin); fur.scale.set(0.095, 0.23, 0.036);
+    const lining = new THREE.Mesh(hang, pinkM); lining.scale.set(0.064, 0.175, 0.014); lining.position.set(0, -0.04, -0.026);
+    ear.add(fur, lining); maeHead.push(ear);
+    const cheek = new THREE.Mesh(blob, blushM); cheek.scale.set(0.04, 0.025, 0.008); const n = new THREE.Vector3(sx * 0.16, -0.07, 0); n.z = -Math.sqrt(0.27 * 0.27 - n.x * n.x - n.y * n.y);
+    cheek.position.copy(n).multiplyScalar(1.005); cheek.lookAt(n.clone().multiplyScalar(2)); maeHead.push(cheek);      // looked at before it has a parent: local = world here
+  }
+  const nose = new THREE.Mesh(blob, pinkM); nose.scale.set(0.03, 0.02, 0.016); nose.position.set(0, -0.055, -0.263);
+  const bow = new THREE.Group(); bow.position.set(0, 0.262, -0.05); bow.rotation.x = -0.25;
+  for (const sx of [-1, 1]) { const loop = new THREE.Mesh(blob, bowM); loop.scale.set(0.075, 0.048, 0.03); loop.position.x = sx * 0.068; loop.rotation.z = sx * 0.3; bow.add(loop); }
+  const bowKnot = new THREE.Mesh(blob, bowM); bowKnot.scale.set(0.03, 0.03, 0.026); bow.add(bowKnot);
+  maeHead.push(nose, bow);
+  for (const o of maeHead) { o.visible = false; head.add(o); }
+  const cotton = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 12), skin); cotton.position.set(0, 0.6, 0.255); cotton.visible = false;
+  maeParts.push(...maeHead, cotton);
   const offHand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), skin); offHand.position.set(-0.42, 0.85, -0.12);
   // Everything above the ankles hangs off `upper`, so a crouch can sink and squash the body while the feet stay on the
   // court. Sinking the whole group instead would push the shoes through the paint.
-  const upper = new THREE.Group(); upper.add(body, shorts, head, offHand); g.add(upper);
+  const upper = new THREE.Group(); upper.add(body, shorts, head, offHand, cotton); g.add(upper);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.scale.setScalar(1.3);
-  g.userData = { head, body, offHand, upper, feet, skin, shirt, kit, hairM, whites, hair, eyes, mattFace, danFace };
+  g.userData = { head, body, offHand, upper, feet, skin, shirt, kit, hairM, whites, hair, eyes, mattFace, danFace, looks: { dan: danFace, mae: maeParts } };      // looks: each named look's own parts, shown only while it sits
   return g;
 }
 
@@ -737,7 +766,7 @@ export function createScene(containerEl) {
   }
   function paint(pd, matt) {                                // a seat changes hands between a person and Matt, or a named look (LOOKS) sits down: repaint, don't rebuild
     pd.matt = matt; const u = pd.avatar.userData, m = matt ? COL.matt : null, L = !matt && !at.on && LOOKS[pd.look] || null, skin = L ? L.body : m ? m.skin : COL.skin, shirt = L ? L.body : m ? m.shirt : COL.shirt[pd.side];      // Matt beats a look; the attract rally is nobody's
-    u.skin.color.setHex(skin); u.shirt.color.setHex(shirt); u.kit.color.setHex(L ? L.body : COL.kit); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); for (const w of u.whites) w.visible = matt; u.hair.visible = !matt && !L; for (const e of u.eyes) e.visible = !matt && !L; for (const o of u.mattFace) o.visible = matt; for (const o of u.danFace) o.visible = !!L;      // Matt is bald, with his own eyes; so is Dan, with his headband
+    u.skin.color.setHex(skin); u.shirt.color.setHex(shirt); u.kit.color.setHex(L ? L.body : COL.kit); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); for (const w of u.whites) w.visible = matt; u.hair.visible = !matt && !L; for (const e of u.eyes) e.visible = !matt && (!L || L.eyes); for (const o of u.mattFace) o.visible = matt; for (const k in u.looks) for (const o of u.looks[k]) o.visible = !!L && L === LOOKS[k];      // Matt is bald, with his own eyes; so are the named looks, with their own parts
     pd.handM.color.setHex(skin); pd.ghostM.color.setHex(skin); pd.sleeveM.color.setHex(shirt);       // the hand on his paddle, and his forearm when a spectator looks through his eyes
     for (const mt of [u.skin, u.shirt, u.kit, u.hairM, pd.handM]) mt.userData.base.c.copy(mt.color); if (pd.ghost > 0) ghostify(pd);      // only what paint set becomes the new base: a full rebase() while the seat is faded would keep every other part (eyes, paddle, band) white for good
   }

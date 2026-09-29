@@ -2884,3 +2884,21 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
 - The owner's ask: the home screen's Ranked tile draws the Ranked view's progress bar (rk-bar, slimmer: .rk-tile-bar)
   under its "Silver II · 240 [cup]" line: the same fill, through the rank's three divisions (Pro stays full), set in
   ui.rkTile from the same tier / trophies. Hidden before a first Ranked match and behind the sign-in / username gate.
+
+## 144. The username Mae plays as a white lop-eared bunny with pink accents and a bow
+- The owner's ask: a second named look (NOTES 137), for the registered username Mae: a white lop-eared bunny with pink
+  on the ears and nose, and a bow on the head. Built as: white fur everywhere (0xf3f1ef, the skin material, so the body,
+  head, hands, shorts and shoes all go white), the default dark eyes kept, no hair; two lop ears hung from the top of the
+  head by their tips, broad face forward and swung out (MAE_EAR), each with a pink lining on its front; a pink nose; two
+  pale pink blush discs on the cheeks; a deeper pink bow on top between the ears; and a white cotton tail on the back of the
+  body (on `upper`, so it crouches with her). Decided without asking: the bow is pink (no colour was given), and the
+  cheeks and tail are the "etc.".
+- Same machinery and rules as Dan's look: `LOOKS.mae` + `LOOK_NAMES.mae` in web/scene.js; buildAvatar's parts per look now
+  sit in `userData.looks` ({ dan, mae }), and paint() shows only the seated look's parts (a seat handed from Dan to Mae
+  keeps nothing of his). `eyes: true` in a look keeps the default eyes. Only a REGISTERED username counts; a guest typing
+  "Mae" gets the normal look. TEMPORARY like Dan's: remove the `mae` entries to take it away.
+- Note: "Mae" was not on the public leaderboard when this shipped (not listed, or not registered yet). The look goes to
+  whoever holds the username Mae, so the intended player should claim it if she has not.
+- Tests: test/scene-next.mjs checks Mae's parts, eyes, hair and colours, that nothing of Dan's stays, and lookFor for Mae /
+  MAE / a guest Mae / Maeve; render test/ui-shots/scene-next/mae-front-and-back-1280x720.png. scene-preview.html takes
+  `&mae=0|1`. No legal change (derived from the public username on the client; CLAUDE.md's data-flow line updated).
