@@ -3038,3 +3038,45 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   public username on the client).
 - Checked in renders (scoreboard both sides and beside a rank emblem, VS card, leaderboard row, profile card) and in
   test/profile-ui.mjs (bow inside the name, text unchanged, no hammer; a guest Mae gets none).
+## 149. A phone gets its own home: the paddle code, Watch a match, Your stats, Leaderboard, Friends
+- "can you build a poddle mobile version, where, you are greeted with only the essential things like courts button to watch, view your stats,
+  leaderboards, etc. since playing is not possible but only as a racket (so maybe have like a code enter area instead of a play button)."
+- Before: a phone that opened poddleball.com got the computer's game: the title's Play, then Quick play, Ranked and Play a bot. Each of those took
+  a seat, and a phone can't use one, because it can't be the screen and the paddle at the same time.
+- A phone is `MOBILE` in web/main.js: a coarse pointer, under 600 px on its short side (`window.screen`, either way up), and the lobby. `?mobile=1` or
+  `?mobile=0` forces it either way (tests; nothing is stored). ui.setMobile puts `data-mobile` on <html>. A tablet stays the full game, because it can be the
+  screen with a phone as its paddle, and so does a phone with a short side of 600 px or more (a foldable, unfolded).
+- The phone skips the title for the lobby's home, which becomes the phone home. The header says Poddle, there's no Back and no name row (Esc and Back
+  at home stay home). At the top is the **Be the paddle** card: P- and a box for the 4 characters, using pad.js's rules (upper-cased; I, O, 0 and 1
+  dropped; a pasted "P-ABCD" or a stray leading P works). Go opens `/pad.html?k=CODE` on its Start screen: the tap there is what iOS needs to ask for
+  motion, and pad.html already says when a code is wrong. Under the card, **On this phone**: Watch a match (the Courts tile), Your stats, Leaderboard and
+  Friends, each shown where it was before (stats and the leaderboard where the server keeps stats, Friends where sign-in is on). Quick play, Ranked and
+  Play a bot are `.desk-only`. `tilesFit` skips them, so `data-n` counts only what shows. The layout is 2 across, with Watch a match taking the whole row
+  when the count is odd. On its side: the card on the left, the tiles on the right, with no Esc or F key hints.
+- A phone never takes a seat. It's enforced in one place, `request()`: quick, create, join, rk, rkwarm and tcreate are refused with "Play on a computer.
+  This phone can be its paddle.", so a hidden button pressed some other way still seats nobody. On top of that:
+  - Courts has no Join, Create court or Create tournament, and Watch sits alone under the code boxes. Enter in the boxes watches (`join` becomes `watch`).
+  - Court rows: a waiting player, a player against Matt ("Ask to play" before) and a tournament all say Watch and watch on a tap. An empty court has
+    nothing to see and is left out. The empty list offers no Create court.
+  - A `?court=` join link opens as a spectator: `play()` sets wantWatch. A tournament code watches, which opens its bracket or sign-up screen as a viewer,
+    where Warm up and Start are hidden.
+  - A spectator gets no Ask to play (`askSync`, `askPlay`). The in-court settings card has no Paddle or Match group, no AirPod or Camera light, and no
+    speaker picker.
+  - The Ranked view's Play Ranked and Warm up are hidden, and the handler returns before its search bar shows.
+- Edge cases, and the decisions made without asking:
+  - Guest or signed in: the same home. A phone's guest stats belong to the phone's own device id (poddle.device), not the computer's, so a guest sees
+    empty stats there. Signing in (Your stats) shows the account's. Nothing merges on its own.
+  - No name yet: the phone home asks for none, and `nameGate` leaves `needs-name` off there, so nothing is dimmed at half opacity with no name row to
+    say why. Watch a match opens Courts, whose name row asks at the first Watch and dims the rows until then, as before. A username replaces it.
+  - Reload: /courts, /stats and /leaderboard come back to their view. / and /play come back to the phone home. Leaving a watched court lands on the phone home.
+  - Friends invites (slice B, being built in another session): docs/SOCIAL.md 10 now says an invite to play or duel that is accepted on a phone must
+    become a watch, or say "Play on a computer", because the gate would refuse its join.
+  - No announcement toast (NOTES 147). The changelog has an entry.
+- Found on the way: `PHONE_SIZED` read `screen.width`, which in main.js is its own `screen()` function (the menu switcher), so it was false everywhere
+  and the title's "this phone becomes your paddle" note never showed. It now reads `window.screen`. The note only shows on a phone with `?mobile=0` now.
+- Legal: nothing changed. No new data is sent or stored, no new storage key, no new permission (pad.html asks for motion as before), nothing new
+  is shown to others, and no third party. Privacy and Terms stay as they are.
+- test/mobile-ui.mjs (MOBILE_UI_PORT, default 9880; fake game + fake /api), 26 checks: the phone home and its tiles; Back and Esc; hidden seat buttons
+  pressed by script send nothing and say why; Courts rows, the code boxes and a ?court= link send watch and never join; no name; the paddle code (Go
+  lands on pad.html's Start with P-CODE); landscape; and an iPad, a desktop and ?mobile=0 keep the title and the full lobby. Screenshots:
+  test/ui-shots/mobile-home.png, mobile-courts.png, mobile-land.png.

@@ -174,3 +174,8 @@ CLIENT-DRIVEN, in two steps, and a failed accept never costs the invitee their g
    Without a valid ticket join/watch behave as today.
 - The sender's Matt match left because a duel was accepted is an abandon, not a loss (the leave carries the duel
   ticket).
+- A PHONE (NOTES 149, web/main.js `MOBILE`): the phone home never takes a seat. request() refuses quick/create/join/rk/rkwarm/tcreate on a phone, and
+  the Courts `join` handler turns a join into a watch. So a play or duel invite accepted on a phone must become a watch invite, or say "Play on a
+  computer". Leave the watch invite as it is, and never send an invite a phone can only refuse: a sender can see a friend's status but not their device,
+  so the invitee's client decides. The gate only catches what goes through request() (refused with a "Play on a computer" toast): an accept that
+  calls game.send({type:'join', code, t}) directly would SEAT the phone with no paddle, so the accept must check MOBILE itself or go through request().

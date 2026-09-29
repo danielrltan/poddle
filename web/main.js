@@ -31,7 +31,13 @@ ui.setServerAddress(GAME);
 // A phone can be the paddle wherever the page is served securely (its sensors need https, and it cannot open 'localhost'), so
 // the hosted game needs no helper and no Mac. ?padtest=1 lets the tests pair a fake phone on localhost.
 const CAN_PHONE = HOSTED && location.protocol === 'https:' || qs.get('padtest') === '1';
-const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 600;
+const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(window.screen.width, window.screen.height) < 600;      // window.screen: this file's own screen() (the menu switcher) shadows the bare name, which made this false everywhere until NOTES 149
+// A phone (NOTES 149): touch first and under 600 px on its short side, either way up. It cannot be the screen and the paddle at once, so it gets the phone home
+// (the paddle-code card, watch, stats, the leaderboard, friends) and never takes a seat. A tablet stays the full game: it can be the screen, a phone its paddle.
+// ?mobile=1 | 0 forces it either way (the tests; nothing is stored)
+const MOBILE = LOBBY && (qs.get('mobile') === '1' || qs.get('mobile') !== '0' && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) < 600);
+ui.setMobile(MOBILE);
+const SEATS = new Set(['quick', 'create', 'join', 'rk', 'rkwarm', 'tcreate']);      // what a phone never asks for: each would seat it (or queue it) with no paddle
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
 else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
 if (HOSTED) { $('down-lan').hidden = true; $('down-net').hidden = false; }      // online, 'start the server on this Mac' is no help: it is the player's own connection
@@ -298,7 +304,7 @@ function startCal() { if (undo) undo.kept = false; calibrating = true; stats.cal
 function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal: on }); }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
-  phase = 'lobby'; screen('lobby');
+  phase = 'lobby'; screen('lobby'); if (MOBILE) wantWatch = true;      // a phone opens any court link as a spectator: a join link watches
   if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
 function begin() {                                 // seated: the camera primer first (once ever), then straight to calibration if the paddle is already streaming, straight to the court if that is done too
@@ -314,6 +320,7 @@ let pendT = 0;
 function settle() { const was = pending; pending = null; clearTimeout(pendT); ui.lobbyBusy(false); if (was && was.type === 'rkwarm') rkBarSync(); }
 const RK_ELSEWHERE = new Set(['quick', 'create', 'join', 'watch', 'tcreate']);      // another court while queued for Ranked: the server refuses it (joinfail inrk), so it is never sent
 function request(m) {                               // one lobby request at a time, each carrying the player's name. Not connected right now: it goes out when the socket opens
+  if (MOBILE && SEATS.has(m.type)) { botWant = null; say('Play on a computer. This phone can be its paddle.', null, 3000); return; }      // the one gate: a button a phone should not show that slipped through still seats nobody
   if (pending) return; if (rkLobbyQ() && RK_ELSEWHERE.has(m.type)) { botWant = null; say(RK_IN_QUEUE, null, 3200); return; }
   const n = myName(); m.name = sentName = n; if (n && !profile.username()) ls.set('poddle.name', n);
   pending = m; ui.lobbyBusy(true); game.send(m);
@@ -331,9 +338,9 @@ const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostn
 let askId = 0, askWho = '', askedFor = false, noBot = false;
 const CAN_PADDLE = CAN_PHONE || /Mac/.test(navigator.platform) && navigator.maxTouchPoints <= 1;      // this device can be a paddle (the inverse of the viewer-only note at the top): only then is there an Ask to play
 function askSync() { const pd = state && state.paddles || [], bots = pd.filter(p => p && p.bot).length, hum = pd.filter(p => p && !p.bot).length;      // a spectator, one human playing Matt
-  ui.showAsk(LOBBY && spec() && phase === 'watch' && CAN_PADDLE && bots === 1 && hum === 1 && !rkKind); }      // never in a Ranked warm-up: that seat is the queue's (docs/RANKED.md 3.11)
+  ui.showAsk(LOBBY && spec() && phase === 'watch' && CAN_PADDLE && !MOBILE && bots === 1 && hum === 1 && !rkKind); }      // never in a Ranked warm-up: that seat is the queue's (docs/RANKED.md 3.11)
 function answer(yes) { if (!askId) return; game.send({ type: 'answer', id: askId, yes }); ui.askCard(null); }
-function askPlay() { game.send({ type: 'ask' }); }
+function askPlay() { if (!MOBILE) game.send({ type: 'ask' }); }
 ui.onAnswer(answer); ui.onAsk(askPlay);
 function switchSeat(m) { const toSpec = m.role === 'spectator'; role = toSpec ? 'spectator' : 'player'; room = m.code; noBot = !toSpec; ui.setRoom(room, shareLink(room)); setUrl(room, toSpec);      // the server moved me between the stands and a seat of the same court: one path
   ui.askPlay(null); ui.askCard(null); ui.setSpectator(toSpec); ui.showAsk(false); syncSettings(); clearFar(); if (toSpec) enterWatch(); else { phase = 'lobby'; begin(); } }      // begin(): connect -> calibrate -> play; a calibrated paddle goes straight to play
@@ -486,7 +493,7 @@ function toLobby(msg) {                            // out of a room, back to the
 }
 function back() {                                  // Back button / Esc, wherever it is
   if (!LOBBY) return;
-  if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { rkQuit(); game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else { phase = 'title'; screen('title'); } }      // Create court and Your court go back to Courts
+  if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { rkQuit(); game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else if (!MOBILE) { phase = 'title'; screen('title'); } }      // a phone's home is its top: no title behind it      // Create court and Your court go back to Courts
   else if (undo && (phase === 'camera' || phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court (the help can come up there too, after a Turn on)
   else if (phase === 'camera' || phase === 'connect' || phase === 'calibrate') { rkQuit(); game.send({ type: 'leave' }); toLobby(); }      // the primer is a set-up screen like the others: Back leaves the court
   venueSync();                                     // off the Ranked view (or the title): the park again, unless the queue is still mine
@@ -838,7 +845,7 @@ const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); sc
 scene.audio.onDevicesChanged(loadSinks);           // an AirPod connecting mid-match changes the list under the open card
 addEventListener('pointerdown', e => { unlock(); if (!e.target?.closest?.('#rk-search')) play(); });      // the Ranked search bar over the title is not a press of Play (its Cancel stays on the title)
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
-ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // the code screen of a watch link watches
+ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: MOBILE || wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // a phone's Enter in the code boxes, or a court row, watches      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
   bot: playBot,
   start: () => { if (room && phase === 'lobby') begin(); }, back, copied: watch => say(watch ? 'Viewer link copied' : 'Invite copied', null, 1600),
@@ -846,7 +853,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   leaderboard: () => profile.showBoard(),      // the global leaderboard (NOTES 126): web/profile.js too
   friends: () => social.showView(),      // Friends (docs/SOCIAL.md 6): web/social.js
   ranked: () => { { const g = profile.rkGate(); if (g === 'signin') return profile.signIn(); if (g === 'username') return profile.pickName(); }      // NOTES 133: the button is the missing step, never the queue
-    if (pending || room || rkQueued) return; profile.seated(); ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1), waiting in the lobby. It settles on rk (queued, or a partner at once) or rkfail. profile.seated(): a first visit's device id is made now and its hello goes first, or the entry could never be paired
+    if (pending || room || rkQueued || MOBILE) return; profile.seated(); ui.rkSearch?.(true); request({ type: 'rk' }); },      // Find a match: the queue (docs/RANKED.md 8.1), waiting in the lobby. It settles on rk (queued, or a partner at once) or rkfail. profile.seated(): a first visit's device id is made now and its hello goes first, or the entry could never be paired
   rkWarm: () => { if (pending || room || !rkLobbyQ()) return; if (phase === 'title') play(); request({ type: 'rkwarm' }); rkBarSync(); },      // the search bar's Warm up with Matt: the warm-up court (settles on room, or rkfail busy { warm })
   rkCancel: () => { if (!rkLobbyQ()) return; if (pending && pending.type === 'rkwarm') settle(); game.send({ type: 'rkleave' }); },      // the search bar's Cancel: out of the queue (the server answers rk { phase: off })
   rankedOpen: () => { venueSync(); profile.showRanked(); }, ranksOpen: () => profile.showRanked(), view: v => { route(v); venueSync(); } });      // every view change re-picks the venue: the Ranks page stands in the stadium whichever way it was opened      // the Ranked view opened: the stadium builds behind the glass, the head and the road come from /api/stats
@@ -860,7 +867,7 @@ profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game
   badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), cup: el => ui.cupify?.(el), board: () => { if (!room) ui.lobbyView('leaderboard'); }, rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0, place: Number.isInteger(L.place) ? L.place : rkYou.place }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 rkTile();                                          // the Ranked tile's line before anything is known: the dimmed Bronze emblem and 'Play your first match'
-{ const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } }      // a reload on /courts, /stats, /ranked...: straight back to that view (after profile.init: Your stats fetches through it)
+{ const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } else if (MOBILE) play(); }      // a phone skips the title: its home is the lobby's (a court link lands in Courts, watching)      // a reload on /courts, /stats, /ranked...: straight back to that view (after profile.init: Your stats fetches through it)
 // open(): the device list is re-read every time the card opens, because headphones come and go.
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
 ui.onSettings({

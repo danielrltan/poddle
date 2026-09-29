@@ -2258,3 +2258,41 @@ body[data-paused] .friends-card .fr-row{box-shadow:none}
 .has-bow{overflow:visible !important;text-overflow:clip !important}
 .name-bow{display:inline-block;width:.9em;height:.6em;margin-left:-.2em;margin-right:-.05em;vertical-align:.58em;transform:rotate(16deg);pointer-events:none;line-height:0}
 .name-bow svg{display:block;width:100%;height:100%;fill:#ff6f9f;stroke:#c93f74;stroke-width:1.1;stroke-linejoin:round;paint-order:stroke;overflow:visible}
+
+/* ============================================== A PHONE (NOTES 149) ==============================================
+   html[data-mobile] (main.js MOBILE, ui.setMobile): a phone is only ever the paddle, so the lobby's home is the phone home: the paddle-code card over
+   the tiles a phone can use (Watch a match, Your stats, Leaderboard, Friends). Everything that takes a seat is hidden here AND refused in main.js request() */
+html:not([data-mobile]) .m-only{display:none!important}
+html[data-mobile] .desk-only{display:none!important}
+html[data-mobile] #screen-lobby[data-view="home"] .btn-back{visibility:hidden}      /* home is the top: Back would only lead to the title, which a phone never shows */
+html[data-mobile] #btn-join,html[data-mobile] .courts-rule,html[data-mobile] .courts-make,html[data-mobile] #btn-ranked-go,html[data-mobile] #btn-rk-warm,
+html[data-mobile] #btn-ask,html[data-mobile] #btn-tour-warm,html[data-mobile] #btn-tour-start,html[data-mobile] #grp-paddle,html[data-mobile] #grp-match,html[data-mobile] #set-camera,html[data-mobile] #set-airpod,html[data-mobile] #set-sink,html[data-mobile] #sink-hint,html[data-mobile] #btn-find-sinks{display:none!important}
+html[data-mobile] .code-acts{grid-template-columns:minmax(0,20rem);justify-content:center}      /* Watch alone, centred (Join is hidden) */
+html[data-mobile] .keyhints-inline{display:none} html[data-mobile] .foot-agree{flex:1;text-align:center}      /* a phone has no Esc or F key, either way up */
+.m-pad{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"art h" "lead lead" "field field" "go go" "err err";align-items:center;column-gap:var(--s-3);row-gap:var(--s-3);width:min(40rem,100%);padding:var(--s-5);text-align:left}
+.m-pad-art{grid-area:art;width:3.5rem;height:3.5rem}
+.m-pad h2{grid-area:h;margin:0;font-size:max(var(--t-xl),22px);font-weight:800;color:var(--ink-strong)}
+.m-pad-lead{grid-area:lead;margin:0;color:var(--ink);font-size:max(var(--t-md),15px);line-height:1.45}      /* px floors: a phone's rem sits at 10px */
+.m-pad-field{grid-area:field;display:flex;align-items:center;gap:0;height:4.75rem;padding:0 var(--s-4);border-radius:var(--r-pill);background:#fff;border:.1875rem solid var(--sky-4);box-shadow:inset 0 .125rem .375rem rgba(120,170,200,.25)}
+.m-pad-field:focus-within{border-color:var(--line);box-shadow:var(--glow), inset 0 .125rem .375rem rgba(120,170,200,.25)}
+.m-pad-field.is-error{animation:nudge 420ms var(--ease-soft) 1;border-color:var(--bad)}
+.m-pad-pre{font:800 2.6rem/1 var(--font);color:var(--ink-soft);letter-spacing:.06em}
+.m-pad .field{flex:1;width:auto;height:100%;padding:0 0 0 .25rem;border:0;background:none;box-shadow:none;font:800 2.6rem/1 var(--font);letter-spacing:.3em;text-transform:uppercase}
+.m-pad .field::placeholder{color:var(--sky-4);letter-spacing:.3em}
+.m-pad .field:focus{box-shadow:none}
+.m-pad #m-pad-go{grid-area:go;width:100%;min-width:0}
+.m-pad-err{grid-area:err;margin:0;min-height:0;text-align:center;font-size:max(var(--t-sm),14px)} .m-pad-err:empty{display:none}
+.m-more{margin:var(--s-2) 0 0;color:var(--ink-soft);font-size:max(var(--t-xs),12px);letter-spacing:var(--track-caps);text-transform:uppercase;font-weight:800}
+html[data-mobile] #screen-lobby .menu-body{overflow-y:auto;justify-content:flex-start}
+html[data-mobile] .lobby-home{gap:var(--s-3);padding-bottom:var(--s-4)}
+html[data-mobile] .lobby-home .tiles{display:grid;grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}
+html[data-mobile] .lobby-home .tile,html[data-mobile] .lobby-home .tile.is-hero{grid-column:span 1;width:auto;height:10rem;padding:0 var(--s-2);gap:var(--s-2);flex-direction:column;justify-content:center;text-align:center;font-size:max(var(--t-lg),17px)}
+html[data-mobile] .lobby-home .tile svg{width:4.25rem;height:4.25rem}
+html[data-mobile] .lobby-home .tile .tile-text{align-items:center;text-align:center}
+html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{grid-column:span 2;height:7.5rem;flex-direction:row;gap:var(--s-4)}      /* an odd count: Watch a match takes the whole first row */
+@media (min-aspect-ratio:1/1){      /* a phone on its side: the card on the left, the tiles on the right, both under the header */
+  html[data-mobile] .lobby-home{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"pad more" "pad tiles";align-items:start;column-gap:var(--s-5);width:min(80rem,100%);margin:0 auto}
+  html[data-mobile] .m-pad{grid-area:pad;width:100%} html[data-mobile] .m-more{grid-area:more;justify-self:center} html[data-mobile] .lobby-home .tiles{grid-area:tiles;width:100%}
+  html[data-mobile] .lobby-home .tile,html[data-mobile] .lobby-home .tile.is-hero{height:8rem}
+  html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{height:6rem}
+}

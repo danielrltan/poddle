@@ -38,6 +38,10 @@ const MENU = ['title', 'lobby', 'camera', 'connect', 'calibrate'], OVERLAY = ['m
 const ALIAS = { 'rk-vs': 'tour-vs' }, canon = name => ALIAS[name] || name;      // two overlay names on one section: body[data-overlay] tells them apart for the CSS
 const screenEl = name => document.querySelector(`.screen[data-screen="${canon(name)}"]`);
 const slots = { menu: null, overlay: null }, hideT = {};
+// A phone (NOTES 149): it cannot be the screen AND the paddle, so it gets the phone home: the paddle-code card, Courts to watch, stats, the leaderboard,
+// friends. main.js decides (MOBILE) and says so once, before the first view; nothing here takes a seat on a phone.
+let mobile = false;
+export function setMobile(on) { mobile = !!on; document.documentElement.toggleAttribute('data-mobile', mobile); const c = $('btn-courts')?.querySelector('b'); if (c) c.textContent = mobile ? 'Watch a match' : 'Courts'; }      // the Courts tile is where a phone watches
 function swap(slot, name) {
   const prev = slots[slot];
   if (prev !== name) {
@@ -511,8 +515,8 @@ function keepName(from) {                                  // typing in one fiel
   nameGate();
 }
 function nameGate() {                                      // first visit: the choices are dimmed (and say so to a screen reader) until the name has a letter
-  const need = !playerName(); $('screen-lobby')?.classList.toggle('needs-name', need); $('name-row')?.classList.remove('is-bad');
-  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile):not(#btn-leaderboard):not(#btn-friends)')) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats, the leaderboard and Friends seat nobody: they need no name
+  const need = !playerName() && !(mobile && view === 'home'); $('screen-lobby')?.classList.toggle('needs-name', need); $('name-row')?.classList.remove('is-bad');      // a phone's home asks for no name (no name row): nothing on it is dimmed
+  for (const t of document.querySelectorAll('#lobby-home .tile:not(#btn-profile):not(#btn-leaderboard):not(#btn-friends)' + (mobile ? ':not(#btn-courts)' : ''))) { if (need) t.setAttribute('aria-disabled', 'true'); else t.removeAttribute('aria-disabled'); }      // Your stats, the leaderboard and Friends seat nobody: they need no name
 }
 function needName() {                                      // a seat was asked for with no name: the field says so, nothing is sent
   if (playerName()) return false;
@@ -755,8 +759,8 @@ export function lobbyView(name, { code, watch } = {}) {
   view = VIEW_TITLE[name] ? name : 'home';
   if (sl.classList.contains('is-active') && sl.dataset.live && was !== view) { const d = (VIEW_DEPTH[view] ?? 0) - (VIEW_DEPTH[was] ?? 0); if (d) sl.dataset.dir = d > 0 ? 'fwd' : 'back'; else delete sl.dataset.dir; }      // the view slides in from the side it lies on (ui.css); a re-call of the same view keeps its entrance
   sl.dataset.live = '1';
-  for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view; tilesFit();
-  { const t = $('lobby-title'), tt = view === 'bracket' && ts ? `Tournament ${ts.code}` : VIEW_TITLE[view]; if (t.textContent !== tt) { setText(t, tt); restart(t, 'swap'); } } codeError(''); show('name-row', !NO_NAME.includes(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
+  for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view; sl.dataset.view = view; tilesFit();      // data-view: a phone's home hides Back (ui.css)
+  { const t = $('lobby-title'), tt = view === 'bracket' && ts ? `Tournament ${ts.code}` : mobile && view === 'home' ? 'Poddle' : VIEW_TITLE[view]; if (t.textContent !== tt) { setText(t, tt); restart(t, 'swap'); } } codeError(''); show('name-row', !noName(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
   if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour(); else if (view === 'profile' && was !== 'profile' && on.profile) on.profile();      // Your stats: main.js asks web/profile.js to fetch and draw it
   else if (view === 'ranked' && was !== 'ranked' && on.rankedOpen) on.rankedOpen();
   else if (view === 'leaderboard' && was !== 'leaderboard' && on.leaderboard) on.leaderboard();      // the global leaderboard: web/profile.js fetches and draws it (NOTES 126)
@@ -770,7 +774,8 @@ export function lobbyView(name, { code, watch } = {}) {
 }
 function focusView(v, n = 0) { if (slots.menu !== 'lobby' || asking() || view !== v) return; const el = firstFocus(); el.focus({ preventScroll: true, focusVisible: true }); if (v === 'bracket') brReveal(el); if (document.activeElement !== el && n < 4) setTimeout(() => focusView(v, n + 1), 100); }      // a screen still fading in (its visibility turns on a frame later under reduced motion) refuses focus: try again
 // where focus lands on a view. No name yet (the first visit): the name field, and nothing else can be chosen until it has a letter
-const firstFocus = () => (!NO_NAME.includes(view) && !playerName() && $('name-input')) || viewFocus();
+const noName = v => NO_NAME.includes(v) || mobile && v === 'home';      // a phone's home seats nobody: the name is asked in Courts, at Watch
+const firstFocus = () => (!noName(view) && !playerName() && $('name-input')) || viewFocus();
 function courtsFocus() {                                                                 // a code half typed: its next box. A link: Join / Watch. A mouse: search. A finger: the switch, so no keyboard pops up
   const c = getCode(); if (c && c.length < 4) return boxes().find(b => !b.value);
   if (deep) return $(deep === 'watch' ? 'btn-watch-code' : 'btn-join');
@@ -780,11 +785,11 @@ const vis = el => !!el && !el.hidden && !!el.offsetParent;
 const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
-const viewFocus = () => ({ home: $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || $('btn-quick'));
+const viewFocus = () => ({ home: mobile ? $('btn-courts') : $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || (mobile ? $('btn-courts') : $('btn-quick')));
 const friendsFocus = () => { const v = $('lobby-friends'), q = v?.querySelector('.fr-q'); return vis(q) && matchMedia('(pointer: fine)').matches ? q : [...(v?.querySelectorAll('button, input') || [])].find(vis) || v; };      // a mouse: the search. A finger: the first button, so no keyboard pops up
 // The home tiles: how many show (Ranked and Your stats only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
 // tile in DOM slot 2 would make the visible fourth the 4th child. Called on every view change and by web/profile.js when it shows or hides a tile
-export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll('.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }
+export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll(mobile ? '.tile:not([hidden]):not(.desk-only)' : '.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }      // a phone never counts the tiles it hides (Quick play, Ranked, Play a bot)
 // The list scrolls when it is full, and macOS hides scrollbars until you already know to scroll. So the bar is ours: a
 // track and a thumb that are always drawn while there is more to see, sized from the list's own scroll numbers. Drag it or wheel.
 function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) return; const more = l.scrollHeight > l.clientHeight + 1; t.hidden = !more; if (!more) return;
@@ -814,8 +819,11 @@ function rowsOf() {                                                             
     if (k === 'open') out.push({ kind: k, code: r.code, who: !r.players ? 'Empty' : `${human || 'A player'} is waiting`, segs: r.players ? [[human || 'A player', hr], ' is waiting'] : null, meta: w > 0 ? `${w} watching` : '', go: 'Join', watch: r.players > 0 && r.watch > 0, w, players: r.players > 0 });      // players: a human is sitting there waiting. segs: who, in pieces: [name, registered] | plain text
     else if (k === 'ask') out.push({ kind: k, code: r.code, who: `${human || 'A player'} vs Matt`, segs: [[human || 'A player', hr], ' vs Matt'], meta: sc(r), go: 'Ask to play', watch: r.watch > 0, w });
     else out.push({ kind: k, code: r.code, who: `${nm(r, 0) || 'Player 1'} vs ${nm(r, 1) || 'Player 2'}`, segs: [[nm(r, 0) || 'Player 1', rg(r, 0)], ' vs ', [nm(r, 1) || 'Player 2', rg(r, 1)]], meta: (r.live === false ? 'Starting' : sc(r)) + (w > 0 ? ` · ${w} watching` : ''), go: r.watch > 0 ? 'Watch' : 'Can’t watch', full: !(r.watch > 0), w }); }
-  return out;
+  return mobile ? out.map(phoneRow).filter(Boolean) : out;
 }
+// A phone watches, never joins (NOTES 149): a row it can watch says Watch and watches on a tap; an empty court has nothing to see and is left out
+const phoneRow = r => r.kind === 'full' ? r : r.kind === 'tour' ? { ...r, go: 'Watch', act: 'watch' } : r.kind === 'open' && !r.players ? null
+  : r.watch ? { ...r, go: 'Watch', act: 'watch', watch: false } : { ...r, go: 'Can’t watch', full: true };
 const tabOf = row => row.kind === 'full' ? 'full' : 'open';
 function shown() {                                                                       // this tab's rows that match the search: codes that START with it first, then codes that contain it
   const all = rowsOf(), q = query, hit = r => !q || r.code.includes(q), pick = t => all.filter(r => tabOf(r) === t && hit(r));
@@ -851,7 +859,7 @@ function drawCourts() {
   ul.textContent = ''; ul.setAttribute('aria-busy', String(st === 'loading'));
   if (st === 'loading' || st === 'down') for (let i = 0; i < 4; i++) { const li = mk('li', 'court is-skel'); li.append(mk('span', 'court-row is-skel')); li.setAttribute('aria-hidden', 'true'); ul.append(li); }      // skeletons: nothing in them is focusable
   rows.forEach((r, i) => { const li = mk('li', 'court'), b = mk('button', 'room-row court-row' + (r.kind === 'full' ? ' is-full' : ''));
-    li.dataset.kind = r.kind; b.dataset.code = r.code; b.dataset.nav = ''; b.tabIndex = i ? -1 : 0; if (r.kind === 'full') b.dataset.act = 'watch'; if (r.full) b.setAttribute('aria-disabled', 'true');
+    li.dataset.kind = r.kind; b.dataset.code = r.code; b.dataset.nav = ''; b.tabIndex = i ? -1 : 0; if (r.kind === 'full' || r.act === 'watch') b.dataset.act = 'watch'; if (r.full) b.setAttribute('aria-disabled', 'true');
     const who = mk('span', 'court-who', r.segs ? '' : r.who); for (const g of r.segs || []) if (typeof g === 'string') who.append(g); else { const n = mk('span', 'court-name', g[0]); who.append(n); regBadge(n, g[1]); }      // a registered name gets its badge beside it, never in its text
     if (r.kind === 'tour') who.prepend(mk('span', 'badge-tour', 'Tournament'));
     const meta = mk('span', 'court-meta', r.meta); b.append(mk('b', 'court-code', r.code), who, meta, mk('span', 'court-go', r.go));
@@ -872,7 +880,7 @@ function drawState(st, s) {
   const q = query, other = filter === 'open' ? 'full' : 'open';
   if (st === 'down') p.append(mk('span', '', 'Courts will show when the connection is back.'));
   else if (st === 'loading') p.append(mk('span', 'vh', 'Loading courts'));
-  else if (st === 'empty-open') p.append(mk('span', '', 'No open courts right now.'), s.full.length ? btn(`${s.full.length} to watch in Full`, () => { setFilter('full'); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); }) : btn('Create court', () => { if (!needName()) lobbyView('create'); }));      // Create court is already beside the list: point at what can be watched instead
+  else if (st === 'empty-open') p.append(mk('span', '', 'No open courts right now.'), s.full.length ? btn(`${s.full.length} to watch in Full`, () => { setFilter('full'); $('court-seg').querySelector('[aria-checked="true"]')?.focus(); }) : mobile ? '' : btn('Create court', () => { if (!needName()) lobbyView('create'); }));      // Create court is already beside the list: point at what can be watched instead
   else if (st === 'empty-full') p.append(mk('span', '', 'Nobody is playing right now.'));
   else if (st === 'nomatch') {
     const code = q.length === 4 && cleanCode(q) === q && !s.all.some(r => r.code === q);      // a whole code that is not listed: private courts only join by code
@@ -884,7 +892,7 @@ function drawState(st, s) {
 }
 function setFilter(f) { filter = f === 'full' ? 'full' : 'open'; try { localStorage.setItem('poddle.courts', filter); } catch { /* fine */ } drawCourts(); }
 function setQuery(q) { query = (String(q || '').toUpperCase().match(CODE_OK) || []).join('').slice(0, 8); const i = $('court-search'); if (i && i.value !== query) i.value = query; drawCourts(); }
-function useCode(c) { setCode(c); codeError(''); deal(); $('btn-join').focus({ preventScroll: true }); }
+function useCode(c) { setCode(c); codeError(''); deal(); $(mobile ? 'btn-watch-code' : 'btn-join').focus({ preventScroll: true }); }
 const deal = () => boxes().forEach((b, i) => { if (b.value) { b.style.setProperty('--i', i); restart(b, 'lob-fill'); } });      // the letters land box by box
 const rove = row => { for (const r of $('room-list').querySelectorAll('.court-row')) r.tabIndex = r === row ? 0 : -1; };      // the list is one Tab stop: the arrows walk it
 // "Court is full. Watch instead?" over the lobby. Yes -> on.watch(code). Either button closes it; so does askWatch(null) and leaving the lobby.
@@ -937,7 +945,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
 {
   // no name, no seat: every choice on the home view waits for it (the field shakes and takes focus), and so does the last button of each view
   $('btn-quick').addEventListener('click', () => { if (!needName() && on.quick) on.quick(); });
-  on2('btn-courts', 'click', () => { if (!needName()) lobbyView('courts'); });
+  on2('btn-courts', 'click', () => { if (mobile || !needName()) lobbyView('courts'); });      // a phone asks for the name in Courts, at Watch (its home has no name row)
   on2('btn-create', 'click', () => { if (!needName()) lobbyView('create'); });
   on2('btn-tour', 'click', () => { if (ts && !ts.you?.viewer && ts.phase !== 'done') { tcall('open'); return; } if (!needName()) tcall('create'); });      // one press makes one (docs/COURTS-TOURNEY.md 4.6 item 1). Already in one: Your tournament
   on2('btn-watch-code', 'click', () => { const c = getCode(); if (c.length === 4 && !needName() && on.watch) on.watch(c); });
@@ -1003,6 +1011,13 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
     else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); bs[i - 1].focus(); } else if (e.key === 'ArrowRight' && i < 3) { e.preventDefault(); bs[i + 1].focus(); }
     else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); $('btn-watch-code').click(); } });      // Enter = Join (the form), Shift+Enter = Watch
   form.addEventListener('submit', e => { e.preventDefault(); const c = getCode(); if (c.length === 4 && !needName() && on.join) on.join(c); });
+  // A phone's home (NOTES 149): the code the computer shows, P- and 4, the same rules as web/pad.js. Go opens the paddle page with it, which asks for motion on its
+  // Start tap (iOS only asks from a tap) and says there if the code is wrong. Nothing is stored: the code lives in that page's address
+  const padIn = $('m-pad-in'), padClean = t => String(t || '').toUpperCase().replace(/^\s*P\s*-\s*/, '').replace(/[^A-HJ-NP-Z2-9]/g, '').replace(/^P(?=.{4}$)/, '').slice(0, 4);
+  padIn?.addEventListener('input', () => { const c = padClean(padIn.value); if (padIn.value !== c) padIn.value = c; $('m-pad-go').disabled = c.length !== 4; $('m-pad-err').textContent = ''; });
+  $('m-pad')?.addEventListener('submit', e => { e.preventDefault(); const c = padClean(padIn.value);
+    if (c.length !== 4) { $('m-pad-err').textContent = 'Paddle codes are P- and 4 letters or numbers.'; restart($('m-pad-field'), 'is-error'); return; }
+    padIn.blur(); location.assign('/pad.html?k=' + c); });
   // arrows walk the three tiles (Tab works too)
   $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
     const nav = [...$('lobby-home').querySelectorAll('[data-nav]:not([hidden])')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });      // hidden tiles (Ranked, Your stats on localhost) are not in the ring: focus() on one is a no-op
