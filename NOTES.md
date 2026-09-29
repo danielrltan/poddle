@@ -3099,3 +3099,12 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   a lift and a spinning + on hover, a squash on press, and the Requested line that replaces it pops in. Reduced motion: none of it.
 - The profile card's leaderboard places (#12 Trophies, #3 Longest rally) sit on the name's line beside the hammer, not in a row of
   their own between the rank and the stats.
+
+## 151. A Sign in button in the menu header
+- The owner: "add a sign in button on the main menu area ... in the header, as you'd normally see in any other game website".
+  The lobby header's right end (.head-end: the online count, then #btn-head-acct) shows, wherever accounts exist (sign-in AND
+  the database, the same gate as the Friends tile): "Sign in" for a guest (opens the sign-in card, like Your stats' button),
+  "Pick a username" when signed in without one (the username card), or my username with a person icon when signed in (opens
+  Your stats). profile.js drawAcct keeps it in step with every sign-in / sign-out / rename. On a phone (<= 480 px) it is a round
+  icon (its name in the aria-label and tooltip) and the online count gives way; the title keeps its room at 360 px.
+- Nothing new is sent or stored: it calls the same signIn / claimCard / Your stats as the existing buttons (no legal change).

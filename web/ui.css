@@ -550,6 +550,12 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 
 /* lobby header bits */
 .lobby-online{position:absolute;right:var(--s-7);top:50%;translate:0 -50%;display:inline-flex;align-items:center;gap:.5rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)}
+.head-end{position:absolute;right:var(--s-7);top:50%;translate:0 -50%;display:flex;align-items:center;gap:var(--s-4)} .head-end .lobby-online{position:relative;right:auto;top:auto;translate:none}      /* the header's right end: the online count, then the account button (NOTES 151) */
+.head-acct{height:2.75rem;min-height:36px;padding:0 var(--s-4) 0 var(--s-3);gap:var(--s-2);font-size:var(--t-md)} .head-acct[hidden]{display:none}
+.head-acct-ic{display:inline-grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:50%;background:var(--line);color:#fff;flex:none} .head-acct-ic svg{width:1.125rem;height:1.125rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.head-acct.is-in .head-acct-ic{background:linear-gradient(180deg,var(--me),var(--me-deep))} .head-acct-t{max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-aspect-ratio: 1/1){ .head-end{right:var(--s-4)} }
+@media (max-width:480px){ .head-end{right:var(--s-5)} .head-end:has(.head-acct:not([hidden])) .lobby-online{display:none} .head-acct{width:max(2.75rem,36px);padding:0;gap:0} .head-acct-t{display:none} }      /* a phone's header holds Back, the title and one more thing: the account button wins over the online count, as a round icon (its name is the aria-label and the tooltip) */
 .lobby-online::before{content:"";width:.625rem;height:.625rem;border-radius:50%;background:var(--good);box-shadow:0 0 0 .125rem #fff}
 .lobby-online{animation:hm-pop var(--d-med) var(--ease-bounce) backwards} .lobby-online::after{content:"";position:absolute;left:0;top:50%;width:.625rem;height:.625rem;margin-top:-.3125rem;border-radius:50%;background:var(--good);animation:hm-ping 2400ms var(--ease-out) infinite;pointer-events:none}      /* a soft sonar on the live dot */
 @keyframes hm-ping{0%{transform:scale(1);opacity:.55}70%,100%{transform:scale(2.6);opacity:0}}

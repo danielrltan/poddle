@@ -563,6 +563,8 @@ function drawAcct() {
   { const b = $('btn-pf-rename'); if (b) { const t = name ? 'Change username' : 'Pick a username'; b.setAttribute('aria-label', t); b.title = t; } }      // the pen beside the name
   show('btn-set-signin', en && !a); show('set-account', !!a); text('set-account-name', name ? `Signed in as ${name}` : 'Signed in');
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
+  { const b = $('btn-head-acct'); if (b) { b.hidden = !en; b.classList.toggle('is-in', !!a); text('head-acct-t', !a ? 'Sign in' : name || 'Pick a username');      // the header's account button (NOTES 151): only where accounts exist
+    b.setAttribute('aria-label', !a ? 'Sign in' : name ? `${name}: your stats` : 'Pick a username'); b.dataset.tip = !a ? 'Sign in' : name ? 'Your stats' : 'Pick a username'; } }
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
   show('btn-profile', on); show('btn-ranked', on && me.db && (!me.rkSignin || me.enabled)); show('btn-leaderboard', on && me.db); show('btn-friends', on && me.db && me.enabled); h.gate(); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // Ranked needs sign-in (NOTES 133): no tile where nobody can sign in; the tile's line follows the gate.      // the leaderboard reads the database too (NOTES 126)      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
 }
@@ -590,6 +592,7 @@ function wire() {
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
 
   addEventListener('storage', e => { if (e.key === null) storageCleared(); });      // the site's storage was cleared in another tab
+  click('btn-head-acct', () => { const a = me.account; if (!a) signIn(); else if (!a.username) claimCard(); else h.stats(); });      // the header's account button (NOTES 151)
   click('btn-signin-close', () => closeCard()); wireShare();
   click('tog-lb-show', () => toggleShow());      // Show me on the global leaderboard (NOTES 126)
   const tabs = $('lb-tabs'); if (tabs) {
