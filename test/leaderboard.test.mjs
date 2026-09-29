@@ -1,7 +1,7 @@
 // The global leaderboards (NOTES 126), no server, no port: server/db.js leaderboard / leaderPlaces / leaderHide on an in-memory database, and the
 // /api/leaderboard routes through api.handle with a fake request. Who is on a board (accounts with a username that did not hide), the minimums, the order,
 // ties sharing a number, a player's place equal to their row's rank, hiding and deleting taking the name off at once, and no owner id on the wire.
-// The leaderboard profile (NOTES 140): GET /api/leaderboard/player?u=<name> answers the share card's subset for a player in a board's top 100 rows,
+// The leaderboard profile (NOTES 140): GET /api/leaderboard/player?u=<name> answers the share card's subset for a player on any board at any place (NOTES 141; the top 100 only before),
 // and the same 404 for everyone else; hide, rename and delete clear it at once; its own rate-limit bucket; 503 with the database closed.
 // Last line: PASS or FAIL n.
 import { createRequire } from 'module';
@@ -128,7 +128,7 @@ console.log('the profile card: db.leaderOwnerByKey');
   ok(a && a.owner === A.owner_id && a.name === 'Ace' && a.ranked === true, `Ace -> { owner, name: Ace, ranked: true } (${J(a)})`);
   ok(db.leaderOwnerByKey(U.skeleton('Bree')) === null && db.leaderOwnerByKey('nobody') === null && db.leaderOwnerByKey('') === null && db.leaderOwnerByKey(null) === null && db.leaderOwnerByKey('x'.repeat(65)) === null, 'hidden, unknown, empty, null and too long -> null'); }
 
-console.log('the profile card: only inside a top 100');
+console.log('the profile card: every listed player, at any place (NOTES 141)');
 { const mkNamed = (name, trophies) => { const a = db.createAccount('s-' + name, T0); if (db.claimUsername(a.id, name, U.skeleton(name), T0) !== 'ok') return null; if (trophies) tro(a.owner_id, trophies); return a; };
   const ABC = 'bcdfghjkmnpqrstwxyz', fill = [];
   for (let i = 0; i < ABC.length && fill.length < 98; i++) for (let k = 0; k < ABC.length && fill.length < 98; k++) { const a = mkNamed('Fx' + ABC[i] + ABC[k], 1000 - fill.length); if (a) fill.push(a); }   // 1000 .. 903: not Pro (1050), above Bree and Cyan
@@ -138,8 +138,8 @@ console.log('the profile card: only inside a top 100');
   ok(L.rows.length === 100 && inside.includes(ties[0].n) && !inside.includes(ties[1].n), `the board's LIMIT keeps the tie's smaller key (${ties[0].n}) and not ${ties[1].n}`);
   const a = await pl(ties[0].n), b = await pl(ties[1].n), c = await pl('Lowly'), cy = await pl('Cyan');
   ok(a.status === 200 && L.rows.find(r => r.name === ties[0].n).rank === 100, `${ties[0].n}, place 100 inside the LIMIT: 200 (${a.status})`);
-  ok(b.status === 404 && b.body === '{"error":"not_found"}', `${ties[1].n}, also place 100 but outside the LIMIT: the same 404 (${b.status})`);
-  ok(c.status === 404 && lp && lp.listed === true && lp.trophies && lp.trophies.rank > 100, `Lowly is listed (place ${lp && lp.trophies && lp.trophies.rank}) but outside every top 100: 404 (${c.status})`);
+  ok(b.status === 200, `${ties[1].n}, place 100 but outside the LIMIT: 200 all the same (${b.status})`);
+  ok(c.status === 200 && lp && lp.listed === true && lp.trophies && lp.trophies.rank > 100, `Lowly is listed at place ${lp && lp.trophies && lp.trophies.rank}, outside every top 100: 200 (${c.status})`);
   ok(cy.status === 200, `Cyan is outside the trophies top 100 but on the rally board: 200 (${cy.status})`);
   ok((await pl('Ace')).status === 200, 'Ace: still 200'); }
 

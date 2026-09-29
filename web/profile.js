@@ -189,7 +189,7 @@ export async function showProfile() {                      // the lobby view ope
 
 // ---------- the global leaderboard (NOTES 126): three boards of counted results, GET /api/leaderboard; my places ride on /api/stats ----------
 const BOARD = {
-  trophies: { what: 'Ranked trophies', unit: n => (n === 1 ? 'trophy' : 'trophies'), none: 'Play Ranked for your first trophies' },
+  trophies: { what: 'Ranked Trophies', unit: n => (n === 1 ? 'trophy' : 'trophies'), none: 'Play Ranked for your first trophies' },
   rally: { what: 'Longest rally, in hits', unit: n => (n === 1 ? 'hit' : 'hits'), none: 'Keep the ball in play for a rally of 3 or more' },
   streak: { what: 'Best win streak against people', unit: n => (n === 1 ? 'win' : 'wins'), none: 'Win a match against a person' },
 };
@@ -231,6 +231,10 @@ function drawYou() {
   show('lb-you', !!cap); text('lb-you-cap', cap); text('lb-you-rank', mine ? rankNum(mine.rank) : '');
   { const v = $('lb-you-v'); if (v) { v.textContent = ''; if (mine) v.append(mk('b', '', Number(mine.v).toLocaleString('en-US')), unitOf(mine.v)); } }
   $('lb-you')?.classList.toggle('is-on', !!mine);
+  { const y = $('lb-you'), link = !!mine && !!(a && a.username); if (y) {      // on the board: the You card opens my own profile card, as my row does (NOTES 141: everyone on the leaderboard is clickable)
+    y.classList.toggle('is-link', link);
+    if (link) { y.dataset.name = a.username; y.setAttribute('role', 'button'); y.tabIndex = 0; y.setAttribute('aria-haspopup', 'dialog'); y.setAttribute('aria-label', `You, ${rankNum(mine.rank)}, ${Number(mine.v).toLocaleString('en-US')} ${B.unit(mine.v)}. Open your profile card`); }
+    else { delete y.dataset.name; for (const k of ['role', 'tabindex', 'aria-haspopup', 'aria-label']) y.removeAttribute(k); } } }
   if (go) { go.hidden = !act; if (act) { go.textContent = act[0]; go.onclick = act[1]; } }
   const t = $('tog-lb-show'); if (t) { t.hidden = !(a && a.username && P); t.setAttribute('aria-checked', String(!(P && P.hidden))); }      // the switch: only for a name that could be on a board
 }
@@ -286,7 +290,7 @@ async function loadPlayer(name, rank) {      // rank: the row's emblem for the l
   let r = null; try { r = await api('/api/leaderboard/player?u=' + encodeURIComponent(name)); } catch { r = null; }
   if (g !== lbpGen || !playerOpen()) return;      // closed, or another row opened meanwhile: this answer is stale
   if (r && r.ok && r.j && typeof r.j.name === 'string') drawPlayer(r.j, 'ok');
-  else drawPlayer({ name }, r && r.status === 404 ? 'gone' : 'error');      // 404: hidden, renamed, deleted or out of the top 100 (the server never says which). 429, 503, offline: Try again
+  else drawPlayer({ name }, r && r.status === 404 ? 'gone' : 'error');      // 404: hidden, renamed, deleted or on no board (the server never says which). 429, 503, offline: Try again
 }
 const strOf = (v, n) => (typeof v === 'string' || Number.isFinite(v) ? String(v).slice(0, n) : '');
 function drawPlayer(p, state) {
@@ -537,6 +541,8 @@ function wire() {
     tabs.addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); e.stopPropagation();      // a radio group: the arrows move the pick
       const o = [...tabs.children], i = o.findIndex(x => x.dataset.board === board), n = o[(i + (e.key === 'ArrowRight' ? 1 : -1) + o.length) % o.length]; setBoard(n.dataset.board); n.focus(); });
   }
+  { const y = $('lb-you'); if (y) { const go = e => y.classList.contains('is-link') && y.dataset.name && !e.target.closest('button') && openPlayer(y);      // the You card, when I am on the board (NOTES 141)
+    y.addEventListener('click', go); y.addEventListener('keydown', e => { if (e.target === y && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(e); } }); } }
   { const list = $('lb-list'); if (list) list.addEventListener('click', e => { const b = e.target.closest('button.lb-row'); if (b && b.dataset.name) openPlayer(b); }); }      // a row opens that player's profile card (NOTES 140): one listener, the rows redraw
   click('btn-lbp-close', () => closeCard()); click('btn-lbp-retry', () => retryPlayer());
   click('btn-lbp-mine', () => { closeCard(); h.stats(); });      // my own row's card: Your stats, one tap away

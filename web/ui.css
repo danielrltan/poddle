@@ -253,6 +253,7 @@ body:not([data-screen="hud"]) .countdown{display:none}            /* the title a
   display:inline-flex;align-items:center;gap:.75rem;height:3.25rem;padding:0 1.75rem;border-radius:var(--r-pill);border:.15625rem solid var(--line);
   background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font-size:var(--t-lg);font-weight:700;box-shadow:var(--sh-hud), var(--inner-hi);
   transition:opacity 200ms var(--ease-soft), transform 220ms var(--ease-soft)}      /* leaves quick and soft */
+.toast{white-space:normal;width:max-content;max-width:min(46rem,calc(100vw - 4 * var(--edge)));height:auto;min-height:3.25rem;padding-block:.5rem;border-radius:1.625rem;text-align:center;text-wrap:balance;line-height:1.25}      /* a long toast wraps inside its max-width instead of running off the screen (NOTES 141); one line is the same pill as before */
 .toast.on{opacity:1;transform:translate(-50%,0) scale(1);transition:opacity var(--d-med) var(--ease-soft), transform 420ms var(--ease-bounce)}      /* arrives with a spring */
 body[data-screen="hud"] .toast{bottom:var(--edge)}
 body[data-overlay] .toast.on{opacity:0}
@@ -1968,6 +1969,7 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 @keyframes rk-breathe{0%,100%{transform:scale(.88)}50%{transform:scale(1.12)}} @keyframes rk-ring{0%{opacity:.55;transform:scale(1)}100%{opacity:0;transform:scale(2.4)}}
 /* the home tile's line and the Ranks page: small hierarchy fixes. The tile's emblem was taking the tile icon's 5rem (.tiles .tile svg) beside a 9 px line */
 .tiles .tile #ranked-em .rank-em{width:2.5rem;height:2.5rem;filter:drop-shadow(0 .125rem .1875rem rgba(20,60,90,.2))}
+#ranked-line .cup .cup-ic{width:1.3em;height:1.3em;scale:none;transition:none}      /* the trophy in the tile's line (NOTES 141): the tile icon's own size rules (.tiles[data-n] .tile svg, up to 6.5rem) must not reach it */
 #ranked-line{font-size:max(var(--t-sm),12px);font-weight:800;gap:.45em}
 .rkx-card.is-now{background:linear-gradient(180deg,#fff 0%,color-mix(in srgb,var(--rank-mid,var(--line)) 18%,#fff) 100%)}      /* your own rank's card, tinted in its colour */
 @media (prefers-reduced-motion: reduce){ .series .pips li.is-now,.rk-pill .rk-dot,.rk-pill .rk-dot::after,.rank-card-em.is-flip::after,.vs-card.is-ranked::after{animation:none!important} .vs-card.is-ranked::after{display:none} .trophy-em.is-up .rank-em{scale:1.12} }
@@ -2072,6 +2074,10 @@ button.lb-row::after{content:"";justify-self:end;width:.45rem;height:.45rem;bord
 @media (hover:hover){ button.lb-row:hover{border-color:var(--line);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 35%,transparent);transform:translateY(-.0625rem)} button.lb-row:hover::after{opacity:1;translate:0 0} }      /* a tight ring, not --glow: the list scrolls with .25rem of padding and would clip a 1.5rem glow */
 button.lb-row:focus-visible{outline:.1875rem solid var(--line-deep);outline-offset:0} button.lb-row:focus-visible::after{opacity:1;translate:0 0}      /* focus has its own mark, a solid deep ring (inside the list's .25rem padding): the pale ring is my own row's at rest, the tight one is hover */
 button.lb-row:active{transform:scale(.985)}
+.lb-you.is-link{cursor:pointer;-webkit-tap-highlight-color:transparent;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}      /* the You card opens my profile card when I am on the board (NOTES 141): the rows' hover, focus and press */
+@media (hover:hover){ .lb-you.is-link:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 60%,transparent);transform:translateY(-.0625rem)} }
+.lb-you.is-link:focus-visible{outline:.1875rem solid var(--line-deep);outline-offset:0} .lb-you.is-link:active{transform:scale(.985)}
+@media (prefers-reduced-motion:reduce){ .lb-you.is-link{transition:none} .lb-you.is-link:hover,.lb-you.is-link:active{transform:none} }
 button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 60%,transparent)}
 @media (prefers-reduced-motion:reduce){ .lb-item{animation:none} button.lb-row,button.lb-row::after{transition:none} button.lb-row:hover,button.lb-row:active{transform:none} }
 @keyframes lb-in{from{opacity:0;translate:0 .5rem}}
@@ -2084,7 +2090,7 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .lb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;color:var(--ink-strong)}
 .cup-ic{flex:none;width:1.25em;height:1.25em;overflow:visible;filter:drop-shadow(0 .0625rem 0 rgba(201,127,8,.35))} .cup-ic .cup-h{fill:none;stroke:var(--gold-3);stroke-width:2;stroke-linecap:round} .cup-ic .cup-c{fill:var(--gold-2);stroke:var(--gold-3);stroke-width:1.2;stroke-linejoin:round} .cup-ic .cup-s{fill:var(--gold-3)} .cup-ic .cup-b{fill:var(--gold-4)} .cup-ic .cup-g{fill:none;stroke:#fff;stroke-width:1.3;stroke-linecap:round;opacity:.75}      /* the trophy icon in place of the word trophies (NOTES 136) */
 .st-rank-cap .cup-ic{width:1.5rem;height:1.5rem;margin-left:-.125rem} .cup{display:inline-flex;vertical-align:-.22em;margin:0 .06em;font-style:normal} .cup .cup-ic{width:1.25em;height:1.25em}      /* the icon inside a sentence (ui.js cupify, NOTES 138) */
-.lb-tabs .cup .cup-ic{width:1.5em;height:1.5em} .trophy-word .cup .cup-ic{width:2.4em;height:2.4em}
+.trophy-word .cup .cup-ic{width:2.4em;height:2.4em}
 .lb-cup{display:inline-flex;vertical-align:-.2em;margin-left:.25rem} .lb-cup .cup-ic{width:1.35rem;height:1.35rem}
 .lb-v{white-space:nowrap;color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)} .lb-v b{font-size:var(--t-lg);font-weight:900;color:var(--ink-strong);font-variant-numeric:tabular-nums}
 .lb-row.is-me,.lb-you.is-on{border-color:var(--line);background:linear-gradient(180deg,#fff,#eef7fc);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 30%,transparent)}

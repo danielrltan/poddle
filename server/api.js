@@ -96,8 +96,8 @@ async function leaderRoute(req, res) {
   const body = { board: q, total: L.total, at: t, rows: L.rows };
   lbCache.set(q, { at: t, body }); send(res, 200, body);
 }
-// one player's profile card from the board (NOTES 140): exactly the share card's subset (share.dataOf), for an account inside a board's top 100.
-// Unknown, guest, no username, hidden, renamed away, deleted, outside every top 100 and a malformed u: the same 404, and the name is never logged
+// one player's profile card from the board (NOTES 140): exactly the share card's subset (share.dataOf), for any account on a board (NOTES 141: at any place, not only the top 100).
+// Unknown, guest, no username, hidden, on no board, renamed away, deleted and a malformed u: the same 404, and the name is never logged
 const publicCard = (d, ranked) => ({ name: d.name, rank: ranked ? { tier: d.tier, div: d.div, label: d.rank, pro: d.pro } : null, trophies: ranked ? d.trophies : 0, matt: d.matt,
   stats: d.big.map(b => ({ label: b.label, value: b.value, ...(b.cap ? { unit: b.cap } : {}) })) });   // never v, em, guest, mattI, bar or the slug
 async function playerRoute(req, res) {

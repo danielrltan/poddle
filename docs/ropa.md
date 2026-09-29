@@ -4,7 +4,7 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card's subset made public for listed top-100 players; no new data stored); 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks re-derived from stored trophies; Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
+Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card's subset made public for every listed player (all places since NOTES 141); no new data stored); 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks re-derived from stored trophies; Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
 
 ## Recipients common to every activity
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`
@@ -47,7 +47,7 @@ Last reviewed: 2026-09-29 (leaderboard profile cards, NOTES 140: the share card'
 - Recipients: only the owner; Fly.io. Exception, the global leaderboard (NOTES 126, 2026-09-28): anyone sees the top 100 of three
   boards (Ranked trophies, best rally, best win streak vs people) with username, value, place and rank emblem, for signed-in accounts
   WITH a username only (never guests); on by default, the account's Show me on the global leaderboard switch (accounts.lb_hidden)
-  removes it at once; and, by clicking a name in those top 100 rows, the profile card (NOTES 140, 2026-09-29): the share card's subset
+  removes it at once; and, by clicking a name on the board (any place since NOTES 141), the profile card (NOTES 140, 2026-09-29): the share card's subset
   (rank/div/trophies/Pro place, toughest Matt beaten, return rate, rally, swing, record vs people, best streak, winners); the same switch
   removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, Ranked mode:
   the rank emblem (the rank and its division, e.g. Gold II; never trophies or record) beside the name, to the opponent and to spectators

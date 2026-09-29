@@ -53,8 +53,8 @@ Important changes also need a notice on the home page. Open questions for the op
   username only, never guests, never an owner id; accounts.lb_hidden = 1 (Show me on the global leaderboard off) takes a name off
   at once. Clicking a row opens that player's profile card (NOTES 140; GET /api/leaderboard/player?u=<name>, public, no sign-in, 60 a minute, 30 s
   cache cleared by hide/rename/delete; admin.js changes wait out the TTL): exactly the share card's subset (share.dataOf / card.dataOf: username,
-  Ranked rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the six card stats), rank null when never played Ranked, only for an account in
-  the top-100 rows of at least one board; unknown, guest, no-username, hidden, renamed-away, deleted and outside-top-100 all answer the same 404;
+  Ranked rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the six card stats), rank null when never played Ranked, for every account on at
+  least one board, at any place (NOTES 141); unknown, guest, no-username, hidden, on-no-board, renamed-away and deleted all answer the same 404;
   never an owner id. A player's own places ride on /api/stats and /api/me. Stats are otherwise private to their owner unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
   (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), Ranked rank + ladder trophies and its
   emblem, toughest Matt beaten, the same six card stats for everyone (return rate, rally, swing, record vs people, best streak, winners), also in the og tags; the apps it is pasted into fetch it for

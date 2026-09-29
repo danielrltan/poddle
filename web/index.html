@@ -255,7 +255,7 @@
       <section class="lbp-hero well" id="lbp-hero" aria-label="Rank and Matt badge">
         <div class="lbp-em" id="lbp-em"></div>
         <div class="lbp-rank"><p class="caps">Rank</p><p class="lbp-rank-name" id="lbp-rank"></p>
-          <p class="lbp-tro" id="lbp-tro" hidden><b id="lbp-trophies">0</b> <span id="lbp-tro-cap" data-cup>trophies</span></p></div>
+          <p class="lbp-tro" id="lbp-tro" hidden><b id="lbp-trophies">0</b> <span id="lbp-tro-cap" data-cup="all">trophies</span></p></div>
         <div class="lbp-matt st-mbadge is-none" id="lbp-matt" aria-hidden="true"><i class="st-mdisc"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/><path d="M10.25 8.5v.75M13.75 8.5v.75M10.5 17.25h3" style="stroke-width:2.5"/></svg></i><svg class="st-mstar" viewBox="0 0 48 48"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div>
         <div class="lbp-mtext"><p class="caps">Hardest Matt beaten</p><p class="lbp-mbest" id="lbp-mbest">None yet</p></div>
       </section>
@@ -434,7 +434,7 @@
       <div class="rk-head">
         <div class="rk-emblem" id="rk-emblem"></div>
         <div class="rk-lines"><h2 class="rk-tier" id="rk-tier">Bronze</h2>
-          <p class="rk-count"><b id="rk-trophies">0</b><span id="rk-count-word" data-cup> trophies</span></p>
+          <p class="rk-count"><b id="rk-trophies">0</b><span id="rk-count-word" data-cup="all"> trophies</span></p>
           <div class="rk-bar" id="rk-bar" role="progressbar" aria-label="Progress to the next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
           <small class="rk-next" id="rk-next" data-cup>100 to Silver</small></div>
       </div>
@@ -451,7 +451,7 @@
     <!-- Ranks: every medal there is to win, drawn by ui.js drawRanks from the last rank the page knows. Opened from the crest on Your stats, the emblem on the
          Ranked view or See all ranks; Back returns to where it was opened from -->
     <div class="panel panel-wide lobby-view ranks-view" id="lobby-ranks" data-view="ranks" data-fit hidden>
-      <p class="rkx-lead" data-cup>Win Ranked matches to earn trophies. Every 50 trophies is a division, and three divisions make a rank.</p>
+      <p class="rkx-lead">Win Ranked matches to earn trophies. Every 50 trophies is a division, and three divisions make a rank.</p>
       <ol class="rkx-grid" id="rkx-grid" aria-label="All ranks"></ol>
       <p class="t-note rkx-note">Ranks up to Platinum are never lost once reached. Diamond and above can drop. Pro has no divisions: Pro players are ranked by their place on the global leaderboard.</p>
       <button class="btn btn-sm is-tall rkx-go" id="btn-rkx-go">Play Ranked</button>
@@ -463,8 +463,8 @@
     <div class="panel panel-wide lobby-view lb-view" id="lobby-leaderboard" data-view="leaderboard" data-fit hidden>
       <p class="lb-scope"><svg class="lb-globe" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.6 3.7 5.6 3.7 9s-1.3 6.4-3.7 9M12 3c-2.4 2.6-3.7 5.6-3.7 9s1.3 6.4 3.7 9"/></svg><b>Global</b><span>All signed-in players, every country</span></p>
       <span class="seg seg-sm lb-tabs" id="lb-tabs" role="radiogroup" aria-label="Leaderboard">
-        <button class="seg-opt" role="radio" aria-checked="true" data-board="rally">Longest rally</button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-board="trophies" data-cup>Trophies</button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-board="streak">Win streak</button></span>
-      <p class="lb-what" id="lb-what" data-cup>Ranked trophies</p>
+        <button class="seg-opt" role="radio" aria-checked="true" data-board="rally">Longest rally</button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-board="trophies">Trophies</button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-board="streak">Win streak</button></span>
+      <p class="lb-what" id="lb-what">Ranked Trophies</p>
       <div class="lb-wrap"><ol class="lb-list" id="lb-list" aria-labelledby="lb-what" aria-busy="true"></ol><p class="lb-state" id="lb-state" data-cup role="status" hidden></p></div>
       <div class="lb-you" id="lb-you" hidden><span class="lb-rank" id="lb-you-rank"></span><span class="lb-you-text"><b>You</b><small id="lb-you-cap" data-cup></small></span><span class="lb-v" id="lb-you-v"></span><button class="btn btn-sm is-tall lb-you-go" id="btn-lb-go" hidden></button></div>
       <button class="set-row set-switch lb-show" id="tog-lb-show" role="switch" aria-checked="true" hidden><span>Show me on the global leaderboard</span><i></i></button>
@@ -681,7 +681,7 @@
     </div>
     <small class="tally-games" id="tally-games" hidden></small>
     <!-- the trophy moment (8.9, 8.10): the rank's emblem card (name + division tag), the total in tally digits over its word, the change and the Rank up / Division up pill -->
-    <div class="trophy" id="trophy" role="status" hidden><div class="trophy-row"><span class="trophy-em" id="trophy-em"></span><span class="trophy-count"><b class="trophy-n" id="trophy-n"></b><small class="trophy-word" id="trophy-word" data-cup>trophies</small></span><span class="trophy-pills"><span class="trophy-d" id="trophy-d" data-cup></span><b class="rank-kicker" id="rank-kicker" hidden></b></span></div><small class="trophy-note" id="trophy-note" data-cup hidden></small></div>
+    <div class="trophy" id="trophy" role="status" hidden><div class="trophy-row"><span class="trophy-em" id="trophy-em"></span><span class="trophy-count"><b class="trophy-n" id="trophy-n"></b><small class="trophy-word" id="trophy-word" data-cup="all">trophies</small></span><span class="trophy-pills"><span class="trophy-d" id="trophy-d" data-cup></span><b class="rank-kicker" id="rank-kicker" hidden></b></span></div><small class="trophy-note" id="trophy-note" data-cup hidden></small></div>
     <ul class="result-stats" id="result-stats" aria-label="Match stats" hidden></ul>
     <ol class="road" id="result-road" aria-label="Tournament matches" hidden></ol>
     <!-- what this match did to the player's own stats (docs/ACCOUNTS.md 9.3): web/profile.js fills it from the 'profile' message. Never takes focus -->

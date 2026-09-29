@@ -2859,3 +2859,18 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   keyboard, focus trap and return, Esc/close/backdrop, own row, 404, 500 + Try again, a stale answer, a double click,
   the list redrawn under the sheet, a guest's plain GET, fit at 1440x900 / 1280x720 / 390x844, reduced motion, the
   notice, MATCH FOUND. test/ui-shots/sweep.mjs answers /api/leaderboard/player and shoots lbp-* and lb-hover/lb-focus.
+
+## 141. Everyone on the leaderboard is clickable; the trophy icon only beside a number; the Ranked tile's trophy fixed
+- The leaderboard profile card (NOTES 140) is for every player on a board, at any place, not only the top 100 (the
+  owner's ask). db.leaderOwnerByKey drops the in-the-LIMIT check (and its lbBefore_ statements); still 404 for
+  unknown, guest, no username, hidden, on no board, renamed away, deleted. The You card, when I am on the board,
+  opens my own card like my row (role=button, Enter / Space, the rows' hover / focus / press). Privacy (the leaderboard
+  bullet and the September 29 notice), CLAUDE.md data flows and docs/ropa.md say "on the leaderboard" instead of top 100.
+- The word "trophies" is back where it reads as a word (the owner: the Trophies tab, "Ranked Trophies" under the tabs,
+  "Win Ranked matches to earn trophies", "No trophies", "Friendly match, no trophies"...). ui.js cupify now swaps it for
+  the icon only right after a number ("240 [cup]", "From 300 [cup]", "+12 [cup]"); data-cup="all" marks the unit labels
+  that sit beside a number in their own element (the Ranked view's count, the match-end roll, the profile card).
+- The Ranked tile's line ("Silver II · 240 [cup]") showed the cup at the tile icon's size (.tiles[data-n] .tile svg,
+  up to 6.5rem): #ranked-line .cup .cup-ic sizes it to the line and keeps the tile's press squash off it.
+- A long toast wraps (max 46rem, balanced lines, a rounded box) instead of running off the screen: the one-time
+  leaderboard / profile-card notice was cut off at 1440 px.

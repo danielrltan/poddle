@@ -5,13 +5,13 @@ const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };   // replay a one-shot CSS animation
 // The gold trophy stands for the word (NOTES 138): in an element marked data-cup, every "trophy" / "trophies" in its text becomes the icon (its
 // aria-label keeps the word). Only on elements that hold our own words, never on a player's name, so a username "Trophy" stays a name.
-const CUP_SVG = '<svg class="cup-ic" viewBox="0 0 24 24" role="img" aria-label="LABEL"><path class="cup-h" d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4"/><path class="cup-c" d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z"/><path class="cup-s" d="M10.5 14.5h3v3h-3Z"/><rect class="cup-b" x="7" y="17" width="10" height="4" rx="1.2"/><path class="cup-g" d="M9 5.5v3.8a3.2 3.2 0 0 0 1.4 2.6"/></svg>', CUP_SPLIT = /\b(troph(?:y|ies))\b/i;
+const CUP_SVG = '<svg class="cup-ic" viewBox="0 0 24 24" role="img" aria-label="LABEL"><path class="cup-h" d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4"/><path class="cup-c" d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z"/><path class="cup-s" d="M10.5 14.5h3v3h-3Z"/><rect class="cup-b" x="7" y="17" width="10" height="4" rx="1.2"/><path class="cup-g" d="M9 5.5v3.8a3.2 3.2 0 0 0 1.4 2.6"/></svg>', CUP_SPLIT = /\b(troph(?:y|ies))\b/i, CUP_NUM = /(?<=\d\s?)(troph(?:y|ies))\b/i;      // NOTES 141: the icon only right after a number ('240 trophies'); a word in a sentence stays a word. data-cup="all": a unit label beside a number, every one
 const cupped = el => { cupify(el); return el; };
 export function cupify(el) {
-  if (!el) return; const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), hits = [];
-  for (let n = w.nextNode(); n; n = w.nextNode()) if (CUP_SPLIT.test(n.data) && !n.parentElement?.closest('.cup')) hits.push(n);
+  if (!el) return; const RE = el.dataset && el.dataset.cup === 'all' ? CUP_SPLIT : CUP_NUM, w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), hits = [];
+  for (let n = w.nextNode(); n; n = w.nextNode()) if (RE.test(n.data) && !n.parentElement?.closest('.cup')) hits.push(n);
   for (const n of hits) { const f = document.createDocumentFragment();
-    n.data.split(CUP_SPLIT).forEach((part, i) => { if (i % 2) { const c = document.createElement('i'); c.className = 'cup'; c.innerHTML = CUP_SVG.replace('LABEL', part.toLowerCase()); f.append(c); } else if (part) f.append(part); });
+    n.data.split(RE).forEach((part, i) => { if (i % 2) { const c = document.createElement('i'); c.className = 'cup'; c.innerHTML = CUP_SVG.replace('LABEL', part.toLowerCase()); f.append(c); } else if (part) f.append(part); });
     n.replaceWith(f); }
 }
 const cupT = new WeakMap();      // the words last set on a data-cup element: its textContent no longer holds them once the icons are in
