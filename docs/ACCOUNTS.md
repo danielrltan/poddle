@@ -1928,6 +1928,7 @@ includes its legal pages; step B another. Work only in /Users/danieltan/poddle-a
   `https://accounts.google.com/gsi/` for script, frame, connect and style. [Deferred; only frame-ancestors now.]
 - **Q14 Public stats later.** Leaderboards would make swing values and bot wins public; both are forgeable. [Never
   public in this project; a future leaderboard would use ranked human results only.]
+  [2026-09-29, NOTES 140: shown, not ranked, on the leaderboard profile card (the share card's six stats and Matt badge); no board sorts on them.]
 - **Q15 Dropped connection vs Matt = no loss.** Closing the tab mid-match counts as an abandon (streak lost) rather
   than a loss, because the server cannot tell it from bad wifi. [Yes.]
 - **Q16 Teleport threshold (gate).** Check the fastest real paddle movement (camera and Auto-off play) in the

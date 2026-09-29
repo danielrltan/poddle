@@ -23,7 +23,8 @@ function origin(req) {                                           // hosted: alwa
   const h = String(req && req.headers && req.headers.host || '');
   return /^(?:[A-Za-z0-9.-]{1,253}|\[[0-9A-Fa-f:.]{2,45}\])(?::\d{1,5})?$/.test(h) ? 'http://' + h : 'http://localhost';
 }
-// dataOf(ownerId) -> what the owner's card draws, or null when there is no profile (the play counters come with it as profile.play)
+// dataOf(ownerId) -> what the owner's card draws, or null when there is no profile (the play counters come with it as profile.play). Also the
+// leaderboard profile (api.js playerRoute, NOTES 140): one source, so the card and the profile never drift apart
 function dataOf(o) {
   const p = db.profileOf(o); if (!p) return null;
   return card.dataOf(p && p.ladder && p.ladder.tier === require('./ladder.js').TOP ? { ...p, places: db.leaderPlaces(o) } : p, db.usernameOf(o));   // Pro: its global leaderboard place for 'PRO #N' (NOTES 124/126); read only for Pro players
@@ -159,4 +160,4 @@ async function page(req, res, rel, notFound) {
   }
 }
 
-module.exports = { make, drop, forget, linkOf, page, newSlug, origin, SLUG };
+module.exports = { make, drop, forget, linkOf, page, newSlug, origin, SLUG, dataOf };

@@ -419,7 +419,7 @@ function drawSeries() { const S = rkSeries, L = spec() ? 0 : side; ui.setSeries?
 function rkMove(m) {                               // rkvs: an opponent is found (docs/RANKED.md 8.3): the MATCH FOUND card now, the series seat in m.at s (the tourMove recipe)
   clearTimeout(rkHang); rkWait = false; rkLeft = 0; rkMoving = true; rkQueued = true; rkPhase = 'vs'; if (pending && (pending.type === 'rk' || pending.type === 'rkwarm')) settle(); ui.rkSearch?.(false); rkBarSync();
   if (phase === 'title') phase = 'lobby';           // found while waiting on the title (OPTIONAL WARM-UP): the seat that follows goes through the set-up screens like a lobby one
-  ui.settings(false); ui.tourCard(false); if (['lobby', 'title'].includes(ui.currentScreen())) screen(null);
+  ui.settings(false); ui.tourCard(false); profile.closePlayer?.(); if (['lobby', 'title'].includes(ui.currentScreen())) screen(null);      // a leaderboard profile open (NOTES 140): its veil would sit over MATCH FOUND and keep every key
   ui.confettiOff(); ui.toastOff();                  // the warm-up point's confetti and any toast sit above the veil: MATCH FOUND opens on a clean screen
   scene.setFrozen(true); scene.jingle('found'); padFx('found'); ui.rkPill?.({ on: false }); ui.rkVs?.(m); clearTimeout(rkVsT);
   rkVsT = setTimeout(() => { if (ui.currentOverlay() !== 'rk-vs') return; ui.rkVs?.(null); rkMoving = false; if (room && rkKind === 'warm') { toLobby(); return; } if (!rkKind) { rkQueued = false; rkSinceP = 0; if (phase === 'lobby' && !room) { screen('lobby'); ui.lobbyView('ranked'); } venueSync(); redialDue(); } }, ((+m.at || 5) + 10) * 1000);      // the seat never came (from a warm-up: that court was closed under me with no 'closed', so off it)
@@ -440,7 +440,7 @@ function onTour(m) {
   if (m.champ && champShown !== m.code) showChamp();
 }
 function tourMove(m) {                              // my next match is drawn: the VS card now, the court in m.at s (docs/COURTS-TOURNEY.md 4.6 item 6)
-  clearTimeout(tourHang); tourMoving = true; ui.settings(false); ui.tourCard(false); if (ui.currentScreen() === 'lobby') screen(null);
+  clearTimeout(tourHang); tourMoving = true; ui.settings(false); ui.tourCard(false); profile.closePlayer?.(); if (ui.currentScreen() === 'lobby') screen(null);
   ui.tourVs(m); clearTimeout(tourVsT);
   tourVsT = setTimeout(() => { if (ui.currentOverlay() !== 'tour-vs') return; ui.tourVs(null); tourMoving = false; if (phase === 'lobby' && !room) { screen('lobby'); tourScreen(true); } }, ((+m.at || 4) + 10) * 1000);      // the seat never came (the other side left first: through without a ball)
 }
@@ -846,7 +846,7 @@ ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ t
   rankedOpen: () => { venueSync(); profile.showRanked(); }, ranksOpen: () => profile.showRanked(), view: v => { route(v); venueSync(); } });      // every view change re-picks the venue: the Ranks page stands in the stadium whichever way it was opened      // the Ranked view opened: the stadium builds behind the glass, the head and the road come from /api/stats
 // Player stats (docs/ACCOUNTS.md 9). On only where this page's server keeps them (hosted; ?acctest=1 is test/profile-ui.mjs on localhost).
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
-profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
+profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (el, r) => ui.rankCrest?.(el, r), emblem: (el, r) => ui.rankEmblem?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',
   gate: () => rkTile(),      // sign-in, sign-out or a new username: the Ranked tile's line follows (NOTES 133)
   badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, ranked: openRanked, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), cup: el => ui.cupify?.(el), board: () => { if (!room) ui.lobbyView('leaderboard'); }, rkView: s => { const t = rkNoteHeld(); ui.rkView?.(t && s && typeof s === 'object' ? { ...s, hold: t } : s); }, queued: () => rkOthers(), ladder: L => { const r = rankRef(L); if (r) { rkYou = { tier: r.tier, div: r.div, trophies: L.trophies | 0, place: Number.isInteger(L.place) ? L.place : rkYou.place }; rkTile(); } },      // the view fetched the ladder: the home tile's line follows
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one

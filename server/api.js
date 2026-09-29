@@ -5,6 +5,7 @@
 // this server never answers (no Access-Control-* header anywhere). Bodies: 8 KB, 5 s, a JSON object, fields read one by one with type
 // checks and never spread or merged. Rate limits per computer node (a keyed hash, never the address). Logs: one fixed line per failure
 // class an hour at most, never an identity, a body, a token or an address. handle() never throws or rejects: a throw answers 500.
+// Public, no sign-in: GET /api/leaderboard (NOTES 126) and GET /api/leaderboard/player?u=<name> (a listed player's profile card, NOTES 140).
 const crypto = require('node:crypto');
 const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share');
 let names = null; try { names = require('./usernames'); } catch { /* usernames need sign-in, which then answers 503 */ }
@@ -21,7 +22,7 @@ function init({ env = process.env } = {}) {
   hosted = !!env.FLY_APP_NAME; rkSignin = !(env.RK_GUESTS === '1' && env.NODE_ENV !== 'production');   // game.js RK_SIGNIN, the same rule (NOTES 133)
   verifier = auth.verifierFromEnv(env);                          // logs 'auth: GOOGLE_JWKS_FILE ignored in production' when it applies
   clientId = verifier ? String(env.GOOGLE_CLIENT_ID).trim() : null;
-  limiter = auth.createRateLimiter(); salt = crypto.randomBytes(32); saltAt = Date.now(); nonces.clear(); lbCache.clear();
+  limiter = auth.createRateLimiter(); salt = crypto.randomBytes(32); saltAt = Date.now(); nonces.clear(); boardsChanged();
   const r = Math.floor(Number(env.RENAME_DAYS)); renameDays = env.RENAME_DAYS !== undefined && env.RENAME_DAYS !== '' && Number.isFinite(r) ? Math.min(3650, Math.max(0, r)) : 30;
 }
 const signinOn = () => !!verifier;
@@ -84,6 +85,8 @@ async function statsRoute(req, res, b) {
 }
 // the global leaderboards (NOTES 126): the top 100 of one board, the same for every visitor, kept LB_MS in memory (a new match shows within a minute)
 const LB_MS = 30e3, lbCache = new Map();                          // board -> { at, body }
+const PL_MS = 30e3, PL_MAX = 500, plCache = new Map();          // the leaderboard profile (NOTES 140): skeleton key -> { at, body | null }. 404s are cached too, so hammering one name is cheap
+const boardsChanged = () => { lbCache.clear(); plCache.clear(); };   // hide, rename, delete: the boards and the profiles change at once, not after the cache
 async function leaderRoute(req, res) {
   const q = new URL(String(req.url || ''), 'http://x').searchParams.get('b') || 'trophies';
   if (!db.BOARDS.includes(q)) return fail(res, 400, 'bad_request');
@@ -93,11 +96,28 @@ async function leaderRoute(req, res) {
   const body = { board: q, total: L.total, at: t, rows: L.rows };
   lbCache.set(q, { at: t, body }); send(res, 200, body);
 }
+// one player's profile card from the board (NOTES 140): exactly the share card's subset (share.dataOf), for an account inside a board's top 100.
+// Unknown, guest, no username, hidden, renamed away, deleted, outside every top 100 and a malformed u: the same 404, and the name is never logged
+const publicCard = (d, ranked) => ({ name: d.name, rank: ranked ? { tier: d.tier, div: d.div, label: d.rank, pro: d.pro } : null, trophies: ranked ? d.trophies : 0, matt: d.matt,
+  stats: d.big.map(b => ({ label: b.label, value: b.value, ...(b.cap ? { unit: b.cap } : {}) })) });   // never v, em, guest, mattI, bar or the slug
+async function playerRoute(req, res) {
+  const u = new URL(String(req.url || ''), 'http://x').searchParams.get('u');
+  const key = names && typeof u === 'string' && u.length >= 1 && u.length <= 24 ? names.skeleton(u.normalize('NFKC').trim()) : '';   // the fold validate() and claimUsername use
+  if (!key || key.length > 64) return fail(res, 404, 'not_found');
+  const t = Date.now(), c = plCache.get(key);
+  if (c && t - c.at < PL_MS) return c.body ? send(res, 200, c.body) : fail(res, 404, 'not_found');
+  const who = db.leaderOwnerByKey(key); if (who === undefined) return fail(res, 503, 'db_unavailable');
+  const d = who ? share.dataOf(who.owner) : null;                 // the share card's own subset (Pro: with its place)
+  const body = d && !d.guest ? publicCard(d, who.ranked) : null;   // guest: no username any more (a race with a delete)
+  if (plCache.size >= PL_MAX) plCache.delete(plCache.keys().next().value);
+  plCache.set(key, { at: t, body });
+  return body ? send(res, 200, body) : fail(res, 404, 'not_found');
+}
 async function leaderHide(req, res, b) {                         // Show me on the global leaderboard (signed in only: a guest is never on it)
   const s = session(req); if (!s) return fail(res, 401, 'signin');
   const v = own(b, 'hidden'); if (typeof v !== 'boolean') return fail(res, 400, 'bad_request');
   if (!db.leaderHide(s.ownerId, v)) return fail(res, 503, 'db_unavailable');
-  lbCache.clear(); send(res, 200, { hidden: v, places: db.leaderPlaces(s.ownerId) });   // hiding takes the name off every board at once, not after the cache
+  boardsChanged(); send(res, 200, { hidden: v, places: db.leaderPlaces(s.ownerId) });   // hiding takes the name (and its profile, NOTES 140) off every board at once, not after the cache
 }
 async function nonce(req, res) {
   const n = auth.newNonce(); nonceIssue(n, Date.now());          // kept, so a token can only be used with a nonce this server handed out, once
@@ -129,7 +149,7 @@ async function username(req, res, b) {
   if (!names) return fail(res, 503, 'db_unavailable');
   const v = names.validate(own(b, 'username')); if (!v.ok) return fail(res, 422, 'invalid', undefined, { reason: v.reason });
   const now = Date.now(), r = db.claimUsername(s.accountId, v.name, v.key, now);
-  if (r === 'ok') { lbCache.clear(); return send(res, 200, { username: v.name, renameAt: now + renameDays * DAY }); }   // a new name shows on the boards at once
+  if (r === 'ok') { boardsChanged(); return send(res, 200, { username: v.name, renameAt: now + renameDays * DAY }); }   // a new name shows on the boards at once
   if (r === 'taken' || r === 'held') return fail(res, 409, 'taken');   // never says which
   if (r === 'cooldown') { const a = db.accountById(s.accountId); return fail(res, 423, 'cooldown', undefined, { until: a && a.renamed_at != null ? a.renamed_at + renameDays * DAY : now }); }
   fail(res, 503, 'db_unavailable');
@@ -142,7 +162,7 @@ async function del(req, res, b) {
   if (s || g != null) stats.forget({ accountId: s ? s.accountId : null, devHash: g != null || merged ? h : null, deleted: true });   // first: no live seat or socket frozen on this account or device may write it again (3.3)
   if (s) { share.forget(s.ownerId); out.account = db.deleteOwner(s.ownerId, now); }   // forget: the card pictures in memory go with the link
   if (g != null) { share.forget(g); out.device = db.deleteOwner(g, now); }
-  lbCache.clear(); send(res, 200, { deleted: out }, { 'Set-Cookie': auth.clearSessionCookie() });   // a deleted account leaves the boards at once, not after the cache
+  boardsChanged(); send(res, 200, { deleted: out }, { 'Set-Cookie': auth.clearSessionCookie() });   // a deleted account leaves the boards at once, not after the cache
 }
 async function exportRoute(req, res, b) {
   const s = session(req), h = auth.deviceHash(own(b, 'dev')), g = h ? db.guestOwner(h) : null, o = s ? s.ownerId : g;
@@ -181,6 +201,7 @@ const ROUTES = {
   '/api/share': { POST: [shareMake, 20, MIN, false, true], DELETE: [shareStop, 20, MIN, false, true] },
   '/api/leaderboard': { GET: [leaderRoute, 60, MIN, false, true] },
   '/api/leaderboard/hide': { POST: [leaderHide, 20, MIN, true, true] },
+  '/api/leaderboard/player': { GET: [playerRoute, 60, MIN, false, true] },   // one player's profile card from the board (NOTES 140): public, 60 a minute, its own bucket (never starves the list)
 };
 
 // handle(req, res) -> Promise that never rejects. game.js: api.handle(req, res).catch(() => {})

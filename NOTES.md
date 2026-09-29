@@ -2796,3 +2796,66 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   card's height budget, the Ranks page's own scroll. Known and left for the owner: the "Getting ready" (connect)
   panel is taller than the window at 1440x900 and 1280x720 and on phones covers the header title; fixing it needs a
   layout change, not padding.
+## 140. Leaderboard names open a profile card
+- The owner: "make it so u can view profiles on the leaderboard just by clicking them". Every row of the global leaderboard
+  (NOTES 126) is now a button (li.lb-item > button.lb-row, like the court list: type=button, aria-haspopup=dialog, an
+  aria-label "3. Kiko, Champion II, 56 hits. Open profile" with ", Developer" on Dan's and ", you" on mine, a chevron,
+  a hover lift with a tight pale ring, and a solid deep-blue focus outline of its own, so a focused row never looks like
+  my own row at rest; both fit in the list's .25rem padding, which the scroll box would otherwise clip). A click, Enter or Space opens that
+  player's profile card (#lbp-card) in #acct-layer over the list: the name (with the hammer on Dan's), the Ranked
+  emblem (ui.rankEmblem, a new export: the crest's medal and numeral without touching lastRank) with the rank
+  ("Gold II", "Pro #3") and trophies, the toughest Matt beaten on Your stats' Matt disc, and the six share-card
+  stats as Your stats' figure tiles. Loading draws the row's emblem at once with six skeleton tiles; 404 says "This
+  player isn't on the leaderboard any more"; anything else says "Couldn't load this player" with Try again. Esc, the
+  close button and a press on the backdrop close it and hand focus back to the row (found again by data-name when the
+  list redrew under the sheet: showBoard draws twice). MATCH FOUND (main.js rkMove), a tournament VS card (tourMove)
+  and a seat of my own (seated) close it, so no veil sits over the court.
+- Server: GET /api/leaderboard/player?u=<name> (server/api.js playerRoute), public, no sign-in, 60 a minute in its
+  own limiter bucket (browsing profiles never starves the list). The name is folded as usernames validate() folds it
+  (NFKC, skeleton), so "ACE" and "D1no" find Ace and Dino and the answer carries the stored spelling. The body is
+  exactly share.dataOf (card.dataOf, the share card's own subset, now exported, so the card and the profile never
+  drift apart): { name, rank: { tier, div, label, pro } | null, trophies, matt, stats: six { label, value, unit? } }.
+  rank is null when the account has no ladder row (the same LEFT JOIN test that leaves a row without an emblem). Never
+  an owner id, a date, the match log, the slug or the card's internals. Unknown, guest, no username, hidden, renamed
+  away, deleted, outside every top 100 and a malformed u all answer the same 404 {"error":"not_found"}; the name is
+  never logged. 503 when the database is closed (db.leaderOwnerByKey answers undefined, not null, on a failure).
+- Who has a profile (a decision): only an account inside the top-100 ROWS of at least one board (db.leaderOwnerByKey:
+  lbBefore_<board> counts the rows lbTop_ puts ahead of it with the same WHERE and ORDER BY, so a tie at place 100 only
+  opens for the name inside the LIMIT). Usernames also show in court lists and brackets; a lookup for every listed
+  account would publish the stats of people nobody can click, and the privacy page promises "from the leaderboard".
+- Cache: 30 s in memory per folded key, 404s too (at most 500 keys). Hide, unhide, a rename and an account delete clear
+  it with the board cache (api.js boardsChanged), so a hidden or renamed name 404s at once. Known limit: admin.js
+  (rename, reset-stats, unshare-user) is another process, so its changes wait out the 30 s TTL, as the board does.
+- Public by default now, for listed players: return rate, record vs people, winners, fastest swing, the Matt badge, and
+  the rank label with trophies. docs/ACCOUNTS.md Q14 said swing values and bot wins would never be public because
+  both are forgeable; they were public only on an opt-in share card until now. Kept (the orchestrator's decision,
+  the owner may overrule): the profile IS the share card, and no board sorts on them. Q14 is annotated. The other
+  way, if the owner objects: send '-' for Fastest swing from the API only, and word the privacy page "five statistics".
+- My own row opens the same public view (not Your stats): every row behaves the same, and it shows me exactly what
+  others see, which is the point of the privacy promise. Its footer says "This is what other players see." with a
+  Your stats link.
+- No URL: the address stays /leaderboard while the sheet is open. A /leaderboard/<name> path would need server routing,
+  a reload-restores-the-sheet flow and would make shareable, indexable profile pages, a new public surface.
+- Notice (NOTES 126's mechanism): poddle.lbSeen gains '2'. A browser that never saw the leaderboard notice is told both
+  at once; one that saw '1' is told "Anyone can now open your profile card from the global leaderboard. You can turn
+  this off on the Leaderboard page" if the player is listed (/api/me places); a hidden player is not told on load, but
+  turning Show me on (toggleShow) says "You're on the global leaderboard. Anyone can open your profile card from it"
+  and sets '2' at once, unless the browser already holds '2'. No new storage key.
+- Also fixed on the way: a press on the veil around any account card (share, sign-in, profile) left focus on <body>,
+  because the mousedown that follows the pointerdown blurred what closeCard had just focused: the veil's pointerdown
+  now calls preventDefault, and the veil closes on the click, not the pointerdown: closed on pointerdown, a touch
+  tap's click was hit-tested after the veil had gone and landed on the leaderboard row under it, opening that player
+  instead (a mouse click was fine: Chrome sends it to the common ancestor). The veil ignores presses in the first 350 ms after a card opens (the second click of a
+  double click on a row landed on it and closed the sheet it had just opened). The sheet's state is a data-state
+  attribute, not a class: .panel.is-error is the red form nudge.
+- Legal (same change): privacy.html Summary, For teens and parents, section 2 (IP purpose; match results and Ranked
+  purposes), 4 (Statistics, Global leaderboard: what the card shows, who has one, Show me off and rename/delete remove
+  it; Usernames), 5 (poddle.lbSeen 1 / 2), 13 (the legitimate-interests row lists the card's contents), 15 (a dated
+  line); terms.html section 5; the header comment. Dates already read September 29, 2026 (dateModified, sitemap
+  lastmod). CLAUDE.md "Current data flows" (Public, Storage), docs/ropa.md, docs/SHARE.md, the changelog.
+- Tests: test/leaderboard.test.mjs (the route's shape and equality with share.dataOf, no leak, case and look-alikes,
+  identical 404s, hide/rename/delete clearing at once, the TTL, leaderOwnerByKey, the tie at the LIMIT, the rate
+  limit's own bucket, 503 closed). New test/lb-profile-ui.mjs (LB_PROFILE_UI_PORT, default 9740): rows as buttons,
+  keyboard, focus trap and return, Esc/close/backdrop, own row, 404, 500 + Try again, a stale answer, a double click,
+  the list redrawn under the sheet, a guest's plain GET, fit at 1440x900 / 1280x720 / 390x844, reduced motion, the
+  notice, MATCH FOUND. test/ui-shots/sweep.mjs answers /api/leaderboard/player and shoots lbp-* and lb-hover/lb-focus.

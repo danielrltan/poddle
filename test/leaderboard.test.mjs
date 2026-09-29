@@ -1,10 +1,13 @@
 // The global leaderboards (NOTES 126), no server, no port: server/db.js leaderboard / leaderPlaces / leaderHide on an in-memory database, and the
 // /api/leaderboard routes through api.handle with a fake request. Who is on a board (accounts with a username that did not hide), the minimums, the order,
 // ties sharing a number, a player's place equal to their row's rank, hiding and deleting taking the name off at once, and no owner id on the wire.
+// The leaderboard profile (NOTES 140): GET /api/leaderboard/player?u=<name> answers the share card's subset for a player in a board's top 100 rows,
+// and the same 404 for everyone else; hide, rename and delete clear it at once; its own rate-limit bucket; 503 with the database closed.
 // Last line: PASS or FAIL n.
 import { createRequire } from 'module';
 import { Readable } from 'node:stream';
 const require = createRequire(import.meta.url);
+process.env.RENAME_DAYS = '0';                                    // db.js reads it at open: Cato renames the day he claimed his name (NOTES 140 section)
 const db = require('../server/db.js'), api = require('../server/api.js'), U = require('../server/usernames.js');
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const T0 = Date.UTC(2026, 8, 28, 12);
@@ -72,6 +75,83 @@ ok(!JSON.parse((await call('GET', '/api/leaderboard?b=trophies')).body).rows.som
 ok((await call('POST', '/api/leaderboard/hide', { hidden: 'yes' }, COOKIE)).status === 400 && (await call('POST', '/api/leaderboard/hide', { hidden: true })).status === 401, 'a non-boolean is 400; no session is 401');
 const st = JSON.parse((await call('POST', '/api/stats', {}, COOKIE)).body);
 ok(st.profile && st.profile.places && st.profile.places.why === 'hidden', '/api/stats carries the places (hidden here)');
-db.close();
+
+// ---------- the leaderboard profile (NOTES 140). Bree is hidden, sign-in is on ----------
+console.log('the profile card');
+const share = require('../server/share.js'), ENV = { GOOGLE_CLIENT_ID: 'x.apps.googleusercontent.com', RENAME_DAYS: '0' }, reinit = () => api.init({ env: ENV });   // init clears both caches and the limiter
+const cookieOf = a => require('../server/auth.js').cookieNames().session + '=' + db.session.create(a.id, Date.now());
+const pl = async u => { const r = await call('GET', '/api/leaderboard/player' + (u === undefined ? '' : '?u=' + encodeURIComponent(u))); return { ...r, j: r.body ? JSON.parse(r.body) : null }; };
+const J = JSON.stringify, LABELS = 'Return rate,Longest rally,Fastest swing,Record vs people,Best streak,Winners';
+reinit();
+let p = await pl('Ace');
+ok(p.status === 200 && Object.keys(p.j).join(',') === 'name,rank,trophies,matt,stats', `Ace -> 200, exactly name, rank, trophies, matt, stats (${p.status} ${p.body})`);
+ok(p.j.name === 'Ace' && p.j.rank.tier === 8 && p.j.rank.label === 'Pro #1' && p.j.rank.pro === 1 && p.j.trophies === 1100, `Ace is Pro #1 with 1100 trophies (${J(p.j.rank)} ${p.j.trophies})`);
+ok(p.j.stats.map(s => s.label).join(',') === LABELS && J(p.j.stats[1]) === J({ label: 'Longest rally', value: '30', unit: 'hits' }), `the six card stats in card order; rally 30 hits (${J(p.j.stats[1])})`);
+{ const d = share.dataOf(A.owner_id);
+  ok(J(p.j.stats.map(s => s.value)) === J(d.big.map(b => b.value)) && p.j.rank.label === d.rank && p.j.matt === d.matt, `the same values as Ace's share card (${p.j.stats.map(s => s.value)})`); }
+ok(!/owner|account|"sub"|google|device|"dev"|since|played|expires|slug|guest|"id"|mattI|"bar"|"em"|"v"/i.test(p.body), 'no owner, account, device, date, slug or card internals in the answer');
+ok(p.head['Cache-Control'] === 'no-store' && p.head['X-Robots-Tag'] === 'noindex', 'no-store and noindex, like every /api answer');
+p = await pl('Dino');
+ok(p.status === 200 && p.j.rank === null && p.j.trophies === 0 && p.j.matt === null && p.j.stats.length === 6, `Dino never played Ranked: rank null, 0 trophies, no Matt, still six stats (${p.body})`);
+p = await pl('ACE'); ok(p.status === 200 && p.j.name === 'Ace', `u=ACE -> Ace (${p.status} ${p.j && p.j.name})`);
+ok(U.skeleton('D1no') === U.skeleton('Dino'), 'D1no folds to the same key as Dino');
+p = await pl('D1no'); ok(p.status === 200 && p.j.name === 'Dino', `u=D1no -> the canonical name Dino (${p.j && p.j.name})`);
+{ const miss = [['hidden Bree', 'Bree'], ['unknown', 'Nobody1'], ['no u', undefined], ['empty u', ''], ['40 chars', 'a'.repeat(40)], ['<script>', '<script>'], ['%00', '\u0000'], ['a guest\'s typed name', 'Guesty'], ['spaces', '   ']];
+  const got = []; for (const [what, u] of miss) { const r = await pl(u); got.push(r.status === 404 && r.body === '{"error":"not_found"}' ? '' : `${what}: ${r.status} ${r.body}`); }
+  ok(got.every(g => !g), `hidden, unknown, missing, empty, too long, <script>, %00, a guest's name, spaces: the same 404 {"error":"not_found"} (${got.filter(Boolean).join('; ')})`); }
+ok((await call('POST', '/api/leaderboard/player?u=Ace', {})).status === 405, 'POST -> 405');
+
+console.log('the profile card: hide, rename, delete');
+reinit();
+const CA = cookieOf(A);
+ok((await pl('Ace')).status === 200, 'Ace: 200, cached now');
+ok((await call('POST', '/api/leaderboard/hide', { hidden: true }, CA)).status === 200 && (await pl('Ace')).status === 404, 'Ace hides: 404 at once, not after the cache');
+ok((await call('POST', '/api/leaderboard/hide', { hidden: false }, CA)).status === 200 && (await pl('Ace')).status === 200, 'Ace shows again: 200 at once');
+ok((await pl('Cato')).status === 200, 'Cato: 200, cached');
+{ const r = await call('POST', '/api/username', { username: 'Cyan' }, cookieOf(C));
+  ok(r.status === 200, `Cato renames to Cyan (${r.status} ${r.body})`);
+  const a = await pl('Cato'), b = await pl('Cyan'), L = JSON.parse((await call('GET', '/api/leaderboard?b=trophies')).body);
+  ok(a.status === 404 && a.body === '{"error":"not_found"}' && b.status === 200 && b.j.name === 'Cyan', `the old name 404s at once, the new one answers (${a.status}, ${b.status} ${b.j && b.j.name})`);
+  ok(!L.rows.some(x => x.name === 'Cato') && L.rows.some(x => x.name === 'Cyan'), 'the board shows Cyan, not Cato'); }
+ok((await pl('Dino')).status === 200, 'Dino: 200, cached');
+{ const r = await call('DELETE', '/api/account', { confirm: 'delete' }, cookieOf(D)); ok(r.status === 200 && (await pl('Dino')).status === 404, `Dino deletes his account: 404 at once (${r.status})`); }
+
+console.log('the profile card: the cache');
+reinit();
+ok((await pl('Ace')).status === 200, 'Ace: 200, cached');
+db.leaderHide(A.owner_id, true);                                  // admin.js's kind of change: another process, no cache clear here
+ok((await pl('Ace')).status === 200, 'a hide the route did not see answers from the cache inside the 30 s TTL (why every self-service route clears it)');
+db.leaderHide(A.owner_id, false); reinit();
+
+console.log('the profile card: db.leaderOwnerByKey');
+{ const a = db.leaderOwnerByKey(U.skeleton('Ace'));
+  ok(a && a.owner === A.owner_id && a.name === 'Ace' && a.ranked === true, `Ace -> { owner, name: Ace, ranked: true } (${J(a)})`);
+  ok(db.leaderOwnerByKey(U.skeleton('Bree')) === null && db.leaderOwnerByKey('nobody') === null && db.leaderOwnerByKey('') === null && db.leaderOwnerByKey(null) === null && db.leaderOwnerByKey('x'.repeat(65)) === null, 'hidden, unknown, empty, null and too long -> null'); }
+
+console.log('the profile card: only inside a top 100');
+{ const mkNamed = (name, trophies) => { const a = db.createAccount('s-' + name, T0); if (db.claimUsername(a.id, name, U.skeleton(name), T0) !== 'ok') return null; if (trophies) tro(a.owner_id, trophies); return a; };
+  const ABC = 'bcdfghjkmnpqrstwxyz', fill = [];
+  for (let i = 0; i < ABC.length && fill.length < 98; i++) for (let k = 0; k < ABC.length && fill.length < 98; k++) { const a = mkNamed('Fx' + ABC[i] + ABC[k], 1000 - fill.length); if (a) fill.push(a); }   // 1000 .. 903: not Pro (1050), above Bree and Cyan
+  const ties = ['Tyeb', 'Tyem'].map(n => ({ n, a: mkNamed(n, 800), k: U.skeleton(n) })).sort((x, y) => (x.k < y.k ? -1 : 1)), low = mkNamed('Lowly', 5);   // Ace + 98 + the tie: the tie is rows 100 and 101, both ranked 100
+  ok(fill.length === 98 && ties.every(t => t.a) && low, `98 fillers, a tie at 800 and Lowly made (${fill.length})`);
+  const L = db.leaderboard('trophies'), inside = L.rows.map(r => r.name), lp = db.leaderPlaces(low.owner_id);
+  ok(L.rows.length === 100 && inside.includes(ties[0].n) && !inside.includes(ties[1].n), `the board's LIMIT keeps the tie's smaller key (${ties[0].n}) and not ${ties[1].n}`);
+  const a = await pl(ties[0].n), b = await pl(ties[1].n), c = await pl('Lowly'), cy = await pl('Cyan');
+  ok(a.status === 200 && L.rows.find(r => r.name === ties[0].n).rank === 100, `${ties[0].n}, place 100 inside the LIMIT: 200 (${a.status})`);
+  ok(b.status === 404 && b.body === '{"error":"not_found"}', `${ties[1].n}, also place 100 but outside the LIMIT: the same 404 (${b.status})`);
+  ok(c.status === 404 && lp && lp.listed === true && lp.trophies && lp.trophies.rank > 100, `Lowly is listed (place ${lp && lp.trophies && lp.trophies.rank}) but outside every top 100: 404 (${c.status})`);
+  ok(cy.status === 200, `Cyan is outside the trophies top 100 but on the rally board: 200 (${cy.status})`);
+  ok((await pl('Ace')).status === 200, 'Ace: still 200'); }
+
+console.log('the profile card: rate limit');
+reinit();
+{ let r = null, n = 0; for (; n < 61; n++) { r = await pl('Ace'); if (r.status === 429) break; }
+  ok(r.status === 429 && n === 60 && Number(r.head['Retry-After']) > 0 && r.j.retryAfter > 0, `the 61st call a minute is 429 with Retry-After (${r.status} after ${n}, ${r.head['Retry-After']})`);
+  ok((await call('GET', '/api/leaderboard?b=rally')).status === 200, 'the board list has its own bucket: still 200'); }
+
+console.log('the profile card: database closed');
+reinit(); db.close();
+ok(db.leaderOwnerByKey(U.skeleton('Ace')) === undefined, 'closed: leaderOwnerByKey is undefined, not null (the route tells a failure from nobody)');
+{ const r = await pl('Ace'); ok(r.status === 503 && r.j.error === 'db_unavailable', `closed: 503 db_unavailable (${r.status} ${r.body})`); }
 console.log(fails ? `FAIL ${fails}` : 'PASS');
 process.exit(fails ? 1 : 0);

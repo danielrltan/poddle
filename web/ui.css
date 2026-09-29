@@ -2064,7 +2064,16 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .lb-wrap{position:relative;width:min(40rem,100%);flex:1 1 auto;min-height:8rem;display:flex;flex-direction:column}
 .lb-list{list-style:none;margin:0;padding:.25rem;display:flex;flex-direction:column;gap:.375rem;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:0;max-height:24rem}
 .lb-row,.lb-you{display:grid;grid-template-columns:3.25rem minmax(0,1fr) auto;align-items:center;gap:.75rem;min-height:3.25rem;padding:.25rem 1rem .25rem .5rem;border-radius:var(--r-lg);background:#fff;border:.125rem solid var(--line-faint);box-shadow:var(--sh-1)}
-.lb-row{animation:lb-in 360ms var(--ease-out) backwards} .lb-row:nth-child(2){animation-delay:30ms} .lb-row:nth-child(3){animation-delay:60ms} .lb-row:nth-child(n+4){animation-delay:90ms}
+/* the rows are buttons (NOTES 140): li.lb-item > button.lb-row, like the court list. The entrance is the li's (nth-child counts li's) */
+.lb-item{display:block;animation:lb-in 360ms var(--ease-out) backwards} .lb-item:nth-child(2){animation-delay:30ms} .lb-item:nth-child(3){animation-delay:60ms} .lb-item:nth-child(n+4){animation-delay:90ms}
+button.lb-row{appearance:none;-webkit-appearance:none;width:100%;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;
+  grid-template-columns:3.25rem minmax(0,1fr) auto .5rem;transition:transform var(--d-fast) var(--ease-bounce),border-color var(--d-fast),box-shadow var(--d-fast)}
+button.lb-row::after{content:"";justify-self:end;width:.45rem;height:.45rem;border:solid var(--line-deep);border-width:.1875rem .1875rem 0 0;border-radius:.0625rem;rotate:45deg;translate:-.125rem 0;opacity:.45;transition:opacity var(--d-fast),translate var(--d-fast) var(--ease-bounce)}      /* a chevron: it opens something */
+@media (hover:hover){ button.lb-row:hover{border-color:var(--line);box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 35%,transparent);transform:translateY(-.0625rem)} button.lb-row:hover::after{opacity:1;translate:0 0} }      /* a tight ring, not --glow: the list scrolls with .25rem of padding and would clip a 1.5rem glow */
+button.lb-row:focus-visible{outline:.1875rem solid var(--line-deep);outline-offset:0} button.lb-row:focus-visible::after{opacity:1;translate:0 0}      /* focus has its own mark, a solid deep ring (inside the list's .25rem padding): the pale ring is my own row's at rest, the tight one is hover */
+button.lb-row:active{transform:scale(.985)}
+button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srgb,var(--line) 60%,transparent)}
+@media (prefers-reduced-motion:reduce){ .lb-item{animation:none} button.lb-row,button.lb-row::after{transition:none} button.lb-row:hover,button.lb-row:active{transform:none} }
 @keyframes lb-in{from{opacity:0;translate:0 .5rem}}
 .lb-rank{justify-self:center;min-width:2.25rem;height:2.25rem;padding:0 .4rem;display:grid;place-items:center;border-radius:var(--r-pill);font:900 var(--t-md)/1 var(--font);font-variant-numeric:tabular-nums;color:var(--ink-soft);background:var(--sky-2)}
 .lb-row.is-top1 .lb-rank{background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 55%,var(--gold-3));color:var(--warn-deep);box-shadow:0 .125rem 0 rgba(201,127,8,.3)}
@@ -2091,3 +2100,33 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .st-place{flex:none;display:inline-flex;align-items:center;gap:.3rem;height:2.25rem;padding:0 .75rem 0 .5rem;border-radius:var(--r-pill);border:.125rem solid var(--line-faint);background:#fff;box-shadow:var(--sh-1);color:var(--line-deep);font:900 var(--t-lg)/1 var(--font);font-variant-numeric:tabular-nums;cursor:pointer;outline:0;transition:transform var(--d-fast) var(--ease-bounce)}
 .st-place:hover,.st-place:focus-visible{border-color:var(--line);box-shadow:var(--glow);transform:translateY(-.0625rem)}
 @media (max-width:480px){ .lb-view{padding:var(--s-5) var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row{padding-right:.625rem;gap:.5rem} .lb-you{padding-right:var(--s-3);gap:var(--s-2)} .lb-you:not(.is-on){padding-left:var(--s-4)} .lb-show{padding-right:.625rem} .lb-tabs .seg-opt{height:max(2.125rem,32px)} }
+
+/* ---------- a player's profile card from the leaderboard (NOTES 140): the share sheet's frame, Your stats' pieces (the emblem, the Matt disc, the figure tiles) ---------- */
+.lbp-card{width:min(32rem,100%)}
+.lbp-title{display:flex;align-items:center;gap:.5rem;min-width:0} .lbp-card .lbp-title h2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-xl);font-weight:900;line-height:1.15}
+.lbp-hero{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"em rank" "m mt";column-gap:var(--s-4);row-gap:var(--s-3);align-items:center;padding:var(--s-4) var(--s-5) var(--s-4) var(--s-4);
+  --lv:#8fa3b1;--lv-deep:#5d6f7c}
+.lbp-hero:has(.is-lv0){--lv:#3ecf72;--lv-deep:#13803f} .lbp-hero:has(.is-lv1){--lv:#3aa0ff;--lv-deep:#1b63b8} .lbp-hero:has(.is-lv2){--lv:#a77bf3;--lv-deep:#6a3fc2} .lbp-hero:has(.is-lv3){--lv:var(--gold-2);--lv-deep:var(--warn-deep)}      /* .st-matt's level colours: the disc reads them */
+.lbp-em{grid-area:em;position:relative;display:grid;place-items:center;width:5.75rem;min-height:5.75rem}
+.lbp-em::before{content:"";position:absolute;inset:.25rem;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--rank-mid,var(--sky-3)) 45%,transparent) 0,transparent 70%)}      /* the rank's own colour, a halo behind the medal */
+.lbp-em:empty::before{inset:.75rem;background:var(--sky-2);box-shadow:inset 0 0 0 .125rem var(--sky-3)}      /* never played Ranked: a quiet disc where the medal would be */
+.lbp-em .st-em{position:relative}
+.lbp-card .caps{margin:0;font-size:var(--t-xs);line-height:1.3}
+.lbp-rank{grid-area:rank;min-width:0;display:flex;flex-direction:column;gap:.125rem}
+.lbp-card .lbp-rank-name{margin:0;font:900 var(--t-xl)/1.1 var(--font);color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbp-card .lbp-rank-name:empty{height:1.1em;width:7rem;border-radius:var(--r-sm);background:var(--sky-2)}      /* loading a player with no emblem on the row */
+.lbp-card .lbp-tro{display:flex;align-items:center;gap:.35rem;font-weight:700;color:var(--ink-soft)} .lbp-tro b{color:var(--ink-strong);font-weight:900;font-variant-numeric:tabular-nums} .lbp-tro .cup .cup-ic{width:1.35rem;height:1.35rem}
+.lbp-matt{grid-area:m;justify-self:center;width:3.25rem;height:3.25rem} .lbp-matt .st-mdisc svg{width:1.75rem;height:1.75rem} .lbp-matt .st-mstar{width:1.4rem;height:1.4rem;animation:none}
+.lbp-mtext{grid-area:mt;min-width:0;display:flex;flex-direction:column;gap:.0625rem}
+.lbp-card .lbp-mbest{margin:0;font:900 var(--t-lg)/1.15 var(--font);color:var(--lv-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .lbp-matt.is-none + .lbp-mtext .lbp-mbest{color:var(--ink-soft)}
+.lbp-stats{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-2)}
+.lbp-stat{position:relative;overflow:hidden;display:flex;flex-direction:column-reverse;align-items:center;justify-content:center;gap:.1875rem;min-width:0;min-height:4.25rem;padding:.5rem .375rem;border-radius:var(--r-md);background:var(--sky-1);box-shadow:inset 0 0 0 .125rem var(--sky-2);text-align:center;line-height:1.1}      /* Your stats' figure tiles: dt first for screen readers, the number on top for the eye */
+.lbp-stat dt{max-width:100%;font-size:max(11px,.75rem);font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbp-stat dd{margin:0;white-space:nowrap;color:var(--me-ink)} .lbp-stat dd b{font-size:1.5rem;font-weight:900;font-variant-numeric:tabular-nums} .lbp-stat dd small{margin-left:.2rem;font-size:var(--t-xs);font-weight:800;color:var(--ink-soft)}
+.lbp-stat.is-skel dd{color:var(--sky-4)} .lbp-stat.is-skel::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:translateX(-100%);animation:skel 1.2s linear infinite}
+.lbp-card[data-state="gone"] .lbp-hero,.lbp-card[data-state="gone"] .lbp-stats,.lbp-card[data-state="error"] .lbp-hero,.lbp-card[data-state="error"] .lbp-stats{display:none}
+.lbp-card .lbp-msg{margin:0;padding:var(--s-5) var(--s-3);border-radius:var(--r-lg);background:var(--sky-1);text-align:center;font-size:var(--t-md);font-weight:800;color:var(--ink-soft)}
+.lbp-card .lbp-retry{justify-content:center;margin-top:0!important}
+.lbp-foot #btn-lbp-mine{color:var(--line-deep);font-weight:800}
+@media (max-width:480px){ .lbp-card{padding:var(--s-4)} .lbp-stats{grid-template-columns:repeat(2,minmax(0,1fr))} .lbp-hero{column-gap:var(--s-3);padding:var(--s-3) var(--s-4) var(--s-3) var(--s-3)} .lbp-em{width:4.75rem;min-height:4.75rem} .lbp-em .st-em{--em-h:4.25rem} .lbp-em .st-em .rank-em{width:4.5rem;height:4.5rem} }
+@media (prefers-reduced-motion:reduce){ .lbp-stat.is-skel::after{animation:none;display:none} }

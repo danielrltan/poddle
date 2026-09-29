@@ -247,6 +247,24 @@
       <p class="share-foot share-confirm" id="share-confirm" role="alert" hidden><span>Stop sharing? This link will stop working.</span><button class="btn btn-sm is-tall btn-danger" id="btn-share-stop-yes">Stop sharing</button><button class="btn btn-sm is-tall btn-quiet" id="btn-share-stop-no">Keep it</button></p>
     </div>
   </div>
+  <!-- A player's profile card from the global leaderboard (NOTES 140): exactly what their share card shows (rank, trophies, the toughest Matt beaten, the six card stats).
+       web/profile.js openPlayer() fills it from GET /api/leaderboard/player; every value goes in as textContent -->
+  <div class="panel panel-sm acct-card lbp-card" id="lbp-card" role="dialog" aria-modal="true" aria-labelledby="lbp-name" tabindex="-1" data-fit hidden>
+    <div class="acct-body">
+      <div class="acct-head"><div class="lbp-title"><h2 id="lbp-name"></h2></div><button class="btn btn-icon acct-close" id="btn-lbp-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <section class="lbp-hero well" id="lbp-hero" aria-label="Rank and Matt badge">
+        <div class="lbp-em" id="lbp-em"></div>
+        <div class="lbp-rank"><p class="caps">Rank</p><p class="lbp-rank-name" id="lbp-rank"></p>
+          <p class="lbp-tro" id="lbp-tro" hidden><b id="lbp-trophies">0</b> <span id="lbp-tro-cap" data-cup>trophies</span></p></div>
+        <div class="lbp-matt st-mbadge is-none" id="lbp-matt" aria-hidden="true"><i class="st-mdisc"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/><path d="M10.25 8.5v.75M13.75 8.5v.75M10.5 17.25h3" style="stroke-width:2.5"/></svg></i><svg class="st-mstar" viewBox="0 0 48 48"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div>
+        <div class="lbp-mtext"><p class="caps">Hardest Matt beaten</p><p class="lbp-mbest" id="lbp-mbest">None yet</p></div>
+      </section>
+      <dl class="lbp-stats" id="lbp-stats" aria-label="Stats" aria-busy="true"></dl>
+      <p class="lbp-msg" id="lbp-msg" role="status" hidden></p>
+      <p class="acct-btns lbp-retry" id="lbp-retry" hidden><button class="btn btn-sm is-tall" id="btn-lbp-retry">Try again</button></p>
+      <p class="share-foot lbp-foot" id="lbp-foot" hidden><span>This is what other players see.</span><button class="share-lnk is-quiet" id="btn-lbp-mine" type="button">Your stats</button></p>
+    </div>
+  </div>
 </div>
 
 <!-- Ranked search bar (docs/RANKED.md 8.1, OPTIONAL WARM-UP): queued and not on a court, it hangs from the top of the title and every lobby view
@@ -440,7 +458,8 @@
     </div>
 
     <!-- Global leaderboard (NOTES 126): three boards of counted results, the top 100 of every signed-in player with a username who has not turned
-         Show me on the global leaderboard off. Drawn by web/profile.js (showBoard) from GET /api/leaderboard; the You bar from /api/stats places -->
+         Show me on the global leaderboard off. Drawn by web/profile.js (showBoard) from GET /api/leaderboard; the You bar from /api/stats places.
+         Every row is a button that opens that player's profile card, #lbp-card (NOTES 140) -->
     <div class="panel panel-wide lobby-view lb-view" id="lobby-leaderboard" data-view="leaderboard" data-fit hidden>
       <p class="lb-scope"><svg class="lb-globe" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.6 3.7 5.6 3.7 9s-1.3 6.4-3.7 9M12 3c-2.4 2.6-3.7 5.6-3.7 9s1.3 6.4 3.7 9"/></svg><b>Global</b><span>All signed-in players, every country</span></p>
       <span class="seg seg-sm lb-tabs" id="lb-tabs" role="radiogroup" aria-label="Leaderboard">

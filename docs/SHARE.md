@@ -52,6 +52,9 @@ Rules, pinned (verify each against server/game.js before relying on it):
 
 ## 2. Share link, page and image (part B: new server/share.js + server/card.js, routes in api.js / game.js)
 
+**One source** (NOTES 140): `share.dataOf(ownerId)` (card.dataOf, plus the trophies place for Pro) is also what the leaderboard
+profile answers (api.js playerRoute, `GET /api/leaderboard/player?u=<name>`), so a profile and a card can never show different figures.
+
 **Storage**: table `share(owner_id PK, slug UNIQUE, created_at)`. One live link per owner. `slug` = 10 chars of
 `[A-Za-z0-9]` from `crypto.randomBytes` (reject-sample; never derived from any id). Deleting an owner cascades.
 Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On a guest->account merge (db.mergeDevice

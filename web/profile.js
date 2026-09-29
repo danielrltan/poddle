@@ -18,7 +18,7 @@ const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/
 const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 
 let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
-let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null;      // saved: the server has a guest profile for this device (true / false / null = not asked)
+let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null, openAt = 0;      // openAt: when a card last opened (the veil ignores the rest of a double click)      // saved: the server has a guest profile for this device (true / false / null = not asked)
 let me = { enabled: false, clientId: null, account: null, db: false, rkSignin: false };      // rkSignin (NOTES 133): Ranked is for signed-in players with a username      // GET /api/me: sign-in on or off, the Google client id, who is signed in
 let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
@@ -31,6 +31,7 @@ function newId() {
 export const hello = () => { if (!on) return null; const dev = deviceId(); return dev ? { type: 'hello', dev, v: 1 } : null; };      // stats are always kept (NOTES 116: the Save my stats switch is gone)
 export function opened() { const m = hello(); sockHello = !!m; return m; }      // the socket's open handler sends this FIRST (9.2); null = say nothing
 export function seated() {                                  // a 'welcome' with a seat of my own: the id is made now if there is none, and its hello follows at once
+  closePlayer();                                            // a leaderboard profile open (NOTES 140): the court is coming, its veil must not sit over it
   if (!on) return;
   let dev = deviceId(); if (!dev) { dev = newId(); ls.set(DEV_KEY, dev); if (deviceId() !== dev) return; }      // storage refused it: a new guest every load is worse than none
   if (!sockHello) { sockHello = true; h.send({ type: 'hello', dev, v: 1 }); }      // the server keeps a socket's first hello and ignores the rest
@@ -52,16 +53,19 @@ export async function loadMe() {                            // once after boot: 
     if (j) { const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
       me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true, rkSignin: j.rkSignin === true };
       if (me.account) { const L = ladderOf(j); if (L) h.ladder(L); }
-      if (me.account && me.account.username && me.db && !ls.get(LB_SEEN)) lbNotice(); } } catch { /* no answer: a guest with sign-in off */ }      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
+      const seen = ls.get(LB_SEEN), listed = !!(j.places && j.places.listed === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140)
+      if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
   drawAcct(); return me;
 }
 // the notice the privacy page promises (NOTES 126): once per browser, only to a name that can be on a board. It waits until the lobby is up and has sat
-// there a moment (opening the lobby clears any toast), and is marked seen only once it has been shown
+// there a moment (opening the lobby clears any toast), and is marked seen only once it has been shown. first: this browser never showed the NOTES 126 one,
+// so both are said at once; else (it said '1' and the player is listed now) only the profile card's (NOTES 140). A hidden '1' is not told here: toggleShow's own toast tells it when Show me is turned on
 let lbT = 0;
-function lbNotice(n = 0) {
-  clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN)) return;      // gives up after ten minutes on the title or in a court: the next load tries again
-  if (!h.view()) { lbT = setTimeout(() => lbNotice(n + 1), 1000); return; }
-  lbT = setTimeout(() => { if (!h.view()) return lbNotice(n + 1); h.toast('Your username can now appear on the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '1'); }, 1200);
+function lbNotice(n = 0, first = true) {
+  clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN) === '2') return;      // gives up after ten minutes on the title or in a court: the next load tries again
+  if (!h.view()) { lbT = setTimeout(() => lbNotice(n + 1, first), 1000); return; }
+  lbT = setTimeout(() => { if (!h.view()) return lbNotice(n + 1, first);
+    h.toast(first ? 'Your username can now appear on the global leaderboard, and anyone can open your profile card from it. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '2'); }, 1200);
 }
 export async function fetchProfile() {                      // -> the Profile of 8.2, null = nothing saved yet, undefined = the request failed
   if (!on) return undefined; await mePromise; const dev = deviceId(); if (!me.account && !dev) return null;      // who is signed in first (/api/me). Nothing to ask about: no request at all
@@ -202,14 +206,18 @@ function drawPlace(p) {
   if (!b) return; b.hidden = !t; if (!t) return;
   text('st-place-n', rankNum(t.rank)); const l = `Global rank ${rankNum(t.rank)} for trophies. See the global leaderboard`; b.setAttribute('aria-label', l); b.title = l;
 }
-function boardRow(r, mine) {
-  const li = mk('li', 'lb-row' + (r.rank <= 3 ? ' is-top is-top' + r.rank : '') + (mine ? ' is-me' : ''));
-  const who = mk('span', 'lb-who'), nm = mk('b', 'lb-name', r.name);
-  who.append(nm); li.append(mk('span', 'lb-rank', String(r.rank)), who, mk('span', 'lb-v'));
-  li.lastChild.append(mk('b', '', Number(r.v).toLocaleString('en-US')), unitOf(r.v));
-  h.badge(nm, true);      // the DEV pill on the developer's name, as in a court
-  if (Number.isInteger(r.tier)) h.rankBadge(nm, { tier: r.tier, div: r.div });      // the Ranked emblem, as beside a name in a Ranked court. None for a player who has never played Ranked
-  return li;
+const rankName = (t, d) => (t === TOP ? RANK_NAME[TOP - 1] : `${RANK_NAME[tierNum(t) - 1]} ${ROMAN[divNum(d)]}`);      // 'Gold II', 'Pro' (the place only comes with the profile)
+function boardRow(r, mine) {      // a row is a button (NOTES 140): it opens that player's profile card. li.lb-item > button.lb-row, like the court list
+  const li = mk('li', 'lb-item'), b = mk('button', 'lb-row' + (r.rank <= 3 ? ' is-top is-top' + r.rank : '') + (mine ? ' is-me' : '')), ranked = Number.isInteger(r.tier);
+  b.type = 'button'; b.dataset.name = r.name; b.setAttribute('aria-haspopup', 'dialog');
+  if (ranked) { b.dataset.tier = String(r.tier); b.dataset.div = String(r.div); }      // the sheet's hero draws from these at once, before the profile answers
+  const who = mk('span', 'lb-who'), nm = mk('b', 'lb-name', r.name), v = Number(r.v).toLocaleString('en-US'), unit = BOARD[board].unit(r.v);
+  who.append(nm); b.append(mk('span', 'lb-rank', String(r.rank)), who, mk('span', 'lb-v'));
+  b.lastChild.append(mk('b', '', v), unitOf(r.v));      // the trophy icon for the Trophies board (NOTES 136)
+  h.badge(nm, true);      // the hammer on the developer's name, as in a court
+  if (ranked) h.rankBadge(nm, { tier: r.tier, div: r.div });      // the Ranked emblem, as beside a name in a Ranked court. None for a player who has never played Ranked
+  b.setAttribute('aria-label', `${r.rank}. ${r.name}${nm.classList.contains('is-dev') ? ', Developer' : ''}${ranked ? ', ' + rankName(r.tier, r.div) : ''}, ${v} ${unit}${mine ? ', you' : ''}. Open profile`);
+  li.append(b); return li;
 }
 function drawYou() {
   const en = on && me.enabled, a = en ? me.account : null, P = places, B = BOARD[board], mine = P && P.listed ? P[board] : null;
@@ -254,9 +262,61 @@ async function toggleShow() {
   const hide = t.getAttribute('aria-checked') === 'true';
   t.setAttribute('aria-checked', String(!hide));      // at once: the answer confirms or puts it back
   let r = null; try { r = await api('/api/leaderboard/hide', 'POST', { hidden: hide }); } catch { r = null; }
-  if (r && r.ok && r.j) { places = placeOf(r.j); h.toast(hide ? 'You’re hidden from the global leaderboard' : 'You’re on the global leaderboard', 2000); }
+  if (r && r.ok && r.j) { places = placeOf(r.j);
+    if (hide) h.toast('You’re hidden from the global leaderboard', 2000);
+    else if (ls.get(LB_SEEN) !== '2') { clearTimeout(lbT); h.toast('You’re on the global leaderboard. Anyone can open your profile card from it', 5000); ls.set(LB_SEEN, '2'); }      // the profile-card notice the privacy page promises, said now, not on the next load (NOTES 140)
+    else h.toast('You’re on the global leaderboard', 2000); }
   else { t.setAttribute('aria-checked', String(hide)); h.toast('Couldn’t change that. Try again.', 2400); }
   if (h.view() === 'leaderboard') drawBoard();
+}
+
+// ---------- a player's profile card from the leaderboard (NOTES 140): GET /api/leaderboard/player?u=<name>, exactly what their share card shows. No URL of its own ----------
+let lbpGen = 0, lbpName = '';      // lbpGen: this sheet's own generation (loadGen is sign-in's); lbpName: the row it came from, to find it again (the list redraws under the sheet)
+const STAT_LABELS = ['Return rate', 'Longest rally', 'Fastest swing', 'Record vs people', 'Best streak', 'Winners'], MATT = ['Rookie', 'Club', 'Tour', 'Pro'];      // MATT: difficulty order, as is-lv<i>
+export const playerOpen = () => cardOpen() && !!$('lbp-card') && !$('lbp-card').hidden;
+export function closePlayer() { if (playerOpen()) closeCard(); }      // main.js: MATCH FOUND and a tournament's VS card; seated(): a seat of my own
+function openPlayer(btn) {
+  const name = btn.dataset.name; if (!name || !$('lbp-card')) return;
+  if (document.activeElement !== btn) btn.focus({ preventScroll: true });      // Safari does not focus a clicked button: closeCard hands focus back to lastFocus
+  lbpName = name; openCard('lbp-card');
+  loadPlayer(name, btn.dataset.tier ? { tier: +btn.dataset.tier, div: +btn.dataset.div } : null);
+}
+async function loadPlayer(name, rank) {      // rank: the row's emblem for the loading face (null: never played Ranked, or a retry: none known)
+  const g = ++lbpGen; drawPlayer({ name, rank }, 'loading');
+  let r = null; try { r = await api('/api/leaderboard/player?u=' + encodeURIComponent(name)); } catch { r = null; }
+  if (g !== lbpGen || !playerOpen()) return;      // closed, or another row opened meanwhile: this answer is stale
+  if (r && r.ok && r.j && typeof r.j.name === 'string') drawPlayer(r.j, 'ok');
+  else drawPlayer({ name }, r && r.status === 404 ? 'gone' : 'error');      // 404: hidden, renamed, deleted or out of the top 100 (the server never says which). 429, 503, offline: Try again
+}
+const strOf = (v, n) => (typeof v === 'string' || Number.isFinite(v) ? String(v).slice(0, n) : '');
+function drawPlayer(p, state) {
+  const c = $('lbp-card'); if (!c) return;
+  const name = String(p.name || '').slice(0, 12), nm = $('lbp-name'); if (nm) { nm.textContent = name; h.badge(nm, true); }      // the hammer beside the developer's name
+  c.dataset.state = state;      // loading | ok | gone | error. An attribute, not a class: .panel.is-error is the red nudge of a form
+  const rk = p.rank && typeof p.rank === 'object' && Number.isInteger(p.rank.tier) ? { tier: tierNum(p.rank.tier), div: divNum(p.rank.div) } : null;
+  const hero = $('lbp-hero'); if (hero) hero.className = 'lbp-hero well' + (rk ? ' is-' + RANK_NAME[rk.tier - 1].toLowerCase() : ' is-none');
+  h.emblem($('lbp-em'), rk);
+  text('lbp-rank', rk ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rk.tier, rk.div)) : state === 'loading' ? '' : 'Not ranked yet');      // 'Pro #3' only from the server
+  const tro = num(p.trophies); show('lbp-tro', !!rk && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
+  const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi);
+  text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
+  const dl = $('lbp-stats');
+  if (dl) {
+    const S = Array.isArray(p.stats) && p.stats.length === 6 && p.stats.every(s => s && typeof s.label === 'string' && (typeof s.value === 'string' || Number.isFinite(s.value))) ? p.stats : null;
+    dl.textContent = ''; dl.setAttribute('aria-busy', String(state === 'loading'));
+    STAT_LABELS.forEach((l, i) => { const s = S ? S[i] : null, d = mk('div', 'lbp-stat' + (s ? '' : ' is-skel')), dd = mk('dd');
+      dd.append(mk('b', '', s ? strOf(s.value, 12) || '–' : '–')); if (s && s.unit) dd.append(mk('small', '', strOf(s.unit, 6)));
+      d.append(mk('dt', '', s ? s.label.slice(0, 24) : l), dd); dl.append(d); });
+  }
+  const msg = state === 'gone' ? 'This player isn’t on the leaderboard any more' : state === 'error' ? 'Couldn’t load this player' : '';
+  text('lbp-msg', msg); show('lbp-msg', !!msg); show('lbp-retry', state === 'error');
+  const mine = state === 'ok' && !!(me.account && me.account.username) && name.toLowerCase() === me.account.username.toLowerCase();      // my own row: the same public view, and the way to Your stats
+  show('lbp-foot', mine);
+}
+function retryPlayer() {
+  const c = $('lbp-card'); if (!lbpName || !playerOpen()) return;
+  if (c) c.focus({ preventScroll: true });      // Try again hides itself: focus waits on the card, not on <body>
+  loadPlayer(lbpName, null);
 }
 
 // ---------- Ranked (docs/RANKED.md 2): the view draws from the Profile's ladder ----------
@@ -287,12 +347,15 @@ export const cardOpen = () => { const l = $('acct-layer'); return !!l && !l.hidd
 function openCard(id) {
   const l = $('acct-layer'), c = $(id); if (!l || !c) return;
   if (!cardOpen()) lastFocus = document.activeElement;
-  for (const k of l.children) k.hidden = k !== c; l.hidden = false;
+  for (const k of l.children) k.hidden = k !== c; l.hidden = false; openAt = performance.now();
   setTimeout(() => { if (!c.hidden) (c.querySelector('[data-first]:not([hidden])') || c).focus({ preventScroll: true }); }, 30);
 }
 export function closeCard() {
-  const l = $('acct-layer'); if (!l || l.hidden) return; l.hidden = true; loadGen++;
-  const f = lastFocus; lastFocus = null; if (f && f.isConnected && f.offsetParent) f.focus({ preventScroll: true });      // back where the player was (the result card's own buttons keep theirs)
+  const l = $('acct-layer'); if (!l || l.hidden) return; l.hidden = true; loadGen++; lbpGen++;
+  let f = lastFocus, again = false; lastFocus = null;
+  if (f && !f.isConnected && lbpName) { f = [...($('lb-list')?.querySelectorAll('button.lb-row') || [])].find(b => b.dataset.name === lbpName) || null; again = !!f; }      // the board redrew under the profile sheet: the same player's new row (.find, never a selector built from a name)
+  lbpName = '';
+  if (f && f.isConnected && f.offsetParent) { f.focus({ preventScroll: true }); if (again) f.scrollIntoView({ block: 'nearest' }); }      // back where the player was (the result card's own buttons keep theirs)
 }
 const err = (id, t) => text(id, t || '');
 export function signIn() {                                  // our own button (the nudge, Your stats, Settings) opens the card: NOTHING goes to Google yet
@@ -449,13 +512,13 @@ function drawAcct() {
 function storageCleared() { if (!on) return; saved = null; drawAcct(); h.redial(); }
 
 // ---------- wiring: main.js calls init() once, while it loads (before the first socket opens) ----------
-// hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), ranked(), tiles(), rkView(s), queued(), ladder(L) }. on: this page's server keeps stats
+// hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), ranked(), tiles(), rkView(s), queued(), ladder(L), crest(el, r), emblem(el, r), rankBadge(el, r) }. on: this page's server keeps stats
 // (hosted, or ?acctest=1 for test/profile-ui.mjs). Off, nothing here sends a request, makes an id or shows a control.
 let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, rankBadge: noop, board: noop, gate: noop, cup: noop };
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, emblem: noop, rankBadge: noop, board: noop, gate: noop, cup: noop };
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
@@ -474,11 +537,15 @@ function wire() {
     tabs.addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); e.stopPropagation();      // a radio group: the arrows move the pick
       const o = [...tabs.children], i = o.findIndex(x => x.dataset.board === board), n = o[(i + (e.key === 'ArrowRight' ? 1 : -1) + o.length) % o.length]; setBoard(n.dataset.board); n.focus(); });
   }
+  { const list = $('lb-list'); if (list) list.addEventListener('click', e => { const b = e.target.closest('button.lb-row'); if (b && b.dataset.name) openPlayer(b); }); }      // a row opens that player's profile card (NOTES 140): one listener, the rows redraw
+  click('btn-lbp-close', () => closeCard()); click('btn-lbp-retry', () => retryPlayer());
+  click('btn-lbp-mine', () => { closeCard(); h.stats(); });      // my own row's card: Your stats, one tap away
   click('btn-claim-skip', () => closeCard());
   const f = $('name-claim'); if (f) f.addEventListener('submit', e => { e.preventDefault(); claimName(($('claim-input') || {}).value); });
   const ci = $('claim-input'); if (ci) ci.addEventListener('input', () => err('claim-err', nameProblem(ci.value)));      // live, as the rules of 7.1
   const l = $('acct-layer'); if (!l) return;
-  l.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === l) closeCard(); });      // the title screen starts the game on any pointerdown: not through a card. The veil around the card closes it
+  l.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === l) e.preventDefault(); });      // the title screen starts the game on any pointerdown: not through a card. preventDefault: no mousedown, so the focus closeCard hands back is not blurred to <body>
+  l.addEventListener('click', e => { e.stopPropagation(); if (e.target === l && performance.now() - openAt > 350) closeCard(); });      // the veil around the card closes it on the CLICK, while the veil is still there to take it: closed on pointerdown, a tap's click fell through to the leaderboard row under it and opened that player (NOTES 140). Not the second press of the double click that opened it
   l.addEventListener('keydown', e => {                      // the card keeps the keys: Esc closes it, Tab stays inside, no game or lobby key reaches main.js or ui.js
     e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); closeCard(); return; }

@@ -1,5 +1,6 @@
 // Spacing sweep screenshots (NOTES 134): the real index.html (?acctest=1) against a fake game socket and a fake /api, every lobby view
-// and the leaderboard's You card in each state, plus the static pages. Usage: node test/ui-shots/sweep.mjs [out-dir] [filter]
+// and the leaderboard's You card in each state, the leaderboard profile sheet (NOTES 140: lbp-*, a hovered and a focused row: lb-hover-*, lb-focus-*),
+// plus the static pages. Usage: node test/ui-shots/sweep.mjs [out-dir] [filter]
 // SWEEP_PORT=<base> moves the ports (default 9460: pages + /api, 9461: fake game, 9462: nothing = no AirPod). SWEEP_SIZES=1440x900,...
 import http from 'http'; import fs from 'fs'; import path from 'path';
 import { WebSocketServer } from 'ws';
@@ -30,10 +31,22 @@ const STATES = {      // the You card's states (web/profile.js drawYou)
   listed: { acct: { username: 'Kiko' }, places: { listed: true, hidden: false, rally: { rank: 2, v: 56 }, trophies: { rank: 2, v: 240 }, streak: { rank: 2, v: 5 } } },
 };
 let STATE = STATES.guest;
+// the leaderboard profile (NOTES 140): GET /api/leaderboard/player?u=<name> as server/api.js publicCard answers it. status: 404 / 500; delay: ms before the answer
+const six = (ret, rally, swing, rec, streak, win) => [['Return rate', ret], ['Longest rally', rally, 'hits'], ['Fastest swing', swing, '°/s'], ['Record vs people', rec], ['Best streak', streak], ['Winners', win]].map(([label, value, unit]) => ({ label, value, ...(unit ? { unit } : {}) }));
+const PLAYERS = {
+  Dan: { body: { name: 'Dan', rank: { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, trophies: 1180, matt: 'Pro', stats: six('81%', '60', '1570', '42-7', '12', '318') } },
+  Kiko: { body: { name: 'Kiko', rank: { tier: 7, div: 2, label: 'Champion II', pro: null }, trophies: 964, matt: 'Tour', stats: six('73%', '56', '1340', '18-9', '5', '140') } },
+  Rallyqueen: { body: { name: 'Rallyqueen', rank: { tier: 7, div: 1, label: 'Champion I', pro: null }, trophies: 912, matt: 'Club', stats: six('68%', '52', '1210', '11-6', '4', '97') } },
+  Pickle_Rick: { body: { name: 'Pickle_Rick', rank: null, trophies: 0, matt: 'Rookie', stats: six('59%', '28', '980', '3-4', '2', '41') } },
+  Juno: { body: { name: 'Juno', rank: null, trophies: 0, matt: null, stats: six('-', '0', '-', '0-0', '0', '0') } },
+  Mo: { status: 404 }, Zed: { status: 500 }, Lobster: { delay: 5000, body: { name: 'Lobster', rank: { tier: 5, div: 1, label: 'Diamond I', pro: null }, trophies: 610, matt: 'Club', stats: six('64%', '36', '1100', '7-7', '3', '60') } },
+};
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   if (u === '/api/me') return send(200, { db: true, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: STATE.acct });
   if (u === '/api/stats') return send(200, { profile: { ...PROFILE, places: STATE.places } });
   if (u === '/api/leaderboard') return send(200, { rows: ROWS });
+  if (u === '/api/leaderboard/player') { const P = PLAYERS[new URL(q.url, 'http://x').searchParams.get('u')] || { status: 404 };
+    return setTimeout(() => (P.status ? send(P.status, { error: P.status === 404 ? 'not_found' : 'internal' }) : send(200, P.body)), P.delay || 60); }
   if (u === '/api/signin/nonce') return send(200, { nonce: 'n'.repeat(32) });
   return send(404, { error: 'nope' }); };
 const web = http.createServer((q, r) => {
@@ -73,6 +86,14 @@ try {
     for (const s of Object.keys(STATES)) { const n = `lb-${s}-${tag}`; if (!want(n)) continue; STATE = STATES[s]; const pg = await open(w, h); await lobby(pg, 'leaderboard');
       const you = await pg.$('#lb-you'); if (you && await pg.evaluate(e => !e.hidden, you)) await you.screenshot({ path: `${OUT}/${n}-card.png` }); const top = await pg.$('.lb-row.is-top1'); if (top) await top.screenshot({ path: `${OUT}/${n}-top.png` });
       await pg.screenshot({ path: `${OUT}/${n}.png` }); report.push(`${n} ${J(await fit(pg))}`); await pg.close(); }
+    // the leaderboard profile sheet (NOTES 140): a row clicked, the sheet shot. Lobster answers in 5 s: its loading face
+    for (const [who, s, wait] of [['Dan', 'listed', 700], ['Kiko', 'listed', 700], ['Juno', 'listed', 700], ['Pickle_Rick', 'guest', 700], ['Mo', 'listed', 700], ['Zed', 'listed', 700], ['Lobster', 'listed', 400]]) {
+      const n = `lbp-${who.toLowerCase()}-${tag}`; if (!want(n)) continue; STATE = STATES[s]; const pg = await open(w, h); await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.lbSeen', '2'); } catch {} }); await lobby(pg, 'leaderboard'); await sleep(600);      // no leaderboard notice toast over the sheet
+      await pg.evaluate(x => [...document.querySelectorAll('button.lb-row')].find(b => b.dataset.name === x)?.click(), who); await sleep(wait);
+      await pg.screenshot({ path: `${OUT}/${n}.png` }); report.push(`${n} ${J(await fit(pg))}`); await pg.close(); }
+    for (const how of ['hover', 'focus']) { const n = `lb-${how}-${tag}`; if (!want(n)) continue; STATE = STATES.listed; const pg = await open(w, h); await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.lbSeen', '2'); } catch {} }); await lobby(pg, 'leaderboard'); await sleep(600);
+      if (how === 'hover') await pg.hover('button.lb-row.is-top2'); else { await pg.focus('button.lb-row.is-top2'); await pg.keyboard.press('Tab'); await pg.keyboard.down('Shift'); await pg.keyboard.press('Tab'); await pg.keyboard.up('Shift'); }      // Tab, Shift+Tab: a keyboard focus, so :focus-visible shows
+      await sleep(400); await pg.screenshot({ path: `${OUT}/${n}.png` }); report.push(`${n} ${J(await fit(pg))}`); await pg.close(); }
     // settings sheet from the lobby
     if (want(`settings-${tag}`)) { STATE = STATES.listed; const pg = await open(w, h); await lobby(pg, 'home'); await pg.evaluate(() => window.__ui.settings?.(true)); await sleep(700); await pg.screenshot({ path: `${OUT}/settings-${tag}.png` }); report.push(`settings ${tag} ${J(await fit(pg))}`); await pg.close(); }
     // static pages, full length

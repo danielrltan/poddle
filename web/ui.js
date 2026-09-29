@@ -128,6 +128,14 @@ export function rankCrest(crest, r) {
   setDiv(w, r); w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep); w.setAttribute('role', 'img'); w.setAttribute('aria-label', `Rank: ${rankLabel(r.tier, r.div)}`);
 }
 const setDiv = (el, r) => { if (hasDivs(r.tier)) el.dataset.div = String(r.div); else delete el.dataset.div; };      // Pro has no divisions (NOTES 126): no numeral pill on its emblem
+// another player's emblem in a box of its own (the leaderboard profile, NOTES 140): the division's medal at .is-lg with its numeral, as on the crest; never
+// lastRank (that is mine, for the Ranks page). r null (never played Ranked) empties the box
+export function rankEmblem(box, r) {
+  if (!box) return; r = rankRef(r); box.textContent = '';
+  if (!r) { box.removeAttribute('role'); box.removeAttribute('aria-label'); box.style.removeProperty('--rank-mid'); return; }
+  const w = document.createElement('span'); w.className = 'st-em'; w.append(emblemEl(r.tier, 'is-lg', r.div)); setDiv(w, r); w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep);
+  box.style.setProperty('--rank-mid', RANKS[r.tier - 1].colour.mid); box.setAttribute('role', 'img'); box.setAttribute('aria-label', `Rank: ${rankLabel(r.tier, r.div)}`); box.append(w);      // --rank-mid: the halo behind the medal (ui.css .lbp-em)
+}
 export function rankBadge(nameEl, r, cls = 'is-xs') {
   if (!nameEl) return; r = rankRef(r);
   let after = nameEl; if (after.nextElementSibling && after.nextElementSibling.classList.contains('reg-badge')) after = after.nextElementSibling;
