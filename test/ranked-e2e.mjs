@@ -15,7 +15,7 @@ const P0 = +process.env.RANKED_E2E_PORT || 8625, G = P0, B = P0 + 1, root = new 
 // the fixture: both devices at 140 trophies (Bronze III), one win from Silver. The device ids are set in each Chrome's localStorage below
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-rke2e-')), DB = path.join(tmp, 'e2e.db'), DEV = { a: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', b: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
 { db.open(DB); const now = Date.now(); for (const d of Object.values(DEV)) { const owner = db.ownerForDevice(db.hash(d), now, { create: true }); const r = db.ladderApply({ owner, delta: 140, won: true, vsBot: false, now }); if (!r || r.trophies !== 140) { console.log('RANKED E2E FAIL: could not seed the ladder', r); process.exit(2); } } db.close(); }
-const server = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: G, PODDLE_DB: DB, WIN_BY: 1, RK_WIN: 2, RK_BEST: 3, RK_VS_S: 2, RK_GAME_GAP_S: 3, RK_DONE_S: 9, RK_ARRIVE_S: 40, READY_S: 0, TOUR_WIN: 2, TOUR_FINAL: 3, TOUR_VS_S: 2, TOUR_ARRIVE_S: 40, TOUR_GAP_S: 4, TOUR_DONE_S: 60,
+const server = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, RK_GUESTS: '1', PORT: G, PODDLE_DB: DB, WIN_BY: 1, RK_WIN: 2, RK_BEST: 3, RK_VS_S: 2, RK_GAME_GAP_S: 3, RK_DONE_S: 9, RK_ARRIVE_S: 40, READY_S: 0, TOUR_WIN: 2, TOUR_FINAL: 3, TOUR_VS_S: 2, TOUR_ARRIVE_S: 40, TOUR_GAP_S: 4, TOUR_DONE_S: 60,
   STATS_FORFEIT_MIN: 1, STATS_AFK_MIN: 0, STATS_ESTABLISHED: 0, STATS_MIN_POINT_S: 0, STATS_SAME_IP: 0, RK_MATT_DAY: 1 }, stdio: ['ignore', 'pipe', 'inherit'] }), slog = []; server.stdout.on('data', d => slog.push(String(d)));
 
 // ---- AirPods: one per tab, told apart by the path (as test/tourney-e2e.mjs). rest = lying still, go = calibrate then swing

@@ -12,7 +12,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const PORT = +process.env.RANKED_PORT || 8630, P_CAP = PORT + 1, P_BOOT = PORT + 2, P_ADDR = PORT + 3, P_GP = PORT + 4, P_AFK = PORT + 5, root = new URL('..', import.meta.url).pathname;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-rk-')), DBA = path.join(tmp, 'a.db'), DBB = path.join(tmp, 'b.db');
-const env = { AUTOBOT: '1', SWING_SERVE: '0', READY_S: '0', WIN_BY: '1', RK_WIN: '1', RK_BEST: '3', RK_GOLD: '3', RK_VS_S: '0.3', RK_GAME_GAP_S: '0.3', RK_DONE_S: '0.5', RK_ARRIVE_S: '1', RK_WINDOW_S: '1', RK_CAP: '20',
+const env = { RK_GUESTS: '1', AUTOBOT: '1', SWING_SERVE: '0', READY_S: '0', WIN_BY: '1', RK_WIN: '1', RK_BEST: '3', RK_GOLD: '3', RK_VS_S: '0.3', RK_GAME_GAP_S: '0.3', RK_DONE_S: '0.5', RK_ARRIVE_S: '1', RK_WINDOW_S: '1', RK_CAP: '20',
   HOLD_S: '1', ROOM_TTL: '0.5', STATS_FORFEIT_MIN: '1', STATS_AFK_MIN: '0', STATS_ESTABLISHED: '0', STATS_MIN_POINT_S: '0', TIMESCALE: '2', TOUR_VS_S: '0.3', TOUR_ARRIVE_S: '1', TOUR_GAP_S: '0.3', TOUR_WIN: '1', TOUR_FINAL: '1' };   // every game is one point; short clocks; every Matt game counts
 const procs = new Map(), logs = new Map();
 const up = (port, more) => new Promise(res => { const p = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: port, ...env, ...more } }); procs.set(port, p); logs.set(port, (logs.get(port) || '') );

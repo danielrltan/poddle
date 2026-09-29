@@ -1183,14 +1183,19 @@ const divIn = (n, tier, div) => (div === 2 || div === 3 ? div : div === 1 ? 1 : 
 // the tile: { tier, div, trophies, queued }. A tier draws the small emblem beside 'Gold II · 372'; none = the Bronze emblem, dimmed, and 'Play your first match'.
 // queued > 0 lights the corner badge '1 waiting' (the strongest lever on a small player base: the home screen says an opponent exists)
 export function rkTile(o = {}) {
-  const em = $('ranked-em'), tier = tierOf(o.tier), n = Math.max(0, o.trophies | 0);
+  const em = $('ranked-em'), gate = o.gate === 'signin' || o.gate === 'username' ? o.gate : '', tier = gate ? 0 : tierOf(o.tier), n = Math.max(0, o.trophies | 0);      // gate (NOTES 133): Ranked needs a sign-in (and a username): the tile says so, the emblem dimmed
   if (em) { const d = tier ? divIn(n, tier, o.div) : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs', d); em.append(e); } setEmblem(e, tier || 1, d); e.classList.toggle('is-off', !tier); }
-  setText($('ranked-line-text'), tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n}` : 'Play your first match');
+  setText($('ranked-line-text'), gate === 'signin' ? 'Sign in to play' : gate === 'username' ? 'Pick a username to play' : tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n}` : 'Play your first match');
   const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
 }
 // the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
 // The head ('Gold II'), the bar through the rank's three divisions, the eight-step road (NOTES 124) with its division pips, Find a match and its status line.
 let rkQueuedSaid = false;
+// NOTES 133: Ranked is for signed-in players with a username. gate '' | 'signin' | 'username' comes with every rkView (web/profile.js rkGate) and
+// turns Find a match into the step that is missing; main.js sends that button to the sign-in or username card instead of the queue
+let rkGateNow = '';
+const GO_LABEL = { signin: 'Sign in to play Ranked', username: 'Pick a username' }, GATE_NOTE = { signin: 'Ranked is for signed-in players, so your trophies are saved to your account', username: 'Ranked needs a username. Your opponents and the leaderboard see it' };
+const goLabel = () => GO_LABEL[rkGateNow] || 'Find a match';
 // The Ranks page: all eight medals, each with where it starts and its three divisions; the player's own rank ringed, the ones reached marked
 function drawRanks() {
   const g = $('rkx-grid'); if (!g) return; g.textContent = ''; const me = lastRank;
@@ -1206,6 +1211,7 @@ function drawRanks() {
   });
 }
 export function rkView(s) {
+  rkGateNow = s && (s.gate === 'signin' || s.gate === 'username') ? s.gate : '';
   const known = !!(s && typeof s === 'object'), tier = known ? tierOf(s.tier) || 1 : 1, n = known ? Math.max(0, s.trophies | 0) : 0, best = known ? Math.max(tier, tierOf(s.best)) : 1, div = known ? divIn(n, tier, s.div) : 1;
   const place = known && Number.isInteger(s.place) && s.place > 0 ? s.place : null;
   if (known) { lastRank = { tier, div, best, place }; if (view === 'ranks') drawRanks(); }
@@ -1223,8 +1229,8 @@ export function rkView(s) {
       const at = known && t === best && Number.isFinite(s.bestAt) && s.bestAt > 0 ? new Date(s.bestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
       const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? (hasDivs(t) ? `, your rank, division ${romanOf(div)}` : ', your rank') : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
       road.append(li); }); }
-  const go = $('btn-ranked-go'); if (go) { setText(go, 'Find a match'); go.disabled = rkInQueue; }
-  rkNote(known && s.hold ? s.hold : known && s.note ? s.note : known && s.queued > 0 && !rkInQueue ? 'Someone is waiting to play' : '', known && !s.hold && !s.note && s.queued > 0 && !rkInQueue);      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
+  const go = $('btn-ranked-go'); if (go) { setText(go, goLabel()); go.disabled = rkInQueue && !rkGateNow; go.classList.toggle('is-gate', !!rkGateNow); }
+  rkNote(known && s.hold ? s.hold : known && s.note ? s.note : rkGateNow ? GATE_NOTE[rkGateNow] : known && s.queued > 0 && !rkInQueue ? 'Someone is waiting to play' : '', !rkGateNow && known && !s.hold && !s.note && s.queued > 0 && !rkInQueue);      // a gate says what is missing instead      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
 }
 // the status line under Find a match: '' = the default line (in the queue: where its two actions are). accent: someone is waiting (the line takes the accent colour and pops once per wait)
 let rkInQueue = false, noteNow = ['', false];
@@ -1272,7 +1278,7 @@ function tickBar() { const s = Math.max(0, Math.floor((performance.now() - barSi
 function tickPill() { const s = Math.max(0, Math.floor((performance.now() - pillSince) / 1000)), t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; setText($('rk-pill-time'), t);
   const hop = Math.floor(s / 30); if (hop > pillHops) { pillHops = hop; restart($('rk-pill-text'), 'ov-pop'); } }
 // Find a match was pressed: the button says Searching (and dips) until the queue answers with a court, a snapshot or a refusal
-export function rkSearch(on) { const b = $('btn-ranked-go'); if (!b) return; if (on) { setText(b, 'Searching'); restart(b, 'ov-press'); } else setText(b, 'Find a match'); }
+export function rkSearch(on) { const b = $('btn-ranked-go'); if (!b) return; if (on) { setText(b, 'Searching'); restart(b, 'ov-press'); } else setText(b, goLabel()); }
 
 // ---------- Ranked: the match show (docs/RANKED.md 8.3-8.10) ----------
 // MATCH FOUND (8.3), on the tournament's VS card in navy: m = { vs: { name, reg, tier, div }, you: { tier, div }, bestOf, target, friendly, at, side }. The opponent's

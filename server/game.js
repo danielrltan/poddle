@@ -1466,6 +1466,19 @@ let rkSeq = Math.floor(BOOT / 1000) * 1e6;                     // REVIEW FIX: se
 const rkLate = new Map();                                      // cid -> { res, until }: a settled series' rkres kept for a seat whose socket was down (held) when it settled, replayed on its &rk=1 return (REVIEW FIX)
 const RK_BAD = new Set([...abuse.MATCH_WIDE, 'anon', 'pad', 'origin_bad', 'too_fast', 'afk', 'paddle_teleport', 'ident_changed']);   // a game with any of these leaves the series uncounted (RANKED.md 5.5 rule 3); new_opponent halves instead
 const RK_CUT = new Set(['early_forfeit', 'leaver_ahead', 'afk', 'too_fast']);   // what a forfeit itself puts on the game it cut short (nobody struck, too few points): never held against the stayer (REVIEW FIX, RANKED.md 5.4)
+// Ranked is for signed-in players with a username (NOTES 133): every trophy belongs to an account and can be on the global leaderboard.
+// RK_GUESTS=1 lets guests queue for the tests only (ranked.test, ranked-e2e); production ignores it, like the STATS_* test knobs
+const RK_SIGNIN = !(process.env.RK_GUESTS === '1' && process.env.NODE_ENV !== 'production');
+// rkWho(ws) -> null when this socket may play Ranked, else the rkfail reason: 'signin' (a guest, or signed out) | 'username' (an account
+// that has not picked one). The account is read fresh: a username claimed after the socket opened counts at once, and the socket learns it
+function rkWho(ws) {
+  if (!RK_SIGNIN) return null;
+  const a = ws && ws.acct && ws.acct.accountId != null ? db.accountById(ws.acct.accountId) : null;
+  if (!a) return 'signin';
+  if (!a.username) return 'username';
+  if (ws.acct.username !== a.username) ws.acct.username = a.username;
+  return null;
+}
 const RK_COOL_S = envNum('RK_COOL_S', 2);                        // s after leaving the queue before the same socket may queue again (rkfail busy meanwhile): rk / rkleave churn made and tore down a court per message (REVIEW FIX)
 const RK_WARM_COOL_S = envNum('RK_WARM_COOL_S', 1);              // s after a warm-up court closes before the same socket may ask for another (rkfail busy, warm:true): the same churn through rkwarm / leave
 const RK_BACK_S = envNum('RK_BACK_S', HOLD_S);                   // s an entry whose socket closed is kept for its &rk=1 return (not paired, not counted meanwhile); an open socket's entry is never swept
@@ -1500,6 +1513,7 @@ function rkQueue(ws) {                                         // rk from the lo
   ws.rk = null;
   if (!ws.cid) return tell(ws, { type: 'rkfail', why: 'nocid' });
   if (tourActive(ws)) return tell(ws, { type: 'rkfail', why: 'intour' });
+  { const who = rkWho(ws); if (who) return tell(ws, { type: 'rkfail', why: who }); }   // NOTES 133: signed in, with a username
   if (ws.statsOff) return tell(ws, { type: 'rkfail', why: 'nostats' });   // an old tab's nostats only (NOTES 116). Trophies need stats; a first-ever visitor has no device id yet and is not refused (its hello follows the seat; until it comes the entry is never paired, rkPick)
   if (ws.rkCool && Date.now() < ws.rkCool) return tell(ws, { type: 'rkfail', why: 'busy' });   // just left the queue: RK_COOL_S before the next entry
   if (!loopback(ws)) { let n = 0; for (const q of rkQ.values()) if (q.on && q.cid !== ws.cid && q.ws && q.ws.computer === ws.computer) n++; if (n >= RK_ADDR) return tell(ws, { type: 'rkfail', why: 'addr' }); }   // per COMPUTER key (an IPv6 /64, docs/ACCOUNTS.md 3.5), the way abuse.js keys addresses: privacy extensions gave one /64 a fresh address per socket (REVIEW FIX). Its own entry kept for a return (a reload) is not another player
@@ -1550,9 +1564,9 @@ function rkFriendly(q, c, L, now) {                           // a pair R10 / R1
 }
 function rkPick(q) {                                           // -> { c, friendly } the best partner for q, or null
   const now = Date.now(), L = stats.linkMap(); let best = null, fr = null;
-  if (!q.ident || q.ident.anon) return null;                   // not identified yet (its hello follows the warm-up seat; a socket that never says hello is dropped by rkTick): nobody to write trophies for, so never paired (REVIEW FIX: an anonymous seat voided every series it joined at no cost)
+  if (!q.ident || q.ident.anon || RK_SIGNIN && q.ident.accountId == null) return null;   // NOTES 133: a guest identity is never paired (rkQueue refuses it; this is the backstop)                   // not identified yet (its hello follows the warm-up seat; a socket that never says hello is dropped by rkTick): nobody to write trophies for, so never paired (REVIEW FIX: an anonymous seat voided every series it joined at no cost)
   for (const c of rkQ.values()) {
-    if (c === q || c.cid === q.cid || !c.on || c.series || !c.ws || c.ws.readyState !== 1 || !c.ident || c.ident.anon) continue;
+    if (c === q || c.cid === q.cid || !c.on || c.series || !c.ws || c.ws.readyState !== 1 || !c.ident || c.ident.anon || RK_SIGNIN && c.ident.accountId == null) continue;
     if (rkSame(q, c, L)) continue;
     const w = Math.min(now - q.since, now - c.since) / 1000, win = 200 + 100 * Math.floor(w / RK_WINDOW_S), gap = Math.abs(q.trophies - c.trophies);
     if (gap > win) continue;
@@ -1681,6 +1695,7 @@ function rkRebind(ws, e, q) {                                  // a socket back 
   e.ws = ws; ws.rk = e; e.on = true; e.offAt = 0; rkDirty();
   const X = e.series && rkSeries.get(e.series);
   if (X && !X.done) { if (e.seatAt) return rkSend(e, 'vs'); rkSeat(e, X); return rkSend(e); }   // the VS card: the seat tick seats them; a live or held series: the seat back (the point is replayed)
+  { const who = rkWho(ws); if (who) { tell(ws, { type: 'rkfail', why: who }); rkDrop(e, 'left'); return; } }   // came back signed out (NOTES 133): not a live series, so the entry ends
   rkIdent(e, ws);                                              // the new socket may carry a sign-in the old one did not (REVIEW FIX)
   const rc = String(q.get('room') || '').trim().toUpperCase(), w = e.warm && rooms.get(e.warm);
   if (w && !w.dead && rc === e.warm) joinCode(ws, rc); else if (rc && !ws.room) rkWarm(e);   // was warming up (the client names its court): the same one if it still stands (a retake), else a new one. No court named: waiting in the lobby, and still is
@@ -1720,7 +1735,10 @@ function rkTick(ms) {
   }
   for (const q of [...rkQ.values()]) {
     if (!q.on && !q.series && !(q.warm && rooms.has(q.warm)) && ms - q.offAt >= RK_BACK_S * 1000) rkDrop(q, 'left');   // its socket closed and it did not come back in RK_BACK_S: out. An open socket's entry is never swept, however long it waits
-    else if (!q.series && (!q.ident || q.ident.anon) && ms - q.since >= RK_ARRIVE_S * 1000) {   // never said hello (a crafted client, a bad Origin): nobody to write trophies for, out (REVIEW FIX)
+    else if (!q.series && q.ws && q.ws.readyState === 1 && rkWho(q.ws) === 'signin') {   // signed out (another tab, Delete my data) while waiting or warming up: out (NOTES 133). A series finishes on its frozen identity
+      tell(q.ws, { type: 'rkfail', why: 'signin' }); if (q.ws.room && q.ws.pl && q.ws.room.tag && q.ws.room.tag.rk) { quit(q.ws); enterLobby(q.ws); }
+      rkDrop(q, 'left');
+    } else if (!q.series && (!q.ident || q.ident.anon) && ms - q.since >= RK_ARRIVE_S * 1000) {   // never said hello (a crafted client, a bad Origin): nobody to write trophies for, out (REVIEW FIX)
       if (q.ws && q.ws.readyState === 1) { tell(q.ws, { type: 'rkfail', why: 'nostats' }); if (q.ws.room && q.ws.pl && q.ws.room.tag && q.ws.room.tag.rk) { quit(q.ws); enterLobby(q.ws); } }
       rkDrop(q, 'left');
     } else if (q.dirty && ms - q.sentAt >= 250 && q.ws && q.ws.readyState === 1) rkSend(q);

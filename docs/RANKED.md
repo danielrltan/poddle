@@ -143,6 +143,7 @@ All env knobs are read like `TOUR_*` (`game.js:1166-1168`) so `test/ranked.test.
 - OPTIONAL WARM-UP 2026-09-28: `rkwarm` joins `RK_MSGS`; `rkMsg` hands it to `rkWarmMsg(ws, q)` (ignored unless `rkQ.get(cid) === q`, `!q.series`, no warm-up standing, and the socket in the lobby with no room; `rkfail busy { warm:true }` within `RK_WARM_COOL_S` of its last warm-up closing), which calls `rkWarm(q)`. The lobby branch refuses `quick|create|join|watch|tcreate` from a queued socket with `joinfail inrk`.
 
 ### 3.4 Entry: `rkQueue(ws)`
+NOTES 133 (the owner, 2026-09-29): Ranked is for signed-in accounts with a username. `rkWho(ws)` refuses a guest (`rkfail signin`) and an account without one (`rkfail username`, read fresh from the database); `rkTick` drops a waiting or warming-up entry whose socket signed out; `rkRebind` drops one that came back signed out; `rkPick` never pairs a guest identity. A live series finishes on its frozen identity. `/api/me` says `rkSignin`; the client turns Find a match into Sign in / Pick a username. `RK_GUESTS=1` lets guests in for tests only (production ignores it).
 
 Refusals, each `tell(ws, { type: 'rkfail', why })` and nothing else:
 

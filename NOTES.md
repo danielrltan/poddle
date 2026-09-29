@@ -2655,3 +2655,27 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
   Matt and anonymous seats never. Whether the match counts is still decided at its end; the card says when it did not.
 - The client: ui.recordNote(what, v) on the watcher pill (notePill, shared with ui.watcherNote): a gold star, "New best rally: 14
   hits" / "New fastest swing: 1,570°/s", 3.6 s, at most three pills. test/records.test.mjs covers records(); test/menu.mjs stubs recordNote.
+
+## 133. Ranked is for signed-in players with a username
+- The owner: "rank should be disabled for guest accounts... so many small considerations like this were not thought about, be sure to do that".
+- Server (game.js): rkWho(ws) -> null | 'signin' | 'username', from a FRESH db.accountById (a username claimed after the socket opened counts at
+  once, no reload; the socket's acct.username is updated too). rkQueue refuses with rkfail signin | username (also reached by Play again on a
+  series card). rkTick drops a waiting or warming-up entry whose socket lost its account (signed out in another tab: stats.forget; Delete my
+  data) with rkfail signin and takes it off the warm-up court. rkRebind (&rk=1) drops an entry that came back signed out, unless it is in a
+  live series, which always finishes on its frozen identity (the result still lands on the account). rkPick never pairs an identity without an
+  account (backstop). RK_GUESTS=1 lets guests queue for the tests (ranked.test, ranked-e2e, stats.test set it); production ignores it.
+- /api/me carries rkSignin (the same rule). The client: profile.rkGate() -> '' | 'signin' | 'username' (only when the server says rkSignin, so
+  an older server and the fake /api/me in menu / profile-ui behave as before). The Ranked tile's line says "Sign in to play" / "Pick a username
+  to play" with the emblem dimmed; the tile is hidden where Ranked needs a sign-in but sign-in is off. The Ranked view's button becomes "Sign in
+  to play Ranked" (opens the sign-in card) or "Pick a username" (the username form), with a line saying why; Find a match never reaches the
+  queue for them. Sign-in, sign-out and a new username redraw the open view (Your stats, Leaderboard, Ranked, Ranks) and the tile. A reload on
+  /ranked re-reads the gate after /api/me (it used to be computed before). Your stats' rank caption for a guest: "Sign in to play Ranked".
+  A refusal on a socket that opened before the sign-in cookie (the race) says "Connecting your account. Press Find a match again" and reconnects.
+- Guest trophies earned before: kept on the guest profile, merged into the account on sign-in on that browser (db.mergeDevice already merges
+  the ladder row). Spectating Ranked courts stays open to everyone.
+- Legal: privacy 2 (the Ranked row) and 15 (a dated paragraph), terms 5, How to play (section and FAQ), changelog (Sept 29, with NOTES 129 and
+  132), sitemap lastmod, docs/RANKED.md 3.4, CLAUDE.md.
+- Tests: test/rksignin.test.mjs (new, a real server with the gate on: guest refused, no username refused, a claim then queues on the same
+  socket, a named account queues, signing out while queued ends the entry, production ignores RK_GUESTS).
+- Decisions made without the owner: a username is required too (Ranked names go on the leaderboard; the username form follows sign-in anyway);
+  a guest's share card still shows Bronze I, 0 trophies.

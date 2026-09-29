@@ -14,7 +14,7 @@ import path from 'path';
 import crypto from 'crypto';
 const PORT = +process.env.STATS_PORT || 9400, P2 = PORT + 1, P3 = PORT + 2, root = new URL('..', import.meta.url).pathname;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-')), DBA = path.join(tmp, 'a.db');
-const BASE = { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', STATS_MIN_POINT_S: '0', STATS_AFK_MIN: '0', STATS_FORFEIT_MIN: '1', STATS_ESTABLISHED: '0', TIMESCALE: '2' };
+const BASE = { RK_GUESTS: '1', WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', STATS_MIN_POINT_S: '0', STATS_AFK_MIN: '0', STATS_FORFEIT_MIN: '1', STATS_ESTABLISHED: '0', TIMESCALE: '2' };
 const procs = new Set(), logs = [];                                // every byte any server printed (test 16)
 function up(port, env) {
   return new Promise(res => { const p = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: port, ...env } }); procs.add(p); const mine = { p, out: '' }; logs.push(mine);

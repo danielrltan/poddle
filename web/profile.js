@@ -18,7 +18,7 @@ const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 
 let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
 let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null;      // saved: the server has a guest profile for this device (true / false / null = not asked)
-let me = { enabled: false, clientId: null, account: null, db: false };      // GET /api/me: sign-in on or off, the Google client id, who is signed in
+let me = { enabled: false, clientId: null, account: null, db: false, rkSignin: false };      // rkSignin (NOTES 133): Ranked is for signed-in players with a username      // GET /api/me: sign-in on or off, the Google client id, who is signed in
 let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
 // ---------- the device id (3.1): made at the first seat, never at load. A bearer secret for the guest profile: never in a URL or a log ----------
@@ -49,7 +49,7 @@ export async function loadMe() {                            // once after boot: 
   if (!on) return me;
   try { const r = await api('/api/me'), j = r.ok && r.j;
     if (j) { const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
-      me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true };
+      me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true, rkSignin: j.rkSignin === true };
       if (me.account) { const L = ladderOf(j); if (L) h.ladder(L); }
       if (me.account && me.account.username && me.db && !ls.get(LB_SEEN)) lbNotice(); } } catch { /* no answer: a guest with sign-in off */ }      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
   drawAcct(); return me;
@@ -107,7 +107,7 @@ function drawRoad(p) {
   const dFloor = RF + (L.div - 1) * DIV_W, nextName = L.tier === TOP ? '' : L.div < 3 ? `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div + 1]}` : `${RANK_NAME[L.tier]} I`;
   const crest = $('st-crest'); if (crest) { crest.className = 'st-crest is-rk is-' + RANK_NAME[L.tier - 1].toLowerCase() + (rkTop ? ' is-top' : ''); h.crest(crest, { tier: L.tier, div: L.div }); }
   text('st-rank', L.tier === TOP ? RANK_NAME[TOP - 1] : `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div]}`); text('st-trophies', String(T));      // 'Pro' has no numeral: the #12 pill beside it says where (drawPlace)
-  text('st-rank-cap', !T && !ladderOf(p) ? 'Play Ranked for your first trophies' : rkTop ? `${T === 1 ? 'trophy' : 'trophies'} · top rank` : `${T === 1 ? 'trophy' : 'trophies'} · ${Math.max(1, dFloor + DIV_W - T)} to ${nextName}`);
+  text('st-rank-cap', !T && rkGate() === 'signin' ? 'Sign in to play Ranked' : !T && !ladderOf(p) ? 'Play Ranked for your first trophies' : rkTop ? `${T === 1 ? 'trophy' : 'trophies'} · top rank` : `${T === 1 ? 'trophy' : 'trophies'} · ${Math.max(1, dFloor + DIV_W - T)} to ${nextName}`);
   const bar = $('st-rank-bar'); if (bar) { const f = rkTop ? 1 : Math.min(1, Math.max(0, (T - dFloor) / DIV_W)); bar.style.setProperty('--p', f.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(f * 100))); }
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
@@ -265,10 +265,16 @@ function ladderOf(p) {                                      // p.ladder as the s
   return { place: trophyPlace(p), tier: tierNum(L.tier), div: tierNum(L.tier) === TOP ? 1 : divNum(L.div), trophies: num(L.trophies), best: tierNum(L.bestTier), bestDiv: divNum(L.bestDiv), bestAt: Number.isFinite(L.bestTierAt) ? L.bestTierAt : 0, next: num(L.next), wins: num(L.wins), losses: num(L.losses), streak: num(L.streak), botWins: num(L.botWins), botLosses: num(L.botLosses), mattDayLeft: num(L.mattDayLeft) };
 }
 let rkGen = 0;
+// rkGate() -> '' when this player may play Ranked, else what is missing: 'signin' | 'username' (NOTES 133). Only when the server says Ranked needs a
+// sign-in (/api/me rkSignin; an older server or the test knob RK_GUESTS: '', as before)
+export const rkGate = () => (!on || !me.rkSignin ? '' : !me.account ? 'signin' : !me.account.username ? 'username' : '');
+const redrawView = () => { const v = h.view(); if (v === 'profile') showProfile(); else if (v === 'leaderboard') showBoard(); else if (v === 'ranked' || v === 'ranks') showRanked(); };      // after a sign-in, sign-out or new username: the open view redraws (Ranked's gate lifts, NOTES 133)
+export const pickName = () => claimCard();      // Pick a username, from the Ranked view
 export async function showRanked() {                       // the Ranked view opened: what is known at once, then /api/stats. Off (no stats server): a fresh Bronze, so the view still reads
-  const g = ++rkGen, base = { tier: 1, div: 1, trophies: 0, best: 1, queued: h.queued() };
+  const g = ++rkGen, base = { tier: 1, div: 1, trophies: 0, best: 1, queued: h.queued(), gate: rkGate() };
   h.rkView(base); if (!on) return;
   const p = await fetchProfile(); if (g !== rkGen || !['ranked', 'ranks'].includes(h.view())) return;      // the Ranks page draws from the same answer
+  base.gate = rkGate();      // again: /api/me has answered by now (fetchProfile waits for it), so a reload on /ranked knows who is signed in
   if (p === undefined) { h.rkView({ ...base, note: 'Stats aren’t available right now. You can still play' }); return; }
   const L = ladderOf(p); h.rkView({ ...base, ...(L || {}), queued: h.queued() }); if (L) h.ladder(L);      // an older server (no ladder) or nothing saved yet: Bronze, 0. The home tile's line follows what was fetched
 }
@@ -321,7 +327,7 @@ async function onCredential(resp) {                        // Google's popup ans
   if (!r.ok || !r.j) { const msg = r.status === 403 ? 'That sign-in timed out. Try again.' : r.status === 503 ? 'Sign-in isn’t available right now. You can keep playing as a guest.' : 'Couldn’t sign you in. Try again.';
     if (r.status === 503) { show('signin-btn', false); show('signin-hint', false); err('signin-err', msg); } else loadGoogle().then(() => err('signin-err', msg)); return; }      // the nonce is single use: Google's button comes back with a new one
   me.account = acct(r.j.account) || { username: null, renameAt: null }; saved = null; drawAcct(); h.redial();      // the socket opens again (after the match) so its upgrade carries the cookie
-  if (h.view() === 'profile') showProfile(); else if (h.view() === 'leaderboard') showBoard();
+  redrawView();
   if (!me.account.username) claimCard(); else { closeCard(); h.toast(`Signed in as ${me.account.username}`, 2400); }      // no username yet: pick one now (Skip for now is there)
 }
 export async function signOut() {                           // only the server's 204 clears the HttpOnly cookie: anything else leaves the player signed in, and says so
@@ -329,7 +335,7 @@ export async function signOut() {                           // only the server's
   let r; try { r = await api('/api/signout', 'POST', {}); } catch { r = { ok: false, status: 0, j: null }; }
   if (r.status !== 204) { h.toast(r.status === 429 ? `Couldn’t sign you out. Try again in ${Math.max(1, num(r.j && r.j.retryAfter))} s.` : 'Couldn’t sign you out. Try again.', 2600); return; }
   me.account = null; forgetDevice(); drawAcct(); h.redial(); h.toast('Signed out', 1800);
-  if (h.view() === 'profile') showProfile(); else if (h.view() === 'leaderboard') showBoard();
+  redrawView();
 }
 
 // ---------- Share card (docs/SHARE.md 2-3): one public link per profile that unfurls as a picture. The click copies it, then the sheet opens ----------
@@ -418,7 +424,7 @@ export async function claimName(name) {                    // -> true when the s
   let r; try { r = await api('/api/username', 'POST', { username: n }); } catch { r = { ok: false, status: 0, j: null }; }
   if (r.ok && r.j && typeof r.j.username === 'string') {
     me.account = { username: r.j.username.slice(0, 12), renameAt: Number.isFinite(r.j.renameAt) ? r.j.renameAt : null }; drawAcct(); h.redial();      // the court shows the badge once the socket's upgrade carries the cookie again
-    closeCard(); h.toast(`Your username is ${me.account.username}`, 2400); if (h.view() === 'profile') showProfile(); else if (h.view() === 'leaderboard') showBoard(); return true;
+    closeCard(); h.toast(`Your username is ${me.account.username}`, 2400); redrawView(); return true;
   }
   const j = r.j || {};
   err('claim-err', r.status === 409 ? 'That name is taken' : r.status === 422 ? CLAIM_ERR[j.reason] || 'That name isn’t allowed' : r.status === 423 ? `You can change your name again on ${day(j.until) || 'a later day'}` : r.status === 401 ? 'You’re signed out. Sign in again to pick a name.' : 'Couldn’t save that name. Try again.');
@@ -433,7 +439,7 @@ function drawAcct() {
   show('btn-set-signin', en && !a); show('set-account', !!a); text('set-account-name', name ? `Signed in as ${name}` : 'Signed in');
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
-  show('btn-profile', on); show('btn-ranked', on && me.db); show('btn-leaderboard', on && me.db); h.tiles();      // the leaderboard reads the database too (NOTES 126)      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
+  show('btn-profile', on); show('btn-ranked', on && me.db && (!me.rkSignin || me.enabled)); show('btn-leaderboard', on && me.db); h.gate(); h.tiles();      // Ranked needs sign-in (NOTES 133): no tile where nobody can sign in; the tile's line follows the gate.      // the leaderboard reads the database too (NOTES 126)      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
 }
 
 // ---------- the site's storage cleared in another tab: the device id went with it. Its socket keeps the old hello, so the next match is on a new one (3.1) ----------
@@ -446,7 +452,7 @@ let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, rankBadge: noop, board: noop };
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, rankBadge: noop, board: noop, gate: noop };
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
