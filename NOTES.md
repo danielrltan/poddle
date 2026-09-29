@@ -3022,3 +3022,19 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   the player did (a friend request arrived, copied, errors) are not announcements and stay.
 - Tests: test/social-ui.mjs A now checks that no announcement toast shows on the home screen and no poddle.friendsSeen key
   is left.
+
+## 148. A small pink bow on the corner of the username Mae, everywhere it shows
+- The owner's ask: a small pink bow on the top right corner of the "e" of the registered username Mae, only for that
+  username, everywhere, games included. ui.js regBadge (the one hook every name display already calls for the developer's
+  hammer: in-game scoreboard, result/tally card, VS card, court list, tournament chips and bracket, leaderboard rows, the
+  profile card, friends lists, the account row) now also puts a `.name-bow` INSIDE the name element, after its text, for
+  BOW_NAMES = { mae }, and marks the name `.has-bow` (overflow visible, so an ellipsis box never clips it). Inside rather
+  than beside (the hammer's way) so it sits on the last letter in every layout, including the VS card where a sibling
+  would drop under the name. The svg has no text, so textContent (the name, which regBadge and callers read) is unchanged;
+  aria-hidden, no tooltip. Pink #ff6f9f with a darker #c93f74 edge so it reads on white cards and the dark VS card alike.
+- Decided without asking: only a REGISTERED Mae (a guest typing Mae gets nothing, as with the hammer). A player's own
+  scoreboard side reads "You", which never carries a mark, so Mae sees her bow on her name everywhere except there.
+  TEMPORARY like her bunny (NOTES 144): remove 'mae' from BOW_NAMES to take it away. No legal change (derived from the
+  public username on the client).
+- Checked in renders (scoreboard both sides and beside a rank emblem, VS card, leaderboard row, profile card) and in
+  test/profile-ui.mjs (bow inside the name, text unchanged, no hammer; a guest Mae gets none).

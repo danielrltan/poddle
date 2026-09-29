@@ -2254,3 +2254,7 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .friends-card .fr-empty{padding:var(--s-4) var(--s-3)}
 body[data-paused] .friends-card .fr-row{box-shadow:none}
 @media (max-width:520px){ .friends-card{width:calc(100vw - 2 * var(--edge))} }
+/* Mae's bow (NOTES 148): on the top right corner of her name's last letter. Inside the name element, so the name's own box must not clip it */
+.has-bow{overflow:visible !important;text-overflow:clip !important}
+.name-bow{display:inline-block;width:.9em;height:.6em;margin-left:-.2em;margin-right:-.05em;vertical-align:.58em;transform:rotate(16deg);pointer-events:none;line-height:0}
+.name-bow svg{display:block;width:100%;height:100%;fill:#ff6f9f;stroke:#c93f74;stroke-width:1.1;stroke-linejoin:round;paint-order:stroke;overflow:visible}

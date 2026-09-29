@@ -121,6 +121,11 @@ r = await ev(pg, () => { const n = document.getElementById('name-them'), b = n.n
 ok(r.text === 'Dan' && r.badge && !r.inName && r.all === 1 && r.dev, `the developer's seat: a hammer badge beside the name, not in its text ("${r.text}", ${J(r)})`);
 push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, false] }); await sleep(300);      // a guest typing Dan: nothing (the server would show Player 2 for look-alikes of staff anyway)
 ok(await ev(pg, () => document.querySelectorAll('.reg-badge').length === 0 && !document.getElementById('name-them').classList.contains('is-dev')), 'a guest named Dan gets no badge');
+push({ type: 'names', names: ['Daniel', 'Mae'], reg: [false, true] }); await sleep(300);      // Mae's bow (NOTES 148): inside the name, after its text, the text unchanged; a guest Mae gets none
+r = await ev(pg, () => { const n = document.getElementById('name-them'), b = n.querySelector(':scope > .name-bow'); return { text: n.textContent, bow: !!b && !!b.querySelector('svg') && b.getAttribute('aria-hidden') === 'true', last: n.lastElementChild === b, cls: n.classList.contains('has-bow'), hammer: document.querySelectorAll('.reg-badge').length }; });
+ok(r.text === 'Mae' && r.bow && r.last && r.cls && r.hammer === 0, `the username Mae: a pink bow on the end of the name, no hammer (${J(r)})`);
+push({ type: 'names', names: ['Daniel', 'Mae'], reg: [false, false] }); await sleep(300);
+ok(await ev(pg, () => !document.querySelector('.name-bow') && !document.getElementById('name-them').classList.contains('has-bow')), 'a guest named Mae gets no bow');
 push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, true] }); await sleep(300);
 // the court list, the tournament chips and the bracket draw it too, from the server's reg fields (room info reg:[a,b], tour players/sides reg:bool)
 r = await ev(pg, () => { const ui = window.__ui, q = (s, sel) => { const e = document.querySelector(s); return e ? e.querySelectorAll(sel).length : -1; };

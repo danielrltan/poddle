@@ -73,11 +73,20 @@ export function setNames({ me, meSub, them, themSub, reg, rank } = {}) {
 // name a guest can type reproduces it (docs/ACCOUNTS.md 7.5). Made and removed here: a guest's seat has no .reg-badge at all.
 const HAMMER = '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(40 12 12)"><rect x="10.3" y="7" width="3.4" height="16" rx="1.7"/><path d="M5.5 1.5h10l4 1.5v5l-4 1.5h-10A1.5 1.5 0 0 1 4 8V3a1.5 1.5 0 0 1 1.5-1.5z"/></g></svg';      // the developer's badge: a hammer (NOTES 134), was the letters DEV
 const DEV_NAMES = new Set(['dan']);      // (the same account has its own character: scene.js LOOKS, NOTES 137) usernames that carry the DEV badge and show in orange (unique and confusable-folded on the server, so only the owner's account has them)
+// Mae's bow (NOTES 148): a small pink bow on the top right corner of the registered username Mae, wherever regBadge is called (scoreboard, result
+// card, VS card, brackets, chips, leaderboard, profile and friends cards, the account row). INSIDE the name element, after its text, so it sits on the
+// last letter in every layout (the hammer is a sibling beside the name instead); a text-less svg, so textContent (the name) is unchanged. TEMPORARY, like
+// the named looks in scene.js (NOTES 137, 144): remove 'mae' here to take it away.
+const BOW = '<svg viewBox="0 0 24 16"><path d="M12 8 4.2 2.4C2.6 1.3 1 2.2 1 4.1v7.8c0 1.9 1.6 2.8 3.2 1.7zM12 8l7.8-5.6c1.6-1.1 3.2-.2 3.2 1.7v7.8c0 1.9-1.6 2.8-3.2 1.7z"/><rect x="9.4" y="5" width="5.2" height="6" rx="2.2"/></svg>';
+const BOW_NAMES = new Set(['mae']);
 export function regBadge(nameEl, on) {                   // on: a registered username sits there. Only the developer's gets a mark: a hammer badge beside the name (NOTES 106)
   if (!nameEl) return; const dev = !!on && DEV_NAMES.has((nameEl.textContent || '').trim().toLowerCase()), next = nameEl.nextElementSibling, has = !!next && next.classList.contains('reg-badge');
   nameEl.classList.toggle('is-dev', dev);
   if (dev && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Developer'); b.dataset.tip = 'Developer'; b.innerHTML = HAMMER; nameEl.after(b); }
   else if (!dev && has) next.remove();
+  const bow = !!on && BOW_NAMES.has((nameEl.textContent || '').trim().toLowerCase()); let b = nameEl.querySelector(':scope > .name-bow');
+  if (bow && !b) { b = document.createElement('span'); b.className = 'name-bow'; b.setAttribute('aria-hidden', 'true'); b.innerHTML = BOW; nameEl.append(b); } else if (!bow && b) b.remove();
+  nameEl.classList.toggle('has-bow', bow);
 }
 // Tooltips (NOTES 136): no browser tooltips anywhere. Every title attribute, in the markup or set later by code, becomes data-tip the moment
 // it appears (a MutationObserver), and one floating label fixed to the window shows it: after 80 ms on hover, at once when Tab focuses the element, for
