@@ -2699,3 +2699,15 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
   scrolling list such as the leaderboard never clips it; it hides on scroll. The text is the badge's aria-label, and the
   native title tooltip is gone so the two never show together.
 - The developer's name is shown in the normal name colour (the owner's ask); the .is-dev class stays as a marker only.
+
+## 136. Custom tooltips everywhere; a gold trophy icon in place of the word "trophies"
+- No browser tooltips anywhere on the page. ui.js turns every title attribute, in index.html or set later by code (rank
+  emblems, Matt chips, the stats figures, the pen, emotes, ping, See all ranks), into data-tip the moment it appears (a
+  MutationObserver), and one floating label (.tip, fixed to the window, so no scrolling list clips it) shows it: 80 ms
+  after the pointer rests on it, at once when Tab focuses it (not when a menu focuses its first control by itself), and
+  for 1.6 s after a tap. Above the element, below when there is no room; wraps at 18rem; hidden on scroll, click and Esc.
+  A title that was an element's only name moves to aria-label, one that adds to it to aria-description, so screen
+  readers keep it. The developer's badge (NOTES 135) and the rank emblems write data-tip directly. Replaces badgeTip.
+- A filled gold trophy (svg .cup-ic, aria-label "trophies") stands for the word: after the number on the leaderboard's
+  Trophies board (rows and the You card) and on Your stats' rank line ("240 [cup] · 10 to Silver III", was an outline
+  cup before the number and the word). The Ranked view's big count and the match-end trophy roll still say "trophies".

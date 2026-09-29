@@ -64,22 +64,45 @@ const DEV_NAMES = new Set(['dan']);      // usernames that carry the DEV badge a
 export function regBadge(nameEl, on) {                   // on: a registered username sits there. Only the developer's gets a mark: a hammer badge beside the name (NOTES 106)
   if (!nameEl) return; const dev = !!on && DEV_NAMES.has((nameEl.textContent || '').trim().toLowerCase()), next = nameEl.nextElementSibling, has = !!next && next.classList.contains('reg-badge');
   nameEl.classList.toggle('is-dev', dev);
-  if (dev && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Developer'); b.innerHTML = HAMMER; nameEl.after(b); }
+  if (dev && !has) { const b = document.createElement('span'); b.className = 'reg-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', 'Developer'); b.dataset.tip = 'Developer'; b.innerHTML = HAMMER; nameEl.after(b); }
   else if (!dev && has) next.remove();
 }
-// The developer badge's tooltip (NOTES 135): one floating label fixed to the window, so no scrolling list or card clips it. Hover
-// shows it, a tap shows it for a moment; it sits above the badge, or below when there is no room. Its text is the badge's aria-label
-let tipEl = null, tipT = 0;
-function badgeTip(b) {
-  if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'badge-tip'; tipEl.setAttribute('aria-hidden', 'true'); document.body.append(tipEl); }
-  tipEl.textContent = b.getAttribute('aria-label') || ''; const r = b.getBoundingClientRect(), t = tipEl.getBoundingClientRect(), below = r.top < t.height + 12;
-  tipEl.style.left = Math.max(8, Math.min(innerWidth - t.width - 8, r.left + r.width / 2 - t.width / 2)) + 'px'; tipEl.style.top = (below ? r.bottom + 8 : r.top - t.height - 8) + 'px';
-  tipEl.classList.toggle('is-below', below); tipEl.classList.add('on');
+// Tooltips (NOTES 136): no browser tooltips anywhere. Every title attribute, in the markup or set later by code, becomes data-tip the moment
+// it appears (a MutationObserver), and one floating label fixed to the window shows it: after 80 ms on hover, at once when Tab focuses the element, for
+// 1.6 s after a tap. It sits above the element, or below when there is no room, and no scrolling list or card clips it. A title that was the
+// element's only name moves to aria-label, one that adds to its name to aria-description, so screen readers keep what the title gave them.
+let tipEl = null, tipT = 0, tipFor = null;
+function adoptTitle(el) {
+  const t = el.getAttribute('title'); el.removeAttribute('title'); if (!t) return;
+  el.dataset.tip = t;
+  const name = el.getAttribute('aria-label'), txt = (el.textContent || '').trim();
+  if (!name && !el.hasAttribute('aria-labelledby') && !txt) el.setAttribute('aria-label', t);
+  else if (t !== name && t !== txt && !el.hasAttribute('aria-description')) el.setAttribute('aria-description', t);
 }
-const tipOff = () => { clearTimeout(tipT); tipEl?.classList.remove('on'); };
-addEventListener('pointerover', e => { const b = e.target.closest?.('.reg-badge'); if (!b) return; clearTimeout(tipT); badgeTip(b); if (e.pointerType !== 'mouse') tipT = setTimeout(tipOff, 1600); });
-addEventListener('pointerout', e => { if (e.pointerType === 'mouse' && e.target.closest?.('.reg-badge') && !e.relatedTarget?.closest?.('.reg-badge')) tipOff(); });
-addEventListener('scroll', tipOff, true);
+function tipShow(el) {
+  const t = el.dataset.tip; if (!t) return;
+  if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'tip'; tipEl.setAttribute('aria-hidden', 'true'); document.body.append(tipEl); }
+  tipFor = el; tipEl.textContent = t; tipEl.classList.remove('on');
+  const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight, below = r.top < h + 12;
+  tipEl.style.left = Math.round(Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))) + 'px';
+  tipEl.style.top = Math.round(below ? r.bottom + 8 : r.top - h - 8) + 'px';
+  tipEl.classList.toggle('is-below', below); void tipEl.offsetWidth; tipEl.classList.add('on');
+}
+const tipOff = () => { clearTimeout(tipT); tipFor = null; tipEl?.classList.remove('on'); };
+if (typeof MutationObserver === 'function' && document.documentElement) {
+  document.querySelectorAll('[title]').forEach(adoptTitle);
+  new MutationObserver(ms => { for (const m of ms) { if (m.type === 'attributes') { if (m.target.hasAttribute('title')) adoptTitle(m.target); }
+    else for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.hasAttribute('title')) adoptTitle(n); n.querySelectorAll('[title]').forEach(adoptTitle); } } })
+    .observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['title'] });
+}
+addEventListener('pointerover', e => { const el = e.target.closest?.('[data-tip]'); if (!el || el === tipFor) return; clearTimeout(tipT);
+  if (e.pointerType === 'mouse') tipT = setTimeout(() => tipShow(el), 80); else { tipShow(el); tipT = setTimeout(tipOff, 1600); } });
+addEventListener('pointerout', e => { if (e.pointerType !== 'mouse') return; const from = e.target.closest?.('[data-tip]'); if (from && from !== e.relatedTarget?.closest?.('[data-tip]')) tipOff(); });
+let tabbed = false;      // keyboard focus shows a tip only when Tab moved it there: the menus focus their first control by themselves, and that is no reason to pop a label
+addEventListener('keydown', e => { tabbed = e.key === 'Tab'; }, true); addEventListener('pointerdown', () => { tabbed = false; }, true);
+addEventListener('focusin', e => { const el = e.target.closest?.('[data-tip]'); if (el && tabbed) { clearTimeout(tipT); tipShow(el); } });
+addEventListener('focusout', tipOff); addEventListener('scroll', tipOff, true); addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') tipOff(); }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && tipFor) tipOff(); });
 // The rank emblem beside a name (docs/RANKED.md 6): the same rule as the badge, its own element AFTER the .reg-badge if there is one, else after
 // the name; never in the name's text. r = { tier: 1..7, div: 1..3 } shows that rank (aria-label / title carry 'Gold II'), null removes it.
 // Beside a name only the emblem shows; from .is-md up the wrapper's data-div draws the division's roman numeral over the emblem (ui.css).
@@ -98,8 +121,8 @@ export function rankBadge(nameEl, r, cls = 'is-xs') {
   const next = after.nextElementSibling, has = !!next && next.classList.contains('rank-badge');
   if (!r) { if (has) next.remove(); return; }
   const name = rankLabel(r.tier, r.div), label = `Rank: ${name}`, ink = RANKS[r.tier - 1].colour.deep;
-  if (has) { if (next.title !== name) { setEmblem(next.firstElementChild, r.tier, r.div); next.setAttribute('aria-label', label); next.title = name; setDiv(next, r); next.style.setProperty('--rank-ink', ink); } return; }
-  const b = document.createElement('span'); b.className = 'rank-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', label); b.title = name; setDiv(b, r); b.style.setProperty('--rank-ink', ink); b.append(emblemEl(r.tier, cls, r.div)); after.after(b);
+  if (has) { if (next.dataset.tip !== name) { setEmblem(next.firstElementChild, r.tier, r.div); next.setAttribute('aria-label', label); next.dataset.tip = name; setDiv(next, r); next.style.setProperty('--rank-ink', ink); } return; }
+  const b = document.createElement('span'); b.className = 'rank-badge'; b.setAttribute('role', 'img'); b.setAttribute('aria-label', label); b.dataset.tip = name; setDiv(b, r); b.style.setProperty('--rank-ink', ink); b.append(emblemEl(r.tier, cls, r.div)); after.after(b);
 }
 export function setScore(me, them) {
   for (const [id, v] of [['sc-me', me], ['sc-them', them]]) { const el = $(id); if (el.textContent !== String(v)) { el.textContent = v; restart(el, 'pop'); if (+v > 0) { const t = el.closest('.score-tab'); if (t) restart(t, 'ov-scored'); } } }      // the tab that scored gets a sweep of its colour (not the 0-0 reset)

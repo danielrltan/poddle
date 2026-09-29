@@ -107,7 +107,7 @@ function drawRoad(p) {
   const dFloor = RF + (L.div - 1) * DIV_W, nextName = L.tier === TOP ? '' : L.div < 3 ? `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div + 1]}` : `${RANK_NAME[L.tier]} I`;
   const crest = $('st-crest'); if (crest) { crest.className = 'st-crest is-rk is-' + RANK_NAME[L.tier - 1].toLowerCase() + (rkTop ? ' is-top' : ''); h.crest(crest, { tier: L.tier, div: L.div }); }
   text('st-rank', L.tier === TOP ? RANK_NAME[TOP - 1] : `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div]}`); text('st-trophies', String(T));      // 'Pro' has no numeral: the #12 pill beside it says where (drawPlace)
-  text('st-rank-cap', !T && rkGate() === 'signin' ? 'Sign in to play Ranked' : !T && !ladderOf(p) ? 'Play Ranked for your first trophies' : rkTop ? `${T === 1 ? 'trophy' : 'trophies'} · top rank` : `${T === 1 ? 'trophy' : 'trophies'} · ${Math.max(1, dFloor + DIV_W - T)} to ${nextName}`);
+  text('st-rank-cap', !T && rkGate() === 'signin' ? 'Sign in to play Ranked' : !T && !ladderOf(p) ? 'Play Ranked for your first trophies' : rkTop ? '· top rank' : `· ${Math.max(1, dFloor + DIV_W - T)} to ${nextName}`);      // the trophy icon after the number stands for the word (NOTES 136)
   const bar = $('st-rank-bar'); if (bar) { const f = rkTop ? 1 : Math.min(1, Math.max(0, (T - dFloor) / DIV_W)); bar.style.setProperty('--p', f.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(f * 100))); }
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
@@ -190,6 +190,8 @@ const BOARD = {
 };
 let board = 'rally', boardGen = 0, places = null;      // Longest rally is the first tab (NOTES 131); the #N beside the rank on Your stats opens Trophies (lb-tabs data-want)
       // places: the last /api/stats answer's places ({ listed, why, hidden, trophies, rally, streak }), null = not known
+const CUP_SVG = '<svg class="cup-ic" viewBox="0 0 24 24" role="img" aria-label="${label}"><path class="cup-h" d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4"/><path class="cup-c" d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z"/><path class="cup-s" d="M10.5 14.5h3v3h-3Z"/><rect class="cup-b" x="7" y="17" width="10" height="4" rx="1.2"/><path class="cup-g" d="M9 5.5v3.8a3.2 3.2 0 0 0 1.4 2.6"/></svg>';      // the gold trophy (index.html st-rank-cap has the same): stands for the word 'trophies' (NOTES 136)
+const unitOf = n => { if (board !== 'trophies') return mk('small', '', ' ' + BOARD[board].unit(n)); const i = mk('i', 'lb-cup'); i.innerHTML = CUP_SVG.replace('${label}', BOARD.trophies.unit(n)); return i; };
 const placeOf = p => (p && p.places && typeof p.places === 'object' ? p.places : null);
 const rankNum = n => '#' + Number(n).toLocaleString('en-US');
 // Your stats: the trophy place beside the rank name ('Champion II  #301'). Only for a listed player with trophies: a guest, a player with no username
@@ -203,7 +205,7 @@ function boardRow(r, mine) {
   const li = mk('li', 'lb-row' + (r.rank <= 3 ? ' is-top is-top' + r.rank : '') + (mine ? ' is-me' : ''));
   const who = mk('span', 'lb-who'), nm = mk('b', 'lb-name', r.name);
   who.append(nm); li.append(mk('span', 'lb-rank', String(r.rank)), who, mk('span', 'lb-v'));
-  li.lastChild.append(mk('b', '', Number(r.v).toLocaleString('en-US')), mk('small', '', ' ' + BOARD[board].unit(r.v)));
+  li.lastChild.append(mk('b', '', Number(r.v).toLocaleString('en-US')), unitOf(r.v));
   h.badge(nm, true);      // the DEV pill on the developer's name, as in a court
   if (Number.isInteger(r.tier)) h.rankBadge(nm, { tier: r.tier, div: r.div });      // the Ranked emblem, as beside a name in a Ranked court. None for a player who has never played Ranked
   return li;
@@ -218,7 +220,7 @@ function drawYou() {
   else if (!mine) cap = B.none;
   else cap = mine.rank <= 100 ? 'Your global rank' : 'Your global rank, outside the top 100';
   show('lb-you', !!cap); text('lb-you-cap', cap); text('lb-you-rank', mine ? rankNum(mine.rank) : '');
-  { const v = $('lb-you-v'); if (v) { v.textContent = ''; if (mine) v.append(mk('b', '', Number(mine.v).toLocaleString('en-US')), mk('small', '', ' ' + B.unit(mine.v))); } }
+  { const v = $('lb-you-v'); if (v) { v.textContent = ''; if (mine) v.append(mk('b', '', Number(mine.v).toLocaleString('en-US')), unitOf(mine.v)); } }
   $('lb-you')?.classList.toggle('is-on', !!mine);
   if (go) { go.hidden = !act; if (act) { go.textContent = act[0]; go.onclick = act[1]; } }
   const t = $('tog-lb-show'); if (t) { t.hidden = !(a && a.username && P); t.setAttribute('aria-checked', String(!(P && P.hidden))); }      // the switch: only for a name that could be on a board
