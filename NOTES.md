@@ -2692,3 +2692,10 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
   view, the You card in all six states (guest, nouser, hidden, none, outside, listed), Settings and the static pages,
   at 1440x900, 1280x720 and 390x844, with a data-fit / sideways-scroll check. `node test/ui-shots/sweep.mjs <out> [filter]`,
   SWEEP_PORT (default 9460), SWEEP_SIZES, SWEEP_DPR. Screenshots go to the out dir (default test/ui-shots/sweep, not committed).
+
+## 135. The developer's hammer badge has a tooltip; the name is no longer orange
+- Hovering the hammer beside the username Dan (NOTES 134) shows a small dark "Developer" label above it (below when
+  there is no room), and a tap shows it for 1.6 s. One floating element fixed to the window (ui.js badgeTip), so a
+  scrolling list such as the leaderboard never clips it; it hides on scroll. The text is the badge's aria-label, and the
+  native title tooltip is gone so the two never show together.
+- The developer's name is shown in the normal name colour (the owner's ask); the .is-dev class stays as a marker only.

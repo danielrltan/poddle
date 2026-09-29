@@ -118,9 +118,9 @@ r = await ev(pg, () => ({ text: document.getElementById('name-them').textContent
 ok(r.text === 'Bobby' && r.all === 0 && !r.dev, `a registered seat gets no mark on its own ("${r.text}", ${J(r)})`);
 push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, true] }); await sleep(400);      // the developer's username (ui.js DEV_NAMES): a DEV pill beside the name, the name in orange
 r = await ev(pg, () => { const n = document.getElementById('name-them'), b = n.nextElementSibling; return { text: n.textContent, badge: !!b && b.classList.contains('reg-badge') && !!b.querySelector('svg') && b.getAttribute('aria-label') === 'Developer', inName: !!n.querySelector('.reg-badge'), all: document.querySelectorAll('.reg-badge').length, dev: n.classList.contains('is-dev'), color: getComputedStyle(n).color }; });
-ok(r.text === 'Dan' && r.badge && !r.inName && r.all === 1 && r.dev, `the developer's seat: a DEV pill beside the name, not in its text, the name in orange ("${r.text}", ${J(r)})`);
+ok(r.text === 'Dan' && r.badge && !r.inName && r.all === 1 && r.dev, `the developer's seat: a hammer badge beside the name, not in its text ("${r.text}", ${J(r)})`);
 push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, false] }); await sleep(300);      // a guest typing Dan: nothing (the server would show Player 2 for look-alikes of staff anyway)
-ok(await ev(pg, () => document.querySelectorAll('.reg-badge').length === 0 && !document.getElementById('name-them').classList.contains('is-dev')), 'a guest named Dan gets no pill and no orange');
+ok(await ev(pg, () => document.querySelectorAll('.reg-badge').length === 0 && !document.getElementById('name-them').classList.contains('is-dev')), 'a guest named Dan gets no badge');
 push({ type: 'names', names: ['Daniel', 'Dan'], reg: [false, true] }); await sleep(300);
 // the court list, the tournament chips and the bracket draw it too, from the server's reg fields (room info reg:[a,b], tour players/sides reg:bool)
 r = await ev(pg, () => { const ui = window.__ui, q = (s, sel) => { const e = document.querySelector(s); return e ? e.querySelectorAll(sel).length : -1; };
