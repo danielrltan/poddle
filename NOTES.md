@@ -2874,3 +2874,8 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   up to 6.5rem): #ranked-line .cup .cup-ic sizes it to the line and keeps the tile's press squash off it.
 - A long toast wraps (max 46rem, balanced lines, a rounded box) instead of running off the screen: the one-time
   leaderboard / profile-card notice was cut off at 1440 px.
+
+## 142. The Ranks page loses its Play Ranked button
+- The owner: unnecessary. The Ranks page (all eight medals, opened from Ranked's info button or the crest on Your
+  stats) ended with a Play Ranked button that only went to the Ranked view; Back already returns to wherever the page
+  was opened from (ui.js viewParent / ranksFrom). The page's keyboard focus on open is now the Back button.

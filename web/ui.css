@@ -2004,7 +2004,6 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .rkx-card.is-now{border-color:var(--rank-ink,var(--line));box-shadow:var(--sh-2),0 0 0 .25rem color-mix(in srgb,var(--rank-mid,var(--line)) 35%,transparent);transform:translateY(-.25rem)}
 .rkx-card.is-done{border-color:var(--line-soft)}
 .rkx-note{margin:0;text-align:center}
-.rkx-go{align-self:center}
 @media (max-width:900px){ .rkx-card .rank-em{width:4.25rem;height:4.25rem} .ranks-view{padding:var(--s-5) var(--s-4)!important} }
 @media (prefers-reduced-motion: reduce){ .rkx-card{animation:none} .rkx-card.is-now{transform:none} }
 /* the medal is a link to the Ranks page: a pointer, a small lift on hover, the focus halo on the keyboard */
