@@ -99,7 +99,7 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   Online, Playing Matt, In a game, Watching, Looking for a Ranked match, In a Ranked match, In a tournament; never the court
   code), each online account's cached friend list, per-account rate buckets (adds 30/hour, searches 60/10 min). Search text
   (2..12 chars) is used to answer the query, never stored or written to our logs (it rides in the URL, so Fly.io's platform
-  logs, ~7 days, may hold it, as for /api/player?name=). Browser: `poddle.friendsSeen` (one-time notice).
+  logs, ~7 days, may hold it, as for /api/player?name=). Browser: nothing (the one-time notice and its `poddle.friendsSeen` key were removed, NOTES 147).
 - Subjects: signed-in players with a username (13+, under 18 with a parent's permission). Guests cannot use it.
 - Basis: contract (Art. 6(1)(b)) for the friends list, requests, and the status, rank and places shown to accepted friends
   (the feature the player chooses to use). Legitimate interests (Art. 6(1)(f)) for being findable in search (the username is

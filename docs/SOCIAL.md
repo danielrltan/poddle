@@ -132,7 +132,7 @@ legal. B: invites (play / watch / duel). Re-fetch origin/main between slices; NO
 Privacy 2 (friend list, requests, presence use), 4 (online status + activity to friends, username searchable, player
 card contents, invites), 7 (retention above), 9 (export includes friends), 15 (dated paragraph); terms 4 (no spamming
 requests / invites; sanctions), 5; changelog; sitemap lastmod; CLAUDE.md data flows; docs/ropa.md; the db.js export NOTES string ("Opponents are shown only as Matt or a player");
-NOTES section; a home notice.
+NOTES section. No home notice or "New:" toast (CLAUDE.md "No announcement notices", NOTES 147).
 
 ## 8. Contract for slice A (server and client are built against this)
 REST (server/api.js ROUTES, needsSignin-feature flag true, needsDb true; a handler-level `session(req)` check -> 401

@@ -3006,3 +3006,19 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   for them), although the endpoint itself stays public; place pills from /api/player on the card (one short line, the numbers only); a hidden
   stranger's card shows no rank at all rather than "Not ranked yet"; "Stats show for players on the global leaderboard" instead of an error when
   only the board says 404; the friend row lives on the card, not in a second modal; hidden accounts are searchable; Duel waits for slice B.
+
+## 147. No feature-announcement notices: the "New: add friends and see who's online" toast is gone, and a rule keeps them out
+- The owner's ask: remove the one-time Friends toast ("New: add friends and see who's online", profile.js frNotice, NOTES
+  146) and make sure no session adds that kind of notice again. frNotice and its calls are removed; the `poddle.friendsSeen`
+  key it set is deleted at load (like poddle.stats.on, NOTES 116), and its row is gone from the privacy page's storage table
+  (Privacy 5), CLAUDE.md's storage line and docs/ropa.md. The page was already dated September 29, 2026.
+- The rule, in CLAUDE.md "No announcement notices": no "New: ..." toasts, what's-new popups, one-time hints, NEW badges or
+  dots, banners or modals announcing a feature or change. The changelog (footer "What's new") lists changes. docs/SOCIAL.md
+  no longer plans "a home notice" for the next Friends slice.
+- Kept, decided without asking: the two one-time LEADERBOARD toasts (profile.js lbNotice: "Your username can now appear on
+  the global leaderboard ..." and the profile-card one, NOTES 126 / 140). They are the privacy notice the privacy page
+  promises for an important change to how data is shown ("we will also post a notice"), not an announcement; the rule
+  names them as its only kind of exception, and says to ask the owner before adding another. Toasts answering something
+  the player did (a friend request arrived, copied, errors) are not announcements and stay.
+- Tests: test/social-ui.mjs A now checks that no announcement toast shows on the home screen and no poddle.friendsSeen key
+  is left.

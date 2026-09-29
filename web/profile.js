@@ -4,7 +4,7 @@
 // stubs ui.js with a fixed list of names, so main.js hands in the few ui calls this needs (init).
 // Every string from the server or the player goes in as textContent. Nothing here logs an id, a name or a token.
 const $ = id => document.getElementById(id);
-const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', LB_SEEN = 'poddle.lbSeen', FR_SEEN = 'poddle.friendsSeen', GSI = 'https://accounts.google.com/gsi/client';
+const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', LB_SEEN = 'poddle.lbSeen', OLD_FR_SEEN = 'poddle.friendsSeen', GSI = 'https://accounts.google.com/gsi/client';
 const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];
 const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^[0-9a-f]{32}$/;      // the server's own check (3.1): anything else is no device id
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
@@ -54,7 +54,7 @@ export async function loadMe() {                            // once after boot: 
       me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true, rkSignin: j.rkSignin === true };
       if (me.account) { const L = ladderOf(j); if (L) h.ladder(L); }
       const seen = ls.get(LB_SEEN), listed = !!(j.places && j.places.listed === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140)
-      if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); else if (me.enabled && me.db && !ls.get(FR_SEEN)) frNotice(); } } catch { /* no answer: a guest with sign-in off */ }
+      if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }
   meDone = true;      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
   drawAcct(); return me;
 }
@@ -66,15 +66,9 @@ function lbNotice(n = 0, first = true) {
   clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN) === '2') return;      // gives up after ten minutes on the title or in a court: the next load tries again
   if (!h.view()) { lbT = setTimeout(() => lbNotice(n + 1, first), 1000); return; }
   lbT = setTimeout(() => { if (!h.view()) return lbNotice(n + 1, first);
-    h.toast(first ? 'Your username can now appear on the global leaderboard, and anyone can open your profile card from it. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '2');
-    if (me.enabled && me.db && !ls.get(FR_SEEN)) lbT = setTimeout(() => frNotice(), 8600); }, 1200);      // the Friends notice waits for this one to go: a second toast would replace it
+    h.toast(first ? 'Your username can now appear on the global leaderboard, and anyone can open your profile card from it. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '2'); }, 1200);
 }
-// the Friends notice (docs/SOCIAL.md 7): once per browser, wherever the Friends tile shows (guests too: it says Sign in to add friends). The same waiting as above
-function frNotice(n = 0) {
-  clearTimeout(lbT); if (n > 600 || ls.get(FR_SEEN) || !(me.enabled && me.db)) return;
-  if (!h.view()) { lbT = setTimeout(() => frNotice(n + 1), 1000); return; }
-  lbT = setTimeout(() => { if (!h.view()) return frNotice(n + 1); h.toast('New: add friends and see who’s online', 6000); ls.set(FR_SEEN, '1'); }, 1200);
-}
+// No "New: ..." feature announcements (NOTES 147, CLAUDE.md "No announcement notices"): the Friends one is gone, and its key with it (below)
 export async function fetchProfile() {                      // -> the Profile of 8.2, null = nothing saved yet, undefined = the request failed
   if (!on) return undefined; await mePromise; const dev = deviceId(); if (!me.account && !dev) return null;      // who is signed in first (/api/me). Nothing to ask about: no request at all
   try { const r = await api('/api/stats', 'POST', devBody()); if (!r.ok || !r.j) return undefined;
@@ -576,6 +570,7 @@ export function init(hooks) {
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
+  ls.del(OLD_FR_SEEN);      // the one-time Friends notice was removed (NOTES 147): its seen flag is a dead key
   wire(); drawAcct(); if (on) mePromise = loadMe();
 }
 function wire() {

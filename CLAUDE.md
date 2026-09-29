@@ -14,7 +14,15 @@ change adds or alters any of these. If it does, update the page(s) in the SAME c
 - the age audience (now 13+, under 18 with a parent's permission)
 - a MediaPipe upgrade: re-apply the "Poddle:" patch in web/vendor/mp/vision_bundle.js (usage logging to Google off);
   `node test/seo.test.mjs` fails without it
-Important changes also need a notice on the home page. Open questions for the operator are in NOTES.md 94.
+Important changes also need a notice on the home page (the one exception to "No announcement notices" below). Open questions for the operator are in NOTES.md 94.
+
+## No announcement notices (the owner's rule, 2026-09-29, NOTES 147)
+Never add a notice that announces a feature or a change: no "New: ..." toasts, what's-new popups, one-time "did you
+know" hints, NEW badges / dots / pills on tiles or buttons, banners or modals about something added. Features speak for
+themselves; the changelog page (the footer's "What's new" link) is where changes are listed. The only exception is a
+notice the Terms / Privacy pages legally promise for an important change to how data is handled (the leaderboard ones in
+profile.js lbNotice are these), and even then ask the owner before adding one. Toasts that answer something the player
+just did (a friend request arrived, a copy worked, an error) are fine: they are not announcements.
 
 ### Current data flows (diff new features against this)
 - Server (Fly.io, Toronto; memory): display name (12 chars), IP (4 courts per IP, 1 open tournament
@@ -78,7 +86,7 @@ Important changes also need a notice on the home page. Open questions for the op
   st only to a friend. The card's friend row (web/social.js): Add / Requested + Cancel / Accept + Decline / Friends + Remove (confirm), a friend's live status.
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140), poddle.friendsSeen (the one-time Friends notice was shown), poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat or Ranked queue entry; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`

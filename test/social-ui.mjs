@@ -98,14 +98,14 @@ const rowBtn = (pg, scope, name, t) => ev(pg, (s, n, t) => { const li = [...docu
 const posts = () => API.log.filter(l => l[0] === 'POST' && l[1] === '/api/friends').map(l => l[2]);
 const searches = () => API.log.filter(l => l[1].startsWith('/api/friends/search')).map(l => decodeURIComponent(l[1].split('q=')[1]));
 
-// ---------- A. signed in with a device id: the socket's hello brings the first snapshot. The home tile, the notice, the view ----------
+// ---------- A. signed in with a device id: the socket's hello brings the first snapshot. The home tile, no notice (NOTES 147), the view ----------
 let pg = await page('lobby', { seen: false });
 await pg.goto(HOME); await sleep(1500); await pg.click('#btn-start'); await sleep(3200);
 let r = await ev(pg, () => { const t = document.getElementById('btn-friends'); return { show: !!t && !t.hidden, n: document.querySelector('#lobby-home .tiles').dataset.n, line: document.getElementById('friends-line-text').textContent, badge: document.getElementById('friends-n').textContent, badgeOn: !document.getElementById('friends-n').classList.contains('is-off'), dot: !document.getElementById('friends-dot').hidden, seen: localStorage.getItem('poddle.friendsSeen') }; });
 ok(r.show && r.n === '7' && r.line === '3 online' && r.badge === '1 request' && r.badgeOn && r.dot, `home: the Friends tile (7 tiles), "${r.line}" with the dot, badge "${r.badge}" (${J(r)})`);
 let t = await toasts(pg);
 ok(!t.some(x => /sent you a friend request/.test(x)), `the first snapshot after the hello is silent (toasts ${J(t)})`);
-ok(t.includes('New: add friends and see who’s online') && r.seen === '1', `the one-time notice showed on the home screen and poddle.friendsSeen is set (${J(t)}, ${r.seen})`);
+ok(!t.some(x => /^New\b|add friends and see/i.test(x)) && r.seen === null, `no feature-announcement toast on the home screen (NOTES 147), and no poddle.friendsSeen key (${J(t)}, ${r.seen})`);
 ok(socks.some(s => s.frames.some(f => f.type === 'hello')), 'the socket said hello (the device id was there)');
 await shot(pg, 'home-desktop');
 // seven tiles lay out as 3 over 4 (landscape), 3 / 2 / 2 (portrait) or one column (phone): never a lone straggler, never wider than the window
