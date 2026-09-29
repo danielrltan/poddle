@@ -173,6 +173,10 @@ console.log('named look: Dan');
   ok(c.hair && c.eyes && !c.dan && c.skin === 0xf2c9a0 && c.shirt === 0xe5484d && c.kit === 0x20222c, 'setLooks([null, null]) gives the seat back its default look');
   c = await page.evaluate(() => { const sc = __scene; sc.setLooks(['dan', null]); sc.startAttract(); const u = sc._dbg.pads[0].avatar.userData, a = u.danFace[0].visible; sc.stopAttract(); return { attract: a, after: u.danFace[0].visible }; });
   ok(!c.attract && c.after, 'the attract rally is nobody: no named look there, and it comes back when the rally stops');
+  c = await page.evaluate(async () => { const sc = __scene, pd = sc._dbg.pads[0], u = pd.avatar.userData, edge = pd.mats.find(m => m.color.getHex() === 0x1b1d24);      // a look changing while the seat is faded (paused, away) must not keep the fade as its colours
+    pd.ghost = 1; sc.setLooks(['dan', null]); sc.setLooks([null, null]); let ms = 1e7; for (let i = 0; i < 60 && pd.ghost > 0; i++) sc.render(ms += 17);
+    return { ghost: pd.ghost, eye: u.eyes[0].material.color.getHex(), glow: u.danFace[0].material.color.getHex(), edge: edge ? edge.color.getHex() : -1, skin: u.skin.color.getHex() }; });
+  ok(c.ghost === 0 && c.eye === 0x20222c && c.glow === 0 && c.edge === 0x1b1d24 && c.skin === 0xf2c9a0, `a look changed while faded: the eyes, glow, paddle edge and skin all come back (${JSON.stringify(c)})`);
   c = await page.evaluate(async () => { const { lookFor } = await import('../web/scene.js'); return [lookFor('Dan', true), lookFor(' dAN ', true), lookFor('Dan', false), lookFor('Dan', undefined), lookFor('Danny', true), lookFor(null, true)]; });
   ok(JSON.stringify(c) === '["dan","dan",null,null,null,null]', `lookFor: only the registered username Dan (any case); a guest called Dan, Danny or an empty seat get none (${JSON.stringify(c)})`);
   await page.close(); }

@@ -302,7 +302,7 @@ const UI_STUB = `${REC}
   export const SHOTS = {}, shotName = k => String(k || '');
   ${UI_NAMES.map(n => `export const ${n} = call('${n}');`).join('\n  ')}`;
 const SCENE_STUB = `${REC}
-  export const coast = () => {}, coastTo = () => {}, hover = () => {}, serverClock = () => ({ reset() {} }), shownN = (n, kind) => kind === 'lob' || kind === 'dink' ? 0 : n;
+  export const coast = () => {}, coastTo = () => {}, hover = () => {}, serverClock = () => ({ reset() {} }), shownN = (n, kind) => kind === 'lob' || kind === 'dink' ? 0 : n, lookFor = () => null;
   export function createScene() { const V = { name: 'play', side: 0, spectator: false, menu: false, attract: false, frozen: false }, VIEWS = ['broadcast', 'split', 'pov', 'free'], o = { _dbg: { view: () => ({ ...V }) } };
     const impl = { setSide: s => { V.spectator = s === null; if (!V.spectator) { V.name = 'play'; V.side = s === 1 ? 1 : 0; } else if (V.name === 'play') { V.name = 'broadcast'; V.side = 0; } }, getView: () => ({ name: V.name, side: V.side }),
       setView: (n, s = 0) => { if (V.spectator && VIEWS.includes(n)) { V.name = n; V.side = n === 'pov' ? (s === 1 ? 1 : 0) : 0; } return { name: V.name, side: V.side }; }, setMenu: on => { V.menu = !!on; }, startAttract: () => { V.attract = true; }, stopAttract: () => { V.attract = false; }, setFrozen: on => { V.frozen = !!on; }, render: () => true };

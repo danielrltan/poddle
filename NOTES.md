@@ -2741,6 +2741,17 @@ The API's own default board (?b omitted) stays trophies; the page always asks fo
 - Tests: test/scene-next.mjs "named look: Dan" (colours, hair and eyes hidden, glow intact after ghostify, Matt unchanged,
   setLooks([null, null]) restores, attract rally, lookFor cases) and a front / back / Matt render
   (test/ui-shots/scene-next/dan-front-back-and-matt-1280x720.png). scene-preview.html takes `&dan=0|1`.
+- Follow-up after a verification workflow (a visual judge with 72 renders, a code review and a regression run, each
+  finding re-checked by a skeptic): (1) the headband's tails were rotated INTO the back of the head (rx +0.38 swings a
+  hanging end forward); now rx -0.12 and a little longer, so they hang clear down the back. (2) The band read brown on
+  its shaded side (the side a spectator mostly sees): a small emissive (0x4d2408, intensity 1, so ghostify fades it with the
+  rest). (3) The eyes are pure emission now (black base, roughness 1): no white sun highlight. (4) An older bug that
+  setLooks made common: paint() ran rebase(), which saved the current, possibly faded colours of EVERY pad material as its
+  base, so a look changing while the seat was paused / away left the next player with white eyes and a white paddle rim until
+  reload. paint() now updates only the bases of the materials it sets; rebase() runs once at build. scene-next checks it.
+  (5) test/menu.mjs's scene.js stub lacked the new `lookFor` export, so main.js failed to link and Part B crashed.
+  Pre-existing failures seen on 76d87fe and unchanged: ui-next 8, spectate-e2e 1, ranked-e2e 5 (one flaky), revive-e2e 1,
+  pad-e2e 1, menu 8 (plus 4 Ranked text checks that still expect the word "trophies", from 32c5549 on main).
 
 ## 138. The gold trophy replaces the word "trophies" everywhere in the game
 - NOTES 136 put the icon on the leaderboard and Your stats; now every place the game says trophy / trophies shows it:

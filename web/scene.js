@@ -239,7 +239,7 @@ function buildPaddle(side) {
 // counts (a guest typing "Dan" gets the normal look); usernames are unique and confusable-folded on the server, so only the
 // owner's account can carry it. Matt's seat and the menu's attract rally never take a named look.
 // To remove it: empty LOOKS. To turn it into cosmetics: have the server send each seat's look id instead of lookFor() here.
-export const LOOKS = { dan: { body: 0xf0f0f0, band: 0xff7a1a, glow: 0xff6f12 } };
+export const LOOKS = { dan: { body: 0xf0f0f0, band: 0xff7a1a, bandGlow: 0x4d2408, glow: 0xff6f12 } };      // bandGlow: a little self-light, so the band stays orange on its shaded side
 const LOOK_NAMES = { dan: 'dan' };                         // lower-cased registered username -> LOOKS key
 export const lookFor = (name, reg) => (reg === true && typeof name === 'string' && LOOK_NAMES[name.trim().toLowerCase()]) || null;
 
@@ -275,14 +275,14 @@ function buildAvatar(side) {
   // Dan's face (LOOKS.dan): the default eyes' shape, lit from inside (a near-black base, so the sun adds nothing and the orange
   // never washes to yellow), and a headband. The band is an open cone cut to the head sphere (r 0.27) between y 0.085 and 0.145,
   // a hair proud of it, above the eyes (their tops are at 0.056); the knot and two short tails hang at the back (+z).
-  const danFace = [], D = LOOKS.dan, glowM = new THREE.MeshStandardMaterial({ color: 0x140800, roughness: 0.4, emissive: D.glow, emissiveIntensity: 1 });
-  const bandM = new THREE.MeshStandardMaterial({ color: D.band, roughness: 0.7, side: THREE.DoubleSide });
+  const danFace = [], D = LOOKS.dan, glowM = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, emissive: D.glow, emissiveIntensity: 1 });      // pure emission: no sun highlight on it
+  const bandM = new THREE.MeshStandardMaterial({ color: D.band, roughness: 0.7, side: THREE.DoubleSide, emissive: D.bandGlow, emissiveIntensity: 1 });      // intensity 1: ghostify fades it to the same grey as the rest
   for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.036, 14, 10), glowM); e.scale.set(1.08, 1.6, 0.5); e.position.set(sx * 0.095, 0.0, -0.25); danFace.push(e); }
   const rAt = y => Math.sqrt(0.27 * 0.27 - y * y) + 0.007;
   const band = new THREE.Mesh(new THREE.CylinderGeometry(rAt(0.145), rAt(0.085), 0.06, 40, 1, true), bandM); band.position.y = 0.115;
   const knot = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 10), bandM); knot.scale.set(1.25, 0.9, 0.7); knot.position.set(0, 0.112, rAt(0.112) + 0.012);
   danFace.push(band, knot);
-  for (const sx of [-1, 1]) { const tail = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.17, 0.012), bandM); tail.geometry.translate(0, -0.085, 0); tail.position.set(sx * 0.022, 0.11, rAt(0.112) + 0.02); tail.rotation.set(0.38, 0, sx * 0.3); danFace.push(tail); }
+  for (const sx of [-1, 1]) { const tail = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.19, 0.012), bandM); tail.geometry.translate(0, -0.095, 0); tail.position.set(sx * 0.022, 0.11, rAt(0.112) + 0.02); tail.rotation.set(-0.12, 0, sx * 0.22); danFace.push(tail); }      // a negative x tips the hanging end out, away from the head
   for (const o of danFace) { o.visible = false; head.add(o); }
   const offHand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), skin); offHand.position.set(-0.42, 0.85, -0.12);
   // Everything above the ankles hangs off `upper`, so a crouch can sink and squash the body while the feet stay on the
@@ -697,7 +697,7 @@ export function createScene(containerEl) {
   // One tween value per pad (pd.ghost, 0.25 s each way) drives the SAME materials toward white: nothing is swapped, nothing is allocated per frame.
   const WHITE = new THREE.Color(0xffffff), GLOW_GHOST = new THREE.Color(0.3, 0.3, 0.3), TAG_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' }, tagTex = {};
   for (const pd of pads) { const seen = new Set(); for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (!seen.has(mt)) { seen.add(mt); pd.mats.push(mt); } }); rebase(pd); }      // (the paddle's face is a mesh with several materials)
-  function rebase(pd) { for (const m of pd.mats) { const b = m.userData.base; m.userData.base = { c: (b ? b.c : new THREE.Color()).copy(m.color), o: b ? b.o : m.opacity, t: b ? b.t : m.transparent, e: b ? b.e : m.emissive ? m.emissive.clone() : null }; } }   // the colours to come back to (paint() changes them when Matt or a named look takes a seat). e: the emissive, taken once (paint never changes it)
+  function rebase(pd) { for (const m of pd.mats) { const b = m.userData.base; m.userData.base = { c: (b ? b.c : new THREE.Color()).copy(m.color), o: b ? b.o : m.opacity, t: b ? b.t : m.transparent, e: b ? b.e : m.emissive ? m.emissive.clone() : null }; } }   // the colours to come back to, taken once at build (paint() updates the ones it sets). e: the emissive, taken once (paint never changes it)
   function ghostify(pd) {
     const k = ease(pd.ghost);
     for (const m of pd.mats) { const b = m.userData.base, t = b.t || k > 0 || pd.bodyM.has(m); m.color.copy(b.c).lerp(WHITE, 0.86 * k); if (b.e) m.emissive.copy(b.e).lerp(GLOW_GHOST, k); m.opacity = b.o * (1 - 0.5 * k) * (pd.self && pd.bodyM.has(m) ? SELF_A : 1); if (m.transparent !== t) { m.transparent = t; m.needsUpdate = true; } }
@@ -739,7 +739,7 @@ export function createScene(containerEl) {
     pd.matt = matt; const u = pd.avatar.userData, m = matt ? COL.matt : null, L = !matt && !at.on && LOOKS[pd.look] || null, skin = L ? L.body : m ? m.skin : COL.skin, shirt = L ? L.body : m ? m.shirt : COL.shirt[pd.side];      // Matt beats a look; the attract rally is nobody's
     u.skin.color.setHex(skin); u.shirt.color.setHex(shirt); u.kit.color.setHex(L ? L.body : COL.kit); u.hairM.color.setHex(m ? m.hair : COL.hair[pd.side]); for (const w of u.whites) w.visible = matt; u.hair.visible = !matt && !L; for (const e of u.eyes) e.visible = !matt && !L; for (const o of u.mattFace) o.visible = matt; for (const o of u.danFace) o.visible = !!L;      // Matt is bald, with his own eyes; so is Dan, with his headband
     pd.handM.color.setHex(skin); pd.ghostM.color.setHex(skin); pd.sleeveM.color.setHex(shirt);       // the hand on his paddle, and his forearm when a spectator looks through his eyes
-    rebase(pd); if (pd.ghost > 0) ghostify(pd);
+    for (const mt of [u.skin, u.shirt, u.kit, u.hairM, pd.handM]) mt.userData.base.c.copy(mt.color); if (pd.ghost > 0) ghostify(pd);      // only what paint set becomes the new base: a full rebase() while the seat is faded would keep every other part (eyes, paddle, band) white for good
   }
   // Whose eyes is the picture taken from? Their avatar is all but see-through (SELF_A) and their ghost forearm shown. -1: nobody's (broadcast, free, attract, a spectator's menu).
   const eyeSide = () => (at.on || (spectator && (menu || vName !== 'pov')) ? -1 : spectator ? vSide : localSide);
