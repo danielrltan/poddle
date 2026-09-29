@@ -1244,6 +1244,8 @@ export function rkTile(o = {}) {
   const em = $('ranked-em'), gate = o.gate === 'signin' || o.gate === 'username' ? o.gate : '', tier = gate ? 0 : tierOf(o.tier), n = Math.max(0, o.trophies | 0);      // gate (NOTES 133): Ranked needs a sign-in (and a username): the tile says so, the emblem dimmed
   if (em) { const d = tier ? divIn(n, tier, o.div) : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs', d); em.append(e); } setEmblem(e, tier || 1, d); e.classList.toggle('is-off', !tier); }
   setText($('ranked-line-text'), gate === 'signin' ? 'Sign in to play' : gate === 'username' ? 'Pick a username to play' : tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n} trophies` : 'Play your first match');
+  { const b = $('ranked-bar'); if (b) { b.hidden = !tier; if (tier) { const p = tier === RANKS.length ? 1 : Math.max(0, Math.min(1, (n - (THRESHOLDS[tier - 1] || 0)) / (DIV_W * 3)));      // the Ranked view's bar (rkView): through the rank's three divisions, Pro full (NOTES 143)
+    b.style.setProperty('--p', p.toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round(p * 100))); } } }
   const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
 }
 // the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.

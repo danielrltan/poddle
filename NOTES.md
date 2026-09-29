@@ -2879,3 +2879,8 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
 - The owner: unnecessary. The Ranks page (all eight medals, opened from Ranked's info button or the crest on Your
   stats) ended with a Play Ranked button that only went to the Ranked view; Back already returns to wherever the page
   was opened from (ui.js viewParent / ranksFrom). The page's keyboard focus on open is now the Back button.
+
+## 143. The Ranked tile shows the trophy bar
+- The owner's ask: the home screen's Ranked tile draws the Ranked view's progress bar (rk-bar, slimmer: .rk-tile-bar)
+  under its "Silver II · 240 [cup]" line: the same fill, through the rank's three divisions (Pro stays full), set in
+  ui.rkTile from the same tier / trophies. Hidden before a first Ranked match and behind the sign-in / username gate.

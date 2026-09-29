@@ -1971,6 +1971,7 @@ body[data-rk] .rally{background:rgba(255,255,255,.9)}
 .tiles .tile #ranked-em .rank-em{width:2.5rem;height:2.5rem;filter:drop-shadow(0 .125rem .1875rem rgba(20,60,90,.2))}
 #ranked-line .cup .cup-ic{width:1.3em;height:1.3em;scale:none;transition:none}      /* the trophy in the tile's line (NOTES 141): the tile icon's own size rules (.tiles[data-n] .tile svg, up to 6.5rem) must not reach it */
 #ranked-line{font-size:max(var(--t-sm),12px);font-weight:800;gap:.45em}
+.rk-tile-bar{display:block;width:min(14rem,100%);height:.625rem;margin-top:.375rem;border-width:.09375rem} .rk-tile-bar[hidden]{display:none}      /* the Ranked tile: the trophy bar under its line (NOTES 143), the Ranked view's bar, slimmer */
 .rkx-card.is-now{background:linear-gradient(180deg,#fff 0%,color-mix(in srgb,var(--rank-mid,var(--line)) 18%,#fff) 100%)}      /* your own rank's card, tinted in its colour */
 @media (prefers-reduced-motion: reduce){ .series .pips li.is-now,.rk-pill .rk-dot,.rk-pill .rk-dot::after,.rank-card-em.is-flip::after,.vs-card.is-ranked::after{animation:none!important} .vs-card.is-ranked::after{display:none} .trophy-em.is-up .rank-em{scale:1.12} }
 
