@@ -681,7 +681,7 @@ no streak change, no firsts, no bests), **ignored** (nothing recorded at all). S
 | R2 `revived` | First match of a court rebuilt by `revive()` (client-asserted score, side, bot level, pub; the 120 s window reopens after every deploy AND every autostop wake). Includes a revived human court that falls back to Matt (`addBot` → first `startMatch` still carries the taint) | `match.revived` | bot, human | unranked, no bests |
 | R3 `anon` | A seat that never had a non-anonymous identity during the match (stats off, old client, bad Origin) | `acc.ident === null` | seat | ignored for that seat |
 | R4 `anon_opponent` | Human match against a seat that was anonymous for the WHOLE match (no frozen identity). Never triggered by a mid-match downgrade (that is R6b) or by `gone` (3.3) | other seat `ident === null` | human, tour | unranked |
-| R5 `same_computer` | The two seats' computer SETS intersect after link-map canonicalisation (5.4): multi-tab, multi-browser, two devices on one home IP, one seat hopping to a VPN or hotspot mid-match, a browser seen on both its IPv4 and IPv6 key | `groups(A) ∩ groups(B) ≠ ∅` | human, tour | unranked |
+| R5 `same_computer` | RETIRED 2026-09-29 (NOTES 153; Q4 answered by the owner: "it's fine, just as long as its not same browser"). Two seats on one network count. One browser is still one person through R6 (device id, every cid, account). The computer groups remain for the per-network caps (R10 cpuPair, R11 cpuLoser), which now skip matches INSIDE one network (the owner-keyed R10/R11 still apply), and no longer merge people in R16 or the Ranked matchmaker | — | — | — |
 | R6 `same_device` / `same_account` / `same_cid` | Both seats share a device id hash, an account, or a cid (frozen identities, and every cid seen on either seat) | equality | human, tour | unranked |
 | R6b `ident_changed` | The seat's identity changed after it was frozen: a different device or account, or a reconnect that stayed anonymous (stats switched off, no hello) until the end (3.2) | `acc.identChanged` (or `pendingAnon` still set) | seat | THAT seat's win credit and bests are withheld; its LOSS is still recorded against the frozen owner; the opponent is judged normally on the frozen identities |
 | R7 `early_forfeit` | A forfeit (B-F) before `FORFEIT_MIN` total points were played. Default `ceil(WIN_AT / 2)` (6 at WIN_AT 11); `STATS_FORFEIT_MIN` overrides in tests only | `ending==='forfeit' && a+b < FORFEIT_MIN` | human, tour | unranked (no win for the stayer, no loss for the leaver) |
@@ -722,8 +722,11 @@ All failing ids are collected into `flags` (not just the first) so the log shows
 are informational.
 
 Known false positives, accepted:
-- Two people in one household or on one school/office network (one public IP) never get ranked human results
-  against each other (R5). Bot progress is unaffected. Q4 asks whether to relax R5 for two established accounts.
+- (Gone, NOTES 153.) Two people on one network used to never get ranked results against each other (R5). The accepted gap now runs
+  the other way: one person with TWO browsers on one computer, a private window (its own storage: a new device id, a new guest), or a tab
+  left seated while another tab signs out (the device id rotates) is two people. For casual play only NEW_GUEST_DAY (5.5) and R12 bound it,
+  because each private window is a new owner, so the owner-keyed R10/R11/R11b never repeat, and R11c is off in production. Ranked needs a
+  signed-in account with a username per seat, so there it takes two Google accounts, and R10 by owners applies.
 - A school lab with more than `NEW_GUEST_DAY` (30) first-time players on one public IP in 24 h: the extra players'
   first matches get `saved:false` until the next day (5.5). Play is unaffected.
 - Friends with a large skill gap: after 5 one-way ranked wins in 30 days, the stronger player's further wins over
@@ -755,7 +758,7 @@ Known gaps (documented, not solved):
 ### 5.3 Knobs (env, read once by `abuse.config`)
 | Env | Default | Tests | Production |
 | --- | --- | --- | --- |
-| `STATS_SAME_IP` | `1` (rule R5 on) | `0` disables R5 ONLY when both addresses are loopback (browser e2e tests that cannot set `fly-client-ip`) | ignored: `NODE_ENV=production` always applies R5 |
+| `STATS_SAME_IP` | removed with R5 (NOTES 153) | ignored | ignored |
 | `STATS_MIN_POINT_S` | `2.5` | `0` with `TIMESCALE` | honoured |
 | `STATS_FORFEIT_MIN` | `ceil(WIN_AT / 2)` | small numbers | ignored: production always uses `ceil(WIN_AT / 2)` |
 | `STATS_PAIR_DAY` | `3` | honoured | honoured |
@@ -764,7 +767,7 @@ Known gaps (documented, not solved):
 | `STATS_ESTABLISHED` | `1` (R11c on) | `0` disables R11c | production ignores `0` |
 | `NEW_GUEST_DAY` / `NEW_GUEST_HOUR` | `30` / `600` | honoured | honoured |
 
-Server integration tests that need RANKED human matches do not use `STATS_SAME_IP=0`: they send distinct
+Server integration tests send distinct
 `fly-client-ip` headers per simulated computer (test/rooms.test.mjs:19-20 pattern); the loopback peer makes the header
 trusted off Fly (section 3.5), and those addresses are then subject to the per-address limits like any other.
 

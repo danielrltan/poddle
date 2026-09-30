@@ -275,13 +275,17 @@ console.log('6. forfeit, drop, reconnect, no-show, never ready');
   ok(await until(() => k.got('closed', m => m.reason === 'away').length, 8000) && await until(() => j.res && j.res.won && eq(j.res.games, [1, 0]), 3000), `calibrating for CAL_S mid-series: closed away, a forfeit, the stayer's rkres (${JSON.stringify(j.res)})`);
   bye(j, k); await until(async () => (await status(P_GP)).courts === 0, 8000); }
 
-console.log('7. never paired: one computer, one device; a capped pair plays a friendly (no trophies); R10 counts series');
-{ const same = { addr: ip() }, a = await lobbied('', PORT, same), b = await lobbied('', PORT, same); await queue(a, 'A'); await queue(b, 'B');
-  await warm(b); await wait(2500); ok(inLobbyQ(a) && inWarm(b) && !a.got('rkvs').length && !b.got('rkvs').length && (await status(PORT)).rk.queued === 2, 'two entries from one computer group (one waiting in the lobby, one warming up) are never paired');
+console.log('7. one network pairs (NOTES 153); one device never; a capped pair plays a friendly (no trophies); R10 counts series');
+{ const same = { addr: ip() }, [n1, n2] = await pairUp(PORT, { lobby: true, a: same, b: same, na: 'N1', nb: 'N2' });
+  ok(n1.got('rkvs').length === 1 && n1.last('rkvs').vs.name === 'N2' && n1.last('rkvs').friendly === false && inMatch(n1) && inMatch(n2), 'two people on one network (one address, two devices) are paired, not as a friendly');
+  hit(n1); still(n2); ok(await until(() => n1.res && n2.res, 45000), 'their series plays out');
+  ok(n1.res && n1.res.counted === true && n1.res.delta > 0 && eq(n1.res.why, []) && n2.res.counted === true, `and it counts: the winner gains trophies (${JSON.stringify(n1.res && { counted: n1.res.counted, delta: n1.res.delta, why: n1.res.why })})`);
+  bye(n1, n2); await until(async () => { const s = await status(PORT); return s.courts === 0 && s.rk.queued === 0; }, 8000);
+  const a = await lobbied(); await queue(a, 'A'); await wait(500);
   const c = await lobbied('', PORT, { dev: a.d }); await queue(c, 'C'); await wait(1500);
   ok(inLobbyQ(c) && !c.got('rkvs').length && !a.got('rkvs').length, 'one device id on two computers: never paired with itself');
   const d = await lobbied(); await queue(d, 'D'); ok(await until(() => d.got('rkvs').length, 3000) && d.last('rkvs').vs.name === 'A', 'a clean stranger pairs with the oldest of them');
-  bye(a, b, c, d); await until(async () => (await status(PORT)).courts === 0, 6000);
+  bye(a, c, d); await until(async () => (await status(PORT)).courts === 0, 6000);
   // R10: three counted series between two owners today -> the fourth is a friendly. Seed the rows (one series of three games counts once)
   const dx = dev(), dy = dev(), ox = db.ownerForDevice(auth.deviceHash(dx), Date.now(), { create: true }), oy = db.ownerForDevice(auth.deviceHash(dy), Date.now(), { create: true });
   const row = (series, i, winner = 0) => db.recordMatch({ now: Date.now() - 1000 + i, kind: 'human', winner, ending: 'won', score: [1, 0], secs: 5, ranked: true, flags: [], mode: 'ladder', series, seats: [{ owner: ox, record: true, bests: false }, { owner: oy, record: true, bests: false }] });

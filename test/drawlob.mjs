@@ -5,7 +5,7 @@
 //   TEST_PORT=<port> node test/drawlob.mjs
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
-const { drawBall, serverClock } = await import('../web/scene.js');
+const { drawBall, serverClock, ballTake, ballState } = await import('../web/scene.js');
 const PORT = +process.env.TEST_PORT || 8189, root = new URL('..', import.meta.url).pathname;
 const proc = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0' } });
 const wait = ms => new Promise(r => setTimeout(r, ms)); await wait(700);
@@ -41,7 +41,7 @@ await wait(+process.env.DRAW_S * 1000 || 30000);
 A.ws.close(); B.ws.close(); proc.kill();
 const streams = shots.filter(s => s.i1 != null).map(s => ({ name: s.plan.name, msgs: log.slice(Math.max(0, s.i0 - 40), s.i1 + 30) }));
 
-// ---- replay: scene.js's onEvent / updateBall for the ball (what they store), then its drawBall() every frame
+// ---- replay: scene.js's own ballTake / ballState (what onEvent / updateBall store for the ball), then its drawBall() every frame
 class V3 { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
   set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } copy(o) { this.x = o.x; this.y = o.y; this.z = o.z; return this; }
   sub(o) { this.x -= o.x; this.y -= o.y; this.z -= o.z; return this; } length() { return Math.hypot(this.x, this.y, this.z); }
@@ -52,18 +52,10 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function replay(msgs, hit, { base, jit, fps, seed, hold = 0 }) {
   let rs = seed; const rnd = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
   const madeAt = serverClock().madeAt, vA = new V3();
-  const b = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new V3(0, 1, 0), vel: new V3(), core: new V3(0, 1, 0), err: new V3(), errT: 1, errDur: 0.1, blend: false, bounces: 0, kick: 0, curl: 0, held: false, spin: 0, arc: null };
+  const b = { p: [0, 1, 0], v: [0, 0, 0], live: false, stamp: 0, seen: false, snap: true, pos: new V3(0, 1, 0), vel: new V3(), core: new V3(0, 1, 0), err: new V3(), errT: 1, errDur: 0.1, blend: false, bounces: 0, kick: 0, curl: 0, held: false, spin: 0, arc: null, w: null, tS: NaN };
   let prevA = 0, lastT = null; const q = [];                  // arrival (local ms): made + base + jitter, in order (one TCP stream)
   for (const m of msgs) { const t = m.t != null ? m.t : lastT; if (t == null) continue; lastT = t; prevA = Math.max(prevA, 10000 + t * 1000 + base + rnd() * jit + (m === hit ? hold : 0)); q.push({ a: prevA, m }); }
-  const on = (m, now) => {
-    if (m.type === 'launch') { if (isFinite(m.spin)) b.spin = clamp(+m.spin, 0, 1); if (isFinite(m.k)) b.kick = +m.k; if (isFinite(m.c)) b.curl = +m.c;
-      if (m.v && m.p && b.seen) { b.p = [...m.p]; b.v = [...m.v]; b.stamp = madeAt(+m.t, now); b.blend = true; } }
-    else if (m.type === 'hit') { const p = m.p || b.p; b.blend = b.seen; b.snap = !b.seen; b.arc = m.v ? { t0: null } : null; b.spin = clamp(+m.spin || 0, 0, 1);
-      if (m.v) { b.p = [...p]; b.v = [...m.v]; b.stamp = madeAt(+m.t, now); b.bounces = 0; b.kick = +m.k || 0; b.curl = +m.c || 0; b.held = false; } }
-    else if (m.type === 'serve') { b.snap = true; b.arc = null; }
-    else if (m.type === 'state') { if (isFinite(m.spin)) b.spin = clamp(+m.spin, 0, 1); if (m.live && !b.live) b.snap = true; if (!m.live) b.arc = null;
-      b.bounces = m.b | 0; b.kick = +m.k || 0; b.curl = +m.c || 0; b.held = m.serving != null;
-      b.p = m.p; b.v = m.v; b.live = !!m.live; b.stamp = madeAt(+m.t, now); if (m.live) b.seen = true; } };
+  const on = (m, now) => (m.type === 'state' ? ballState(b, m.p, m.v, m.live, madeAt(+m.t, now), m.spin, m, +m.t) : ballTake(b, m, t => madeAt(t, now)));
   const out = []; let qi = 0, last = q[0].a, hitAt = null;
   for (let now = q[0].a; now < q[q.length - 1].a + 50; now += 1000 / fps) {
     while (qi < q.length && q[qi].a <= now) { const e = q[qi++]; on(e.m, e.a); if (e.m === hit) hitAt = now; }

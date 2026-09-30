@@ -9,7 +9,9 @@ const DAY = 24 * 3600 * 1000, HOUR = 3600 * 1000;
 const HUMAN = new Set(['human', 'tour']), BOTK = new Set(['bot', 'tourbot']);
 // Flags that unrank the whole match on their own. The per-seat ones (ident_changed, too_fast, afk, new_opponent,
 // paddle_teleport) act only through each seat's `record`; level_changed and swing_implausible are informational.
-const MATCH_WIDE = new Set(['legacy', 'revived', 'anon_opponent', 'same_computer', 'same_device', 'same_account', 'same_cid',
+// same_computer (R5: both seats on one network address) is RETIRED (NOTES 153): the owner wants two people on one network to count, only one BROWSER
+// (R6 same_device / same_account / same_cid) is one person. Old match_log rows may still carry the id.
+const MATCH_WIDE = new Set(['legacy', 'revived', 'anon_opponent', 'same_device', 'same_account', 'same_cid',
   'early_forfeit', 'leaver_ahead', 'pair_cap', 'feeder', 'one_way', 'daily_cap']);
 
 // computerKey(addr) -> what "the same computer" means (3.5): IPv4 whole, IPv6 its /64 (first four hextets, canonical),
@@ -42,12 +44,11 @@ function v6hextets(a) {                                                         
   const out = [...hs, ...Array(fill).fill('0'), ...ts].map(x => parseInt(x, 16));
   return out.length === 8 && out.every(x => Number.isInteger(x) && x >= 0 && x <= 0xffff) ? out : null;
 }
-const loopKey = k => k === 'local' || k === '0:0:0:0' || /^127\./.test(k);        // computer keys a loopback peer produces (127/8, ::1's /64, no address); only for STATS_SAME_IP=0 off production
 
 // rank(level) -> ladder position of a wire bot level (BOT_ORDER.indexOf), -1 for anything else
 const rank = level => BOT_ORDER.indexOf(level);
 
-// config(env) -> the knobs of 5.3, read once at boot. NODE_ENV=production forces the safe values (R5 always on, FORFEIT_MIN
+// config(env) -> the knobs of 5.3, read once at boot. NODE_ENV=production forces the safe values (FORFEIT_MIN
 // from WIN_AT, and a 0 for AFK/teleport/established ignored).
 function config(env = process.env) {
   const prod = env.NODE_ENV === 'production';
@@ -59,7 +60,6 @@ function config(env = process.env) {
   const afk = n('STATS_AFK_MIN', 2, 0, 1000), tele = n('STATS_TELEPORT_MS', 12, 0, 1000);
   return Object.freeze({
     production: prod,
-    sameIp: prod ? true : env.STATS_SAME_IP !== '0',                               // '0' switches R5 off only when both seats are loopback (browser e2e)
     minPointS: n('STATS_MIN_POINT_S', 2.5, 0, 600),                                 // R8, honoured everywhere
     forfeitMin: prod ? forfeitDef : n('STATS_FORFEIT_MIN', forfeitDef, 0, 1000),   // R7
     pairDay: n('STATS_PAIR_DAY', 3, 0, 1e4),                                       // R10
@@ -125,8 +125,8 @@ function judge(facts, history, cfg) {
     const [A, B] = seats;
     if (!live[0] || !live[1]) flag('anon_opponent');                              // R4: a seat anonymous for the WHOLE match (a downgrade is R6b; `gone` keeps its frozen identity)
     if (A && B) {
-      const loopOnly = s => { const k = setOf(s.computers); return k.size > 0 && [...k].every(loopKey); };
-      if (meets(A.groups, B.groups) && (c.sameIp || !(loopOnly(A) && loopOnly(B)))) flag('same_computer');   // R5
+      // R5 (one network address in both seats -> unranked) is retired, NOTES 153: a household, a school or an office on one address plays for real.
+      // One browser is still one person: its device id (R6), its tab (same_cid) or its account.
       const ia = A.ident || {}, ib = B.ident || {};
       if (hex(ia.devHash) && hex(ia.devHash) === hex(ib.devHash)) flag('same_device');                         // R6
       if ((ia.accountId != null && ia.accountId === ib.accountId) || (A.owner != null && A.owner === B.owner)) flag('same_account');   // one account, or one owner (a device merged into the other seat's account)
@@ -193,8 +193,8 @@ function titleCounts(members, champ, links, cfg) {
   const par = ms.map((_, i) => i), find = i => (par[i] === i ? i : (par[i] = find(par[i])));
   for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) {
     const a = ms[i].ident, b = ms[j].ident;
-    const same = meets(gs[i], gs[j]) || (hex(a.devHash) && hex(a.devHash) === hex(b.devHash)) || (a.accountId != null && a.accountId === b.accountId);
-    if (same) par[find(i)] = find(j);                                             // same computer group or same device/account: one person
+    const same = (hex(a.devHash) && hex(a.devHash) === hex(b.devHash)) || (a.accountId != null && a.accountId === b.accountId);
+    if (same) par[find(i)] = find(j);                                             // same device or account: one person (one network is not, NOTES 153)
   }
   const people = new Set(ms.map((_, i) => find(i))).size;
   const ok = !!champ && ms.includes(champ) && people >= 3 && num0(champ.rankedWins) >= 1;
@@ -274,6 +274,7 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
     // series; `series` (the one being played) is left out, so its own first game never caps its second (REVIEW FIX, RANKED.md 5.6)
     pair(ka, kb, series = null) {
       const ga = groupsOfNodes(nodesFor(ka)), gb = groupsOfNodes(nodesFor(kb)), cut = clock() - ttlMs, seen = new Set(); let n = 0;
+      if (meets(ga, gb)) return 0;                                                  // one network (NOTES 153): it is not one person, so the owners' own pair cap (pairRanked24h) is the cap
       hist.forEach((e, i) => { if (e.at < cut || !e.ranked || (e.series != null && e.series === series)) return; const w = groupsOfNodes(e.w), l = groupsOfNodes(e.l);
         if (!((meets(w, ga) && meets(l, gb)) || (meets(w, gb) && meets(l, ga)))) return;
         const k = e.series != null ? 's' + e.series : 'i' + i; if (!seen.has(k)) { seen.add(k); n++; } });
@@ -282,7 +283,7 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
     // loser(keys) -> { losses, distinctWinnerGroups } of this computer group in the last ttl, all results (R11 cpuLoser24h)
     loser(keys) {
       const g = groupsOfNodes(nodesFor(keys)), cut = clock() - ttlMs, winners = new Set(); let losses = 0;
-      for (const e of hist) { if (e.at < cut || !meets(groupsOfNodes(e.l), g)) continue; losses++;
+      for (const e of hist) { if (e.at < cut || !meets(groupsOfNodes(e.l), g) || meets(groupsOfNodes(e.w), groupsOfNodes(e.l))) continue; losses++;      // a loss to someone on the same network is not feeding (NOTES 153): the owners' R11 still sees it
         const wg = [...groupsOfNodes(e.w)].sort(); if (wg.length) winners.add(wg[0]); }
       return { losses, distinctWinnerGroups: winners.size };
     },
@@ -302,4 +303,4 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
   };
 }
 
-module.exports = { BOT_ORDER, MATCH_WIDE, computerKey, loopKey, meets, rank, config, judge, why, titleCounts, createLinks };   // MATCH_WIDE, loopKey, meets: read by the Ranked matchmaker and settlement (docs/RANKED.md 3.6, 5.5), never loosened
+module.exports = { BOT_ORDER, MATCH_WIDE, computerKey, meets, rank, config, judge, why, titleCounts, createLinks };   // MATCH_WIDE, meets: read by the Ranked matchmaker and settlement (docs/RANKED.md 3.6, 5.5), never loosened

@@ -3100,6 +3100,211 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
 - The profile card's leaderboard places (#12 Trophies, #3 Longest rally) sit on the name's line beside the hammer, not in a row of
   their own between the rank and the stats.
 
+## 151. A Sign in button in the menu header
+- The owner: "add a sign in button on the main menu area ... in the header, as you'd normally see in any other game website".
+  The lobby header's right end (.head-end: the online count, then #btn-head-acct) shows, wherever accounts exist (sign-in AND
+  the database, the same gate as the Friends tile): "Sign in" for a guest (opens the sign-in card, like Your stats' button),
+  "Pick a username" when signed in without one (the username card), or my username with a person icon when signed in (opens
+  Your stats). profile.js drawAcct keeps it in step with every sign-in / sign-out / rename. On a phone (<= 480 px) it is a round
+  icon (its name in the aria-label and tooltip) and the online count gives way; the title keeps its room at 360 px.
+- Nothing new is sent or stored: it calls the same signIn / claimCard / Your stats as the existing buttons (no legal change).
+
+## 152. The Friends tile's icon plays, like the other home tiles
+- "add the friend button css animation". Every home tile's icon plays on hover (looping) and on keyboard or pad focus (once): Quick play's arrow, Courts'
+  magnifier, the bot's head, the stats bars, the trophy, the podium. The Friends tile was the only one that stood still.
+- Now the two friends hop hello: the front friend first, the one behind 160 ms later, each from their own feet (`ic-greet`). Then the plus pops with a
+  quarter turn (`ic-add`; a plus turned 90 degrees looks the same, so the jump back at the start of each loop can't be seen). 1.7 s, the same easing as the
+  others. It goes where the other tiles' rules are in web/ui.css, so the rules they already have apply: a dimmed tile (no name yet, server down) stays still,
+  and reduced motion cuts it to one frame.
+- Checked in headless Chrome at 1280x720: while hovered, all four parts of the two friends run `ic-greet` and the plus runs `ic-add`, and the captured frames show the hop and the pop.
+  CSS only; nothing for the legal pages.
+
+## 153. Two people on one network: their matches count (R5 retired); one browser is still one person
+- "i noticed that matches dont count if u and someone is on the same network. fix that, it's fine, just as long as its not same browser"
+- Before: R5 `same_computer` (server/abuse.js judge) unranked any human match whose two seats' computer groups met. A computer key is the public IPv4,
+  or the IPv6 /64, and a home router gives the whole house one. So a household, a school lab or an office never had a counted match against each
+  other, and the Ranked matchmaker (game.js rkSame) never even paired them. This was docs/ACCOUNTS.md's "accepted false positive" (Q4); the owner has now
+  answered Q4.
+- Now R5 is gone: the `same_computer` flag is no longer raised (it is off MATCH_WIDE; old match_log rows may still carry it). One browser is still one
+  person, through the rules that were already there: `same_device` (the browser's poddle.device id, shared by every tab and window of one browser
+  profile), `same_cid` (one tab, including a tab that reconnected through a VPN) and `same_account` (one account or one owner). All three still unrank,
+  and the card still says "self".
+- The other places that treated "one network" as "one person" follow:
+  - rkSame (Ranked matchmaker): two entries on one network may be paired. One device, account or owner still never pairs.
+  - titleCounts (R16, a tournament title needs 3+ people): people are counted by device and account, not network. A tournament among three people in
+    one house can give a title.
+  - The link map's per-network caps: `pair()` (R10 cpuPair24h, also rkFriendly) returns 0 for two keys in ONE group, and `loser()` (R11 cpuLoser24h)
+    skips losses to a winner on the same network. Without that, every match in a house would count toward one shared cap of 3 a day, and a sibling who
+    keeps losing to another would soon look like a feeder. The owner-keyed R10 (3 counted series a day per pair of players, then a Ranked friendly),
+    R11, R11b, R11c and R12 still apply to them. Across two networks, the computer-keyed rules work as before.
+  - Removed as dead: the `STATS_SAME_IP` knob (`config().sameIp`) and `loopKey`, which only existed to switch R5 off for loopback e2e runs (ranked-e2e
+    no longer sets it).
+- Where "not the same browser" cannot be enforced (told to the owner): the server knows a browser only by its device id, its tab ids and its account.
+  These all count as two people now:
+  - two different browsers on one computer (Chrome and Safari);
+  - a private window of the same browser (its own storage, so a new device id and a new guest);
+  - a tab that stays seated while another tab of that browser signs out (sign-out rotates poddle.device, and the two tabs never shared a cid).
+  Casual farming by one person this way is bounded only by NEW_GUEST_DAY (30 new guests per network a day, 5.5) and R12 (30 counted wins a day per winner).
+  The owner pair caps don't bite, because every private window is a new owner, and R11c is off in production. It can feed the win rate and the
+  "best win streak vs people" board. Ranked is safer: each seat needs a signed-in account with a username, so it takes two Google accounts, and R10 by
+  owners makes a pair's 4th series of the day a friendly.
+- Legal: Terms' fair-play line now says matches where both players share the same browser or account may not count (before: "the same network or the
+  same browser"). In the Privacy IP-address row, the Ranked "avoid pairing ... the same computer or network" is gone. The match-end address comparison is
+  now said to be for the daily limits on repeated matches between networks, with a sentence that two players on one network count. No new data, no new
+  storage. The dates were already September 29, 2026. No home-page notice: this relaxes a rule and hands over no new data (NOTES 147 rule). Changelog
+  entry added. docs/ACCOUNTS.md (R5 row, the false-positive note, the knob table), docs/RANKED.md (never-paired row) and CLAUDE.md's data flows are updated.
+- Tests: accounts-unit covers one network ranked (production config too), one network plus one device id unranked as same_device, one network plus one
+  tab unranked as same_cid, a title with two members on one network, and pair()/loser() skipping one network while still counting across two.
+  stats.test 5 and 18 now expect ranked. ranked.test 7: two people on one address are paired (not as a friendly), play a series, and it counts (+33
+  trophies, no reasons). One device id on two computers still never pairs.
+  All pass solo: accounts-unit, stats, ranked, ladder, seo.
+
+## 154. A re-aim bends the ball smoothly onto the flight it always had; the screen no longer stalls on a correction; the ball lands on its marker
+- "The mechanics for the swings are messed up. They get recalculated post hit, causing the ball to swerve like every time. That millisecond of changed
+  trajectory makes the game feel janky and inconsistent. Find a way to preserve game mechanics while cleaning up ball trajectories and calculations."
+- Measured first (3 real captures x 300 s through the real web/motion.js into the real server, 235 of my hits): every one is struck on its bet (66) and
+  the settled report re-aims 87% of them ~100 ms later (p90 133, max 250), moving the landing p50 0.57, p90 2.28, max 4.09 m (63). That rule stays. What
+  made it read as a swerve was how the move was flown and drawn:
+  - Server: easeAim() moved vx / vz in equal shares over 0.1-0.45 s, re-aiming every tick. The pull switched on in ONE tick (the first tick after the
+    re-aim: p50 1.6, p90 7.1, max 13.7 m/s^2), grew ~2x (per hit p50 1.9x, p90 4x) and cut to nothing; its biggest one-tick change p50 3.4, p90 11.2, max 23.8 m/s^2. A settled
+    hard swing's swoop switched a steady pull on mid-flight, another step.
+  - Screen: the re-aim's `launch` carried the server's CURRENT p v t (nothing jumped), yet set blend. drawBall() measured the correction from where the
+    ball was drawn LAST frame against the truth NOW, so a frame of real travel counted as error and was eased out on a smoothstep: the ball stood still
+    for a frame (0.09x its speed, 0.17-0.27 m behind), then surged 1.3-1.4x for 5-10 frames. Drawn peak 775-995 m/s^2 against 72-117 for the same hit
+    without the re-aim. The same freeze on EVERY hit at contact and whenever the height arc ended (131 of 235 in mid-air). The marker teleported and
+    popped again on every re-aim, even when it barely moved. coast() knew nothing of the ease, so the drawn ball learned the bend packet by packet.
+  - The sim stepped y v-then-p, so the server's ball ran g dt t / 2 under the closed form solve(), fallLeft() and coast() all use (0.14 m by a lob's
+    bounce), and it found the floor up to a tick late, up to 0.25 m past the marker.
+- Now (server/game.js):
+  - reaim(): the move is one bend (`bent()`, `ball.bend`): the new velocity comes in on a smoothstep over the old ease's own window (BEND: half the hang
+    the ball has left, 0.1-0.45 s, whole ticks), then the ball flies straight on. Its pull is 0 at the re-aim (it fades in, no step) and 0 again when
+    the window ends; the ball lands exactly on the marker, and reaches it with the heading and pace the ease gave it. easeAim, `ball.aim`, FIX_EASE,
+    FIX_SHARE and FIX_EASE_MAX are gone.
+  - Tried first and dropped: one bend over the whole hang (d phi(tau), phi = 2 tau^3 - tau^4), the gentlest pull there is. A pull that fades in over the
+    whole hang has to end harder: the ball reached the bounce with 2 d / T of extra velocity where the ease gave ~1.33 d / T, so it came off the bounce
+    somewhere else. Replaying the captured hits through both servers (below), same marker: the receiver's meeting point moved p90 0.43, max 0.91 m; 37
+    re-aims asked the receiver to go wider than REACH against 27; Matt returned 57 more of 2360 at Club and 67 fewer at Tour. Where the receiver has to go
+    on 87% of human shots is a mechanic, so the window is the ease's. With it: meeting point p90 0.02, max 0.05 m off main's; heading off the bounce p90
+    0.2 deg off; 27 wider than REACH, as on main; Matt's returns identical at Rookie (448), Club (1217) and Pro (2305), 1846 against 1838 at Tour. The
+    cost: the pull peaks where the ease's did (real hits p50 / p90 / max 3.4 / 11.7 / 23.6 m/s^2, ease 2.9 / 11.0 / 22.7; the whole hang 2.5 / 10.1 /
+    19.7). What is gone is the step: the biggest change in one tick is 0.50 / 1.92 / 3.63 m/s^2 (ease 2.9 / 11.0 / 22.7).
+  - The swoop (a settled full-power drive, NOTES 72) keeps its landing rule exactly (cReq against cMin the hook way, |x| <= 2.5). Its sideways part is bent
+    in over the whole hang left, as its steady pull ran (and it ends at 2 d / T, as that pull did), but fading in: a pull switched on mid-flight was a
+    step. Along it takes the window like any re-aim. `ball.curl` stays what the ball was struck with (0 for a bet); a ball struck curling keeps its curl.
+  - A second re-aim of one ball (a legacy client with no `final`, or fixBlock twice) adds its own bend and the first one's pull runs on. Replacing it
+    dropped that pull to nothing in one tick (the ease did the same: ~21 m/s^2 to 0.7 in a legacy client's two fixes 7 ticks apart).
+  - The net: the crossing is found on the bent flight itself (halving) and the sealed height there must clear; a landing the sealed ball cannot reach
+    over the net is walked deeper 0.1 m at a time to 6.2 m as before, none: it flies as struck. The ease's check took the crossing at the average pace
+    (and the as-struck pace had to clear too), too slow for a ball slowing onto a shorter landing, so it walked on further than it had to. So some
+    landings change, all nearer the settled aim: 33 of 208 re-aims of the real captures land 0.10-0.40 m shorter (p50 0.20); 484 of 5549 sampled
+    re-aims; 12 sampled late re-aims the ease gave up on (its walk ran out) now fly, and 7 of 6000 sampled shots end as another kind (such a late
+    re-aim can be announced, a smash included). Every one clears net + clear (lowest margin 0.000 m, on the real and the sampled hits).
+  - FIX_ALONG 0.1, a guard: a re-aim never stops the ball or turns it back along the court (`alongFloor()`: the landing moves deeper to where it keeps
+    exactly 0.1 of its pace, the marker with it), so z runs one way and the net has one crossing. It fired on 0 of 208 real re-aims, 0 of 5549 sampled,
+    0 of 1164 sampled late near-net pushes; the slowest kept 0.64 / 0.14 / 0.14 of its pace (the ease 0.63 / 0.13 / 0.11). A floor of 0.3 (tried with
+    the whole-hang bend) fired on 13% of near-net pushes and landed a settled soft push up to 1.7 m deeper than its push curve (push.test's bet 33 ->
+    settled 8: 1.91 -> 2.93 m); now 1.91, as on main.
+  - flight(): every step of the sim is the closed form (y too: + g h^2 / 2), and a tick that reaches the floor stops the ball ON the landing, bounces it
+    there and flies the rest of the tick up (`ball.rest`). The server's ball is now exactly what solve(), fallLeft() and coast() compute. solve()'s REACH
+    margin for the old late tick is kept.
+  - planFootwork(side, tb) flies the same flight(), the bends and the exact bounce included, from the time the ball's p v are at: the receiver and Matt
+    go where the ball really goes. The receiver is planned again when the bend's window ends, as the ease's end did (every plan restarts Matt's reaction
+    clock, so Matt is no quicker on a re-aimed human shot than he was); sim() plans before its step, where the ball is still a tick back (flown a tick
+    ahead, the whole-hang bend's replan was up to 0.13 m off on the real hits). The last plan against where the ball is really met: max 0.04 m (main 0.03, 120 Hz steps).
+  - The wire: `launch` and `state` carry the bends while one is still bending the ball before the bounce, `w: [vx, vz, W, t0, ...]` (four numbers a
+    bend, t0 in the packets' own t). The hit never carries one: a bend starts at a re-aim. An old tab ignores it and learns the bend from the state
+    packets, as it did the ease; until it reloads it also keeps the old re-aim freeze and marker pop, and its height arc (anchored for the old
+    v-then-p sim) sits up to 0.14 m under a lob near the bounce until the arc's end corrects it. Cosmetic, and gone on reload.
+  - At most BEND.most (6) bends at once: a client flooding settled reports (MSG_DROP lets through ~50 in a FIX_WINDOW) piled up one or two a report,
+    18-75 of them (12x the state packet, ~10x the CPU for that hit); past 6 a re-aim is refused and the ball flies as it is aimed. A legacy
+    client's few fixes never get near it.
+- Client (web/scene.js):
+  - `ballTake()` / `ballState()` (exported) are what a message does to the ball record; onEvent / updateBall call them, and so do test/drawlob.mjs,
+    test/bend.test.mjs and the swerve harness, so no hand copy can drift.
+  - A re-aim `launch` takes p v t and w as they stand: no blend.
+  - drawBall(): a correction is measured from where the drawn ball would be THIS frame had it flown on as the truth did, and the smoothstep that takes it
+    out starts flat, so the drawn ball moves as the truth moves on that very frame. The truth a frame ago:
+    - a hit that brought its flight: the truth turned at the hit's OWN time (`b.turn`), even when the next tick came in the same frame (a TCP burst; at
+      30 fps every other hit). Taken from the newest record, it flew on the old way through the whole frame, 0.10-0.35 m on toward the hitter, then
+      surged 1.4-1.6x; now 0.000 m.
+    - anything else: the record's own flight, coasted on when it is older than a frame, else run back along it, at the velocity it had before a bounce
+      it has not reached, and back to the floor it just came off and then at last frame's velocity (the one it came down at). Run back at the
+      velocity from past the bounce, the ball was drawn rising before the floor on the frame the arc ended (up to 0.17 m above the server's ball, p50
+      0.06); now 0.003 m at most.
+    - an old server's hit (no flight on it): last frame's velocity until the news, as before.
+    - a link silent past COAST_MAX: measured from the unclamped age, the truth did not move and the ball no longer lurches 11 cm on when the arc ends.
+  - coast() / coastTo() fly the bends (the share of W gone read off the packet's own server t, so no other clock), and with the server's exact steps
+    coast() IS the server's ball, bounce included. The height arc anchors on the truth's own vy (the SIM_DT offset is gone).
+  - The landing marker glides 0.2 s (eased) to a re-aim's new landing, no second pop; a fresh shot's landing still pops.
+- Measured after, live, this change alone (before 155; the same 3 captures x 300 s, the same analysis on main's client for before; different
+  rallies, so landings are "the same rule"): p50 / p90 / max over the re-aimed hits.
+  - Server: first tick after the re-aim 1.6 / 7.1 / 13.7 -> 0.26 / 1.05 / 2.06 m/s^2; biggest one-tick change 3.4 / 11.2 / 23.8 -> 0.50 / 1.98 / 3.88;
+    peak 3.5 / 12.6 / 23.8 -> 3.4 / 12.0 / 25.4; heading change 1.8 / 14.4 / 41.2 -> 1.8 / 15.7 / 40.0 deg; landing moved 0.57 / 2.28 / 4.09 -> 0.59 /
+    2.33 / 4.17 m.
+  - Drawn (40 ms, 60 fps): peak accel 775 / 893 / 995 -> 3.4 / 11.9 / 25.3 m/s^2, the server ball's own; the same hit without a re-aim 72.5 -> 0.0. The
+    re-aim frame 0.09x -> 1.00x its speed (the catch-up 1.28 / 1.43 max -> 1.00 / 1.20); contact 0.09x -> 1.00x; the arc's end 0.09x -> 0.92x p50 (the
+    bounce's own 0.78 along is in it). 120 fps: 1446 / 1953 -> 3.4 / 25.3 m/s^2, freeze 0.03x -> 1.00x. 30 fps: 336 / 503 -> 3.4 / 25.0, freeze 0.26x ->
+    1.00x. 80+60 ms jitter: 832 / 1498 -> 223 / 286, the same as the hit drawn without its re-aim (the jitter's own).
+  - coast() against the server's own steps: worst 13.4 cm -> 0.0 cm over 0.6 s (test/coast.test.mjs, now held to 1 cm). The marker against where the
+    ball really bounces: worst 0.15 -> 0.00 m live (p90 0.11; 469 hits on main, 731 after; 0.13 in helium.test). Lobs top out where solve() designed them: drawn apex 4.07 -> 4.16 m.
+- Measured the same input on both servers (the review's replay, kept for the next one): each captured hit (contact point, bet, every later report at its
+  own tick) and 6000 sampled bet -> settled pairs run through the real createRoom() of main with only the exact flight added, of the whole-hang bend,
+  and of this; Matt receiving at each level with 10 seeds. The figures above come from it.
+- Kept: the re-aim's triggers (only the settled report, once; FIX_WINDOW, PUSH.fix / gate, the late push, fixBlock, the serve's settled swing, legacy
+  no-final clients), the sealed height (vy never rises after the paddle: helium, drawlob), the kick rescale, the kind / n announcements (the late
+  smash ignites the trail, no second impact), stats.fixRecords, the swoop's landing rule, the push curve's landings, Matt's timing. Bots are never
+  bets and never re-aimed. No data flow changed: nothing for the legal pages. No notice; a changelog line.
+- Tests: new test/bend.test.mjs. In process: sim()'s own flight() + bent() stay on the closed form and land on the marker; the pull starts from nothing
+  and changes by at most its own slope a tick; coast() flies the bend to 0.00 mm; two bends at once never step and land on the second marker;
+  alongFloor() keeps exactly 0.1 of the pace and leaves a reachable landing alone. Live: every kind of re-aim (a legacy client's two included) fades in
+  and never steps, lands on its marker, never stops along the court, coast() from the re-aim packet alone follows it to the bounce, and the real
+  drawBall() (60 / 120 / 30 fps, the hit's tick held back into the next one's frame too) draws the re-aim frame and the arc's end at 0.6-1.6x the server
+  ball's own step, the contact frame at 0.6x or more (a late contact's slide, or a hit that came in late, may add speed after) and never on past the
+  server's ball toward the hitter. Against main's server it fails the fade-in, the step, the marker (0.02-0.12 m off) and the prediction (2.38 m).
+  test/drawlob.mjs replays through the exported ballTake / ballState. The sim copies in coast, curve, badwifi and server.test fly sim()'s own flight();
+  coast.test's tolerance goes from 25 cm to 1 cm. curve.test: the swoop is the re-aim's bend, measured as how far its bends carry the ball sideways by
+  the bounce (at least 0.3 m; 1.7-1.9 m here), the near-net swoop now needs a 0.3 m bow too (it had no bow check), and a ball lands within 3 cm of its
+  marker (was 0.12 / 0.3 m, for the old late tick). helium.test: the marker within 2 cm (was 0.15); a hard bet settled as a tap still lands deeper than
+  3.5 m (4.14; main walked on to 4.91), and now crosses within 1 cm of net + clear, which pins the exact crossing (the average-pace check gave 1.8
+  cm). lagcomp's line says bent, not eased. A swoop switched off, or the net crossing taken at the average pace, now fails curve.test / helium.test.
+  Pass: coast, badwifi, lobbet, curve, helium, drawlob, bet, bend, lagcomp, feel, push, kitchen, deep, slice, serve, real; reaim and latesmash measure
+  (bent once, 0 twice; the late smash still ignites 98-121 ms on). Also pass: bot, countdown, watcher, joinreq, stats, ranked, rooms, ladder, records,
+  seo, kinds, strokes, emote, revive, spin, smooth. server.test (54 failures, main 49 on the same run): the same teleport and scoring failures; new,
+  its scripted 'high' whiff (a dink, paddle at 0.3 m) is met by the receiver's exact footwork at dy 1.00, inside the server's reach box (0.95 + 0.5 n)
+  but outside the test's own ZONE-only check, where on main that case ended with no point at all. Browser, with a local headless Chromium:
+  test/hitblend.mjs turns the ball on the frame the hit arrives (drawn z 1.35 -> 1.30 -> 0.94; an old server's hit without v now keeps flying at last frame's velocity on the event frame, where it stood still,
+  largest step unchanged at 0.27 m); its
+  sliced-trail check fails here on main's client too. test/scene-next.mjs timed out here waiting for its page (not run).
+
+## 155. The bet aims on its own: a first report no longer carries the wind-up's direction
+- The other half of "the ball swerves after the hit" (154). The bend is now smooth, but its size is the gap between the bet and the settled report,
+  and the widest ones were sideways: 63 of 205 re-aims in 154's captures turned the ball more than 0.1 of dir: heading p50 4.6, p90 30 deg, up to 4.0 m across.
+- Cause (web/motion.js): the bet read its aim off sw.sum, the settled report's rate-weighted turn, which is seeded with the two samples before the
+  trigger. When the stroke loops out of a wind-up (the `mvR` start) the seed and the first samples still turn the wind-up's way: bets of 0.34, 0.45
+  and 0.77 settled at -0.96. 22 of 89 scored real bets fire within 50 ms of the movement's start (sensor clock).
+- Now the bet computes its own aim: the turn since the trigger (no seed), measured from the wind-up's own angular velocity when the hand was already
+  moving (`wB`, the same "wound" test that picks mvR), plus BET_AHEAD (2) samples of where it is heading (this sample carried on by its last change).
+  Only the bet's `dir` changes. sw.sum, sw.dir and every later report are untouched: over 3527 swings (the 3 real captures, AirPod and phone gain,
+  lobsynth x 12 seeds, strokes.mjs-style strokes) every settled report is bit-identical, every in-between fix and swingEnd too, and every bet fires on
+  the same sample. Power, lob, roll and spin of the bet are unchanged, so a bet still never smashes and a flick stays soft.
+- Measured, |bet dir - settled dir| on the real captures (132 bets): p90 0.26 -> 0.14, mean 0.13 -> 0.07, worst 1.71 -> 1.11, off by more than 0.3:
+  12 -> 6. Leave one capture out (fitted on two, tested on the third), the same setting sits on a flat optimum (held-out means 0.089 -> 0.055, 0.199 ->
+  0.102, 0.153 -> 0.099). Gyro noise up to 0.3 rad/s keeps the gain (p90 0.25 -> 0.17). lobsynth strokes: p90 0.22 -> 0.14 (AirPod), 0.23 -> 0.15 (phone).
+- End to end (the real motion.js into the real server and the real client, 3 captures x 300 s; before, main and 154 alone: 5 runs; after, this tree: 3 runs, 634 re-aims):
+  sideways landing move p90 1.19-1.43 -> 0.93 m (0.81-0.97 a run); heading change p90 11.4-16.1 -> 7.1 deg; landing moved p90 2.28 -> 1.69 m. The
+  worst move a bet's direction causes 4.1 -> 2.7 m (a settled full-power swoop can still move a landing 3.4 m, as on main, 41 -> 33 deg). With 154
+  as well: the pull's first tick 1.7 / 7.1 / 13.7 -> 0.27 / 0.85 / 1.43 m/s^2, its biggest one-tick change 3.5 / 11.2 / 24.4 -> 0.50 / 1.59 / 2.69,
+  its peak 3.6 / 12.5 / 24.4 -> 3.1 / 10.5 / 19.4, the drawn ball's 761 / 895 / 995 -> 3.0 / 10.5 / 19.3; the marker 0.00 m from the bounce. How often a hit is re-aimed does not change (87%): power still decides that, and no bet-only power
+  estimator beat the current one on a held-out capture (look-ahead scaling, blends with the earned power, shrinking to a prior, time-to-peak): 63's
+  "there is no conservative bet" still holds, so power is left alone.
+- Limits: 132 real bets from one player; the worst reversal bets are about six swings. Some are still far off (a reversal that has not started by the
+  bet sample cannot be seen), and 38 of 132 real bets get a little worse, 2 by more than 0.1 (at most 0.15), none newly past 0.3. Tuned on the
+  50 Hz AirPod captures: resampled to 60 Hz (a phone on iOS) the mean goes 0.156 -> 0.090, to 100 Hz 0.160 -> 0.116 (upsampled data is smoother
+  than a real stream; BET_AHEAD counts samples, not time). An in-between fix ~60 ms after the bet still carries sw.dir to a swing that has not
+  met the ball yet (worse in 3 of 59 real cases, better in 19). A serve struck on its first report uses the new aim; the serve's decisions read the
+  settled dir, as before.
+- Tests: lobbet, lobsynth, spin, strokes, kinds, effort, onset, bigswing, zigzag, zigzag-power, smooth, rom, padmotion, phone-jitter and real.mjs
+  print the same as before (real.mjs "dir within 0.3": FLICK 26 -> 27 of 27, FAST 10 -> 13 of 17 on live-play-1).
 ## 156. Your own name on the left instead of "You"
 - The owner's ask: the scoreboard's left slot read "You"; it now shows the player's own name, since the left is always
   yours. main.js meName(): the server's name for your seat (what everyone else reads: your username if signed in with

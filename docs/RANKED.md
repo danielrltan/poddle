@@ -674,7 +674,7 @@ A, B, C in parallel from the start (A is the long pole). D starts at once on the
 | A third drop, or `2 x HOLD_S` held in all; `2 x CAL_S` calibrating in all | that seat's forfeit (REVIEW FIX) |
 | `rk` while already queued | a fresh `rk` snapshot |
 | `&back=1` or `revive()` for an rk court | never revived; `rkend restart|gone` |
-| Same device / account / owner / computer group | never paired |
+| Same device / account / owner | never paired (one computer group may pair since NOTES 153) |
 | Pair capped by R10 / R11b | paired as a friendly (announced), no trophies |
 | A series with an uncounted game | trophies 0 both, the `WHY` word |
 | Forfeit with no counted game | leaver −loss, stayer 0 `left_early` (the forfeited game's own `early_forfeit`/`leaver_ahead`/`afk`/`too_fast` never count against the stayer, REVIEW FIX) |

@@ -1,5 +1,5 @@
 // Server side of early swing reports: lag compensation by `age` (the ball is struck where it WAS, never from behind the
-// player), power corrections (`fix`, eased in), and no added latency. Usage: node test/lagcomp.mjs
+// player), power corrections (`fix`, bent in: NOTES 154), and no added latency. Usage: node test/lagcomp.mjs
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
 const PORT = +process.env.TEST_PORT || 8171, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT, AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0' } });
@@ -52,7 +52,7 @@ if (ah.length && al.length === 2) {
   let kink = 0, steps = 0;                                // velocity change between packets after the hit packet, gravity removed
   for (let i = ah[0].i + 1; i < a.st.length && a.st[i].at - ah[0].at < 450; i++) { const A = a.st[i - 1], B = a.st[i], d = B.t - A.t;
     const k = Math.hypot(B.v[0] - A.v[0], B.v[1] - A.v[1] + G * d, B.v[2] - A.v[2]); kink = Math.max(kink, k); if (k > 0.05) steps++; }
-  ok(kink < 3 && steps >= 5, `the fix is eased in: largest velocity step ${kink.toFixed(2)} m/s, spread over ${steps} packets (was one ~7 m/s step)`);
+  ok(kink < 3 && steps >= 5, `the fix is bent in, never stepped (NOTES 154): largest velocity step ${kink.toFixed(2)} m/s, spread over ${steps} packets (was one ~7 m/s step)`);
 }
 const bh = mine(b, 2, 'hit');
 ok(bh.length === 1 && Math.abs(bh[0].n - 24 / 28) < 0.01 && mine(b, 2, 'launch').filter(e => e.at - bh[0].at < 400).length === 1, `fix before contact: one hit, one launch, on the corrected power (n=${bh[0] && bh[0].n.toFixed(2)})`);
