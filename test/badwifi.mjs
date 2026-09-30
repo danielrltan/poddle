@@ -16,9 +16,9 @@ const packets = []; let t = 0;
 { let side = 0, p = [1, 0.9, 6.2], sol = S.solve(p, side, 0.5, 0.2, 0.1, 0), v = [...sol.v], b = 0, shot = 0;
   while (packets.length < 60 * 180) {
     packets.push({ t, p: [...p], v: [...v], b, spin: sol.spin, kick: sol.kick, curl: b ? 0 : sol.curl, shot, to: 1 - side });
-    const c = b ? 0 : sol.curl; v[0] += c * DT;                                    // a hard flat drive curls until it bounces (NOTES 71), exactly as sim() flies it
-    v[1] -= (b ? S.G : S.gOf(sol.spin)) * DT; for (let i = 0; i < 3; i++) p[i] += v[i] * DT; p[0] -= 0.5 * c * DT * DT;
-    if (p[1] < S.R) { p[1] = S.R; if (b) S.bounceV(v, 0, 0); else S.bounceV(v, sol.spin, sol.kick); b++; }
+    const g = b ? S.G : S.gOf(sol.spin), h = Math.min(DT, S.fallLeft(Math.max(p[1], S.R), v[1], g));   // sim()'s own flight(): a hard flat drive curls until it bounces (NOTES 71), the floor met where it is (NOTES 154)
+    S.flight(p, v, h, b ? 0 : sol.curl, g, null, t);
+    if (h < DT) { p[1] = S.R; if (b) S.bounceV(v, 0, 0); else S.bounceV(v, sol.spin, sol.kick); b++; S.flight(p, v, DT - h, 0, S.G, null, t + h); }
     t += DT;
     const rs = side === 0 ? -1 : 1;                                                 // the receiver's end
     if (p[2] * rs >= 6.2 || b >= 2) {                                               // it got there: hit it back
