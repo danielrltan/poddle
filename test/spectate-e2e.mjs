@@ -92,7 +92,7 @@ await a.click('#name-input'); await type(a, 'Ann'); s = await st(a); ok(!s.gated
 // =====================================================================================================================
 await a.click('#btn-bot'); s = await until(a, s => s.lview === 'bot', 2000, 'a opens Play a bot'); await shot(a, '04-lobby-bot', BOTH);
 await a.click('#btn-bot-2'); s = await toCourt(a);
-s = await until(a, s => s.them === 'Matt' && s.themSub === 'Pro', 6000, 'Matt sits down at the level picked'); ok(s.them === 'Matt' && s.themSub === 'Pro' && s.me === 'You', `Play a bot: "${s.them}" / "${s.themSub}"`);
+s = await until(a, s => s.them === 'Matt' && s.themSub === 'Pro', 6000, 'Matt sits down at the level picked'); ok(s.them === 'Matt' && s.themSub === 'Pro' && s.me === 'Ann', `Play a bot: "${s.them}" / "${s.themSub}"`);
 ok(!s.scene.menu && !s.scene.attract && s.scene.pr >= 1 && s.scene.name === 'play', `court open: full quality (menu ${s.scene.menu}, attract ${s.scene.attract}, pixel ratio ${s.scene.pr})`);
 ok(s.menuBtn && s.pill && !s.pills.length && !s.views && !s.watchTag, `HUD: hamburger, court code ${s.pill}, no pills, no spectator bits`);
 s = await wake(a); ok(HINTS(s.keys, 'Pro'), `key hints against Matt: "${s.keys}"`); await shot(a, '05-hud-matt', BOTH);
@@ -121,7 +121,7 @@ const CODE = s.share; ok(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/.test(CODE) && 
 await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await type(b, CODE.toLowerCase()); await b.keyboard.press('Enter');
 await a.click('#btn-share-go'); [s, t] = await Promise.all([toCourt(a), toCourt(b)]);
 [s, t] = await Promise.all([until(a, s => s.them === 'Ben', 5000, 'a sees Ben'), until(b, s => s.them === 'Ann', 5000, 'b sees Ann')]);
-ok(s.them === 'Ben' && t.them === 'Ann' && s.me === 'You' && t.me === 'You', `names on the scoreboards: Ann sees "${s.them}", Ben sees "${t.them}"`);
+ok(s.them === 'Ben' && t.them === 'Ann' && s.me === 'Ann' && t.me === 'Ben', `names on the scoreboards: Ann sees "${s.them}", Ben sees "${t.them}"`);
 s = await wake(a); ok(HINTS(s.keys, null), `against a person the hints are: "${s.keys}"`);
 
 const c = await open('c', 'Cat', `&room=${CODE.toLowerCase()}`);                // a link from before 'court': still works, and the address bar is rewritten

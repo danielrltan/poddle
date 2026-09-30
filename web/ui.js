@@ -1158,10 +1158,11 @@ function placeCard(id = 'tour-card') {                    // under the corner (i
 }
 addEventListener('resize', () => { placeCard(); placeCard('friends-card'); });
 // ---- the VS card: m = the server's tmove { round, name, n, of, vs:{ name, bot }, target, final, at } | null
+const vsMe = me => { const n = me && typeof me === 'object' ? tnm(me.name) : ''; setText($('vs-me'), n || 'You'); regBadge($('vs-me'), !!n && me.reg === true); };      // your own name on the left (NOTES 156), its hammer / bow
 export function tourVs(m) {
   if (!m || typeof m !== 'object') { if (slots.overlay === 'tour-vs') showOverlay(null); return; }
   const of = m.of | 0, name = tnm(m.name) || 'Next round', bot = !!(m.vs && m.vs.bot);
-  setText($('vs-round'), of > 1 ? `${name} · Match ${m.n | 0} of ${of}` : name);
+  setText($('vs-round'), of > 1 ? `${name} · Match ${m.n | 0} of ${of}` : name); vsMe(m.me);
   setText($('vs-them'), bot ? 'Matt' : tnm(m.vs && m.vs.name) || 'Opponent'); show('vs-them-tag', bot); regBadge($('vs-them'), !bot && !!m.vs && m.vs.reg === true);
   rankBadge($('vs-them'), !bot && m.vs ? m.vs : null); rankBadge($('vs-me'), m.you || null);      // a Ranked draw carries both ranks ({ tier, div }, docs/RANKED.md 8.3); a tournament's has none
   setText($('vs-target'), `First to ${m.target | 0 || (m.final ? 11 : 7)}, win by 2`);      // the round line above already says Final
@@ -1402,7 +1403,7 @@ export function rkVs(m) {
   if (!m || typeof m !== 'object') { if (slots.overlay === 'rk-vs') showOverlay(null); return; }
   const card = $('vs-card'); if (!card) return; vsStop(); card.classList.add('is-ranked');
   const vs = m.vs && typeof m.vs === 'object' ? m.vs : {};
-  setText($('vs-round'), 'MATCH FOUND'); setText($('vs-me'), 'You'); rankBadge($('vs-me'), null);
+  setText($('vs-round'), 'MATCH FOUND'); vsMe(m.me); rankBadge($('vs-me'), null);
   setText($('vs-them'), tnm(vs.name) || 'Opponent'); show('vs-them-tag', false); regBadge($('vs-them'), vs.reg === true); rankBadge($('vs-them'), null);      // the emblem goes UNDER the name here, as a card with the rank's name, never beside it
   for (const [id, r] of [['vs-me-em', m.you], ['vs-them-em', vs]]) { const box = $(id); if (!box) continue; const ref = rankRef(r); box.replaceChildren(); box.hidden = !ref; if (ref) box.append(emblemCard(ref.tier, 'is-lg is-inverse', ref.div)); }
   const t = $('vs-target'); setText(t, m.friendly === true ? 'Friendly match, no trophies' : `Ranked · Best of ${m.bestOf | 0 || 3} · First to ${m.target | 0 || 7}, win by 2`); t.classList.toggle('is-friendly', m.friendly === true);

@@ -3099,3 +3099,16 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   a lift and a spinning + on hover, a squash on press, and the Requested line that replaces it pops in. Reduced motion: none of it.
 - The profile card's leaderboard places (#12 Trophies, #3 Longest rally) sit on the name's line beside the hammer, not in a row of
   their own between the rank and the stats.
+
+## 156. Your own name on the left instead of "You"
+- The owner's ask: the scoreboard's left slot read "You"; it now shows the player's own name, since the left is always
+  yours. main.js meName(): the server's name for your seat (what everyone else reads: your username if signed in with
+  one, else your typed name), before a seat your username, then your typed name, and "You" only if there is none at all.
+  meReg(): whether that is a registered username, so the developer's hammer and Mae's bow (NOTES 148) now show on your own
+  name too (they never did on "You"). The rank emblem beside it is unchanged.
+- Same change everywhere "You" stood for the player's name: the in-game scoreboard, the result card's tally, the Ranked
+  game card, and the Match found / tournament VS cards (ui.js vsMe). Kept, decided without asking: headlines that talk to
+  the player ("You win", "You lose"), the leaderboard's "You" card, and the tournament list's "You" tag beside your name.
+  A spectator's scoreboard already showed both names.
+- Tests: menu.mjs and spectate-e2e.mjs expect the player's name where they expected "You" (spectate-e2e: "Play a bot" and "names on the scoreboards" pass). menu.mjs Part B crashes on
+  main before this change too (a ui stub gap from a later peer commit), so it could not confirm this; spectate-e2e did.

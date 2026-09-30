@@ -140,6 +140,9 @@ let rally = 0, unsettled = null;                  // unsettled: my last swing re
 let ms = null;
 const msNew = () => ({ sum: 0, rally: 0, smash: [0, 0], run: [0, 0], best: [0, 0], cur: -1, kind: [null, null] });
 const msCommit = i => { if (ms && ms.kind[i] === 'smash') ms.smash[i]++; if (ms) ms.kind[i] = null; };      // a shot counts once, with its final kind (a bet's kind can still be re-aimed by 'launch')
+// The player's own name on the left of the scoreboard, the result and Ranked cards and the VS card (NOTES 156; was the word 'You': the left is always yours).
+// Seated: the server's name for the seat (what everyone else reads). Not yet: the username, else the typed name. reg: a registered username (the hammer / bow, ui.js regBadge)
+const meName = () => names[side] || profile.username() || myName() || 'You', meReg = () => (names[side] ? regs[side] : !!profile.username());
 const alone = () => ({ them: 'Waiting', themSub: room ? '' : 'Press B to play Matt', meSub: '' });      // the far side of the scoreboard with nobody on it. In a room the bot walks in by itself
 const clearFar = () => { rally = 0; ui.setRally(0); scene.updatePaddle(1 - side, null); if (spec()) scene.updatePaddle(side, null); scene.hideBall(); };      // nobody over there any more: no avatar, no ball, no rally
 const cleanNames = a => [0, 1].map(i => Array.isArray(a) && typeof a[i] === 'string' && a[i] ? a[i].replace(BADGE_OUT, '').slice(0, 24) || null : null);      // untrusted text: ui.js writes it with textContent only
@@ -147,16 +150,16 @@ const cleanRegs = a => [0, 1].map(i => Array.isArray(a) && a[i] === true);      
 const dressSeats = () => scene.setLooks?.([0, 1].map(i => lookFor(names[i], regs[i])));      // a registered username with its own character (scene.js LOOKS, NOTES 137): whenever names or regs change
 const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r }; return Number.isInteger(o.tier) && o.tier >= 1 && o.tier <= 8 ? { tier: o.tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // { tier 1..8 (server/ladder.js TIERS: Master since NOTES 124), div 1..3 } or nothing (a bare tier reads as division I)
 const cleanRanks = a => [0, 1].map(i => Array.isArray(a) ? rankRef(a[i]) : null);      // only a rank draws an emblem (a plain court sends [null, null] or nothing)
-// Who is on the scoreboard. A player reads 'You' on the left and the other seat on the right; a spectator reads side 0 on the
-// left (blue) and side 1 on the right (orange), names in both, never 'You'. Matt's second line is his level.
+// Who is on the scoreboard. A player reads their own name on the left (NOTES 156) and the other seat on the right; a spectator reads side 0 on the
+// left (blue) and side 1 on the right (orange), names in both. Matt's second line is his level.
 function drawNames() {
   const pd = state ? state.paddles : [], sub = i => !pd[i] ? '' : pd[i].bot ? botLevel : STATUS_WORD[pd[i].status] || (pd[i].wait ? 'Calibrating' : '');      // the same word as the tag over their character (wait: a server from before 'status')
   ui.setBot(!spec() && tourKind !== 'match' && rkKind !== 'match' && pd[1 - side] && pd[1 - side].bot && botLevel ? botLevel : null);      // the 1 2 3 hint and the Difficulty row: only against Matt, and never in a tournament match (he stays at Tour) or a Ranked court (his level follows your rank)      // NOTES 128: the Ranked warm-up shows it too (the level is the player's to change there)
   if (spec()) { ui.setNames({ me: pd[0] || names[0] ? nameOf(0) : 'Waiting', meSub: sub(0), them: pd[1] || names[1] ? nameOf(1) : 'Waiting', themSub: sub(1), reg: [!!pd[0] && regs[0], !!pd[1] && regs[1]], rank: [!!pd[0] && !pd[0].bot ? ranks[0] : null, !!pd[1] && !pd[1].bot ? ranks[1] : null] }); return; }
   const o = pd[1 - side];
-  if (!o) ui.setNames({ me: 'You', ...alone(), reg: [false, false], rank: [ranks[side], null] });
-  else if (o.bot) ui.setNames({ me: 'You', meSub: '', them: nameOf(1 - side), themSub: botLevel, reg: [false, false], rank: [ranks[side], null] });
-  else ui.setNames({ me: 'You', meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [false, regs[1 - side]], rank: [ranks[side], ranks[1 - side]] });      // 'You' is not a name: no badge on it. The emblem is a rank, not a name: yours shows beside You in a Ranked court
+  if (!o) ui.setNames({ me: meName(), ...alone(), reg: [meReg(), false], rank: [ranks[side], null] });
+  else if (o.bot) ui.setNames({ me: meName(), meSub: '', them: nameOf(1 - side), themSub: botLevel, reg: [meReg(), false], rank: [ranks[side], null] });
+  else ui.setNames({ me: meName(), meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [meReg(), regs[1 - side]], rank: [ranks[side], ranks[1 - side]] });      // 'You' is not a name: no badge on it. The emblem is a rank, not a name: yours shows beside You in a Ranked court
 }
 const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' };
 const seatsOn = () => [0, 1].filter(i => (spec() || i !== side) && regs[i] && names[i] && names[i] !== 'Matt').map(i => ({ name: names[i], rank: ranks[i] }));      // On this court (docs/SOCIAL.md 6): the registered SEATS only, never mine, never a spectator (their registration is not on the wire)
@@ -176,7 +179,7 @@ function showOver() {                              // the result card. A matchov
   const rk = Array.isArray(m.rank) ? cleanRanks(m.rank) : ranks;      // the tiers as they were when it ended (docs/RANKED.md 6)
   const gone = (performance.now() - overAt) / 1000, RKo = !RK ? null : RK.matt ? { matt: true, next: Math.max(0, Math.round((+RK.next || 0) - gone)) }      // the card's own clock, less what was spent behind a set-up screen
     : { games: [(Array.isArray(RK.games) ? RK.games[L] : 0) | 0, (Array.isArray(RK.games) ? RK.games[1 - L] : 0) | 0], bestOf: Math.max(1, RK.bestOf | 0) || 3, scores: (Array.isArray(RK.scores) ? RK.scores : []).filter(Array.isArray).map(x => [x[L] | 0, x[1 - L] | 0]), done: true, gap: Math.max(0, Math.round((+RK.gap || 0) - gone)) };      // games and scores from the left slot's side
-  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, rk: RKo || undefined, reg: [spec() && rg[0], rg[1 - L]], rank: [rk[L], rk[1 - L]], stats: mstats });
+  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, rk: RKo || undefined, reg: [rg[L], rg[1 - L]], rank: [rk[L], rk[1 - L]], stats: mstats });
   if (RKo && !RKo.matt) padFx('series');
   if (RKo && rkRes) { const r = rkRes; rkRes = null; ui.trophyRow?.(rkRow(r)); rkCeremony(r); }      // its settlement came while a set-up screen was up
   scene.jingle(spec() ? (m.forfeit ? 'forfeit' : 'watch') : m.forfeit ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
@@ -430,7 +433,7 @@ function rkMove(m) {                               // rkvs: an opponent is found
   if (phase === 'title') phase = 'lobby';           // found while waiting on the title (OPTIONAL WARM-UP): the seat that follows goes through the set-up screens like a lobby one
   ui.settings(false); ui.tourCard(false); profile.closePlayer?.(); if (['lobby', 'title'].includes(ui.currentScreen())) screen(null);      // a leaderboard profile open (NOTES 140): its veil would sit over MATCH FOUND and keep every key
   ui.confettiOff(); ui.toastOff();                  // the warm-up point's confetti and any toast sit above the veil: MATCH FOUND opens on a clean screen
-  scene.setFrozen(true); scene.jingle('found'); padFx('found'); ui.rkPill?.({ on: false }); ui.rkVs?.(m); clearTimeout(rkVsT);
+  scene.setFrozen(true); scene.jingle('found'); padFx('found'); ui.rkPill?.({ on: false }); ui.rkVs?.({ ...m, me: { name: meName(), reg: meReg() } }); clearTimeout(rkVsT);
   rkVsT = setTimeout(() => { if (ui.currentOverlay() !== 'rk-vs') return; ui.rkVs?.(null); rkMoving = false; if (room && rkKind === 'warm') { toLobby(); return; } if (!rkKind) { rkQueued = false; rkSinceP = 0; if (phase === 'lobby' && !room) { screen('lobby'); ui.lobbyView('ranked'); } venueSync(); redialDue(); } }, ((+m.at || 5) + 10) * 1000);      // the seat never came (from a warm-up: that court was closed under me with no 'closed', so off it)
 }
 function tourScreen(force) {                        // between courts: the code screen while it signs up, the bracket once it runs. Only a view change calls lobbyView (it moves focus)
@@ -450,7 +453,7 @@ function onTour(m) {
 }
 function tourMove(m) {                              // my next match is drawn: the VS card now, the court in m.at s (docs/COURTS-TOURNEY.md 4.6 item 6)
   clearTimeout(tourHang); tourMoving = true; ui.settings(false); ui.tourCard(false); profile.closePlayer?.(); if (ui.currentScreen() === 'lobby') screen(null);
-  ui.tourVs(m); clearTimeout(tourVsT);
+  ui.tourVs({ ...m, me: { name: meName(), reg: meReg() } }); clearTimeout(tourVsT);
   tourVsT = setTimeout(() => { if (ui.currentOverlay() !== 'tour-vs') return; ui.tourVs(null); tourMoving = false; if (phase === 'lobby' && !room) { screen('lobby'); tourScreen(true); } }, ((+m.at || 4) + 10) * 1000);      // the seat never came (the other side left first: through without a ball)
 }
 function showChamp() {                              // for everyone: the champion card over the court, confetti twice (docs/COURTS-TOURNEY.md 4.6 item 10)
@@ -483,7 +486,7 @@ function toLobby(msg) {                            // out of a room, back to the
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
-  ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: 'You', ...alone() });
+  ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: meName(), ...alone(), reg: [meReg(), false] });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
   tourKind = null; tourMoving = false; ui.tourCourt(null);
   const wasRk = rkKind; rkKind = null; rkSeries = null; ranks = [null, null]; if (!rkMoving && (wasRk === 'match' || rkPhase !== 'queue' || spec())) { rkQueued = false; rkWarmNow = false; rkSinceP = 0; if (rkPhase === 'match' || rkPhase === 'vs') rkPhase = 'off'; }      /* a settled series took its entry with it: nothing of the queue is left. Off a warm-up (OPTIONAL WARM-UP) the entry stays: the search bar is back */ ui.rkCourt?.(null); ui.rkPill?.({ on: false }); ui.setSeries?.(null); ui.setPressure?.(null); clearTimeout(rkUpT); syncSettings();      // out of a Ranked court: the queue went with it (unless the VS card holds my place while the series seat comes)
@@ -758,7 +761,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     const L = spec() ? 0 : side, W = m.winner === 1 ? 1 : 0, won = W === L, sc = Array.isArray(m.score) ? m.score : [0, 0], gs = Array.isArray(m.games) ? [m.games[0] | 0, m.games[1] | 0] : [0, 0], g = Math.max(1, m.game | 0), bo = Math.max(1, m.bestOf | 0) || 3, need = Math.ceil(bo / 2);
     rkSeries = { bestOf: bo, game: g, games: gs, done: false }; drawSeries(); drawNames();
     if (!live()) return;                                         // behind a set-up screen: the card is a moment, not news to keep
-    ui.rkGame?.({ won, watching: spec(), nameMe: spec() ? nameOf(0) : 'You', nameThem: nameOf(1 - L), game: g, bestOf: bo, games: [gs[L], gs[1 - L]], score: [sc[L] | 0, sc[1 - L] | 0], serve: m.serve === L ? 'me' : 'them', next: m.next, deciding: gs[0] === gs[1] && gs[0] === need - 1 });
+    ui.rkGame?.({ won, watching: spec(), nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), game: g, bestOf: bo, games: [gs[L], gs[1 - L]], score: [sc[L] | 0, sc[1 - L] | 0], serve: m.serve === L ? 'me' : 'them', next: m.next, deciding: gs[0] === gs[1] && gs[0] === need - 1 });
     scene.jingle(won || spec() ? 'game' : 'gamelose'); if (won && !spec()) { padFx('game'); ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 46); }      // a spectator hears the winner's sting; the phone buzzes for a game taken
     return; }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
