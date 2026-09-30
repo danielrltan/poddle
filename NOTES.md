@@ -3108,3 +3108,13 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   Your stats). profile.js drawAcct keeps it in step with every sign-in / sign-out / rename. On a phone (<= 480 px) it is a round
   icon (its name in the aria-label and tooltip) and the online count gives way; the title keeps its room at 360 px.
 - Nothing new is sent or stored: it calls the same signIn / claimCard / Your stats as the existing buttons (no legal change).
+
+## 152. The Friends tile's icon plays, like the other home tiles
+- "add the friend button css animation". Every home tile's icon plays on hover (looping) and on keyboard or pad focus (once): Quick play's arrow, Courts'
+  magnifier, the bot's head, the stats bars, the trophy, the podium. The Friends tile was the only one that stood still.
+- Now the two friends hop hello: the front friend first, the one behind 160 ms later, each from their own feet (`ic-greet`). Then the plus pops with a
+  quarter turn (`ic-add`; a plus turned 90 degrees looks the same, so the jump back at the start of each loop can't be seen). 1.7 s, the same easing as the
+  others. It goes where the other tiles' rules are in web/ui.css, so the rules they already have apply: a dimmed tile (no name yet, server down) stays still,
+  and reduced motion cuts it to one frame.
+- Checked in headless Chrome at 1280x720: while hovered, all four parts of the two friends run `ic-greet` and the plus runs `ic-add`, and the captured frames show the hop and the pop.
+  CSS only; nothing for the legal pages.
