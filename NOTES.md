@@ -3118,3 +3118,43 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   and reduced motion cuts it to one frame.
 - Checked in headless Chrome at 1280x720: while hovered, all four parts of the two friends run `ic-greet` and the plus runs `ic-add`, and the captured frames show the hop and the pop.
   CSS only; nothing for the legal pages.
+
+## 153. Two people on one network: their matches count (R5 retired); one browser is still one person
+- "i noticed that matches dont count if u and someone is on the same network. fix that, it's fine, just as long as its not same browser"
+- Before: R5 `same_computer` (server/abuse.js judge) unranked any human match whose two seats' computer groups met. A computer key is the public IPv4,
+  or the IPv6 /64, and a home router gives the whole house one. So a household, a school lab or an office never had a counted match against each
+  other, and the Ranked matchmaker (game.js rkSame) never even paired them. This was docs/ACCOUNTS.md's "accepted false positive" (Q4); the owner has now
+  answered Q4.
+- Now R5 is gone: the `same_computer` flag is no longer raised (it is off MATCH_WIDE; old match_log rows may still carry it). One browser is still one
+  person, through the rules that were already there: `same_device` (the browser's poddle.device id, shared by every tab and window of one browser
+  profile), `same_cid` (one tab, including a tab that reconnected through a VPN) and `same_account` (one account or one owner). All three still unrank,
+  and the card still says "self".
+- The other places that treated "one network" as "one person" follow:
+  - rkSame (Ranked matchmaker): two entries on one network may be paired. One device, account or owner still never pairs.
+  - titleCounts (R16, a tournament title needs 3+ people): people are counted by device and account, not network. A tournament among three people in
+    one house can give a title.
+  - The link map's per-network caps: `pair()` (R10 cpuPair24h, also rkFriendly) returns 0 for two keys in ONE group, and `loser()` (R11 cpuLoser24h)
+    skips losses to a winner on the same network. Without that, every match in a house would count toward one shared cap of 3 a day, and a sibling who
+    keeps losing to another would soon look like a feeder. The owner-keyed R10 (3 counted series a day per pair of players, then a Ranked friendly),
+    R11, R11b, R11c and R12 still apply to them. Across two networks, the computer-keyed rules work as before.
+  - Removed as dead: the `STATS_SAME_IP` knob (`config().sameIp`) and `loopKey`, which only existed to switch R5 off for loopback e2e runs (ranked-e2e
+    no longer sets it).
+- Where "not the same browser" cannot be enforced (told to the owner): the server knows a browser only by its device id, its tab ids and its account.
+  These all count as two people now:
+  - two different browsers on one computer (Chrome and Safari);
+  - a private window of the same browser (its own storage, so a new device id and a new guest);
+  - a tab that stays seated while another tab of that browser signs out (sign-out rotates poddle.device, and the two tabs never shared a cid).
+  Casual farming by one person this way is bounded only by NEW_GUEST_DAY (30 new guests per network a day, 5.5) and R12 (30 counted wins a day per winner).
+  The owner pair caps don't bite, because every private window is a new owner, and R11c is off in production. It can feed the win rate and the
+  "best win streak vs people" board. Ranked is safer: each seat needs a signed-in account with a username, so it takes two Google accounts, and R10 by
+  owners makes a pair's 4th series of the day a friendly.
+- Legal: Terms' fair-play line now says matches where both players share the same browser or account may not count (before: "the same network or the
+  same browser"). In the Privacy IP-address row, the Ranked "avoid pairing ... the same computer or network" is gone. The match-end address comparison is
+  now said to be for the daily limits on repeated matches between networks, with a sentence that two players on one network count. No new data, no new
+  storage. The dates were already September 29, 2026. No home-page notice: this relaxes a rule and hands over no new data (NOTES 147 rule). Changelog
+  entry added. docs/ACCOUNTS.md (R5 row, the false-positive note, the knob table), docs/RANKED.md (never-paired row) and CLAUDE.md's data flows are updated.
+- Tests: accounts-unit covers one network ranked (production config too), one network plus one device id unranked as same_device, one network plus one
+  tab unranked as same_cid, a title with two members on one network, and pair()/loser() skipping one network while still counting across two.
+  stats.test 5 and 18 now expect ranked. ranked.test 7: two people on one address are paired (not as a friendly), play a series, and it counts (+33
+  trophies, no reasons). One device id on two computers still never pairs.
+  All pass solo: accounts-unit, stats, ranked, ladder, seo.

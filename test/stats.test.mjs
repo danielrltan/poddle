@@ -190,10 +190,10 @@ report(await Promise.all([
       bye(a, b);
     }
   }),
-  sc('5. one computer: same address -> same_computer; same device on two addresses -> same_device', async t => {
+  sc('5. one network: same address, two browsers -> counts (NOTES 153); same device on two addresses -> same_device', async t => {
     const X = ip(); let [a, b] = await pair({ A: { addr: X, d: dev() }, B: { addr: X, d: dev() } }), [pa, pb] = await duel(a, b);
-    t.ok(pa && !pa.ranked && pa.why.join() === 'not_counted' && pb && !pb.ranked && pb.why.join() === 'not_counted', 'same fly-client-ip: unranked, and the card never says why (it would reveal the other player\'s network)');
-    t.ok(lastMatch(await exportOf(a.d, X))?.reasons.includes('same_computer'), 'the export says same_computer'); bye(a, b);
+    t.ok(pa && pa.ranked && pb && pb.ranked, 'same fly-client-ip, two device ids: ranked for both (two people on one network)');
+    { const m = lastMatch(await exportOf(a.d, X)); t.ok(m && !m.reasons.includes('same_computer'), `the export has no same_computer (${m && m.reasons})`); } bye(a, b);
     const D = dev(); [a, b] = await pair({ A: { addr: ip(), d: D }, B: { addr: ip(), d: D } }); [pa, pb] = await duel(a, b);
     t.ok(pa && !pa.ranked && pa.why.join() === 'self' && pb.why.join() === 'self', 'one device id in both seats: unranked, why self');
     const P = await profileOf(D, a.addr); t.ok(P && P.played === 1 && P.human.wins === 0 && P.human.losses === 0, 'one owner in both seats: played once, no W/L'); bye(a, b);
@@ -210,10 +210,10 @@ report(await Promise.all([
       bye(a, b2);
     }
   }),
-  sc('18. a network hop onto the opponent\'s address mid-match -> same_computer', async t => {
+  sc('18. a network hop onto the opponent\'s address mid-match -> still counts (NOTES 153: one network is not one person)', async t => {
     const X = ip(), [a, b] = await pair({ A: { addr: X, d: dev() }, B: { addr: ip(), d: dev() } }); hit(a); lose(b); await until(() => a.n('hit') >= 1, 15000);
     b.addr = X; const b2 = await drop(b); lose(b2); await over(a); const pa = await prof(a);
-    t.ok(pa && !pa.ranked && lastMatch(await exportOf(a.d, X))?.reasons.includes('same_computer'), 'the seat\'s computer set meets the other seat\'s: unranked same_computer');
+    t.ok(pa && pa.ranked && !lastMatch(await exportOf(a.d, X))?.reasons.includes('same_computer'), 'the seat\'s computer set meets the other seat\'s: ranked, no same_computer');
     bye(a, b2);
   }),
   sc('21. deleting a guest profile mid-match', async t => {

@@ -38,7 +38,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
 
 ### Current data flows (diff new features against this)
 - Server (Fly.io, Toronto; memory): display name (12 chars), IP (4 courts per IP, 1 open tournament
-  per IP, ask-to-play cooldown, 2 Ranked queue entries per computer (Ranked only for signed-in accounts with a username, NOTES 133) and never paired within one computer group), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
+  per IP, ask-to-play cooldown, 2 Ranked queue entries per computer (Ranked only for signed-in accounts with a username, NOTES 133); one network may play and be paired, and those matches count: only one browser (device id, tab, account) is one person, NOTES 153), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
   level, emotes, pause/rematch, position (~60 Hz, relayed), phone motion (relayed to the paired tab only). Reconnect URL
   carries name, cid, code, score, side, bot (revive()); never the device id or any sign-in value. Logs: activity lines
   with court codes and ranked/unranked, no names/IPs/cids/device ids/account ids/Google subs/tokens (friends lines too: no names, no ids).

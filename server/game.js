@@ -1543,16 +1543,13 @@ function rkWarm(q) {                                           // a private cour
   r.by = null; r.tag = { rk: true, kind: 'warm' }; rooms.set(code, r); q.warm = code;   // by null: never counted by ADDR_ROOMS (RK_ADDR is the address cap instead)
   if (!seat(q.ws, r)) r.close('empty'); else rkSend(q, 'queue');
 }
-// rkSame(q, c): two entries that may NEVER be paired: one device, one account, one owner, or one computer group (R5 would void every game). Off Fly the
-// loopback keys are one computer only when STATS_SAME_IP is on (tests give each client its own address header)
+// rkSame(q, c): two entries that may NEVER be paired: one device, one account or one owner (one browser, one person). One network may be paired since
+// NOTES 153 (R5 retired): two people in one house queue and play for real; the friendly rule (rkFriendly) still caps a pair per day
 function rkSame(q, c, L) {
   const a = q.ident, b = c.ident;
   if (a.devHash && b.devHash && Buffer.compare(Buffer.from(a.devHash), Buffer.from(b.devHash)) === 0) return true;
   if (a.accountId != null && a.accountId === b.accountId) return true;
-  if (q.owner != null && q.owner === c.owner) return true;
-  const ka = q.ws.computer || 'local', kb = c.ws.computer || 'local';
-  if (!stats.config().sameIp && abuse.loopKey(ka) && abuse.loopKey(kb)) return false;
-  return abuse.meets(L.groups([ka]), L.groups([kb]));
+  return q.owner != null && q.owner === c.owner;
 }
 function rkFriendly(q, c, L, now) {                           // a pair R10 / R11b would void: they still play, announced as a friendly (RANKED.md 3.6)
   const cfg = stats.config();

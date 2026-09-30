@@ -208,11 +208,11 @@ console.log('abuse: computerKey, rank, config');
   ok(K('') === 'local' && K(undefined) === 'local' && K('bad') === 'bad' && K('garbage') === 'bad' && K('x'.repeat(100)) === 'bad', "empty -> 'local', 'bad' and junk -> 'bad'");
   ok(K(K('2001:db8:1:2::5')) === K('2001:db8:1:2::5') && K(K('1.2.3.4')) === '1.2.3.4', 'idempotent on its own output');
   const r = abuse.rank; ok(r(0) < r(1) && r(1) < r(3) && r(3) < r(2) && r(7) === -1, 'rank: Rookie < Club < Tour < Pro (by BOT_ORDER, not the wire index)');
-  const dev0 = abuse.config({}), prod = abuse.config({ NODE_ENV: 'production', STATS_SAME_IP: '0', STATS_AFK_MIN: '0', STATS_TELEPORT_MS: '0', STATS_ESTABLISHED: '0', STATS_FORFEIT_MIN: '1', WIN_AT: '11' });
-  ok(dev0.sameIp && dev0.minPointS === 2.5 && dev0.forfeitMin === 6 && dev0.pairDay === 3 && dev0.afkMin === 2 && dev0.teleportMs === 12 && !dev0.established && dev0.newGuestDay === 30 && dev0.newGuestHour === 600, 'config defaults (5.3)');
-  ok(prod.sameIp && prod.afkMin === 2 && prod.teleportMs === 12 && !prod.established && abuse.config({ NODE_ENV: 'production', STATS_ESTABLISHED: '1' }).established && prod.forfeitMin === 6, 'production ignores STATS_SAME_IP=0, AFK_MIN=0, TELEPORT_MS=0 and STATS_FORFEIT_MIN; R11c is off unless STATS_ESTABLISHED=1 (NOTES 129)');
-  const test = abuse.config({ STATS_SAME_IP: '0', STATS_AFK_MIN: '0', STATS_TELEPORT_MS: '0', STATS_ESTABLISHED: '0', STATS_FORFEIT_MIN: '1', STATS_MIN_POINT_S: 'junk' });
-  ok(!test.sameIp && test.afkMin === 0 && test.teleportMs === 0 && !test.established && test.forfeitMin === 1 && test.minPointS === 2.5 && Object.isFrozen(test), 'test knobs honoured off production; junk -> default; frozen');
+  const dev0 = abuse.config({}), prod = abuse.config({ NODE_ENV: 'production', STATS_AFK_MIN: '0', STATS_TELEPORT_MS: '0', STATS_ESTABLISHED: '0', STATS_FORFEIT_MIN: '1', WIN_AT: '11' });
+  ok(!('sameIp' in dev0) && dev0.minPointS === 2.5 && dev0.forfeitMin === 6 && dev0.pairDay === 3 && dev0.afkMin === 2 && dev0.teleportMs === 12 && !dev0.established && dev0.newGuestDay === 30 && dev0.newGuestHour === 600, 'config defaults (5.3); no sameIp knob since R5 was retired (NOTES 153)');
+  ok(prod.afkMin === 2 && prod.teleportMs === 12 && !prod.established && abuse.config({ NODE_ENV: 'production', STATS_ESTABLISHED: '1' }).established && prod.forfeitMin === 6, 'production ignores AFK_MIN=0, TELEPORT_MS=0 and STATS_FORFEIT_MIN; R11c is off unless STATS_ESTABLISHED=1 (NOTES 129)');
+  const test = abuse.config({ STATS_AFK_MIN: '0', STATS_TELEPORT_MS: '0', STATS_ESTABLISHED: '0', STATS_FORFEIT_MIN: '1', STATS_MIN_POINT_S: 'junk' });
+  ok(test.afkMin === 0 && test.teleportMs === 0 && !test.established && test.forfeitMin === 1 && test.minPointS === 2.5 && Object.isFrozen(test), 'test knobs honoured off production; junk -> default; frozen');
 }
 
 // ======================================================================= abuse: judge, one case per rule (5.2)
@@ -239,13 +239,13 @@ const has = (v, ...ids) => ids.every(i => v.flags.includes(i));
   v = J(human({}, {}, { ident: null })); ok(!v.ranked && has(v, 'anon_opponent', 'anon') && rec(v) === '-- --', 'R4 anon_opponent: the winner over an anonymous seat gets nothing');
   v = J(human({}, {}, { gone: true })); ok(v.ranked && !has(v, 'anon_opponent'), 'R4 not triggered by gone (the frozen identity still judges)');
   v = J(human({}, {}, { pendingAnon: true })); ok(!has(v, 'anon_opponent') && has(v, 'ident_changed'), 'R4 not triggered by a mid-match downgrade (that is R6b)');
-  v = J(human({}, {}, { groups: new Set(['g1']) })); ok(!v.ranked && has(v, 'same_computer') && rec(v) === '-- --', 'R5 same_computer: unranked');
-  v = J(human({}, { ident: { accountId: 1, cid: 'a' }, groups: new Set(['home']) }, { ident: { accountId: 2, cid: 'b' }, groups: new Set(['home']) }));
-  ok(!v.ranked && has(v, 'same_computer'), 'accepted false positive (Q4 strict): two established accounts in one household stay unranked');
-  const loop = { computers: new Set(['127.0.0.1']), groups: new Set(['gL']) };
-  v = J(human({}, loop, loop), {}, abuse.config({ STATS_SAME_IP: '0' })); ok(v.ranked && !has(v, 'same_computer'), 'R5 off with STATS_SAME_IP=0 when both seats are loopback');
-  v = J(human({}, { groups: new Set(['gX']) }, { groups: new Set(['gX']) }), {}, abuse.config({ STATS_SAME_IP: '0' })); ok(has(v, 'same_computer'), 'STATS_SAME_IP=0 never disables R5 for real addresses');
-  v = J(human({}, loop, loop), {}, abuse.config({ STATS_SAME_IP: '0', NODE_ENV: 'production' })); ok(has(v, 'same_computer'), 'production applies R5 even on loopback');
+  // R5 retired (NOTES 153): one network in both seats is two people and counts; one browser (device id, tab, account) is still one person
+  v = J(human({}, { groups: new Set(['g1']) }, { groups: new Set(['g1']) })); ok(v.ranked && !has(v, 'same_computer') && rec(v) === 'RB RB', 'one network (same computer group) in both seats: ranked, both records and bests');
+  v = J(human({}, { ident: { accountId: 1, cid: 'a' }, groups: new Set(['home']) }, { ident: { accountId: 2, cid: 'b' }, groups: new Set(['home']) }), {}, abuse.config({ NODE_ENV: 'production' }));
+  ok(v.ranked && !has(v, 'same_computer'), 'two accounts in one household, production: ranked');
+  v = J(human({}, { groups: new Set(['home']), ident: { devHash: Buffer.from(dev(9)), cid: 'a' } }, { groups: new Set(['home']), ident: { devHash: Buffer.from(dev(9)), cid: 'b' } }));
+  ok(!v.ranked && has(v, 'same_device') && !has(v, 'same_computer'), 'one network AND one browser (device id), two tabs: unranked as same_device');
+  v = J(human({}, { groups: new Set(['home']), cids: new Set(['t1']) }, { groups: new Set(['home']), cids: new Set(['t1']) })); ok(!v.ranked && has(v, 'same_cid'), 'one network, one tab id: unranked as same_cid');
   v = J(human({}, {}, { ident: { devHash: Buffer.from(dev(1)), cid: 'x' } })); ok(!v.ranked && has(v, 'same_device'), 'R6 same_device (hash equality)');
   v = J(human({}, { ident: { accountId: 7, cid: 'a' } }, { ident: { accountId: 7, cid: 'b' } })); ok(!v.ranked && has(v, 'same_account'), 'R6 same_account');
   v = J(human({}, {}, { cids: new Set(['cid2', 'cid1']) })); ok(!v.ranked && has(v, 'same_cid'), 'R6 same_cid (any cid seen on either seat)');
@@ -293,21 +293,21 @@ const has = (v, ...ids) => ids.every(i => v.flags.includes(i));
   v = J(human({}, {}, { teleport: true })); ok(v.ranked && rec(v) === 'RB R-', 'R18 teleporting LOSER: its loss counts, the winner ranked');
   v = J(vsBot({}, { teleport: true })); ok(!v.ranked && rec(v) === '-- --', 'R18 teleporting win over Matt: unranked');
   v = J(human({}, { teleport: true }), {}, abuse.config({ STATS_TELEPORT_MS: '0' })); ok(v.ranked, 'STATS_TELEPORT_MS=0 disables R18 (tests)');
-  v = J(human({ revived: true, secs: 10 }, {}, { groups: new Set(['g1']) }), { pairRanked24h: 5, winnerWins24h: 40 });
-  ok(has(v, 'revived', 'too_fast', 'same_computer', 'pair_cap', 'daily_cap') && !v.ranked, 'several flags at once: every failing id is collected');
+  v = J(human({ revived: true, secs: 10 }, {}, { cids: new Set(['cid1']) }), { pairRanked24h: 5, winnerWins24h: 40 });
+  ok(has(v, 'revived', 'too_fast', 'same_cid', 'pair_cap', 'daily_cap') && !v.ranked, 'several flags at once: every failing id is collected');
   // why (8.3): a human match never names the opponent's network
   const allowed = new Set(['self', 'not_counted', 'restart', 'too_short']);
   const hv = [human({}, {}, { groups: new Set(['g1']) }), human(), human({}, {}, { established: false }), human({ secs: 1 }), human({ revived: true }), human({}, {}, { cids: new Set(['cid1']) })];
   const hh = [{}, { cpuPair24h: 3 }, {}, {}, {}, {}];
   let clean = true; hv.forEach((f, k) => { const verdict = J(f, hh[k]); for (const i of [0, 1]) for (const w of abuse.why(verdict, f, i)) if (!allowed.has(w)) clean = false; });
   ok(clean, 'why: human reasons only self / not_counted / restart / too_short');
-  ok(eq(abuse.why(J(human({}, {}, { groups: new Set(['g1']) })), human(), 1), ['not_counted']) && eq(abuse.why(J(human({}, {}, { cids: new Set(['cid1']) })), human(), 0), ['self']), 'why: same_computer -> not_counted, same_cid -> self');
+  ok(eq(abuse.why(J(human({}, {}, { established: false }), {}, abuse.config({ STATS_ESTABLISHED: '1' })), human(), 1), ['not_counted']) && eq(abuse.why(J(human({}, {}, { cids: new Set(['cid1']) })), human(), 0), ['self']), 'why: a withheld opponent rule -> not_counted, same_cid -> self');
   // titles (R16)
   const L0 = abuse.createLinks({ now: () => T0 });
   const m = (n, o = {}) => ({ ident: { devHash: dev(n) }, computers: ['8.8.0.' + n], rankedWins: 0, ...o });
   const champ = m(1, { rankedWins: 1 });
   ok(abuse.titleCounts([champ, m(2), m(3)], champ, L0, CFG).ok, 'R16: 3 distinct people and a ranked win -> title');
-  ok(!abuse.titleCounts([champ, m(2), m(3, { computers: ['8.8.0.2'] })], champ, L0, CFG).ok, 'R16: two members on one computer -> 2 people, no title');
+  ok(abuse.titleCounts([champ, m(2), m(3, { computers: ['8.8.0.2'] })], champ, L0, CFG).ok, 'R16: two members on one network are two people (NOTES 153) -> title');
   ok(!abuse.titleCounts([champ, m(2), m(3, { ident: { devHash: dev(2) } })], champ, L0, CFG).ok, 'R16: two members with one device -> no title');
   const c0 = m(1); ok(!abuse.titleCounts([c0, m(2), m(3)], c0, L0, CFG).ok, 'R16: no ranked human win -> no title');
   const c1 = m(1, { rankedWins: 1, identChanged: true }); ok(!abuse.titleCounts([c1, m(2), m(3)], c1, L0, CFG).ok, 'R16: an identity-changed champion -> no title');
@@ -323,8 +323,7 @@ console.log('abuse: link map');
   L.see({ devHash: dev(1) }, '1.2.3.4'); L.see({ devHash: dev(1) }, '2001:db8:1:2::5');
   ok(meet(['1.2.3.4'], ['2001:db8:1:2::77']), 'one device hash on an IPv4 key and an IPv6 /64 -> one group');
   L.see({ cid: 'tab-7' }, '5.5.5.5'); L.see({ cid: 'tab-7' }, '6.6.6.6');   // home, then the same tab on a VPN
-  ok(meet(['6.6.6.6'], ['5.5.5.5']), 'a seat that hopped to a VPN keeping its cid: {vpn} meets {home} -> R5');
-  const f = human({}, { groups: L.groups(['6.6.6.6']) }, { groups: L.groups(['5.5.5.5']) }); ok(has(J(f), 'same_computer'), '... and judge flags same_computer');
+  ok(meet(['6.6.6.6'], ['5.5.5.5']), 'a seat that hopped to a VPN keeping its cid: {vpn} meets {home} (one group, for the per-network caps)');
   ok(!JSON.stringify([...L.groups(['5.5.5.5'])]).includes('5.5.5.5'), 'group roots are hashes, never the address');
   // salt rotation: links made 23 h in keep working after the salt changes at 24 h
   clock = T0 + 23 * HOUR; L.see({ devHash: dev(2) }, '7.7.7.7'); L.see({ devHash: dev(2) }, '8.8.8.8');
@@ -343,6 +342,11 @@ console.log('abuse: link map');
   const lo = L.loser(['66.1.1.1']); ok(lo.losses === 6 && lo.distinctWinnerGroups === 1, 'loser(): 6 losses (ranked or not) to 1 winner group');
   ok(has(J(human(), { cpuLoser24h: lo }), 'feeder'), '... which is R11 by computer');
   ok(L.pair(['55.1.1.1'], ['77.1.1.1']) === 0, 'an unrelated pair counts 0');
+  // one network (NOTES 153): matches between two people on one address are theirs, not the network's: no per-network pair cap, no per-network feeder
+  for (let k = 0; k < 5; k++) L.result(['90.1.1.1'], ['90.1.1.1'], true);
+  ok(L.pair(['90.1.1.1'], ['90.1.1.1']) === 0, 'pair(): five ranked matches inside one network count 0 (the owners\' own pair cap still applies)');
+  const lh = L.loser(['90.1.1.1']); ok(lh.losses === 0, `loser(): losses to someone on the same network are not feeding (${lh.losses})`);
+  L.result(['91.1.1.1'], ['90.1.1.1'], true); ok(L.loser(['90.1.1.1']).losses === 1 && L.pair(['91.1.1.1'], ['90.1.1.1']) === 1, '... while a loss to another network still counts for both');
   L.result(['101.1.1.1'], ['102.1.1.1'], true, 7001); L.result(['101.1.1.1'], ['102.1.1.1'], true, 7001); L.result(['102.1.1.1'], ['101.1.1.1'], true, 7002);
   ok(L.pair(['101.1.1.1'], ['102.1.1.1']) === 2 && L.pair(['101.1.1.1'], ['102.1.1.1'], 7002) === 1, 'a series counts once, and the series being played is left out (R10 never caps a series with its own game 1)');
   // new-guest cap (5.5)
