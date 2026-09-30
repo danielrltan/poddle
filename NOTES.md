@@ -3275,3 +3275,33 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   test/hitblend.mjs turns the ball on the frame the hit arrives (drawn z 1.35 -> 1.30 -> 0.94; an old server's hit without v now keeps flying at last frame's velocity on the event frame, where it stood still,
   largest step unchanged at 0.27 m); its
   sliced-trail check fails here on main's client too. test/scene-next.mjs timed out here waiting for its page (not run).
+
+## 155. The bet aims on its own: a first report no longer carries the wind-up's direction
+- The other half of "the ball swerves after the hit" (154). The bend is now smooth, but its size is the gap between the bet and the settled report,
+  and the widest ones were sideways: 63 of 205 re-aims in 154's captures turned the ball more than 0.1 of dir: heading p50 4.6, p90 30 deg, up to 4.0 m across.
+- Cause (web/motion.js): the bet read its aim off sw.sum, the settled report's rate-weighted turn, which is seeded with the two samples before the
+  trigger. When the stroke loops out of a wind-up (the `mvR` start) the seed and the first samples still turn the wind-up's way: bets of 0.34, 0.45
+  and 0.77 settled at -0.96. 22 of 89 scored real bets fire within 50 ms of the movement's start (sensor clock).
+- Now the bet computes its own aim: the turn since the trigger (no seed), measured from the wind-up's own angular velocity when the hand was already
+  moving (`wB`, the same "wound" test that picks mvR), plus BET_AHEAD (2) samples of where it is heading (this sample carried on by its last change).
+  Only the bet's `dir` changes. sw.sum, sw.dir and every later report are untouched: over 3527 swings (the 3 real captures, AirPod and phone gain,
+  lobsynth x 12 seeds, strokes.mjs-style strokes) every settled report is bit-identical, every in-between fix and swingEnd too, and every bet fires on
+  the same sample. Power, lob, roll and spin of the bet are unchanged, so a bet still never smashes and a flick stays soft.
+- Measured, |bet dir - settled dir| on the real captures (132 bets): p90 0.26 -> 0.14, mean 0.13 -> 0.07, worst 1.71 -> 1.11, off by more than 0.3:
+  12 -> 6. Leave one capture out (fitted on two, tested on the third), the same setting sits on a flat optimum (held-out means 0.089 -> 0.055, 0.199 ->
+  0.102, 0.153 -> 0.099). Gyro noise up to 0.3 rad/s keeps the gain (p90 0.25 -> 0.17). lobsynth strokes: p90 0.22 -> 0.14 (AirPod), 0.23 -> 0.15 (phone).
+- End to end (the real motion.js into the real server and the real client, 3 captures x 300 s; before, main and 154 alone: 5 runs; after, this tree: 3 runs, 634 re-aims):
+  sideways landing move p90 1.19-1.43 -> 0.93 m (0.81-0.97 a run); heading change p90 11.4-16.1 -> 7.1 deg; landing moved p90 2.28 -> 1.69 m. The
+  worst move a bet's direction causes 4.1 -> 2.7 m (a settled full-power swoop can still move a landing 3.4 m, as on main, 41 -> 33 deg). With 154
+  as well: the pull's first tick 1.7 / 7.1 / 13.7 -> 0.27 / 0.85 / 1.43 m/s^2, its biggest one-tick change 3.5 / 11.2 / 24.4 -> 0.50 / 1.59 / 2.69,
+  its peak 3.6 / 12.5 / 24.4 -> 3.1 / 10.5 / 19.4, the drawn ball's 761 / 895 / 995 -> 3.0 / 10.5 / 19.3; the marker 0.00 m from the bounce. How often a hit is re-aimed does not change (87%): power still decides that, and no bet-only power
+  estimator beat the current one on a held-out capture (look-ahead scaling, blends with the earned power, shrinking to a prior, time-to-peak): 63's
+  "there is no conservative bet" still holds, so power is left alone.
+- Limits: 132 real bets from one player; the worst reversal bets are about six swings. Some are still far off (a reversal that has not started by the
+  bet sample cannot be seen), and 38 of 132 real bets get a little worse, 2 by more than 0.1 (at most 0.15), none newly past 0.3. Tuned on the
+  50 Hz AirPod captures: resampled to 60 Hz (a phone on iOS) the mean goes 0.156 -> 0.090, to 100 Hz 0.160 -> 0.116 (upsampled data is smoother
+  than a real stream; BET_AHEAD counts samples, not time). An in-between fix ~60 ms after the bet still carries sw.dir to a swing that has not
+  met the ball yet (worse in 3 of 59 real cases, better in 19). A serve struck on its first report uses the new aim; the serve's decisions read the
+  settled dir, as before.
+- Tests: lobbet, lobsynth, spin, strokes, kinds, effort, onset, bigswing, zigzag, zigzag-power, smooth, rom, padmotion, phone-jitter and real.mjs
+  print the same as before (real.mjs "dir within 0.3": FLICK 26 -> 27 of 27, FAST 10 -> 13 of 17 on live-play-1).
