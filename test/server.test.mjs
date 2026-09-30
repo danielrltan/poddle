@@ -14,7 +14,7 @@ const SCALE = +process.env.TEST_SCALE || 6;
 const DT = 1 / 60;
 const P0 = +process.env.TEST_PORT || 8140;                       // TEST_PORT=<base> moves the whole block (P0 .. P0+19)
 process.env.PORT = String(P0);                                 // the in-process copy (only used for solve())
-const { COURT, ZONE, BOUNCE, G, R, solve } = createRequire(import.meta.url)(GAME);
+const { COURT, ZONE, BOUNCE, G, R, solve, flight, fallLeft } = createRequire(import.meta.url)(GAME);
 
 const sg = side => (side === 0 ? 1 : -1);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -216,12 +216,12 @@ function sweepSolve() {
     const p = [p0[0], Math.max(p0[1], R), p0[2]], v = [...sol.v];
     for (let i = 0; i < 600; i++) {                            // same integrator as the server
       const z0 = p[2], y0 = p[1];
-      v[1] -= G * DT; for (let k = 0; k < 3; k++) p[k] += v[k] * DT;
+      const h = Math.min(DT, fallLeft(Math.max(p[1], R), v[1], G)); flight(p, v, h, 0, G, null, 0);   // sim()'s own step: y exact, the floor met where it is (NOTES 154)
       if (z0 * p[2] < 0 || (z0 !== 0 && p[2] === 0)) {
         const yn = y0 + (p[1] - y0) * (z0 / (z0 - p[2])); minNet = Math.min(minNet, yn);
         ok(W, yn > COURT.net + R, `net: y=${yn.toFixed(2)} from p=${p0} n=${n} dir=${dir} lob=${lob}`);
       }
-      if (p[1] < R) {
+      if (h < DT) {
         const ta = -v[1] * BOUNCE.up / G, xc = p[0] + v[0] * BOUNCE.along * ta; maxXc = Math.max(maxXc, Math.abs(xc));
         ok(W, Math.abs(xc) <= 3.25, `top of bounce at x=${xc.toFixed(2)}: out of reach, from p=${p0} n=${n} dir=${dir} lob=${lob}`);
         ok(W, p[2] * s < 0 && Math.abs(p[0]) <= COURT.halfW && Math.abs(p[2]) <= COURT.halfL && Math.abs(p[2]) > 0.5, `lands out: ${p.map(a => a.toFixed(2))} from p=${p0} n=${n} dir=${dir} lob=${lob}`);

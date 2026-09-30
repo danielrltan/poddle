@@ -73,9 +73,12 @@ const reaimed = all.filter(x => x.re);
 ok(PLAN.concat(SERVE).every(p => by(p.name).length > 0) && reaimed.length >= 10, `every kind of shot came round (${all.length} shots, ${reaimed.length} re-aimed, ${served} serves)`);
 ok(all.every(x => x.rise <= 0.05), `after the contact packet vy never rises: worst ${f2(Math.max(...all.map(x => x.rise)))} m/s`);
 ok(all.every(x => x.light <= 0.05 && x.spin < 1e-9), `...and gravity never lightens (spin is the paddle's): worst ${f2(Math.max(...all.map(x => x.light)))} m/s^2 short, spin moved ${Math.max(...all.map(x => x.spin))}`);
-ok(all.every(x => x.miss < 0.15), `the marker is where it really lands: worst ${f2(Math.max(...all.map(x => x.miss)))} m`);
+ok(all.every(x => x.miss < 0.02), `the marker is where it really lands: worst ${f2(Math.max(...all.map(x => x.miss)))} m (the sim meets the floor where the closed form does, NOTES 154; it was up to a tick late, < 0.15)`);
 ok(all.every(x => x.net >= NET + R), `every ball clears the net (centre over the tape by a radius): lowest ${f2(Math.min(...all.map(x => x.net)))} m`);
-ok(by('hard bet, settled tap').length && by('hard bet, settled tap').every(x => Math.abs(x.bz) > 3.5), `a hard bet that settles as a tap is not given height for the net: its landing moves deeper instead (tap depth ~2.8 m, landed ${by('hard bet, settled tap').map(x => f2(Math.abs(x.bz)))} m)`);
+// the walk stops where the sealed ball first clears: its crossing is found on the bent flight itself (NOTES 154; the ease's check took the
+// average pace, too slow for a ball slowing onto a tap, and walked on to 4.91 m), so it crosses within 1 cm of net + clear (0.25; a 0.1 m step of the walk moves it ~5 mm)
+const tap = by('hard bet, settled tap');
+ok(tap.length && tap.every(x => Math.abs(x.bz) > 3.5 && x.net - (NET + 0.25) < 0.01), `a hard bet that settles as a tap is not given height for the net: its landing moves deeper instead (tap depth ~2.8 m, landed ${tap.map(x => f2(Math.abs(x.bz)))} m), just deep enough (over the tape by ${tap.map(x => (x.net - NET).toFixed(3)).join(', ')} m, clear 0.25)`);
 ok(by('near net (fixBlock)').some(x => x.near && x.re), 'the near-net path (fixBlock) was re-aimed from up at the net');
 ok(by('serve, re-aimed').some(x => x.re), 'a serve struck on its first report was re-aimed by its settled one');
 const clean = by('clean lob'), both = by('lob bet, settled lob').filter(x => x.re);

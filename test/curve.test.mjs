@@ -20,10 +20,10 @@ function flyOut(p0, side, n, dir, lob, slice, curl) {
   const sol = S.solve(p0, side, n, dir, lob, slice, null, curl), p = [p0[0], Math.max(p0[1], S.R), p0[2]], v = [...sol.v], a = [...p];
   let bow = 0;
   for (let i = 0; i < 400; i++) {                                  // server/game.js sim(), flight part
-    const c = sol.curl; v[0] += c * DT; v[1] -= S.gOf(sol.spin) * DT;
-    for (let k = 0; k < 3; k++) p[k] += v[k] * DT; p[0] -= 0.5 * c * DT * DT;
+    const g = S.gOf(sol.spin), h = Math.min(DT, S.fallLeft(Math.max(p[1], S.R), v[1], g));
+    S.flight(p, v, h, sol.curl, g, null, i * DT);                   // sim()'s own step: x and y exact, the floor met where it is (NOTES 154)
     const f = (p[2] - a[2]) / (sol.land[1] - a[2]); bow = Math.max(bow, Math.abs(p[0] - (a[0] + (sol.land[0] - a[0]) * f)));
-    if (p[1] < S.R) {
+    if (h < DT) {
       const al = S.BOUNCE.along + (S.SLICE.along - S.BOUNCE.along) * sol.spin, up = S.BOUNCE.up + (S.SLICE.up - S.BOUNCE.up) * sol.spin;
       const ta = -v[1] * up / S.G, xc = p[0] + (v[0] * al + sol.kick) * ta;
       return { sol, err: Math.hypot(p[0] - sol.land[0], p[2] - sol.land[1]), ex: Math.abs(p[0] - sol.land[0]), bow, xc };
@@ -36,8 +36,8 @@ function flyOut(p0, side, n, dir, lob, slice, curl) {
   for (const side of [0, 1]) for (const d of [1.7, 3, 4.5, 6.5, 8]) for (const x of [-3, -1, 0, 1, 3]) for (const dir of [-1, -0.4, 0, 0.6, 1]) for (const y of [0.4, 1, 1.8]) {
     const s = side ? -1 : 1, r = flyOut([x, y, s * d], side, 1, dir, 0, 0, 1), st = flyOut([x, y, s * d], side, 1, dir, 0, 0, 0); count++;
     worstX = Math.max(worstX, r.ex); worstE = Math.max(worstE, r.err - st.err); minBow = Math.min(minBow, r.bow); maxXc = Math.max(maxXc, Math.abs(r.xc));
-    // lands: sideways within 0.1 m of the marker, and no further off in all than the same shot flown straight (a fast low ball lands up to
-    // a tick, ~0.2 m, past its closed-form spot along the court whether it curls or not)
+    // lands: sideways within 0.1 m of the marker, and no further off in all than the same shot flown straight (the sim meets the floor where
+    // the closed form does, NOTES 154: both are ~0 now; it used to land up to a tick, ~0.2 m, past it whether it curled or not)
     if (!r.sol.curl || r.ex > 0.1 || r.err > st.err + 0.03 || r.bow < 0.3 || Math.abs(r.xc) > 3.25) { ok(false, `n 1 from ${[x, y, s * d]} side ${side} dir ${dir}: c ${r.sol.curl.toFixed(1)} bow ${r.bow.toFixed(2)} lands ${r.ex.toFixed(2)} m off sideways, ${r.err.toFixed(2)} in all (straight ${st.err.toFixed(2)}), top of bounce x ${r.xc.toFixed(2)}`); }
   }
   ok(true, `${count} full-power flat drives all curl: bow at least ${minBow.toFixed(2)} m, land within ${worstX.toFixed(3)} m of the marker sideways and at most ${(worstE * 100).toFixed(1)} cm further off than the same shot flown straight, top of bounce |x| <= ${maxXc.toFixed(2)} (reach 3.25)`);
@@ -68,7 +68,7 @@ function player(o) {
     if (m.type === 'launch' && cur && m.by === P.side) cur.launches.push({ ...m, t0: lastT });   // t0: the last state before it, so zig() looks from the re-aim on
     if (m.type === 'bounce' && cur && !cur.bounce) cur.bounce = m.p;
     if (m.type !== 'state' || P.side == null) return; lastT = m.t;
-    if (cur && !cur.bounce && m.live && m.b === 0) cur.states.push({ t: m.t, p: m.p, v: m.v, c: +m.c || 0, spin: m.spin, k: m.k });
+    if (cur && !cur.bounce && m.live && m.b === 0) cur.states.push({ t: m.t, p: m.p, v: m.v, c: +m.c || 0, w: m.w, spin: m.spin, k: m.k });
     const me = m.paddles[P.side], s = P.side === 0 ? 1 : -1, mine = m.live && m.v[2] * s > 0, z = P.a && phase === 'near' ? 3 : 6.5;
     ws.send(JSON.stringify({ type: 'paddle', x: mine ? m.p[0] : 0, y: mine ? Math.max(0.4, Math.min(1.4, m.p[1])) : 1, z, q: [0, 0, 0, 1] }));
     if (mine && me && Date.now() > cool && Math.abs(m.p[2] - me.z) < 1.0) { cool = Date.now() + 500; swungAt = Date.now();
@@ -84,15 +84,20 @@ A.ws.close(); B.ws.close(); proc.kill();
 
 const done = shots.filter(s => s.bounce && s.states.length > 5), by = md => done.filter(s => s.mode === md);
 const last = s => s.launches[s.launches.length - 1], cOf = s => s.launches.reduce((c, l) => l.c || c, s.hit.c || 0);
+// a re-aim's swoop rides on its bends (w: [vx, vz, W, t0] each); the ball's own c stays the struck one (NOTES 154). How far they carry it
+// sideways by the bounce: the re-aim packet coasted to the floor with them, less without them
+const reOf = s => s.launches.find(l => l.n != null);
+const bendX = s => { const r = reOf(s); if (!r || !r.w) return 0; const T = S.fallLeft(r.p[1], r.v[1], S.gOf(r.spin || 0));
+  coast(cP, cV, r.p, r.v, T, r.spin || 0, 0, r.k || 0, +r.c || 0, r.w, r.t); const x = cP.x; coast(cP, cV, r.p, r.v, T, r.spin || 0, 0, r.k || 0, +r.c || 0); return x - cP.x; };
 const bowOf = s => { const a = s.hit.p, b = s.bounce, L = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1; return Math.max(...s.states.map(q => Math.abs((q.p[0] - a[0]) * (b[2] - a[2]) - (q.p[2] - a[2]) * (b[0] - a[0])) / L)); };
 const offOf = s => Math.hypot(s.bounce[0] - last(s).land[0], s.bounce[2] - last(s).land[1]), exOf = s => Math.abs(s.bounce[0] - last(s).land[0]);
-// on the marker: sideways within 0.12 m (the curl's own error, part 1: < 0.09), and within 0.3 m in all. The 60 Hz sim only sees the ball
-// land on the tick after it passes R, up to ~0.25 m further along a fast drive whether it curls or not: 0.2 in all failed ~5% of finals.
-const onMark = s => exOf(s) < 0.12 && offOf(s) < 0.3;
+// on the marker: within 3 cm. The sim meets the floor where the closed form does (NOTES 154); it used to see the ball land on the tick after
+// it passed R, up to ~0.25 m further along a fast drive, and this was 0.12 m sideways / 0.3 m in all.
+const onMark = s => exOf(s) < 0.03 && offOf(s) < 0.03;
 function smooth(s) {                                               // the client's own prediction from each packet to the next, and the plain packet-to-packet step
   let pred = 0, jump = 0; const st = [{ t: s.hit.t, p: s.hit.p, v: s.hit.v, c: +s.hit.c || 0, spin: s.hit.spin, k: s.hit.k }, ...s.states];
   for (let i = 1; i < st.length; i++) { const a = st[i - 1], b = st[i]; if (!(b.t > a.t)) continue;
-    coast(cP, cV, a.p, a.v, b.t - a.t, a.spin || 0, 0, a.k || 0, a.c); pred = Math.max(pred, Math.hypot(cP.x - b.p[0], cP.y - b.p[1], cP.z - b.p[2]));
+    coast(cP, cV, a.p, a.v, b.t - a.t, a.spin || 0, 0, a.k || 0, a.c, a.w, a.t); pred = Math.max(pred, Math.hypot(cP.x - b.p[0], cP.y - b.p[1], cP.z - b.p[2]));
     jump = Math.max(jump, Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2])); }
   return { pred, jump };
 }
@@ -105,12 +110,13 @@ ok(F.every(s => bowOf(s) >= 0.3), `...and bends visibly: bow ${F.map(s => f2(bow
 ok(F.every(onMark), `...and still lands on its marker: ${F.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off (sideways/in all)`);
 ok(Bt.every(s => !s.hit.c && s.hit.bet), `a bet never curls: the hit on it carries c ${[...new Set(Bt.map(s => s.hit.c || 0))]}`);
 const BtR = Bt.filter(s => s.launches.some(l => l.n != null));
-ok(BtR.length >= 3 && BtR.every(s => { const r = s.launches.find(l => l.n != null); return r.c && r.n > 0.8; }), `its settled report (full power) curls it from the re-aim: ${BtR.map(s => { const r = s.launches.find(l => l.n != null); return `n ${f2(r.n)} c ${f2(r.c || 0)}`; }).join(', ')}`);
-const zig = s => { const r = s.launches.find(l => l.n != null), vx = s.states.filter(q => q.t >= r.t0).map(q => q.v[0]), d = vx.slice(1).map((v, i) => v - vx[i]); return Math.max(0, ...d.map(x => x * -Math.sign(r.c))); };   // after the re-aim the ball's sideways speed only ever moves the way it curls
+// the swoop is the re-aim's bend now, not a pull switched on mid-flight: the re-aim carries it as w (its sideways part), c stays the bet's 0 (NOTES 154)
+ok(BtR.length >= 3 && BtR.every(s => Math.abs(bendX(s)) >= 0.3 && reOf(s).n > 0.8), `its settled report (full power) swoops it from the re-aim: ${BtR.map(s => `n ${f2(reOf(s).n)} bend ${f2(bendX(s))} m`).join(', ')} (at least 0.3)`);
+const zig = s => { const r = reOf(s), vx = s.states.filter(q => q.t >= r.t0).map(q => q.v[0]), d = vx.slice(1).map((v, i) => v - vx[i]); return Math.max(0, ...d.map(x => x * -Math.sign(r.c || bendX(s)))); };   // after the re-aim the ball's sideways speed only ever moves the way it swoops
 ok(BtR.every(s => zig(s) < 0.02), `...as one swoop, no zig-zag: the sideways speed never steps against the curl (worst ${BtR.map(s => f2(zig(s))).join(', ')} m/s per packet)`);
 ok(BtR.every(s => bowOf(s) >= 0.3 && onMark(s)), `...bends like one (bow from contact ${BtR.map(s => f2(bowOf(s))).join(', ')} m, at least 0.3) and lands on the moved marker (${BtR.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off)`);
 const NR = N.filter(s => s.launches.some(l => l.n != null));
-ok(NR.length >= 2 && NR.every(s => cOf(s) && onMark(s)), `near the net (z 3), a bet settled at full power curls too: c ${NR.map(s => f2(cOf(s))).join(', ')}, lands ${NR.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off, bow ${NR.map(s => f2(bowOf(s))).join(', ')} m`);
+ok(NR.length >= 2 && NR.every(s => (cOf(s) || Math.abs(bendX(s)) >= 0.3) && bowOf(s) >= 0.3 && onMark(s)), `near the net (z 3), a bet settled at full power swoops too: sideways bend ${NR.map(s => f2(bendX(s))).join(', ')} m, bow ${NR.map(s => f2(bowOf(s))).join(', ')} m (both at least 0.3), lands ${NR.map(s => f2(exOf(s)) + '/' + f2(offOf(s))).join(', ')} m off`);
 ok(L.every(s => !cOf(s) && s.states.every(q => !q.c)), `a full-power lob never curls (c on no packet), bow ${L.map(s => f2(bowOf(s))).join(', ')} m`);
 ok(So.every(s => !cOf(s) && bowOf(s) < 0.05), `a soft drive (power 20) flies straight: bow ${So.map(s => f2(bowOf(s))).join(', ')} m`);
 const sm = done.map(s => ({ mode: s.mode, ...smooth(s) })), cur = sm.filter(s => s.mode !== 'lob' && s.mode !== 'soft');
