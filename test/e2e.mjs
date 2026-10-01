@@ -34,16 +34,19 @@ const ui = pg => pg.evaluate(() => { const t = id => document.getElementById(id)
     pod: (r => ({ top: r.top / innerHeight, bottom: r.bottom / innerHeight, w: r.width }))(t('podwrap').getBoundingClientRect()), meter: !!t('bar'), camCaption: t('camwrap').textContent.trim(), font: getComputedStyle(document.body).fontFamily, fontsLoaded: [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family + ' ' + f.weight).join(', ') }; });
 const a = await open('p0', '&skiptitle=1&uitest=1' + (TWO ? '' : '&autobot=1'));
 const b = TWO ? await open('p1', '&skiptitle=1') : null;
-await sleep(3000); await shot(a, '1-cal-hold.png'); await shot(a, 'ui-3-calibrate1.png');
-{ const u = await ui(a); check(u.screen === 'calibrate' && /hold still/i.test(u.calh), `calibrate step 1 not showing (screen=${u.screen}, headline=${u.calh})`); check(!u.calHidden, '#cal hidden during calibration'); }
-let ok = false; const seen = { tilt: false, done: false, banner: null, callout: null, rally: false, toastTop: null, keysOnBanner: null }, SHOT_NAMES = ['Dink', 'Lob', 'Tap', 'Drive', 'Smash', 'Block'];
+let ok = false; const seen = { hold: null, tilt: false, done: false, banner: null, callout: null, rally: false, toastTop: null, keysOnBanner: null }, SHOT_NAMES = ['Dink', 'Lob', 'Tap', 'Drive', 'Smash', 'Block'], t0 = Date.now();
+// the calibration beats, watched from the first frame: the page boots in well under 3 s now (the stadium venue went, docs/TROPHIES.md 2), so a fixed wait would land on 'All set'
+const calBeats = async u => { const at = ((Date.now() - t0) / 1000).toFixed(1);
+  if (seen.hold === null && u.screen === 'calibrate' && /hold still/i.test(u.calh)) { seen.hold = { at, calHidden: u.calHidden }; await shot(a, '1-cal-hold.png'); await shot(a, 'ui-3-calibrate1.png'); }
+  if (!seen.tilt && u.screen === 'calibrate' && u.calh === 'Tip it up') { seen.tilt = at; await shot(a, '2-cal-tilt.png'); await shot(a, 'ui-4-calibrate2.png'); }
+  if (!seen.done && u.screen === 'calibrate' && u.calh === 'All set') { seen.done = at; await shot(a, 'ui-4b-cal-done.png'); } };     // the success beat must be held long enough to see
+for (let i = 0; i < 60 && !seen.done; i++) { await sleep(50); const u = await ui(a).catch(() => null); if (u) await calBeats(u); }
+check(!!seen.hold, `calibrate step 1 ("hold still") never showed`); check(seen.hold && seen.hold.calHidden === false, '#cal hidden during calibration'); console.log('calibration beats at', JSON.stringify({ hold: seen.hold && seen.hold.at, tilt: seen.tilt, done: seen.done }), 's');
 for (let i = 0; i < 600; i++) {
   await sleep(100);
-  const st = await a.evaluate(() => window.__stats), u = await ui(a);
-  if (!seen.tilt && u.screen === 'calibrate' && u.calh === 'Tip it up') { seen.tilt = true; await shot(a, '2-cal-tilt.png'); await shot(a, 'ui-4-calibrate2.png'); }
-  if (!seen.done && u.screen === 'calibrate' && u.calh === 'All set') { seen.done = true; await shot(a, 'ui-4b-cal-done.png'); }     // the success beat must be held long enough to see
+  const st = await a.evaluate(() => window.__stats), u = await ui(a); await calBeats(u);
   if (u.screen === 'hud' && u.toastOn && seen.toastTop == null) { seen.toastTop = u.toastTop; await shot(a, 'ui-5a-serve-toast.png'); }
-  if (st.calibrated && !ok) { ok = true; console.log('calibrated at', (i / 10 + 3).toFixed(1), 's'); }
+  if (st.calibrated && !ok) { ok = true; console.log('calibrated at', ((Date.now() - t0) / 1000).toFixed(1), 's'); }
   if (u.banner && !seen.banner) { seen.banner = u.banner; seen.keysOnBanner = u.keys; await shot(a, 'ui-6-point-banner.png'); }
   if (u.callout && !seen.callout) { seen.callout = u.callout; await shot(a, 'ui-7-callout.png'); }
   if (ok && !seen.rally && st.hits >= 2 && !u.banner) { seen.rally = true; await shot(a, 'ui-5-hud-rally.png'); }
@@ -51,7 +54,7 @@ for (let i = 0; i < 600; i++) {
 }
 await a.screenshot({ path: root + 'test/shots/3-rally.png' });
 { const u = await ui(a);
-  check(seen.tilt, 'never saw calibration step 2 ("Tip it up")'); check(seen.done, 'never saw the "All set" beat at the end of calibration');
+  check(!!seen.tilt, 'never saw calibration step 2 ("Tip it up")'); check(!!seen.done, 'never saw the "All set" beat at the end of calibration');
   check(u.pod.w > 0 && u.pod.bottom < 0.55, `AirPod inset reaches into the near court (bottom at ${(u.pod.bottom * 100).toFixed(0)}% of the height)`); check(!u.meter, 'stats panel still has a meter bar');
   check(seen.toastTop == null || seen.toastTop > 0.88, `HUD toast sits over the court (top at ${(seen.toastTop * 100).toFixed(0)}% of the height)`); check(u.screen === 'hud' && u.hud, `HUD not showing after calibration (screen=${u.screen})`);
   check(u.g === 'live', `#g is "${u.g}", expected "live"`); check(!u.dev, 'stats panel visible by default'); check(u.camCaption === '', 'webcam inset has a caption');

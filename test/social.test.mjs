@@ -1,4 +1,4 @@
-// Friends live (docs/SOCIAL.md 4, 5, 8): a real server (the presence tick at its default 2 s) on a database seeded first, as test/rksignin.test.mjs does.
+// Friends live (docs/SOCIAL.md 4, 5, 8): a real server (the presence tick at its default 2 s) on a database seeded first, as test/trophies.test.mjs does.
 // Amy and Ben are friends, Cal is not. Signed-in lobby sockets get the 'social' snapshot after their hello (a guest never does); Amy sees Ben come online
 // (menu), Ben sees Amy go menu -> matt (create + Matt) -> Ben watching her court, and off when his socket closes; Cal's add reaches Amy at once; Cal never
 // hears of Amy's status; signing out (POST /api/signout) says socialoff and takes Amy offline for Ben; an account deleted from another process (admin.js)

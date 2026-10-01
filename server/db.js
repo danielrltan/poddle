@@ -7,7 +7,7 @@
 // max_page_count (a PRAGMA cannot take a parameter): an operator env value, forced to a clamped integer first; and the rank table's own
 // integer constants (server/ladder.js FLOORS / DIV_W, frozen, never input) in extra()'s tier recompute.
 const crypto = require('node:crypto'), fs = require('node:fs'), path = require('node:path');
-const LAD = require('./ladder');                                  // the Ranked ladder's pure table: tiers, floors, the Matt ceiling (docs/RANKED.md 5)
+const LAD = require('./ladder');                                  // the trophy ladder's pure table: tiers, floors, the Matt ceiling (docs/TROPHIES.md 1)
 
 const WEB = path.join(__dirname, '..', 'web');                    // served publicly: the database may never live under it (11.1)
 const DAY = 24 * 3600e3, HOUR = 3600e3;
@@ -18,6 +18,9 @@ const SESSION_DAYS = 180, SESSIONS_MAX = 10, SEEN_EVERY = HOUR;  // 3.3: absolut
 const HOLD_RENAME_DAYS = 30, HOLD_DELETE_DAYS = 90;               // 7.4: an old name after a rename, a deleted account's name
 const ACCOUNT_IDLE_DAYS = 730;                                    // 10.5 / Q8: no sign-in and no match for 24 months -> deleted
 const BATCH = 500;                                                // 10.5: rows per sweep transaction; setImmediate between batches
+// a match_log row that moved trophies to its winner: a counted win, or a paid forfeit win (ranked = 0 under early_forfeit, delta on the winner's side > 0:
+// the leaver rule, docs/TROPHIES.md 3.4). The anti-abuse counts (R10 pairs, R11b one-way, R12 daily) take both, so forfeits cap like played-out games
+const PAID = "(ranked = 1 OR (winner = 0 AND coalesce(delta_a, 0) > 0) OR (winner = 1 AND coalesce(delta_b, 0) > 0))";
 const TRIM = 50;                                                  // log rows trimmed before one match is recorded near the size cap: small, since that runs inside sim() (each match adds at most one row)
 const SQLITE = { 5: 'SQLITE_BUSY', 7: 'SQLITE_NOMEM', 8: 'SQLITE_READONLY', 10: 'SQLITE_IOERR', 11: 'SQLITE_CORRUPT', 13: 'SQLITE_FULL', 14: 'SQLITE_CANTOPEN', 19: 'SQLITE_CONSTRAINT', 26: 'SQLITE_NOTADB' };
 const BROKEN = new Set([10, 11, 13]);                             // the write failures that turn ok() false (11.4); a constraint race does not
@@ -112,7 +115,7 @@ CREATE INDEX match_log_at ON match_log(at);
 CREATE INDEX match_log_a  ON match_log(owner_a, at);
 CREATE INDEX match_log_b  ON match_log(owner_b, at);
 `,
-// Schema version 2 (docs/RANKED.md 10.1): the Ranked ladder, one row per owner, and the mode / series / trophy-delta columns on match_log.
+// Schema version 2 (docs/RANKED.md 10.1, history): the trophy ladder, one row per owner, and the mode / series / trophy-delta columns on match_log (series is always NULL since docs/TROPHIES.md; the column stays).
 // A separate table, not profile columns: profSet is a positional full-row update. kind keeps human/bot (its CHECK cannot be widened by ALTER).
 `
 CREATE TABLE ladder (
@@ -141,7 +144,7 @@ ALTER TABLE match_log ADD COLUMN delta_b INTEGER;
 `];
 
 // Additive schema outside the numbered migrations (NOTES 114): new profile counters and the share table. Idempotent, run on every open
-// after the migrations. It deliberately takes no MIGRATIONS slot: Ranked (NOTES 112) owns migration 2, and the two were built in parallel, so
+// after the migrations. It deliberately takes no MIGRATIONS slot: the ladder (NOTES 112) owns migration 2, and the two were built in parallel, so
 // whichever deployed first would have owned a shared slot while the other's migration silently never ran. Columns are only ever ADDED here (never renamed or dropped).
 const PLAY_COLS = ['hits', 'returns', 'chances', 'winners', 'aces', 'smashes', 'pts_won', 'pts_lost', 'secs_played'];   // profile: every match kind, see stats.js play counters
 const EXTRA = `
@@ -227,7 +230,7 @@ function open(p, opts = {}) {
   const env = process.env;
   cfg = { guestDays: intEnv(env, 'GUEST_DAYS', 90, 1, 3650), guestOneDays: intEnv(env, 'GUEST_ONE_DAYS', 7, 1, 3650), logDays: intEnv(env, 'LOG_DAYS', 30, 1, 3650),
     renameDays: intEnv(env, 'RENAME_DAYS', 30, 0, 3650), mergeMax: intEnv(env, 'MERGE_MAX', 10, 0, 1000), devicesMax: intEnv(env, 'DEVICES_MAX', 50, 0, 10000),
-    maxMb: intEnv(env, 'DB_MAX_MB', 256, 1, 65536), logCap: intEnv(env, 'LOG_CAP_DAY', 100, 1, 100000), mattDay: intEnv(env, 'RK_MATT_DAY', 40, 0, 100000),   // mattDay: Ranked trophies Matt may pay one owner per UTC day (RANKED.md 5.3)
+    maxMb: intEnv(env, 'DB_MAX_MB', 256, 1, 65536), logCap: intEnv(env, 'LOG_CAP_DAY', 100, 1, 100000), mattDay: intEnv(env, 'MATT_DAY', 40, 0, 100000),   // mattDay: trophies Matt may pay one owner per UTC day (docs/TROPHIES.md 3.3; was RK_MATT_DAY, nothing set it)
     friendMax: intEnv(env, 'FRIEND_MAX', 100, 1, 10000), reqOutMax: intEnv(env, 'REQ_OUT_MAX', 20, 1, 1000) };   // docs/SOCIAL.md 2: friends per account, pending requests out per account (test knobs like the rest)
   const where = p && String(p) !== ':memory:' ? path.resolve(String(p)) : null;
   try {
@@ -297,7 +300,7 @@ function prepare() {                                             // every statem
     profGet: q('SELECT * FROM profile WHERE owner_id = ?'),
     profSet: q(`UPDATE profile SET played = ?, h_wins = ?, h_losses = ?, h_streak = ?, h_best_streak = ?, h_points_won = ?, h_points_lost = ?, tour_titles = ?,
       best_rally = ?, best_rally_at = ?, best_hit = ?, best_hit_at = ?, best_speed = ?, best_speed_at = ?, updated_at = ? WHERE owner_id = ?`),
-    playAdd: q(`UPDATE profile SET ${PLAY_COLS.map(c => c + ' = ' + c + ' + ?').join(', ')} WHERE owner_id = ?`),   // the play counters, PLAY_COLS order (constants, never input). Its own statement: profSet stays as Ranked left it
+    playAdd: q(`UPDATE profile SET ${PLAY_COLS.map(c => c + ' = ' + c + ' + ?').join(', ')} WHERE owner_id = ?`),   // the play counters, PLAY_COLS order (constants, never input). Its own statement: profSet stays as the ladder work left it
     botGet: q('SELECT * FROM bot_record WHERE owner_id = ? AND level = ?'),
     botAll: q('SELECT * FROM bot_record WHERE owner_id = ? ORDER BY level'),
     botPut: q(`INSERT INTO bot_record (owner_id, level, wins, losses, abandons, streak, best_streak, first_win_at, best_margin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -325,11 +328,13 @@ function prepare() {                                             // every statem
     logMoveA: q('UPDATE match_log SET owner_a = ? WHERE owner_a = ?'),
     logMoveB: q('UPDATE match_log SET owner_b = ? WHERE owner_b = ?'),
     logOf: q('SELECT * FROM match_log WHERE (owner_a = ? OR owner_b = ?) AND at >= ? ORDER BY at'),
-    // RANKED.md 5.6: a best-of-3 writes up to three rows, so R10 counts SERIES between a pair, not games (a casual match is its own series). REVIEW FIX: series
-    // ids and row ids are two number spaces ('s' / 'i'), and the series being played is left out (its own first game must not cap its second)
-    pairs: q(`SELECT count(DISTINCT CASE WHEN series IS NULL THEN 'i' || id ELSE 's' || series END) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ? AND winner IS NOT NULL
+    // series is always NULL now (docs/TROPHIES.md 3.8): every match is its own. Old rows may still carry a series id (the removed Ranked mode's best-of-3),
+    // which R10 counts once ('s' / 'i' are two number spaces)
+    // ...and a paid forfeit win (ranked = 0, but delta on the winner's side > 0: the leaver rule, TROPHIES.md 3.4) counts like a counted win for R10 / R11b / R12,
+    // so repeated forfeits by one pair hit pair_cap and the stayer's day hits daily_cap (then the stayer gets +0 while the leaver still pays)
+    pairs: q(`SELECT count(DISTINCT CASE WHEN series IS NULL THEN 'i' || id ELSE 's' || series END) AS n FROM match_log WHERE kind IN ('human','tour') AND ${PAID} AND at >= ? AND winner IS NOT NULL
       AND ((owner_a = ? AND owner_b = ?) OR (owner_a = ? AND owner_b = ?)) AND (series IS NULL OR series <> ?)`),
-    // the Ranked ladder (RANKED.md 10.1)
+    // the trophy ladder (docs/TROPHIES.md 1)
     ladGet: q('SELECT * FROM ladder WHERE owner_id = ?'),
     ladTier: q('SELECT tier, div, trophies, best_tier, best_div, matt_day, matt_day_at FROM ladder WHERE owner_id = ?'),
     ladPut: q(`INSERT INTO ladder (owner_id, trophies, tier, div, best_trophies, best_tier, best_div, best_tier_at, wins, losses, streak, best_streak, bot_wins, bot_losses, matt_day, matt_day_at, updated_at)
@@ -340,8 +345,8 @@ function prepare() {                                             // every statem
     logDeltaA: q('UPDATE match_log SET delta_a = ? WHERE owner_a = ? AND (series = ? OR id = ?)'),   // the trophy change on that side's rows of a series (or the one Matt game)
     logDeltaB: q('UPDATE match_log SET delta_b = ? WHERE owner_b = ? AND (series = ? OR id = ?)'),
     humanOf: q(`SELECT owner_a, owner_b, winner FROM match_log WHERE kind IN ('human','tour') AND winner IS NOT NULL AND at >= ? AND (owner_a = ? OR owner_b = ?)`),
-    winsOf: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ? AND ((owner_a = ? AND winner = 0) OR (owner_b = ? AND winner = 1))`),
-    winsOver: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ranked = 1 AND at >= ?
+    winsOf: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ${PAID} AND at >= ? AND ((owner_a = ? AND winner = 0) OR (owner_b = ? AND winner = 1))`),
+    winsOver: q(`SELECT count(*) AS n FROM match_log WHERE kind IN ('human','tour') AND ${PAID} AND at >= ?
       AND ((owner_a = ? AND owner_b = ? AND winner = 0) OR (owner_b = ? AND owner_a = ? AND winner = 1)) AND (series IS NULL OR series <> ?)`),   // R11b, per game, the series being played left out (REVIEW FIX: a clean best-of-3 must not flag itself mid-series)
     // sweep (10.5): rowid batches, one short transaction each
     swGuests: q(`DELETE FROM owners WHERE rowid IN (SELECT o.rowid FROM owners o LEFT JOIN profile p ON p.owner_id = o.id WHERE o.kind = 'device'
@@ -447,7 +452,7 @@ function fold(g, a, now) {
     S.botPut.run(a, gb.level, ab.wins + gb.wins, ab.losses + gb.losses, ab.abandons + gb.abandons, ab.streak, Math.max(ab.best_streak, gb.best_streak), first, Math.max(ab.best_margin, gb.best_margin));
   }
   S.logMoveA.run(a, g); S.logMoveB.run(a, g);                    // the pair caps keep working across the merge
-  // the Ranked ladder (RANKED.md 10.1): a merge must never double a position: trophies / best_* / tier take the max, W/L and Matt games add, the streak is
+  // the trophy ladder (docs/TROPHIES.md 1): a merge must never double a position: trophies / best_* / tier take the max, W/L and Matt games add, the streak is
   // the account's, and Matt's day count is the sum (capped) when both rows are on the same day, else the later day's
   const LG = S.ladGet.get(g); if (LG) {
     const LA = S.ladGet.get(a) || ladZero(a);
@@ -528,7 +533,7 @@ const recordMatch = guard(null, m => {
   if (bot) { level = Number.isInteger(m.level) ? m.level : Number.isInteger(m.levelRank) ? BOT_ORDER[m.levelRank] : kind === 'tourbot' ? 3 : null;   // never read a rank as a level: rank 2 is Tour (3), rank 3 is Pro (2)
     if (!(level >= 0 && level <= 3)) return null; }
   const secs = Math.round(num(m.secs, 0, 1e7)), ranked = m.ranked ? 1 : 0;
-  const mode = m.mode === 'ladder' ? 'ladder' : 'casual', series = Number.isSafeInteger(m.series) && m.series > 0 ? m.series : null;   // RANKED.md 10.1: the mode and the process-local series id (NULL for casual and for Matt games)
+  const mode = m.mode === 'ladder' ? 'ladder' : 'casual', series = Number.isSafeInteger(m.series) && m.series > 0 ? m.series : null;   // the mode ('ladder': a seat could earn trophies) and series, history: always null now (docs/TROPHIES.md 3.8)
   if (broken || nearFull()) trimLog();                            // size-aware retention, in its OWN transaction first: a SQLITE_FULL rollback of this match must not undo it, and its success clears `broken`
   return tx(() => {
     const seats = [0, 1].map(i => { const s = m.seats[i]; return s && typeof s === 'object' && isId(s.owner) && S.ownerGet.get(s.owner) ? s : null; });   // ownerExists per seat, inside the transaction
@@ -583,26 +588,27 @@ const addTitle = guard(false, (o, now) => isId(o) && isNow(now) && tx(() => { co
   S.profSet.run(P.played, P.h_wins, P.h_losses, P.h_streak, P.h_best_streak, P.h_points_won, P.h_points_lost, P.tour_titles + 1,
     P.best_rally, P.best_rally_at, P.best_hit, P.best_hit_at, P.best_speed, P.best_speed_at, now, o); S.ownerTouch.run(now, o); return true; }));
 
-// ---- the Ranked ladder (docs/RANKED.md 5, 10.1) ----
+// ---- the trophy ladder (docs/TROPHIES.md 1, 3): one row per owner who has been paid or charged once ----
 const ladZero = o => ({ owner_id: o, trophies: 0, tier: 1, div: 1, best_trophies: 0, best_tier: 1, best_div: 1, best_tier_at: null, wins: 0, losses: 0, streak: 0, best_streak: 0, bot_wins: 0, bot_losses: 0, matt_day: 0, matt_day_at: 0 });
 const dayOf = now => Math.floor(now / DAY);                      // the UTC day number Matt's daily trophies belong to
 const mattLeft = (r, now) => (r.matt_day_at === dayOf(now) ? Math.max(0, cfg.mattDay - r.matt_day) : cfg.mattDay);
-// ladderTier(ownerId, now) -> { tier, div, trophies, bestTier, bestDiv, dayLeft }: the one cheap read for a seat (a missing row is Bronze I, 0)
+// ladderTier(ownerId, now) -> { tier, div, trophies, bestTier, bestDiv, dayLeft, row }: the one cheap read for a seat (a missing row is Bronze I, 0, with row false:
+// the emblem is shown only for a player who has been paid or charged once, docs/TROPHIES.md 3.9)
 const proDiv = r => { if (r.tier === LAD.TOP) r.div = 1; if (r.best_tier === LAD.TOP) r.best_div = 1; return r; };   // a Pro row written before Pro lost its divisions (NOTES 126) reads as plain Pro
-const ladderTier = guard(null, (o, now = Date.now()) => { if (!isId(o)) return null; const r = proDiv({ ...(S.ladTier.get(o) || ladZero(o)) });
-  return { tier: r.tier, div: r.div, trophies: r.trophies, bestTier: r.best_tier, bestDiv: r.best_div, dayLeft: mattLeft(r, now) }; });
+const ladderTier = guard(null, (o, now = Date.now()) => { if (!isId(o)) return null; const have = S.ladTier.get(o), r = proDiv({ ...(have || ladZero(o)) });
+  return { tier: r.tier, div: r.div, trophies: r.trophies, bestTier: r.best_tier, bestDiv: r.best_div, dayLeft: mattLeft(r, now), row: !!have }; });
 // ladderOf(ownerId, now) -> the Profile.ladder shape of RANKED.md 10.1 | null (a missing row = tier 1 zeros, never null for a real owner)
 const ladderOf = guard(null, (o, now = Date.now()) => {
   if (!isId(o) || !S.ownerGet.get(o)) return null;
-  const r = proDiv({ ...(S.ladGet.get(o) || ladZero(o)) });
+  const have = S.ladGet.get(o), r = proDiv({ ...(have || ladZero(o)) });
   return { trophies: r.trophies, tier: r.tier, div: r.div, floor: LAD.floorOf(r.tier), divFloor: LAD.divFloorOf(r.tier, r.div), next: LAD.nextFloorOf(r.tier), nextDiv: LAD.nextDivFloorOf(r.tier, r.div),
     bestTrophies: r.best_trophies, bestTier: r.best_tier, bestDiv: r.best_div, best_tier: r.best_tier, best_div: r.best_div, bestTierAt: r.best_tier_at,   // best_tier / best_div: the DIVISIONS note's spelling, beside the camelCase of 10.1
-    wins: r.wins, losses: r.losses, streak: r.streak, bestStreak: r.best_streak, botWins: r.bot_wins, botLosses: r.bot_losses, mattDayLeft: mattLeft(r, now) };
+    wins: r.wins, losses: r.losses, streak: r.streak, bestStreak: r.best_streak, botWins: r.bot_wins, botLosses: r.bot_losses, mattDayLeft: mattLeft(r, now), row: !!have };      // row: a ladder row exists (false = no trophies yet; the client draws the empty hero, docs/TROPHIES.md 4)
 });
 // ladderApply({ owner, delta, won, vsBot, seriesId, side, logId, now }) -> { trophies, tier, div, tierWas, divWas, floorHeld, delta (as applied), dayLeft } | null.
-// ONE transaction: the trophies (floors of 5.2 applied), tier, best_*, W/L and streak (vsBot: bot_wins/bot_losses, the day cap and the 1399 ceiling applied
-// HERE, 5.3), and delta_a / delta_b on that side's match_log rows of the series (or on the one Matt game named by logId). null when not open, on a
-// failed write, or for an owner that no longer exists (a deleted player mid-series: the other seat is still written by its own call).
+// ONE transaction: the trophies (the sticky floors applied), tier, best_*, W/L and streak (vsBot: bot_wins/bot_losses, the day cap and the MATT_CEILING applied
+// HERE), and delta_a / delta_b on the game's own match_log row (logId + side; seriesId is history, always null now). null when not open, on a
+// failed write, or for an owner that no longer exists (a deleted player mid-game: the other seat is still written by its own call).
 const ladderApply = guard(null, o => {
   if (!o || typeof o !== 'object' || !isId(o.owner) || !isNow(o.now) || !Number.isFinite(o.delta)) return null;
   const now = o.now, day = dayOf(now);
@@ -630,7 +636,7 @@ const ladderApply = guard(null, o => {
 });
 
 // Anti-abuse history (5.2), all from match_log. "o won" = (owner_a = o AND winner = 0) OR (owner_b = o AND winner = 1).
-const recentPairs = guard(0, (a, b, since, series = null) => isId(a) && isId(b) ? S.pairs.get(since, a, b, b, a, isId(series) ? series : -1).n : 0);   // R10: ranked human SERIES between the two, either way; series: the one in progress, not counted
+const recentPairs = guard(0, (a, b, since, series = null) => isId(a) && isId(b) ? S.pairs.get(since, a, b, b, a, isId(series) ? series : -1).n : 0);   // R10: ranked human matches between the two, either way (old series rows count once); series: history, null
 const recentLosses = guard({ losses: 0, wins: 0, topTwoShare: 0 }, (o, since) => {   // R11: over ALL human results, ranked or not
   if (!isId(o)) return { losses: 0, wins: 0, topTwoShare: 0 };
   let losses = 0, wins = 0; const by = new Map();
@@ -659,7 +665,7 @@ const profileOf = guard(null, (o, now = Date.now()) => {
     bests: { rally: { v: p.best_rally, at: p.best_rally_at }, hit: { v: p.best_hit, at: p.best_hit_at }, speed: { v: p.best_speed, at: p.best_speed_at } },
     play: { hits: p.hits || 0, returns: p.returns || 0, chances: p.chances || 0, winners: p.winners || 0, aces: p.aces || 0, smashes: p.smashes || 0,   // every match kind (docs/SHARE.md 1)
       pointsWon: p.pts_won || 0, pointsLost: p.pts_lost || 0, secs: p.secs_played || 0 },
-    ladder: ladderOf(o, now) };                                   // the Ranked ladder (RANKED.md 10.1): tier 1 zeros until a Ranked game is played
+    ladder: ladderOf(o, now) };                                   // the trophy ladder (docs/TROPHIES.md): tier 1 zeros until a game pays or charges trophies
 });
 // exportOf(ownerId, now?) -> the section 10.6 export object | null. Matches from the requester's side, opponents never identified.
 const SHARE_URL = 'https://poddleball.com/c/';                   // a share link's public address (server/share.js makes it; locally the page answers on the test host)
@@ -705,7 +711,7 @@ const usernameOf = guard(null, o => { if (!isId(o)) return null; const a = S.acc
 
 // ---- the global leaderboards (NOTES 126) ----
 // leaderboard(board, limit) -> { board, rows: [{ rank, name, v, tier, div }], total } | null. rank: 1 + everyone listed above (a tie shares its number).
-// Never an owner id: a row is what any visitor may see. tier/div: the Ranked emblem, null for a player who has never played Ranked
+// Never an owner id: a row is what any visitor may see. tier/div: the rank emblem, null for a player with no trophies yet (no ladder row)
 const leaderboard = guard(null, (b, limit = LB_MAX) => {
   if (!Object.prototype.hasOwnProperty.call(BOARDS, b)) return null;
   const n = Math.max(1, Math.min(LB_MAX, Math.floor(Number(limit)) || LB_MAX)), rows = [];
@@ -750,7 +756,7 @@ const pairOf = (x, y) => (x < y ? [x, y] : [y, x]);              // one row per 
 const cutOf = now => now - REQ_MS;                               // a request created at or before this has expired, whatever the sweep did yet
 const isFriend = (x, y) => !!S.frGet.get(...pairOf(x, y));
 const nFriends = x => S.frCount.get(x, x).n;
-const rankOf = (tier, div) => (tier == null ? null : { tier, div: tier === LAD.TOP ? 1 : div });   // null: never played Ranked (no ladder row). Pro has no divisions (NOTES 126)
+const rankOf = (tier, div) => (tier == null ? null : { tier, div: tier === LAD.TOP ? 1 : div });   // null: no trophies yet (no ladder row). Pro has no divisions (NOTES 126)
 function relOf(me, o, now) {                                     // me's view of o: friend | out (my request, pending or silently declined) | in (theirs, pending) | none
   if (isFriend(me, o)) return 'friend';
   const c = cutOf(now), mine = S.reqGet.get(me, o, c); if (mine && mine.sent) return 'out';
@@ -833,7 +839,7 @@ const deleteOwner = guard(false, (o, now) => {
 });
 
 // resetStats(ownerId, now) -> true when the owner exists. The operator's reset (admin.js reset-stats, the owner's own request): the profile row
-// back to a fresh one, the Matt record and the Ranked ladder gone, the owner unlinked from match_log (so R10/R11 history starts again);
+// back to a fresh one, the Matt record and the trophy ladder gone, the owner unlinked from match_log (so R10/R11 history starts again);
 // the owner, account, username, devices, sessions and any share link stay
 const resetStats = guard(false, (o, now) => {
   if (!isId(o) || !isNow(now)) return false;

@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-09-30 (NOTES 157): the Ranked mode is gone.** docs/TROPHIES.md is the spec now: trophies are earned in every counted game by signed-in players with a username, there is no queue, series, stadium or Ranked view, and the rank emblem shows on every court. This file is history; where it disagrees with TROPHIES.md, TROPHIES.md wins.
+
 # Poddle RANKED: the final spec
 
 Menu overhaul, the Ranked queue with Matt as the warm-up, best-of-3 series in a night stadium, a seven-rank trophy road, and the match show (VS, game cards, series card, trophy roll, rank-up). Implementation-ready. Every `file:line` below was verified in the worktree at `/Users/danieltan/poddle-ranked` (branch `ranked`, head `6f6488d`), including the uncommitted work already in it (section 0.2).

@@ -20,11 +20,11 @@ const swapText = (el, t, cls) => { if (!el) return false; const cup = el.hasAttr
 { const ONE = { 'lob-row-in': 'lob-in', 'num-pop': 'lob-pop', 'lob-fill': 'lob-fill', 'lob-clear': 'lob-clear', 'lob-swap': 'lob-swap', nudge: 'lob-nope' };      // one-shot class <- its animation: back to rest when it ends (or a hidden screen cancels it), so nothing replays when it shows again
   const done = e => { const c = ONE[e.animationName]; if (c && e.target.classList?.contains(c) && (e.type === 'animationend' || e.target.closest?.('.screen:not(.is-active)'))) e.target.classList.remove(c); };      // a cancel from restart() itself must not strip the replay it just started
   document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
-{ const OV = { 'num-pop': 'ov-pop', 'ov-tick-up': 'ov-up', 'ov-tick-down': 'ov-down', nudge: 'ov-nudge', 'ov-recentre': 'ov-spin', 'ov-shine-l': 'ov-scored', 'ov-shine-r': 'ov-scored', 'ov-bump': 'ov-bump', 'ov-emote-sent': 'ov-sent', 'ov-key-press': 'ov-press', 'ov-note-in': 'ov-note', 'rk-pill-in': 'ov-pill', 'rank-pop': 'is-pop', 'chip-in': 'chip-in' };      // rank-pop: an emblem's ceremony (docs/RANKED.md 8.10; rank-down is not here: its shrunk emblem is the resting state until the next result clears it); chip-in: the series pips redrawn      // the settings / HUD one-shots (ov-*): the class may sit on a parent of what moves (Recentre's svg, an emote's img)
+{ const OV = { 'num-pop': 'ov-pop', 'ov-tick-up': 'ov-up', 'ov-tick-down': 'ov-down', nudge: 'ov-nudge', 'ov-recentre': 'ov-spin', 'ov-shine-l': 'ov-scored', 'ov-shine-r': 'ov-scored', 'ov-bump': 'ov-bump', 'ov-emote-sent': 'ov-sent', 'ov-key-press': 'ov-press', 'ov-note-in': 'ov-note', 'rank-pop': 'is-pop' };      // rank-pop: an emblem's ceremony (docs/RANKED.md 8.10; rank-down is not here: its shrunk emblem is the resting state until the next result clears it)      // the settings / HUD one-shots (ov-*): the class may sit on a parent of what moves (Recentre's svg, an emote's img)
   const done = e => { const c = OV[e.animationName], el = c && e.target.closest?.('.' + c); if (el && (e.type === 'animationend' || !el.getClientRects().length)) el.classList.remove(c); };      // a cancel: only when its card or the HUD was hidden mid-way (restart() itself cancels too)
   document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
 const on2 = (id, type, fn) => { const el = $(id); if (el) el.addEventListener(type, fn); };      // every new element is optional (older markup, a test page)
-import { RANKS, THRESHOLDS, DIV_W, divOf, hasDivs, romanOf, rankLabel, emblemEl, setEmblem, emblemCard, installSprite } from './emblems.js';      // the rank emblems (docs/RANKED.md 6): one sprite at the start of <body>, drawn here and nowhere else
+import { RANKS, THRESHOLDS, DIV_W, hasDivs, romanOf, rankLabel, emblemEl, setEmblem, emblemCard, installSprite } from './emblems.js';      // the rank emblems (docs/RANKED.md 6): one sprite at the start of <body>, drawn here and nowhere else
 installSprite();
 
 // Shot names for the hit callout. Add new kinds here; an unknown kind falls back to its own name, capitalised.
@@ -34,9 +34,8 @@ export const shotName = kind => !kind ? '' : SHOTS[kind] || String(kind).replace
 // ---------- screens ----------
 // Two independent slots. Menu screens (title and lobby on glass over the live court; connect and calibrate opaque) cover everything; overlays (match, server-down,
 // game-full) sit over the court, under any menu screen (ui.css lifts game-full above them: that one cannot wait). The HUD leaves the render tree under a menu screen.
-const MENU = ['title', 'lobby', 'camera', 'connect', 'calibrate'], OVERLAY = ['match', 'server-down', 'game-full', 'tour-vs', 'rk-vs', 'rk-game'];      // tour-vs: a tournament's VS card, before a match. rk-vs: Ranked's MATCH FOUND on the same markup; rk-game: the card between the games of a series (docs/RANKED.md 8.3, 8.7)
-const ALIAS = { 'rk-vs': 'tour-vs' }, canon = name => ALIAS[name] || name;      // two overlay names on one section: body[data-overlay] tells them apart for the CSS
-const screenEl = name => document.querySelector(`.screen[data-screen="${canon(name)}"]`);
+const MENU = ['title', 'lobby', 'camera', 'connect', 'calibrate'], OVERLAY = ['match', 'server-down', 'game-full', 'tour-vs'];      // tour-vs: a tournament's VS card, before a match
+const screenEl = name => document.querySelector(`.screen[data-screen="${name}"]`);
 const slots = { menu: null, overlay: null }, hideT = {};
 // A phone (NOTES 149): it cannot be the screen AND the paddle, so it gets the phone home: the paddle-code card, Courts to watch, stats, the leaderboard,
 // friends. main.js decides (MOBILE) and says so once, before the first view; nothing here takes a seat on a phone.
@@ -46,9 +45,9 @@ function swap(slot, name) {
   const prev = slots[slot];
   if (prev !== name) {
     slots[slot] = name;
-    if (prev) { const el = screenEl(prev); el.classList.remove('is-active'); clearTimeout(hideT[canon(prev)]); hideT[canon(prev)] = setTimeout(() => { el.hidden = true; }, 360); }   // after the fade: out of the render tree
+    if (prev) { const el = screenEl(prev); el.classList.remove('is-active'); clearTimeout(hideT[prev]); hideT[prev] = setTimeout(() => { el.hidden = true; }, 360); }   // after the fade: out of the render tree
     if (name === 'lobby') { const l = screenEl('lobby'); delete l.dataset.dir; delete l.dataset.live; }      // entering the lobby: its first view rises, it does not slide
-    if (name) { const el = screenEl(name); clearTimeout(hideT[canon(name)]); el.hidden = false; void el.offsetWidth; el.classList.add('is-active'); }
+    if (name) { const el = screenEl(name); clearTimeout(hideT[name]); el.hidden = false; void el.offsetWidth; el.classList.add('is-active'); }
   }
   const b = document.body, hud = $('hud');
   b.dataset.screen = slots.menu || 'hud';
@@ -56,7 +55,6 @@ function swap(slot, name) {
   if (slots.menu || slots.overlay) { settings(false); tourCard(false); friendsCard(false); }             // the cards belong to the open court. (Closing fires their callback: a pause must not outlive the panel)
   if (slots.menu !== 'lobby') askWatch(null);
   if (slots.overlay === 'match') hold(null); else stopCount();                        // the result replaces the hold card; leaving the result stops its countdown
-  if (slots.overlay !== 'rk-game') gameStop(); if (slots.overlay !== 'rk-vs') vsStop();      // the Ranked cards' own clocks stop with them
   clearTimeout(hideT.hud);
   if (slots.menu) { if (!hud.hidden) hideT.hud = setTimeout(() => { hud.hidden = true; }, 360); }
   else if (hud.hidden) { hud.hidden = false; wake(); }
@@ -71,7 +69,7 @@ export function setNames({ me, meSub, them, themSub, reg, rank } = {}) {
   if (me != null) setText($('name-me'), me); if (meSub != null) setText($('sub-me'), meSub);
   if (them != null) setText($('name-them'), them); if (themSub != null) setText($('sub-them'), themSub);
   if (reg !== undefined) { const r = Array.isArray(reg) ? reg : []; regBadge($('name-me'), r[0] === true); regBadge($('name-them'), r[1] === true); }      // [left, right]: a registered username (docs/ACCOUNTS.md 7.5). Left out = unchanged
-  if (rank !== undefined) { const r = Array.isArray(rank) ? rank : []; rankBadge($('name-me'), r[0]); rankBadge($('name-them'), r[1]); }      // [left, right]: { tier, div } in a Ranked court, null = no emblem (docs/RANKED.md 6). Left out = unchanged
+  if (rank !== undefined) { const r = Array.isArray(rank) ? rank : []; rankBadge($('name-me'), r[0]); rankBadge($('name-them'), r[1]); }      // [left, right]: { tier, div } on any court (docs/TROPHIES.md 3.9), null = no emblem. Left out = unchanged
 }
 // The registered-name badge: its own element BESIDE the name, never in the name's text, drawn as a pill with an SVG tick, so no
 // name a guest can type reproduces it (docs/ACCOUNTS.md 7.5). Made and removed here: a guest's seat has no .reg-badge at all.
@@ -134,15 +132,44 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && tipFor) tipOff(); }
 // Beside a name only the emblem shows; from .is-md up the wrapper's data-div draws the division's roman numeral over the emblem (ui.css).
 const tierOf = t => Number.isInteger(t) && t >= 1 && t <= RANKS.length ? t : 0;      // 1..8 since Master (NOTES 124)
 const rankRef = r => { const o = r && typeof r === 'object' ? r : { tier: r, div: 1 }, tier = tierOf(o.tier); return tier ? { tier, div: o.div === 2 ? 2 : o.div === 3 ? 3 : 1 } : null; };      // a bare number still reads (division I)
-// Your stats' crest wears the Ranked emblem (one rank per player, docs/RANKED.md 2): the emblem at .is-lg inside the crest, its division as the tag
-export function rankCrest(crest, r) {
-  if (!crest) return; r = rankRef(r) || { tier: 1, div: 1 }; lastRank = { tier: r.tier, div: r.div, best: Math.max(r.tier, lastRank && lastRank.best || 1) }; let w = crest.querySelector('.st-em');
+// Your stats' hero (docs/TROPHIES.md 4): the crest wears the rank's emblem (.is-lg, its division as the tag), and from the same ladder the bar and the line to the next
+// step (#st-next beside the count: '10 to Gold III', Pro: 'Top rank'), 'Gold II' and the count (#st-rank, #st-trophies; the place pill is web/profile.js drawPlace's), the trophy road (#st-road, under the streak: eight medals, reached ones lit, the current one ringed, the rest dimmed), the keep line under the bar and
+// 'Best: Platinum I' beside it when the best rank is above the current. L = the /api/stats ladder as web/profile.js ladderOf reads it ({ tier, div, trophies, best, bestDiv, place });
+// null = no trophies yet: the Bronze emblem dimmed, no next line, the cap line 'Win a game for your first trophies' (signedIn true) / 'Pick a username to earn trophies' (signedIn 'username') / 'Sign in to earn trophies'.
+// The old call rankCrest(crestEl, { tier, div }) still draws the emblem alone. lastRank (the Ranks page's You card) follows every call.
+export function rankCrest(L, signedIn = false) {
+  let crest = $('st-crest'); const legacy = typeof Element === 'function' && L instanceof Element; if (legacy) { crest = L; L = signedIn; signedIn = false; }
+  if (!crest) return;
+  const known = legacy || !!(L && typeof L === 'object' && tierOf(L.tier)), r = rankRef(L) || { tier: 1, div: 1 }, n = known && !legacy ? Math.max(0, L.trophies | 0) : 0, top = r.tier === RANKS.length;
+  const best = known ? Math.max(r.tier, legacy ? (lastRank && lastRank.best) || 1 : tierOf(L.best)) : 1, bestDiv = best > r.tier ? (L && (L.bestDiv === 2 || L.bestDiv === 3) ? L.bestDiv : 1) : Math.max(r.div, L && best === r.tier && (L.bestDiv === 2 || L.bestDiv === 3) ? L.bestDiv : 1);
+  const place = known && !legacy && Number.isInteger(L.place) && L.place > 0 ? L.place : null;
+  lastRank = known ? { tier: r.tier, div: r.div, best, place } : null; if (view === 'ranks') drawRanks();
+  let w = crest.querySelector('.st-em');
   if (!w) { w = document.createElement('span'); w.className = 'st-em'; w.append(emblemEl(r.tier, 'is-lg', r.div)); crest.append(w); } else setEmblem(w.firstElementChild, r.tier, r.div);      // the division's own medal (NOTES 124)
-  setDiv(w, r); w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep); w.setAttribute('role', 'img'); w.setAttribute('aria-label', `Rank: ${rankLabel(r.tier, r.div)}`);
+  w.firstElementChild.classList.toggle('is-off', !known); setDiv(w, known ? r : { tier: RANKS.length });      // no trophies yet: the Bronze emblem, dimmed, no numeral
+  w.style.setProperty('--rank-ink', RANKS[r.tier - 1].colour.deep); w.setAttribute('role', 'img'); w.setAttribute('aria-label', known ? `Rank: ${rankLabel(r.tier, r.div)}` : 'No trophies yet');
+  for (const c of [...crest.classList]) if (c !== 'is-link' && c.startsWith('is-')) crest.classList.remove(c);      // is-link (the way to the Ranks page) stays
+  crest.classList.add('has-rank', 'is-' + RANKS[r.tier - 1].name.toLowerCase()); crest.classList.toggle('is-top', known && top); crest.classList.toggle('is-none', !known);
+  if (legacy) return;
+  crest.closest('.st-hero')?.classList.toggle('is-none', !known);      // ui.css: no count, no bar before the first trophies
+  setText($('st-rank'), known ? (top ? RANKS[r.tier - 1].name : rankLabel(r.tier, r.div)) : 'No trophies yet'); setText($('st-trophies'), String(n));      // 'Pro' has no numeral: the #12 pill beside it says where (web/profile.js drawPlace)
+  setText($('st-rank-cap'), known ? '' : signedIn === 'username' ? 'Pick a username to earn trophies' : signedIn ? 'Win a game for your first trophies' : 'Sign in to earn trophies');
+  const floor = THRESHOLDS[r.tier - 1] || 0, dFloor = floor + (r.div - 1) * DIV_W, p = top ? 1 : Math.max(0, Math.min(1, (n - dFloor) / DIV_W));      // the bar: across the current division (Pro: full)
+  { const b = $('st-rank-bar'); if (b) { b.style.setProperty('--p', (known ? p : 0).toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round((known ? p : 0) * 100))); } }
+  const nextAt = r.div < 3 ? floor + r.div * DIV_W : THRESHOLDS[r.tier], nextName = top ? '' : r.div < 3 ? rankLabel(r.tier, r.div + 1) : rankLabel(r.tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
+  { const nx = $('st-next'); if (nx) { setText(nx, !known ? '' : top ? 'Top rank' : `${Math.max(1, nextAt - n)} to ${nextName}`); nx.hidden = !known; } }
+  const road = $('st-road'); if (road) { road.textContent = '';
+    RANKS.forEach((R, i) => { const t = i + 1, now = known && t === r.tier, done = known && !now && t <= best, li = mk('li', 'st-step' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t);
+      li.style.setProperty('--rank-ink', R.colour.deep); li.style.setProperty('--rank-mid', R.colour.mid); const em = emblemEl(t, 'is-md', now ? r.div : done ? 3 : 1); if (!known) em.classList.add('is-off'); li.append(em);      // your rank at your division's medal, a rank passed at its full III, one ahead at its I (NOTES 124)
+      if (now) setDiv(li, r);
+      li.title = `${now ? rankLabel(t, r.div) + ' · your rank' : done ? R.name + ' · reached' : R.name} · ${t === 1 ? 'the starting rank' : `from ${THRESHOLDS[i]} trophies`}`;      // the tooltip (and, with no text in it, the aria-label)
+      road.append(li); }); }
+  setText($('st-keep'), 'Bronze to Platinum are yours to keep. Diamond and above can drop.');
+  { const b = $('st-best'), above = known && (best > r.tier || best === r.tier && hasDivs(best) && bestDiv > r.div); if (b) { setText(b, above ? `Best: ${rankLabel(best, bestDiv)}` : ''); b.hidden = !above; } }      // Pro has no divisions: never 'Best: Pro' over Pro
 }
 const setDiv = (el, r) => { if (hasDivs(r.tier)) el.dataset.div = String(r.div); else delete el.dataset.div; };      // Pro has no divisions (NOTES 126): no numeral pill on its emblem
 // another player's emblem in a box of its own (the leaderboard profile, NOTES 140): the division's medal at .is-lg with its numeral, as on the crest; never
-// lastRank (that is mine, for the Ranks page). r null (never played Ranked) empties the box
+// lastRank (that is mine, for the Ranks page). r null (no trophies yet) empties the box
 export function rankEmblem(box, r) {
   if (!box) return; r = rankRef(r); box.textContent = '';
   if (!r) { box.removeAttribute('role'); box.removeAttribute('aria-label'); box.style.removeProperty('--rank-mid'); return; }
@@ -181,10 +208,6 @@ export function joinBanner(name, them = true) {
   $('banner-text').textContent = name ? `${name} joined to play` : 'A player joined';
   b.classList.remove('is-info'); b.classList.toggle('is-me', !them); b.classList.toggle('is-them', !!them); restart(b, 'show');
 }
-// A Ranked series (docs/RANKED.md 8.4): 'Game 2 of 3' in the same pill, in the house cyan (neither side's colour); the server's 3-2-1 follows
-export function gameBanner(text) {
-  const b = $('banner'); if (!b) return; $('banner-text').textContent = String(text || ''); b.classList.remove('is-me', 'is-them'); b.classList.add('is-info'); restart(b, 'show');
-}
 // The count into a match: n = whole seconds left, 0 or null = gone. Each new number pops once (server/game.js 'countdown').
 export function countdown(n) {
   const el = $('count'), b = $('count-n'); if (!el || !b) return;
@@ -208,7 +231,7 @@ export function confetti(colors, n = 46) {
     c.style.setProperty('--dx', (Math.random() * 30 - 15) + 'vw'); c.style.setProperty('--rot', (Math.random() * 1400 - 700) + 'deg');
     c.style.animationDuration = 1.4 + Math.random() * 1.2 + 's'; c.style.animationDelay = Math.random() * 0.25 + 's';
     frag.appendChild(c); made.push(c); }
-  const host = slots.overlay === 'match' || slots.overlay === 'rk-game' ? screenEl(slots.overlay) : document.body;       // on the result screen (or the game card): behind the card, never across the score
+  const host = slots.overlay === 'match' ? screenEl('match') : document.body;       // on the result screen: behind the card, never across the score
   host.insertBefore(frag, host.firstChild); setTimeout(() => made.forEach(c => c.remove()), 3200);
 }
 // o = { won, me, them, nameMe, nameThem, forfeit, role, vote }: me / them are the left and right scores, won = the left side won.
@@ -219,32 +242,24 @@ export function matchResult(o, me, them, name) {
   const legacy = o === null || typeof o !== 'object';                                   // the old positional call: it never carries stats
   if (legacy) o = { won: !!o, me, them, nameThem: name, vote: false };
   const T = o.tour && typeof o.tour === 'object' ? o.tour : null;      // a tournament match (docs/COURTS-TOURNEY.md 4.6 item 8): { round, next, gap }. No vote, one button: See bracket
-  const RK = o.rk && typeof o.rk === 'object' ? o.rk : null, MATT = !!(RK && RK.matt), SERIES = !!(RK && !MATT);      // a Ranked court (docs/RANKED.md 8.2, 8.8): a warm-up game vs Matt { matt, next }, or the series card { games, bestOf, scores, done, gap } (games / scores from the left slot's side)
-  const won = !!o.won, watching = o.role === 'spectator', nameMe = String(o.nameMe || 'You'), nameThem = String(o.nameThem || 'Opponent'), lost = !watching && !won, vote = !watching && o.vote !== false && !T && !RK;
+  const won = !!o.won, watching = o.role === 'spectator', nameMe = String(o.nameMe || 'You'), nameThem = String(o.nameThem || 'Opponent'), lost = !watching && !won, vote = !watching && o.vote !== false && !T;
   $('result').classList.toggle('is-lose', lost); $('result').classList.remove('is-champion'); show('result-road', false); show('champ-acts', false); show('tour-res', !!T);
-  $('result').classList.toggle('is-rk', SERIES); resultRkReset();
+  trophyReset();      // the trophy row starts hidden: main.js draws it with trophyRow() when the profile message brings trophies (docs/TROPHIES.md 4)
   $('medal').className = 'medal ' + (lost ? 'is-silver' : 'is-gold');
   const winner = won ? nameMe : nameThem;
-  $('result-title').textContent = SERIES ? (watching ? `${winner} wins the match` : won ? 'You win the match' : `${nameThem} wins the match`) : MATT ? (won ? 'You beat Matt' : 'Matt wins') : watching ? `${winner} wins` : won ? 'You win' : `${nameThem} wins`;
+  $('result-title').textContent = watching ? `${winner} wins` : won ? 'You win' : `${nameThem} wins`;
   setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : '');
-  const games = SERIES && Array.isArray(RK.games) ? [RK.games[0] | 0, RK.games[1] | 0] : null, bestOf = SERIES ? Math.max(1, RK.bestOf | 0) || 3 : 0;
-  const L = games ? games[0] : o.me ?? 0, R = games ? games[1] : o.them ?? 0;      // the series card tallies games; every other card the points
+  const L = o.me ?? 0, R = o.them ?? 0;
   $('tally-sc-me').textContent = L; $('tally-sc-them').textContent = R; setText($('tally-name-me'), nameMe); setText($('tally-name-them'), nameThem);
   $('tally-me').classList.toggle('is-winner', won); $('tally-them').classList.toggle('is-winner', !won);
   { const r = Array.isArray(o.reg) ? o.reg : []; regBadge($('tally-name-me'), r[0] === true); regBadge($('tally-name-them'), r[1] === true); }      // reg: [left, right], registered usernames (docs/ACCOUNTS.md 7.5)
-  { const r = Array.isArray(o.rank) ? o.rank : []; rankBadge($('tally-name-me'), r[0], 'is-md'); rankBadge($('tally-name-them'), r[1], 'is-md'); }      // rank: [left, right], the tiers in a Ranked court (docs/RANKED.md 6); absent = none. .is-md: the emblem with its division tag beside each name
-  if (games) {                                                                          // the final pips over the tally, the per-game scores under it
-    const need = Math.ceil(bestOf / 2); drawPips($('result-pips-me'), need, games[0], -1); drawPips($('result-pips-them'), need, games[1], -1); $('result-pips')?.setAttribute('aria-label', `Games ${games[0]} to ${games[1]}`); show('result-pips', true);
-    const sc = (Array.isArray(RK.scores) ? RK.scores : []).filter(x => Array.isArray(x)).map(x => `${x[0] | 0}-${x[1] | 0}`); setText($('tally-games'), sc.join(' · ')); show('tally-games', sc.length > 0);
-    if (!o.forfeit) setText($('result-note'), `${games[0]}-${games[1]}`);
-  }
-  countWord = T ? 'Bracket in ' : SERIES ? 'Back in ' : MATT ? 'Next game in ' : '';
-  resultRole = watching ? 'spectator' : 'player'; voted = votedYes = false; noCount = !!o.forfeit && !RK; stopCount();      // a forfeit leaves one thing to press (Leave): a bar ticking down beside it read as a rematch clock nobody could answer. The court still closes by itself countTotal = 0; votes = { mine: null, theirs: null, name: nameThem };
-  show('rematch-btns', vote); show('rematch-count', false); show('rk-acts', SERIES && !watching);
-  for (const id of ['btn-rematch', 'btn-leave', 'btn-rk-again', 'btn-rk-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
-  setText($('rematch-note'), T || RK ? '' : watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
+  { const r = Array.isArray(o.rank) ? o.rank : []; rankBadge($('tally-name-me'), r[0], 'is-md'); rankBadge($('tally-name-them'), r[1], 'is-md'); }      // rank: [left, right], the tiers on any court (docs/TROPHIES.md 3.9); absent = none. .is-md: the emblem with its division tag beside each name
+  countWord = T ? 'Bracket in ' : '';
+  resultRole = watching ? 'spectator' : 'player'; voted = votedYes = false; noCount = !!o.forfeit; stopCount();      // a forfeit leaves one thing to press (Leave): a bar ticking down beside it read as a rematch clock nobody could answer. The court still closes by itself countTotal = 0; votes = { mine: null, theirs: null, name: nameThem };
+  show('rematch-btns', vote); show('rematch-count', false);
+  for (const id of ['btn-rematch', 'btn-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
+  setText($('rematch-note'), T ? '' : watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
   if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
-  $('result-note').classList.toggle('is-quiet', SERIES && !o.forfeit);      // '2-1' is already the pips and the tally: read out, not drawn a third time. 'Priyanka left' stays in sight
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
   { const st = $('result-slam'), scr = $('screen-match'); if (st) { st.textContent = won && !watching && !o.forfeit ? 'VICTORY!' : ''; st.classList.remove('is-rank'); st.classList.toggle('is-victory', !!st.textContent); if (st.textContent) restart(st, 'go'); }
@@ -253,28 +268,20 @@ export function matchResult(o, me, them, name) {
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
   if (T) { if (T.gap > 0) rematch({ left: T.gap }); setTimeout(() => { if (slots.overlay === 'match') $('btn-see-bracket')?.focus({ preventScroll: true, focusVisible: true }); }, 60); }
-  if (SERIES) { if (RK.gap > 0) rematch({ left: RK.gap }); if (!watching) setTimeout(() => { if (slots.overlay === 'match') $('btn-rk-again')?.focus({ preventScroll: true, focusVisible: true }); }, 60); }      // Back in 12: the court closes by itself. Play again has focus: one press queues again
-  if (MATT && RK.next > 0) rematch({ left: RK.next });      // Next game in 6: the warm-up's next game starts by itself (rematchon closes this card)
   if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60);
 }
-// the Ranked rows of the card, back to nothing: the pips, the game scores, the trophy roll and its ceremony (matchResult and champion both start clean)
-function resultRkReset() { show('result-pips', false); show('tally-games', false); show('rk-acts', false); trophyReset(); }
-function trophyReset() {
-  clearTimeout(upT); upT = 0; const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll'); }
+// the trophy row back to nothing: the roll, its ceremony and the card's extra room for it (matchResult and champion both start clean)
+export function trophyReset() {
+  clearTimeout(upT); upT = 0; const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll', 'is-none'); } $('result')?.classList.remove('has-trophies');
   const em = $('trophy-em'); if (em) { em.querySelector('.medal-rays')?.remove(); em.querySelector('.rank-em')?.classList.remove('is-pop', 'is-down'); em.querySelector('.rank-card-em')?.classList.remove('is-flip'); em.classList.remove('is-up'); }
   { const k = $('rank-kicker'); if (k) { k.hidden = true; k.textContent = ''; } } $('result-flash')?.classList.remove('is-sweep');
-  const n = $('result-note'), c = $('result'); n?.querySelector('.result-note-sub')?.remove(); n?.classList.toggle('is-quiet', !!c && c.classList.contains('is-rk') && !c.classList.contains('is-forfeit')); $('result-slam')?.classList.remove('is-rank');
+  const n = $('result-note'); n?.querySelector('.result-note-sub')?.remove(); n?.classList.remove('is-quiet'); $('result-slam')?.classList.remove('is-rank');
 }
 // the emblem card in the trophy row: the rank's emblem at .is-lg, its name and division under it (emblems.js emblemCard), re-pointed in place on a change
 function trophyCard(tier, div) {
   const em = $('trophy-em'); if (!em) return null; let c = em.querySelector('.rank-card-em');
   if (!c) { c = emblemCard(tier, 'is-lg', div); em.append(c); return c; }
   const R = RANKS[tier - 1]; setEmblem(c.querySelector('.rank-em'), tier, div); setText(c.querySelector('b'), rankLabel(tier, div)); setDiv(c, { tier, div }); c.style.setProperty('--rank-ink', R.colour.deep); c.style.setProperty('--rank-mid', R.colour.mid); c.hidden = false; return c;
-}
-// bestOf dots as a row of pips: won of them filled, the one at `now` pulsing (the game in play), the one at `fresh` popping (the game just won)
-function drawPips(ol, n, won, now, fresh = -1) {
-  if (!ol) return; ol.textContent = '';
-  for (let i = 0; i < n; i++) { const li = mk('li', (i < won ? 'is-won' : '') + (i === now ? ' is-now' : '') + (i === fresh ? ' is-new' : '')); li.style.setProperty('--i', i); ol.append(li); }
 }
 // The stats pills under the tally ({ rally, smashes, run } from main.js, counted on this client). A stat under its floor stays out; the one furthest over its norm is starred.
 function resultStats(S, card) {
@@ -288,7 +295,7 @@ function stopCount() { clearInterval(countT); countT = 0; }
 let countWord = '';      // a tournament match: 'Bracket in 6' (the vote's own count is a bare number beside its buttons)
 function drawCount(n) { countLeft = n; { const l = $('rematch-left'), t = countWord + n; if (l && l.textContent !== t) { l.textContent = t; if (n !== countTotal) restart(l, 'ov-pop'); } }
   $('rematch-bar')?.style.setProperty('--p', (countTotal ? Math.min(1, n / countTotal) : 0).toFixed(3)); }      // each second hops (not the first)
-function lockVote(yes) { voted = true; votedYes = yes; for (const [id, mine] of [['btn-rematch', yes], ['btn-leave', !yes], ['btn-rk-again', yes], ['btn-rk-leave', !yes]]) { const b = $(id); if (b) { b.disabled = mine || !yes; b.classList.toggle('is-pressed', mine); } } }      // after Rematch, Leave stays open: nobody is locked in for 20 s behind someone who walked off
+function lockVote(yes) { voted = true; votedYes = yes; for (const [id, mine] of [['btn-rematch', yes], ['btn-leave', !yes]]) { const b = $(id); if (b) { b.disabled = mine || !yes; b.classList.toggle('is-pressed', mine); } } }      // after Rematch, Leave stays open: nobody is locked in for 20 s behind someone who walked off
 let onVote = null;
 export function onRematch(fn) { onVote = fn; }                                          // Rematch -> fn(true), Leave -> fn(false)
 // { mine, theirs, left, name }: each vote true | false | null, a missing key = unchanged. The server only speaks when a vote changes, so the seconds tick here.
@@ -564,21 +571,21 @@ export function setSettings(o = {}) {
       s.value = o.sink != null ? o.sink : keep; if (!s.selectedOptions.length) s.value = ''; } }
   if ('sink' in o) { const s = $('set-sink-sel'); if (s && s.value !== o.sink) s.value = o.sink || ''; }
   if ('inRoom' in o) show('btn-leave-room', !!o.inRoom);
-  { let n = false; for (const k of ['forfeit', 'canPause', 'tourMatch', 'rkMatch', 'rkWarm']) if (k in o) { setNote[k] = !!o[k]; n = true; } if (n) drawNote(); }      // the Leave button and the note under it: what leaving costs, and why a match cannot pause
+  { let n = false; for (const k of ['forfeit', 'canPause', 'tourMatch']) if (k in o) { setNote[k] = !!o[k]; n = true; } if (n) drawNote(); }      // the Leave button and the note under it: what leaving costs, and why a match cannot pause
   if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }
   if ('bodyNote' in o) { const n = $('move-note'); if (n) { setText(n, o.bodyNote || 'Body needs a camera'); if (o.bodyNote) n.hidden = false; } }      // the camera is off but can be asked for: picking Body asks, and the row says so      // no camera: Body cannot be picked, and the row says why
   if ('spectator' in o) $('settings')?.classList.toggle('is-spectator', !!o.spectator);
   if ('paddle' in o) { show('set-paddle', !!o.paddle); for (const b of $('paddle-seg2')?.children || []) b.setAttribute('aria-checked', String(b.dataset.paddle === o.paddle)); }      // null: only an AirPod can be the paddle here, nothing to pick
 }
-// forfeit: mid-match against a person (or any Ranked / tournament match), leaving is a forfeit and the button says so. rkWarm: the Ranked warm-up (Stop warm-up: you stay queued; Matt is fixed).
-// canPause false: the note says why (a tournament match, a Ranked match, or any online game against a person)
-const setNote = { forfeit: false, canPause: true, tourMatch: false, rkMatch: false, rkWarm: false };
+// forfeit: mid-match against a person (or a tournament match), leaving is a forfeit and the button says so.
+// canPause false: the note says why (a tournament match, or any online game against a person)
+const setNote = { forfeit: false, canPause: true, tourMatch: false };
 function drawNote() {
-  const b = $('btn-leave-room'), t = setNote.forfeit ? 'Forfeit' : setNote.rkWarm ? 'Stop warm-up' : 'Leave court';
+  const b = $('btn-leave-room'), t = setNote.forfeit ? 'Forfeit' : 'Leave court';
   if (b && swapText(b, t) && setOpen && !b.hidden) restart(b, 'ov-nudge');
   const n = $('set-note'); if (!n) return;
-  setText(n, setNote.rkMatch ? 'Ranked matches can’t pause' : setNote.tourMatch ? 'Tournament matches can’t pause' : setNote.canPause ? 'Matt’s level is locked during the Ranked warm-up' : 'Online games can’t pause');
-  n.hidden = !(!setNote.canPause || setNote.rkWarm);
+  setText(n, setNote.tourMatch ? 'Tournament matches can’t pause' : 'Online games can’t pause');
+  n.hidden = setNote.canPause;
 }
 export function setPaused(on) {                            // the rest is CSS: blur behind the open card, the "Paused" tag while it is closed
   if (on) document.body.dataset.paused = '1'; else delete document.body.dataset.paused;
@@ -638,7 +645,7 @@ let onViewFn = null;
 export function setSpectator(on) { const b = document.body; if (on) b.dataset.role = 'spectator'; else { delete b.dataset.role; delete b.dataset.view; } }      // CSS does the rest: tag, chips, no key hints, no insets
 export function setWatchers(n) { n = Math.max(0, n | 0); const was = isVisible('watchers'); show('watchers', n > 0); if (swapText($('watch-n'), String(n)) && was && n > 0) restart($('watchers'), 'ov-pop'); $('watchers')?.setAttribute('aria-label', `${n} watching`); }
 export function onView(fn) { onViewFn = fn; }                                          // a chip click -> fn(name). The active Player chip calls again: main.js flips the side
-export function setView(name, who = '', tier = null) {    // tier: that player's rank in a Ranked court (the emblem beside the chip's name, docs/RANKED.md 6)
+export function setView(name, who = '', tier = null) {    // tier: that player's rank (the emblem beside the chip's name, docs/TROPHIES.md 3.9)
   if (!VIEWS.includes(name)) return;
   document.body.dataset.view = name; setText($('view-pov'), name === 'pov' && who ? `Player: ${who}` : 'Player'); rankBadge($('view-pov'), name === 'pov' && who ? tier : null);
   for (const c of document.querySelectorAll('#views .view-chip')) c.setAttribute('aria-pressed', String(c.dataset.view === name));
@@ -733,8 +740,6 @@ on2('btn-ask', 'click', e => { if (e.pointerType) e.currentTarget.blur(); if (as
 
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });
 on2('btn-leave', 'click', () => { if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
-on2('btn-rk-again', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); }); on2('btn-rk-leave', 'click', () => { if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // the series card (docs/RANKED.md 8.8): Play again queues again, Leave is Leave; main.js tells them from a rematch vote by the card
-on2('rk-acts', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const b = $(e.key === 'ArrowLeft' ? 'btn-rk-again' : 'btn-rk-leave'); if (b && !b.disabled) { e.preventDefault(); b.focus(); } });
 on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const b = $(e.key === 'ArrowLeft' ? 'btn-rematch' : 'btn-leave'); if (b && !b.disabled) { e.preventDefault(); b.focus(); } });
 
 // ---------- lobby ----------
@@ -744,14 +749,14 @@ on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'Ar
 // main.js owns the socket; this only draws and reports what was chosen. Handlers carry no name: main.js reads playerName().
 const CODE_OK = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;                                   // the server's alphabet: no I, L, O, 0, 1
 export const cleanCode = t => { t = String(t || '').toUpperCase(); const m = /(?:COURT|ROOM)=([A-Z0-9]{4})/.exec(t); return ((m ? m[1] : t).match(CODE_OK) || []).slice(0, 4).join(''); };   // a pasted link works too
-const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats', ranked: 'Ranked', ranks: 'Ranks', leaderboard: 'Global leaderboard', friends: 'Friends' };      // the board's title says Global: it is everyone, not friends or a region (NOTES 126)
-const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, ranked: 1, leaderboard: 1, friends: 1, ranks: 2, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
+const VIEW_TITLE = { home: 'Play', courts: 'Courts', create: 'Create court', share: 'Your court', bot: 'Play a bot', tour: 'Tournament', bracket: 'Tournament', profile: 'Your stats', ranks: 'Ranks', leaderboard: 'Global leaderboard', friends: 'Friends' };      // the board's title says Global: it is everyone, not friends or a region (NOTES 126)
+const VIEW_DEPTH = { home: 0, courts: 1, bot: 1, profile: 1, leaderboard: 1, friends: 1, ranks: 2, create: 2, tour: 2, bracket: 2, share: 3 };      // how deep each view sits: forward slides in from the right, back from the left
 const VIEW_PARENT = { create: 'courts', share: 'courts', tour: 'courts', bracket: 'courts' };      // Back from these goes to Courts, not home (a tournament lives on: T brings it back)
 const NO_NAME = ['share', 'tour', 'bracket', 'profile', 'ranks', 'leaderboard', 'friends'];                                 // views with no name row above them
-export const viewParent = v => (v === 'ranks' ? ranksFrom : VIEW_PARENT[v] || null);      // Ranks goes back to where it was opened from (Your stats or Ranked)
+export const viewParent = v => (v === 'ranks' ? ranksFrom : VIEW_PARENT[v] || null);      // Ranks goes back to where it was opened from (Your stats)
 const boxes = () => [...$('code-boxes').children];
-let view = 'home', roomsKey = '', on = {}, deep = null, ranksFrom = 'ranked', lastRank = null;      // lastRank: { tier, div, best } from the last rkView / rankCrest, for the Ranks page                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
-export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied(), profile(), ranked(), rankedOpen(), view(name) }
+let view = 'home', roomsKey = '', on = {}, deep = null, ranksFrom = 'profile', lastRank = null;      // lastRank: { tier, div, best, place } from the last rankCrest, for the Ranks page (null: no trophies yet)                                  // deep: a shared link's Join or Watch, focused and lit until the view changes
+export function onLobby(handlers) { on = handlers || {}; }                              // { quick(), create(isPublic), join(code), watch(code), bot(level), start(), back(), copied(), profile(), leaderboard(), friends(), ranksOpen(), view(name) }
 export function lobbyView(name, { code, watch } = {}) {
   if (!name) return view;
   if (name === 'code') name = 'courts';                                                 // the old code view lives inside Courts now: old call sites still land
@@ -762,10 +767,9 @@ export function lobbyView(name, { code, watch } = {}) {
   for (const el of document.querySelectorAll('#screen-lobby .lobby-view')) el.hidden = el.dataset.view !== view; sl.dataset.view = view; tilesFit();      // data-view: a phone's home hides Back (ui.css)
   { const t = $('lobby-title'), tt = view === 'bracket' && ts ? `Tournament ${ts.code}` : mobile && view === 'home' ? 'Poddle' : VIEW_TITLE[view]; if (t.textContent !== tt) { setText(t, tt); restart(t, 'swap'); } } codeError(''); show('name-row', !noName(view)); askWatch(null); show('tour-ended', false); tourConfirm(false);
   if (view === 'bracket') drawBracket(); else if (view === 'tour') drawTour(); else if (view === 'profile' && was !== 'profile' && on.profile) on.profile();      // Your stats: main.js asks web/profile.js to fetch and draw it
-  else if (view === 'ranked' && was !== 'ranked' && on.rankedOpen) on.rankedOpen();
   else if (view === 'leaderboard' && was !== 'leaderboard' && on.leaderboard) on.leaderboard();      // the global leaderboard: web/profile.js fetches and draws it (NOTES 126)
   else if (view === 'friends' && was !== 'friends' && on.friends) on.friends();      // Friends (docs/SOCIAL.md 6): web/social.js builds, fetches and draws it
-  else if (view === 'ranks') { if (was !== 'ranks' && was !== 'home') ranksFrom = was === 'profile' ? 'profile' : 'ranked'; drawRanks(); if (!lastRank && on.ranksOpen) on.ranksOpen(); }      // a reload on /ranks knows no rank yet: main.js fetches it      // Ranked: the same, and the stadium behind the glass (docs/RANKED.md 2)
+  else if (view === 'ranks') { drawRanks(); if (on.ranksOpen) on.ranksOpen(); }      // what is known draws at once; main.js fetches /api/stats (web/profile.js showRanks) and rankCrest redraws the You card, so a game played since Your stats shows
   deep = null; for (const b of [$('btn-join'), $('btn-watch-code')]) b?.classList.remove('is-focus');
   if (view === 'courts') { setCode(cleanCode(code || '')); if (cleanCode(code).length === 4) { deep = watch ? 'watch' : 'join'; $(deep === 'watch' ? 'btn-watch-code' : 'btn-join')?.classList.add('is-focus'); } drawCourts(); }      // a shared link: the boxes filled in, Join (or Watch) lit
   nameGate();
@@ -785,11 +789,11 @@ const vis = el => !!el && !el.hidden && !!el.offsetParent;
 const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
-const viewFocus = () => ({ home: mobile ? $('btn-courts') : $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranked: (g => g && !g.disabled ? g : barOn && vis($('btn-rk-warm')) ? $('btn-rk-warm') : $('btn-rk-all'))($('btn-ranked-go')), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || (mobile ? $('btn-courts') : $('btn-quick')));
+const viewFocus = () => ({ home: mobile ? $('btn-courts') : $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || (mobile ? $('btn-courts') : $('btn-quick')));
 const friendsFocus = () => { const v = $('lobby-friends'), q = v?.querySelector('.fr-q'); return vis(q) && matchMedia('(pointer: fine)').matches ? q : [...(v?.querySelectorAll('button, input') || [])].find(vis) || v; };      // a mouse: the search. A finger: the first button, so no keyboard pops up
-// The home tiles: how many show (Ranked and Your stats only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
+// The home tiles: how many show (Friends, Your stats and Leaderboard only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
 // tile in DOM slot 2 would make the visible fourth the 4th child. Called on every view change and by web/profile.js when it shows or hides a tile
-export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll(mobile ? '.tile:not([hidden]):not(.desk-only)' : '.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }      // a phone never counts the tiles it hides (Quick play, Ranked, Play a bot)
+export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll(mobile ? '.tile:not([hidden]):not(.desk-only)' : '.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }      // a phone never counts the tiles it hides (Quick play, Play a bot)
 // The list scrolls when it is full, and macOS hides scrollbars until you already know to scroll. So the bar is ours: a
 // track and a thumb that are always drawn while there is more to see, sized from the list's own scroll numbers. Drag it or wheel.
 function roomBar() { const l = $('room-list'), t = $('room-bar'); if (!l || !t) return; const more = l.scrollHeight > l.clientHeight + 1; t.hidden = !more; if (!more) return;
@@ -953,13 +957,9 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   on2('btn-profile', 'click', () => lobbyView('profile'));      // no name needed: nobody is seated
   on2('btn-friends', 'click', () => lobbyView('friends'));      // no name needed: nobody is seated
   on2('btn-leaderboard', 'click', () => lobbyView('leaderboard')); on2('st-place', 'click', () => { const t = $('lb-tabs'); if (t) t.dataset.want = 'trophies'; lobbyView('leaderboard'); });      // the global leaderboard, from its tile or from the #301 beside the rank on Your stats
-  on2('btn-ranked', 'click', () => { if (!needName()) lobbyView('ranked'); });      // Ranked seats you: it needs a name, like Quick play
-  on2('btn-ranked-go', 'click', () => { if (!needName() && on.ranked) on.ranked(); });
-  on2('btn-rk-warm', 'click', () => { if (on.rkWarm) on.rkWarm(); }); on2('btn-rk-cancel', 'click', () => { if (on.rkCancel) on.rkCancel(); });      // the search bar (OPTIONAL WARM-UP): its two actions
-  on2('btn-rk-all', 'click', () => lobbyView('ranks'));      // the Ranks page (Back returns to Ranked)
-  for (const id of ['st-crest', 'rk-emblem']) { const el = $(id); if (!el) continue;      // the medal itself opens the Ranks page: a button in all but tag
+  { const el = $('st-crest'); if (el) {      // the crest on Your stats opens the Ranks page: a button in all but tag
     el.setAttribute('role', 'button'); el.tabIndex = 0; el.title = 'See all ranks'; el.setAttribute('aria-label', 'See all ranks'); el.classList.add('is-link');
-    el.addEventListener('click', () => lobbyView('ranks')); el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lobbyView('ranks'); } }); }
+    el.addEventListener('click', () => lobbyView('ranks')); el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lobbyView('ranks'); } }); } }
   $('btn-create-go').addEventListener('click', () => { if (!needName() && on.create) on.create($('seg').querySelector('[aria-checked="true"]').dataset.public === '1'); });
   on2('bot-levels', 'click', e => { const b = e.target.closest('[data-level]'); if (b && !needName() && on.bot) on.bot(+b.dataset.level); });       // one click plays: no second confirm
   on2('lobby-bot', 'keydown', e => { let d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); const bs = [...$('bot-levels').children], i = bs.indexOf(document.activeElement);
@@ -1020,7 +1020,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
     padIn.blur(); location.assign('/pad.html?k=' + c); });
   // arrows walk the three tiles (Tab works too)
   $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
-    const nav = [...$('lobby-home').querySelectorAll('[data-nav]:not([hidden])')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });      // hidden tiles (Ranked, Your stats on localhost) are not in the ring: focus() on one is a no-op
+    const nav = [...$('lobby-home').querySelectorAll('[data-nav]:not([hidden])')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });      // hidden tiles (Your stats on localhost) are not in the ring: focus() on one is a no-op
 }
 
 // ---------- sliding segmented controls ----------
@@ -1164,9 +1164,9 @@ export function tourVs(m) {
   const of = m.of | 0, name = tnm(m.name) || 'Next round', bot = !!(m.vs && m.vs.bot);
   setText($('vs-round'), of > 1 ? `${name} · Match ${m.n | 0} of ${of}` : name); vsMe(m.me);
   setText($('vs-them'), bot ? 'Matt' : tnm(m.vs && m.vs.name) || 'Opponent'); show('vs-them-tag', bot); regBadge($('vs-them'), !bot && !!m.vs && m.vs.reg === true);
-  rankBadge($('vs-them'), !bot && m.vs ? m.vs : null); rankBadge($('vs-me'), m.you || null);      // a Ranked draw carries both ranks ({ tier, div }, docs/RANKED.md 8.3); a tournament's has none
+  rankBadge($('vs-them'), !bot && m.vs ? m.vs : null); rankBadge($('vs-me'), m.you || null);      // both ranks ({ tier, div }) beside the names when the server sends them (docs/TROPHIES.md 3.9)
   setText($('vs-target'), `First to ${m.target | 0 || (m.final ? 11 : 7)}, win by 2`);      // the round line above already says Final
-  vsPlain(); showOverlay('tour-vs'); restart($('vs-card'), 'go');
+  showOverlay('tour-vs'); restart($('vs-card'), 'go');
 }
 // ---- the bracket: one column per round, the rounds still to come drawn as To be decided. Your matches lit, Matt marked, live scores and Watch
 function roundNow(s) { const rs = s.rounds || []; let i = 0; rs.forEach((r, k) => { if ((r.matches || []).some(x => x.a && (x.a.name || x.a.bot))) i = k; }); return i; }
@@ -1192,7 +1192,7 @@ function drawBracket() {
       for (const x of r.matches || []) { const drawn = x.a && (x.a.name || x.a.bot) || x.b && (x.b.name || x.b.bot), li = mk('li', 'br-match' + (mine(x) ? ' is-you' : '') + (x.live ? ' is-live' : '') + (x.w ? ' is-done' : '') + (drawn ? '' : ' is-tbd')); if (mine(x) && k === cur && !you.viewer && !you.out) li.tabIndex = -1;      // your own card takes the first focus (brFocus)
         for (const sd of ['a', 'b']) { const p = x[sd] || {}, won = x.w === sd, lost = !!x.w && !won, row = mk('div', 'br-p' + (won ? ' is-win' : '') + (lost ? ' is-lose' : '') + (id != null && p.id === id ? ' is-me' : ''));
           const nmEl = mk('span', 'br-name', drawn ? who(p) : 'To be decided'); if (drawn && x.forfeit && lost && !p.bot) nmEl.append(mk('span', 'br-left', ' (left)'));
-          row.append(nmEl); if (drawn && !p.bot) regBadge(nmEl, p.reg === true); if (p.bot) row.append(mk('span', 'br-tag', 'Tour'));      // a registered username: its badge beside the name (docs/ACCOUNTS.md 7.5)
+          row.append(nmEl); if (drawn && !p.bot) regBadge(nmEl, p.reg === true); if (drawn && !p.bot) rankBadge(nmEl, Number.isInteger(p.tier) ? { tier: p.tier, div: p.div } : null); if (p.bot) row.append(mk('span', 'br-tag', 'Tour'));      // a registered username: its badge beside the name (docs/ACCOUNTS.md 7.5)
           row.append(mk('b', 'br-sc', x.live || x.w ? String(Array.isArray(x.score) ? x.score[sd === 'a' ? 0 : 1] | 0 : 0) : '')); li.append(row); }
         if (x.live && typeof x.room === 'string') { const f = mk('div', 'br-live'), lv = mk('span', '', 'Live'), nw = x.watchers | 0; if (nw > 0) { lv.append(' · '); const e = mk('span', 'br-eye'); e.innerHTML = EYE_SVG; lv.append(e, String(nw)); } f.append(mk('i', 'br-dot'), lv);      // 'Live · (eye) 3': never cut to 'Live · 3 wat…' in a 13rem column; the Watch button's label says '3 watching'
           const w = mk('button', 'btn btn-sm is-tall br-watch'); w.innerHTML = EYE_SVG; w.append('Watch'); w.dataset.room = x.room; w.setAttribute('aria-label', `Watch ${who(x.a)} versus ${who(x.b)}${nw > 0 ? `, live, ${nw} watching` : ', live'}`); f.append(w); li.append(f); }
@@ -1219,7 +1219,7 @@ export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
   { const st = $('result-slam'); if (st) { st.textContent = ''; st.classList.remove('is-victory'); } clearTimeout(stampT); $('screen-match')?.classList.remove('is-stamp'); }      // the champion's card has no stamp: the final's VICTORY! goes with its card
-  $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won', 'is-rk'); resultStats(null, card); resultRkReset();      // the final's own card is replaced at once: its stats, beat and any Ranked rows go with it
+  $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won'); resultStats(null, card); trophyReset();      // the final's own card is replaced at once: its stats, beat and any trophy row go with it
   setText($('result-title'), me ? 'You’re the champion' : `${name} is the champion`); setText($('result-note'), me ? 'Your tournament matches' : `${name}’s tournament matches`);
   const road = $('result-road'); road.textContent = '';
   for (const st of Array.isArray(c.path) ? c.path : []) { const li = mk('li', 'road-step'), sc = Array.isArray(st.score) ? st.score : [0, 0], vs = st.bot ? 'Matt' : tnm(st.vs) || 'Player';
@@ -1285,202 +1285,55 @@ export function tourEnded(why, asToast = false) {                               
     place();
   }
 }
-// ---------- Ranked (docs/RANKED.md 1.3, 2, 8.2): the home tile's line, the view, the queue pill and the court attribute ----------
+// ---------- Ranks and trophies (docs/TROPHIES.md 4): the Ranks page and the Your stats hero ----------
 // Everything here draws from what main.js / web/profile.js hand in; nothing is fetched. Every string is textContent. Rank names come from
-// web/emblems.js RANKS; a tier is 1..7, anything else = not known.
-const rankName = t => (tierOf(t) ? RANKS[t - 1].name : '');
+// web/emblems.js RANKS; a tier is 1..8, anything else = not known.
 const proLabel = (tier, div, place) => (tier === RANKS.length && Number.isInteger(place) && place > 0 ? `Pro #${place.toLocaleString('en-US')}` : rankLabel(tier, div));      // Pro is told apart by the global leaderboard place: 'Pro #12' (NOTES 126)
-const divIn = (n, tier, div) => (div === 2 || div === 3 ? div : div === 1 ? 1 : divOf(n, tier));      // the division as sent, else from the count
-// the tile: { tier, div, trophies, queued }. A tier draws the small emblem beside 'Gold II · 372'; none = the Bronze emblem, dimmed, and 'Play your first match'.
-// queued > 0 lights the corner badge '1 waiting' (the strongest lever on a small player base: the home screen says an opponent exists)
-export function rkTile(o = {}) {
-  const em = $('ranked-em'), gate = o.gate === 'signin' || o.gate === 'username' ? o.gate : '', tier = gate ? 0 : tierOf(o.tier), n = Math.max(0, o.trophies | 0);      // gate (NOTES 133): Ranked needs a sign-in (and a username): the tile says so, the emblem dimmed
-  if (em) { const d = tier ? divIn(n, tier, o.div) : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(tier || 1, 'is-xs', d); em.append(e); } setEmblem(e, tier || 1, d); e.classList.toggle('is-off', !tier); }
-  setText($('ranked-line-text'), gate === 'signin' ? 'Sign in to play' : gate === 'username' ? 'Pick a username to play' : tier ? `${proLabel(tier, divIn(n, tier, o.div), o.place)} · ${n} trophies` : 'Play your first match');
-  { const b = $('ranked-bar'); if (b) { b.hidden = !tier; if (tier) { const p = tier === RANKS.length ? 1 : Math.max(0, Math.min(1, (n - (THRESHOLDS[tier - 1] || 0)) / (DIV_W * 3)));      // the Ranked view's bar (rkView): through the rank's three divisions, Pro full (NOTES 143)
-    b.style.setProperty('--p', p.toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round(p * 100))); } } }
-  const q = Math.max(0, o.queued | 0), sub = $('ranked-n'); if (sub) { const t = `${q} waiting`, was = sub.textContent; if (q) setText(sub, t); sub.classList.toggle('is-off', !q); if (q && was && was !== t) restart(sub, 'pop'); }
-}
-// the view: s = { tier, div, trophies, best, bestAt, next, wins, losses, queued, note } from /api/stats (web/profile.js showRanked), or null when nothing is known yet.
-// The head ('Gold II'), the bar through the rank's three divisions, the eight-step road (NOTES 124) with its division pips, Find a match and its status line.
-let rkQueuedSaid = false;
-// NOTES 133: Ranked is for signed-in players with a username. gate '' | 'signin' | 'username' comes with every rkView (web/profile.js rkGate) and
-// turns Find a match into the step that is missing; main.js sends that button to the sign-in or username card instead of the queue
-let rkGateNow = '';
-const GO_LABEL = { signin: 'Sign in to play Ranked', username: 'Pick a username' }, GATE_NOTE = { signin: 'Ranked is for signed-in players, so your trophies are saved to your account', username: 'Ranked needs a username. Your opponents and the leaderboard see it' };
-const goLabel = () => GO_LABEL[rkGateNow] || 'Find a match';
 // The Ranks page: all eight medals, each with where it starts and its three divisions; the player's own rank ringed, the ones reached marked
 function drawRanks() {
-  const g = $('rkx-grid'); if (!g) return; g.textContent = ''; const me = lastRank;
+  const g = $('ranks-grid'); if (!g) return; g.textContent = ''; const me = lastRank;
   RANKS.forEach((r, i) => {
     const t = i + 1, now = !!me && t === me.tier, done = !!me && !now && t <= Math.max(me.tier, me.best || 1), floor = THRESHOLDS[i];
-    const li = mk('li', 'rkx-card' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t); li.style.setProperty('--rank-ink', r.colour.deep); li.style.setProperty('--rank-mid', r.colour.mid);
+    const li = mk('li', 'ranks-card' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t); li.style.setProperty('--rank-ink', r.colour.deep); li.style.setProperty('--rank-mid', r.colour.mid);
     const em = emblemEl(t, 'is-xl', now ? me.div : done ? 3 : 1); if (now) em.classList.add('is-pop');      // your rank at your division's medal, a rank passed at its full III, one ahead at its I (NOTES 124)
-    const divs = mk('span', 'rkx-divs'); if (hasDivs(t)) [0, 1, 2].forEach(d => { const on = now && d + 1 <= me.div || done, pip = mk('span', 'rkx-evo' + (on ? ' is-on' : '')); pip.append(emblemEl(t, 'is-sm', d + 1), mk('span', 'rkx-div' + (on ? ' is-on' : ''), romanOf(d + 1)), mk('small', 'rkx-at', String(floor + d * DIV_W))); divs.append(pip); });      // each division's own medal, its numeral and where it starts (NOTES 124): the medal grows I, II, III
-    else divs.append(mk('span', 'rkx-div' + (now || done ? ' is-on' : ''), 'By leaderboard place'));      // Pro: no divisions, the global leaderboard tells its players apart
-    const tag = now ? mk('span', 'rkx-tag is-now', `You · ${proLabel(t, me.div, me.place)}`) : done ? mk('span', 'rkx-tag', 'Reached') : t <= 4 ? mk('span', 'rkx-tag is-keep', 'Never lost') : null;
-    li.append(em, mk('b', 'rkx-name', r.name), cupped(mk('small', 'rkx-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`)), divs); if (tag) li.append(tag);
+    const divs = mk('span', 'ranks-divs'); if (hasDivs(t)) [0, 1, 2].forEach(d => { const on = now && d + 1 <= me.div || done, pip = mk('span', 'ranks-evo' + (on ? ' is-on' : '')); pip.append(emblemEl(t, 'is-sm', d + 1), mk('span', 'ranks-div' + (on ? ' is-on' : ''), romanOf(d + 1)), mk('small', 'ranks-at', String(floor + d * DIV_W))); divs.append(pip); });      // each division's own medal, its numeral and where it starts (NOTES 124): the medal grows I, II, III
+    else divs.append(mk('span', 'ranks-div' + (now || done ? ' is-on' : ''), 'By leaderboard place'));      // Pro: no divisions, the global leaderboard tells its players apart
+    const tag = now ? mk('span', 'ranks-tag is-now', `You · ${proLabel(t, me.div, me.place)}`) : done ? mk('span', 'ranks-tag', 'Reached') : t <= 4 ? mk('span', 'ranks-tag is-keep', 'Never lost') : null;
+    li.append(em, mk('b', 'ranks-name', r.name), cupped(mk('small', 'ranks-from', t === 1 ? 'Starting rank' : `From ${floor} trophies`)), divs); if (tag) li.append(tag);
     li.setAttribute('aria-label', `${r.name}, from ${floor} trophies${now ? `, your rank, ${rankLabel(t, me.div)}` : done ? ', reached' : ''}`); g.append(li);
   });
 }
-export function rkView(s) {
-  rkGateNow = s && (s.gate === 'signin' || s.gate === 'username') ? s.gate : '';
-  const known = !!(s && typeof s === 'object'), tier = known ? tierOf(s.tier) || 1 : 1, n = known ? Math.max(0, s.trophies | 0) : 0, best = known ? Math.max(tier, tierOf(s.best)) : 1, div = known ? divIn(n, tier, s.div) : 1;
-  const place = known && Number.isInteger(s.place) && s.place > 0 ? s.place : null;
-  if (known) { lastRank = { tier, div, best, place }; if (view === 'ranks') drawRanks(); }
-  const floor = THRESHOLDS[tier - 1] || 0, span = DIV_W * 3, p = tier === RANKS.length ? 1 : Math.max(0, Math.min(1, (n - floor) / span));      // Pro fills it and it stays full      // the bar: through the rank (three divisions of 50); Pro III fills it and stays full
-  const head = $('rk-emblem'); if (head) { head.replaceChildren(emblemCard(tier, 'is-xl', known ? div : 0)); head.querySelector('.rank-em')?.classList.toggle('is-off', !known); }
-  setText($('rk-tier'), known ? proLabel(tier, div, place) : 'No rank yet');
-  setText($('rk-trophies'), String(n)); setText($('rk-count-word'), n === 1 ? ' trophy' : ' trophies');
-  { const b = $('rk-bar'); if (b) { b.style.setProperty('--p', p.toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round(p * 100))); } }
-  const nextAt = div < 3 ? floor + div * DIV_W : THRESHOLDS[tier], nextName = tier === RANKS.length ? '' : div < 3 ? rankLabel(tier, div + 1) : rankLabel(tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
-  setText($('rk-next'), !known ? 'Play Ranked for your first trophies' : !nextName ? (place ? 'Top rank · your place on the global leaderboard' : 'Top rank · ranked by global leaderboard place') : `${Math.max(1, nextAt - n)} to ${nextName}`);
-  const road = $('rk-road'); if (road) { road.textContent = '';
-    RANKS.forEach((r, i) => { const t = i + 1, now = t === tier && known, done = !now && (t < tier || t <= best && known), li = mk('li', 'rk-step' + (now ? ' is-now' : done ? ' is-done' : '')); li.dataset.tier = String(t);
-      const pips = mk('span', 'rk-pips'), lit = now ? div : done ? 3 : 0; for (let k = 1; k <= (hasDivs(t) ? 3 : 0); k++) pips.append(mk('i', k <= lit ? 'is-lit' : '')); pips.setAttribute('aria-hidden', 'true');      // three divisions, filled up to the current one
-      li.append(emblemEl(t, 'is-md', now ? div : done ? 3 : 1), mk('b', '', r.name), pips, mk('small', '', String(THRESHOLDS[i])));
-      const at = known && t === best && Number.isFinite(s.bestAt) && s.bestAt > 0 ? new Date(s.bestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
-      const label = `${r.name}, ${THRESHOLDS[i]} trophies${now ? (hasDivs(t) ? `, your rank, division ${romanOf(div)}` : ', your rank') : done ? ', reached' : ''}${at ? `. Reached on ${at}` : ''}`; li.setAttribute('aria-label', label); if (at) li.title = `Reached on ${at}`;
-      road.append(li); }); }
-  const go = $('btn-ranked-go'); if (go) { setText(go, goLabel()); go.disabled = rkInQueue && !rkGateNow; go.classList.toggle('is-gate', !!rkGateNow); }
-  rkNote(known && s.hold ? s.hold : known && s.note ? s.note : rkGateNow ? GATE_NOTE[rkGateNow] : known && s.queued > 0 && !rkInQueue ? 'Someone is waiting to play' : '', !rkGateNow && known && !s.hold && !s.note && s.queued > 0 && !rkInQueue);      // a gate says what is missing instead      // hold: a line main.js still holds (a result, a refusal): the view's redraws keep it
-}
-// the status line under Find a match: '' = the default line (in the queue: where its two actions are). accent: someone is waiting (the line takes the accent colour and pops once per wait)
-let rkInQueue = false, noteNow = ['', false];
-export function rkNote(text, accent = false) {
-  noteNow = [text || '', !!accent];
-  const el = $('rk-status'); if (!el) return; const t = text || (rkInQueue ? 'Finding a match. Warm up with Matt or cancel from the bar at the top' : 'You can warm up with Matt while you wait');
-  el.classList.toggle('is-accent', !!accent); if (swapText(el, t, accent && !rkQueuedSaid ? 'ov-pop' : '') && accent) rkQueuedSaid = true; if (!accent) rkQueuedSaid = false;
-}
-// the court: kind = 'warm' | 'match' | null. body[data-rk] hides the court pill's invite menu (an rk court is never shared) and themes the HUD
-let rkKindNow = null;
-export function rkCourt(kind) { rkKindNow = kind === 'warm' || kind === 'match' ? kind : null; if (rkKindNow) document.body.dataset.rk = rkKindNow; else delete document.body.dataset.rk; if (rkKindNow !== 'warm') rkPill({ on: false }); }
-// the queue pill (8.2): { on, since (ms, performance.now clock), queued }. The timer is textContent once a second; every 30 s the text hops so the wait reads as alive
-let pillT = 0, pillSince = 0, pillOn = false, pillHops = 0;
-export function rkPill(o = {}) {
-  const el = $('rk-pill'); if (!el) return;
-  const on = !!o.on, since = Number.isFinite(o.since) && o.since > 0 ? o.since : 0;      // 0: not known yet (a new entry's warm-up room comes before its snapshot)
-  if (on !== pillOn) { pillOn = on; el.hidden = !on; clearInterval(pillT); pillT = 0; pillHops = 0; if (on) { pillSince = since || performance.now(); restart(el, 'ov-pill'); pillT = setInterval(tickPill, 1000); tickPill(); } }
-  else if (on && since && since !== pillSince) { pillSince = since; pillHops = Math.floor(Math.max(0, performance.now() - since) / 30000); tickPill(); }      // the snapshot's clock: the 30 s hops count from it
-  if (on && 'queued' in o) setText($('rk-pill-sub'), o.queued > 0 ? 'Someone is waiting. Matching you' : 'You stay in the queue if you leave');
-}
-// the search bar (docs/RANKED.md 8.1, OPTIONAL WARM-UP): { on, since (performance.now clock), tier, div, busy }. On while queued and off court: it hangs from the top of the title
-// and of every lobby view (ui.css hides it anywhere else). Its timer is textContent once a second; Warm up with Matt is disabled while that request is out (busy).
-// Find a match is disabled while it is up, and the line under it says where the two actions are
-let barT = 0, barSince = 0, barOn = false;
-export function rkBanner(o = {}) {
-  const el = $('rk-search'); if (!el) return;
-  const on = !!o.on, since = Number.isFinite(o.since) && o.since !== 0 ? o.since : 0;      // below 0 is fine: a wait older than this page
-  if (on !== barOn) {
-    const had = el.contains(document.activeElement);
-    barOn = on; rkInQueue = on; el.hidden = !on; clearInterval(barT); barT = 0; document.body.classList.toggle('is-rk-search', on);
-    if (on) { barSince = since || performance.now(); barT = setInterval(tickBar, 1000); tickBar(); }
-    const go = $('btn-ranked-go'); if (go) go.disabled = on;
-    rkNote(...noteNow);
-    const a = document.activeElement;
-    if (on && (!a || a === document.body || a === go)) $('btn-rk-warm')?.focus({ preventScroll: true });      // Find a match just went grey under the focus: the bar's first action takes it
-    else if (!on && had && slots.menu === 'lobby') viewFocus()?.focus({ preventScroll: true });      // Cancel pressed: back to the view
-  } else if (on && since && since !== barSince) { barSince = since; tickBar(); }
-  if (!on) return;
-  const t = tierOf(o.tier), em = $('rk-search-em');
-  if (em) { const d = o.div === 2 || o.div === 3 ? o.div : 1; let e = em.firstElementChild; if (!e) { e = emblemEl(t || 1, 'is-md', d); em.append(e); } setEmblem(e, t || 1, d); e.classList.toggle('is-off', !t); }
-  setText($('rk-search-sub'), t ? `Ranked · ${rankLabel(t, o.div)}` : 'Ranked');
-  const w = $('btn-rk-warm'); if (w) w.disabled = !!o.busy;
-}
-function tickBar() { const s = Math.max(0, Math.floor((performance.now() - barSince) / 1000)); setText($('rk-search-time'), `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); }
-function tickPill() { const s = Math.max(0, Math.floor((performance.now() - pillSince) / 1000)), t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; setText($('rk-pill-time'), t);
-  const hop = Math.floor(s / 30); if (hop > pillHops) { pillHops = hop; restart($('rk-pill-text'), 'ov-pop'); } }
-// Find a match was pressed: the button says Searching (and dips) until the queue answers with a court, a snapshot or a refusal
-export function rkSearch(on) { const b = $('btn-ranked-go'); if (!b) return; if (on) { setText(b, 'Searching'); restart(b, 'ov-press'); } else setText(b, goLabel()); }
-
-// ---------- Ranked: the match show (docs/RANKED.md 8.3-8.10) ----------
-// MATCH FOUND (8.3), on the tournament's VS card in navy: m = { vs: { name, reg, tier, div }, you: { tier, div }, bestOf, target, friendly, at, side }. The opponent's
-// count is never here (only their rank). 'Get ready' and its bar take the last 1.5 s before the seat (at s); the series welcome closes the card (main.js). rkVs(null) closes it.
-let vsT = 0;
-function vsStop() { clearTimeout(vsT); vsT = 0; }
-function vsPlain() { $('vs-card')?.classList.remove('is-ranked'); for (const id of ['vs-me-em', 'vs-them-em', 'vs-ready']) show(id, false); $('vs-target')?.classList.remove('is-friendly'); vsStop(); }      // the tournament look again
-export function rkVs(m) {
-  if (!m || typeof m !== 'object') { if (slots.overlay === 'rk-vs') showOverlay(null); return; }
-  const card = $('vs-card'); if (!card) return; vsStop(); card.classList.add('is-ranked');
-  const vs = m.vs && typeof m.vs === 'object' ? m.vs : {};
-  setText($('vs-round'), 'MATCH FOUND'); vsMe(m.me); rankBadge($('vs-me'), null);
-  setText($('vs-them'), tnm(vs.name) || 'Opponent'); show('vs-them-tag', false); regBadge($('vs-them'), vs.reg === true); rankBadge($('vs-them'), null);      // the emblem goes UNDER the name here, as a card with the rank's name, never beside it
-  for (const [id, r] of [['vs-me-em', m.you], ['vs-them-em', vs]]) { const box = $(id); if (!box) continue; const ref = rankRef(r); box.replaceChildren(); box.hidden = !ref; if (ref) box.append(emblemCard(ref.tier, 'is-lg is-inverse', ref.div)); }
-  const t = $('vs-target'); setText(t, m.friendly === true ? 'Friendly match, no trophies' : `Ranked · Best of ${m.bestOf | 0 || 3} · First to ${m.target | 0 || 7}, win by 2`); t.classList.toggle('is-friendly', m.friendly === true);
-  const ready = $('vs-ready'), bar = $('vs-bar'); if (ready) ready.hidden = true; bar?.style.setProperty('--p', '1');
-  showOverlay('rk-vs'); restart(card, 'go');
-  const at = Math.max(0.3, +m.at || 5) * 1000, lead = Math.min(1500, at);
-  vsT = setTimeout(() => { vsT = 0; if (slots.overlay !== 'rk-vs' || !ready) return; ready.hidden = false; bar?.style.setProperty('--vs-d', lead + 'ms'); requestAnimationFrame(() => requestAnimationFrame(() => { if (slots.overlay === 'rk-vs') bar?.style.setProperty('--p', '0'); })); }, at - lead);      // the bar drains over the lead (the 1 s transition floor under reduced motion: a countdown is information)
-}
-// the GAME card between the games of a series (8.7): o = { won, nameMe, nameThem, game, bestOf, games:[left, right], score:[left, right], serve: 'me'|'them', next, deciding, watching }.
-// Everything from the LEFT slot's side (main.js orients it: me, or side 0 for a spectator). Closed by rkgo (main.js); rkGame(null) closes it too.
-let gameT = 0, gameLeft = 0, gameTotal = 0, gameNo = 0;
-function gameStop() { clearInterval(gameT); gameT = 0; }
-function drawGame(n) { gameLeft = n; const l = $('game-left'), t = `Game ${gameNo + 1} in ${n}`; if (l && l.textContent !== t) { l.textContent = t; if (n !== gameTotal) restart(l, 'ov-pop'); } $('game-bar')?.style.setProperty('--p', (gameTotal ? Math.min(1, n / gameTotal) : 0).toFixed(3)); }
-export function rkGame(o) {
-  if (!o || typeof o !== 'object') { if (slots.overlay === 'rk-game') showOverlay(null); return; }
-  const sec = $('screen-rk-game'); if (!sec) return;
-  const won = !!o.won, watching = !!o.watching, nameMe = String(o.nameMe || 'You'), nameThem = String(o.nameThem || 'Opponent'), game = Math.max(1, o.game | 0), bestOf = Math.max(1, o.bestOf | 0) || 3, need = Math.ceil(bestOf / 2);
-  const games = Array.isArray(o.games) ? [o.games[0] | 0, o.games[1] | 0] : [0, 0], score = Array.isArray(o.score) ? [o.score[0] | 0, o.score[1] | 0] : [0, 0], deciding = !!o.deciding;
-  sec.dataset.beat = won ? 'win' : 'lose'; sec.classList.toggle('is-deciding', deciding); sec.classList.toggle('is-watch', watching);      // set before showOverlay: the CSS beats start on activation
-  setText($('game-kicker'), `Ranked · Best of ${bestOf}`);
-  setText($('game-title'), watching ? `${won ? nameMe : nameThem} takes game ${game}` : won ? `You take game ${game}` : `${nameThem} takes game ${game}`);
-  for (const [id, v] of [['game-sc-me', score[0]], ['game-sc-them', score[1]]]) { const el = $(id); el.textContent = String(v); el.style.setProperty('--to', v); }      // final from the first frame; the counter rolls over it
-  setText($('game-name-me'), nameMe); setText($('game-name-them'), nameThem);
-  drawPips($('game-pips-me'), need, games[0], -1, won ? games[0] - 1 : -1); drawPips($('game-pips-them'), need, games[1], -1, won ? -1 : games[1] - 1);
-  setText($('game-n-me'), String(games[0])); setText($('game-n-them'), String(games[1]));
-  sec.querySelector('.pip-row.is-me')?.classList.toggle('is-won', won); sec.querySelector('.pip-row.is-them')?.classList.toggle('is-won', !won);
-  show('game-deciding', deciding);
-  setText($('game-serve'), o.serve === 'me' ? (watching ? `${nameMe} serves first` : 'You serve first') : o.serve === 'them' ? `${nameThem} serves first` : '');
-  gameNo = game; gameStop(); const n = Math.max(0, Math.round(+o.next || 0)); gameTotal = n || 1; show('game-count', n > 0);
-  showOverlay('rk-game');
-  if (n > 0) { drawGame(n); gameT = setInterval(() => { if (gameLeft > 0) drawGame(gameLeft - 1); else gameStop(); }, 1000); }
-}
-// the series pips in the rally lozenge (8.5): { bestOf, games:[left, right], done }. One pip per game a side needs; a win fills it; the next one pulses while the series is on
-export function setSeries(o) {
-  const box = $('series'); if (!box) return;
-  if (!o || typeof o !== 'object') { box.hidden = true; delete box.dataset.sig; return; }
-  const bestOf = Math.max(1, o.bestOf | 0) || 3, need = Math.ceil(bestOf / 2), g = Array.isArray(o.games) ? [Math.min(need, o.games[0] | 0), Math.min(need, o.games[1] | 0)] : [0, 0], done = !!o.done;
-  const sig = `${bestOf}/${g[0]}-${g[1]}/${done ? 1 : 0}`;
-  if (box.dataset.sig !== sig) { const was = box.dataset.sig; box.dataset.sig = sig; drawPips($('series-me'), need, g[0], done ? -1 : g[0]); drawPips($('series-them'), need, g[1], done ? -1 : g[1]); if (was && !box.hidden) restart(box, 'chip-in'); }
-  box.setAttribute('aria-label', `Best of ${bestOf}: games ${g[0]} to ${g[1]}`); box.hidden = false;
-}
-// game point / match point (8.6): { side: 'me' | 'them' | null, kind: 'game' | 'match' }. The pressing side's score wears a ring, the lozenge's word says which; null clears both
-export function setPressure(o) {
-  const side = o && (o.side === 'me' || o.side === 'them') ? o.side : null, kind = o && o.kind === 'match' ? 'match' : 'game';
-  for (const s of ['me', 'them']) $('sc-' + s)?.classList.toggle('is-pressure', side === s);
-  const w = $('rally-word'); if (!w) return; w.classList.toggle('is-pressure', !!side); w.classList.toggle('is-them', side === 'them');
-  swapText(w, side ? (kind === 'match' ? 'MATCH POINT' : 'GAME POINT') : 'Rally', 'ov-pop');
-}
-// the trophy roll (8.9): r = the rkres message { matt, void, saved, won, delta, trophies, tier, div, tierWas, divWas, floorHeld, counted, why, dayLeft }.
-// The emblem shows the rank the player HAD until the count lands; the number is the new total from frame one (the counter rolls from the old one over it);
-// the pill is the change as applied; a small line says why when nothing changed. A changed rank or division is the ceremony at 2100 ms (8.10).
-const MATT_LV = ['Rookie', 'Club', 'Pro', 'Tour'];               // Matt's wire level -> name (the trophy note of a practice game, NOTES 128)
-const RK_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count', left_early: 'They left before a game finished', noshow: 'Your opponent never joined' };
+// the trophy row on the result card (docs/TROPHIES.md 4): t = the profile message's trophies { won, delta, trophies, tier, div, tierWas, divWas, floorHeld, counted,
+// saved, why, matt, limit, none }. The emblem shows the rank the player HAD until the count lands; the number is the new total from frame one (the counter rolls
+// from the old one over it); the pill is the change as applied; a small line says why when nothing changed. A changed rank or division is the ceremony at 2100 ms.
+// none: 'signin' | 'username' draws one quiet line in the row's place (a reply to the game just played, not an announcement). The card gets .has-trophies for the room the row takes.
+const MATT_LV = ['Rookie', 'Club', 'Pro', 'Tour'], MATT_NEED = [0, 1, 1, 3, 3, 2, 2, 2];      // Matt's wire level -> name; per rank, the lowest level a win pays at: the server says it (t.need, server/ladder.js TIERS[].matt); the table is the fallback for an older server
+const TROPHY_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count', left_early: 'They left before the game finished' };
+const NONE_LINE = { signin: 'Sign in to earn trophies', username: 'Pick a username to earn trophies' };
 let upT = 0;
 export function trophyRow(r) {
-  const box = $('trophy'); if (!box || !r || typeof r !== 'object') return; trophyReset();
+  const box = $('trophy'); if (!box || !r || typeof r !== 'object') return; trophyReset(); $('result')?.classList.add('has-trophies');
+  if (NONE_LINE[r.none]) { box.classList.add('is-none'); setText($('trophy-note'), NONE_LINE[r.none]); show('trophy-note', true); box.hidden = false; return; }
   const now = rankRef(r), was = rankRef({ tier: r.tierWas, div: r.divWas }) || now, tier = now ? now.tier : 0, n = Math.max(0, r.trophies | 0), d = Number.isInteger(r.delta) ? r.delta : 0;
   const had = was || now || { tier: 1, div: 1 }, card = trophyCard(had.tier, had.div), e = card && card.querySelector('.rank-em'); if (e) e.classList.remove('is-down', 'is-pop');      // the rank I had until the count lands, named under its emblem
   const num = $('trophy-n'); num.textContent = String(n); setText($('trophy-word'), n === 1 ? 'trophy' : 'trophies'); num.style.setProperty('--from', String(Math.max(0, n - d))); num.style.setProperty('--to', String(n));      // final from the first frame
   box.classList.toggle('is-roll', d !== 0);
   const pill = $('trophy-d'); let text, cls = '', note = '';
-  const why = (Array.isArray(r.why) ? r.why : []).find(w => RK_WHY[w]);
-  if (r.void === true) { text = 'Not counted'; cls = 'is-off'; note = why ? RK_WHY[why] : 'No trophies changed'; }
-  else if (d < 0) { text = `−${-d}`; cls = 'is-down'; note = r.leaver === true ? 'Forfeit' : ''; }      // the change as applied comes first: a leaver's loss is never 'No trophies' (it is taken whatever the verdict)
-  else if (r.leaver === true) { text = '±0'; note = r.floorHeld === true && tier ? `Forfeit · you keep ${RANKS[tier - 1].name}` : 'Forfeit'; }      // my own forfeit that cost nothing (the floor held, or nothing to save to): never 'They left'
-  else if (r.counted === false) { text = 'No trophies'; cls = 'is-off'; note = why ? RK_WHY[why] : ''; }
-  else if (r.saved === false) { text = 'No trophies'; cls = 'is-off'; note = r.matt === true ? 'Sign in or finish a game to keep trophies' : 'Couldn’t save trophies right now'; }
-  else if (d > 0) { text = `+${d}`; cls = 'is-up'; note = r.forfeit === true ? 'Opponent forfeited' : ''; }      // forfeit: main.js passes the series card's matchover flag (rkres has none)
-  else { text = '±0'; note = r.floorHeld === true && tier ? `You keep ${RANKS[tier - 1].name}` : ''; }
-  if (r.matt === true && r.dayLeft === 0 && d === 0) note = 'Daily Matt trophy limit reached';
-  if (r.matt === true && r.easy === true && d === 0) { text = 'Practice'; cls = 'is-off'; note = `Trophies need ${MATT_LV[r.need] || 'your rank\u2019s'} Matt or harder`; }      // NOTES 128: an easier Matt than the rank's pays nothing
+  const why = (Array.isArray(r.why) ? r.why : []).find(w => TROPHY_WHY[w]), limit = r.matt === true && d === 0 ? r.limit : '';
+  if (d < 0) { text = `−${-d}`; cls = 'is-down'; }      // the change as applied comes first: a loss is never 'No trophies' (a leaver's is taken whatever the verdict, docs/TROPHIES.md 3.4; they are in the lobby by then and see no card)
+  else if (r.counted === false) { text = 'No trophies'; cls = 'is-off'; note = why ? TROPHY_WHY[why] : ''; }
+  else if (r.saved === false) { text = 'No trophies'; cls = 'is-off'; note = 'Couldn’t save trophies right now'; }
+  else if (limit === 'easy') { const lvl = Number.isInteger(r.need) ? r.need : MATT_NEED[(r.tierWas || tier || 1) - 1]; text = 'No trophies'; cls = 'is-off'; note = `Matt pays trophies at ${MATT_LV[lvl] || 'Club'} or above for your rank`; }      // an easier Matt than the rank's pays nothing: the level the server named (need)
+  else if (limit === 'day') { text = 'No trophies'; cls = 'is-off'; note = 'Today’s Matt trophies are all earned'; }
+  else if (limit === 'ceiling') { text = 'No trophies'; cls = 'is-off'; note = 'Matt cannot take you past Master'; }
+  else if (d > 0) { text = `+${d}`; cls = 'is-up'; note = r.forfeit === true ? 'Opponent forfeited' : ''; }      // forfeit: not the server's (docs/TROPHIES.md 3.6); main.js adds the card's matchover flag to a win
+  else { text = '±0'; note = why ? TROPHY_WHY[why] : r.floorHeld === true && tier ? `You keep ${RANKS[tier - 1].name}` : ''; }      // +0 with a why word (the stayer after a leave, 3.4): the word
   pill.className = 'trophy-d' + (cls ? ' ' + cls : ''); setText(pill, text); setText($('trophy-note'), note); show('trophy-note', !!note);
   box.hidden = false;
   if (now && was && (now.tier !== was.tier || now.div !== was.div)) { const kind = now.tier > was.tier ? 'rank' : now.tier < was.tier || now.div < was.div ? 'down' : 'div';
     upT = setTimeout(() => { upT = 0; if (slots.overlay === 'match') rankUp({ tier: now.tier, div: now.div, kind }); }, reduced() ? 0 : 2100); }      // after the count lands
 }
-// the ceremony (8.10; NOTES 117): { tier, div, kind: 'rank' | 'div' | 'down' }. The emblem card in the trophy row names the new rank. rank: the emblem swaps, pops and
+// the ceremony (docs/RANKED.md 8.10; NOTES 117): { tier, div, kind: 'rank' | 'div' | 'down' }. The emblem card in the trophy row names the new rank. rank: the emblem swaps, pops and
 // stays grown, rays open behind it, one band of light crosses the card, 'Rank up' under the delta; div: a pop and the numeral flips on its tag, 'Division up';
 // down: the emblem shrinks a little and the line under the row says 'Down to Gold I'. #result-note carries the words for a screen reader. Sounds are main.js's (scene.jingle)
 export function rankUp(o) {

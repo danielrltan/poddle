@@ -23,17 +23,17 @@ const ELEVEN = (wr, rec, ...v) => LABELS.map(([label, tag, unit], i) => ({ label
   ...(i === 0 ? { note: rec + ' vs people', hero: true } : i === 1 ? { note: 'all modes', hero: true } : i === 2 ? { note: 'wins vs people', hero: true } : {}) }));
 const LBP = { Dan: { name: 'Dan', rank: { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, trophies: 1400, matt: 'Pro', stats: ELEVEN('86%', '42-7', '11h 6m', '12', '81%', '58%', '58', '1570', '318', '40', '22', '3') },
   Bea: { name: 'Bea', rank: { tier: 3, div: 2, label: 'Gold II', pro: null }, trophies: 340, matt: 'Club', stats: ELEVEN('50%', '7-7', '2h 5m', '3', '64%', '51%', '41', '1100', '60', '4', '9', '0') } };
-const W0 = () => ({ friends: new Set(['bea', 'cy', 'dan', 'eve']), st: { bea: 'matt', cy: 'menu', dan: 'off', eve: 'ranked' }, inc: [{ k: 'rex', at: now - 3 * 3600e3 }], out: [{ k: 'olga', at: now - 86400e3 }] });
+const W0 = () => ({ friends: new Set(['bea', 'cy', 'dan', 'eve']), st: { bea: 'matt', cy: 'menu', dan: 'off', eve: 'playing' }, inc: [{ k: 'rex', at: now - 3 * 3600e3 }], out: [{ k: 'olga', at: now - 86400e3 }] });
 let world = W0();
 const API = { acct: { username: 'Sam', renameAt: null }, fail: null, slow: {}, meSlow: 0, log: [] };      // fail: the next POST answers { status, error }. slow: search q -> delay ms (the stale-answer test). meSlow: /api/me's delay
-const WEIGHT = { ranked: 7, tour: 6, playing: 5, matt: 4, watching: 3, queue: 2, menu: 1, off: 0 };
+const WEIGHT = { tour: 6, playing: 5, matt: 4, watching: 3, menu: 1, off: 0 };      // docs/SOCIAL.md presence: no queue or ranked since docs/TROPHIES.md 2
 const snap = () => ({ friends: [...world.friends].map(k => ({ name: USERS[k].name, st: world.st[k] || 'off', rank: USERS[k].rank || null })).sort((a, b) => WEIGHT[b.st] - WEIGHT[a.st] || a.name.localeCompare(b.name)),
   inc: world.inc.map(x => ({ name: USERS[x.k].name, at: x.at })), out: world.out.map(x => ({ name: USERS[x.k].name, at: x.at })) });
 const relOf = k => world.friends.has(k) ? 'friend' : world.inc.some(x => x.k === k) ? 'in' : world.out.some(x => x.k === k) ? 'out' : 'none';
 const apiAnswer = (q, body, r) => { const u = new URL(q.url, 'http://x'), send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   let b = null; try { b = body ? JSON.parse(body) : null; } catch { b = null; } API.log.push([q.method, u.pathname + u.search, b]);
   const who = API.acct, gate = () => (!who ? send(401, { error: 'signin' }) || true : !who.username ? send(403, { error: 'username' }) || true : false);
-  if (u.pathname === '/api/me') return setTimeout(() => send(200, { db: true, rkSignin: true, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: API.acct }), API.meSlow);
+  if (u.pathname === '/api/me') return setTimeout(() => send(200, { db: true, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: API.acct }), API.meSlow);
   if (u.pathname === '/api/stats') return send(200, { profile: null });
   if (u.pathname === '/api/leaderboard') return send(200, { rows: [{ rank: 1, name: 'Dan', v: 58, tier: 8, div: 1 }, { rank: 2, name: 'Bea', v: 41, tier: 3, div: 2 }, { rank: 3, name: 'alice', v: 30, tier: 1, div: 3 }] });
   if (u.pathname === '/api/friends' && q.method === 'GET') { if (gate()) return; return send(200, snap()); }
@@ -102,20 +102,20 @@ const searches = () => API.log.filter(l => l[1].startsWith('/api/friends/search'
 let pg = await page('lobby', { seen: false });
 await pg.goto(HOME); await sleep(1500); await pg.click('#btn-start'); await sleep(3200);
 let r = await ev(pg, () => { const t = document.getElementById('btn-friends'); return { show: !!t && !t.hidden, n: document.querySelector('#lobby-home .tiles').dataset.n, line: document.getElementById('friends-line-text').textContent, badge: document.getElementById('friends-n').textContent, badgeOn: !document.getElementById('friends-n').classList.contains('is-off'), dot: !document.getElementById('friends-dot').hidden, seen: localStorage.getItem('poddle.friendsSeen') }; });
-ok(r.show && r.n === '7' && r.line === '3 online' && r.badge === '1 request' && r.badgeOn && r.dot, `home: the Friends tile (7 tiles), "${r.line}" with the dot, badge "${r.badge}" (${J(r)})`);
+ok(r.show && r.n === '6' && r.line === '3 online' && r.badge === '1 request' && r.badgeOn && r.dot, `home: the Friends tile (6 tiles: docs/TROPHIES.md 4), "${r.line}" with the dot, badge "${r.badge}" (${J(r)})`);
 let t = await toasts(pg);
 ok(!t.some(x => /sent you a friend request/.test(x)), `the first snapshot after the hello is silent (toasts ${J(t)})`);
 ok(!t.some(x => /^New\b|add friends and see/i.test(x)) && r.seen === null, `no feature-announcement toast on the home screen (NOTES 147), and no poddle.friendsSeen key (${J(t)}, ${r.seen})`);
 ok(socks.some(s => s.frames.some(f => f.type === 'hello')), 'the socket said hello (the device id was there)');
 await shot(pg, 'home-desktop');
-// seven tiles lay out as 3 over 4 (landscape), 3 / 2 / 2 (portrait) or one column (phone): never a lone straggler, never wider than the window
+// six tiles lay out as 2 over 4 (landscape), 2 / 2 / 2 (portrait) or one column (phone): never a lone straggler, never wider than the window
 { const SIZES = [[1920, 1080], [1440, 900], [1280, 720], [1024, 768], [900, 700], [760, 600], [1366, 500], [700, 900], [600, 900], [390, 844]], bad = [];
   for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);
     const x = await ev(pg, () => { const ts = [...document.querySelectorAll('#lobby-home .tile')].filter(e => !e.hidden), m = new Map(); for (const e of ts) m.set(e.offsetTop, (m.get(e.offsetTop) || 0) + 1);
-      const cut = [...document.querySelectorAll('#lobby-home .tile b, #friends-line-text, #ranked-line-text')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
+      const cut = [...document.querySelectorAll('#lobby-home .tile b, #friends-line-text')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
       return { rows: [...m.values()].join(), over: document.querySelector('#lobby-home .tiles').scrollWidth > innerWidth, cut }; });
-    if (!['3,4', '3,2,2', '1,1,1,1,1,1,1'].includes(x.rows) || x.over || x.cut.length) bad.push(`${w}x${h}: ${J(x)}`); }
-  ok(!bad.length, `home tiles: 3 over 4, 3 / 2 / 2 or one column at ${SIZES.length} sizes, no label cut${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
+    if (!['2,4', '2,2,2', '1,1,1,1,1,1'].includes(x.rows) || x.over || x.cut.length) bad.push(`${w}x${h}: ${J(x)}`); }
+  ok(!bad.length, `home tiles: 2 over 4, 2 / 2 / 2 or one column at ${SIZES.length} sizes, no label cut${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 await pg.setViewport(PHONE); await sleep(300); await shot(pg, 'home-phone'); await pg.setViewport(DESK); await sleep(300);
 
 // the view: /friends in the address bar; requests, friends online first with their words, sent
@@ -124,9 +124,9 @@ r = await ev(pg, () => ({ view: !document.getElementById('lobby-friends').hidden
 ok(r.view && r.title === 'Friends' && !r.nameRow, `the Friends view opens (title "${r.title}", no name row) (${J(r)})`);
 r = await ev(pg, () => { const V = document.getElementById('lobby-friends'), rows = s => [...V.querySelectorAll(s + ' .fr-row')].map(li => [li.dataset.name, li.querySelector('.fr-st')?.textContent || '', li.querySelector('.fr-dot')?.className || '', [...li.querySelectorAll('.fr-acts button, .fr-acts .fr-tag')].map(b => b.textContent.trim() || b.getAttribute('aria-label'))]);
   return { inc: rows('.fr-inc'), fr: rows('.fr-friends'), out: rows('.fr-out'), count: V.querySelector('.fr-inc .fr-count').textContent, online: V.querySelector('.fr-friends .fr-more-n').textContent, emblems: V.querySelectorAll('.fr-friends .rank-badge').length, dev: V.querySelectorAll('.fr-friends .reg-badge').length }; });
-ok(J(r.fr.map(x => x[0])) === J(['Eve', 'Bea', 'Cy', 'Dan']) && r.fr[0][1] === 'In a Ranked match' && r.fr[1][1] === 'Playing Matt' && r.fr[2][1] === 'Online' && r.fr[3][1] === 'Offline', `friends: online first, busiest on top, the status words (${J(r.fr.map(x => x.slice(0, 2)))})`);
+ok(J(r.fr.map(x => x[0])) === J(['Eve', 'Bea', 'Cy', 'Dan']) && r.fr[0][1] === 'In a game' && r.fr[1][1] === 'Playing Matt' && r.fr[2][1] === 'Online' && r.fr[3][1] === 'Offline', `friends: online first, busiest on top, the status words (${J(r.fr.map(x => x.slice(0, 2)))})`);
 ok(/is-busy/.test(r.fr[0][2]) && /is-on/.test(r.fr[2][2]) && !/is-on|is-busy/.test(r.fr[3][2]) && r.online === '3 online', `dots: amber in a match, green online, a ring offline; "${r.online}"`);
-ok(r.emblems === 3 && r.dev === 1, `rank emblems beside the three ranked friends, the developer's hammer beside Dan (${r.emblems}, ${r.dev})`);
+ok(r.emblems === 3 && r.dev === 1, `rank emblems beside the three friends with a rank, the developer's hammer beside Dan (${r.emblems}, ${r.dev})`);
 ok(J(r.inc.map(x => [x[0], x[3]])) === J([['Rex', ['Accept', 'Decline']]]) && r.count === '1' && /^Wants to be friends · 3 h ago$/.test(r.inc[0][1]), `requests: Rex with Accept / Decline, the count ${r.count}, "${r.inc[0] && r.inc[0][1]}"`);
 ok(J(r.out.map(x => [x[0], x[3]])) === J([['Olga', ['Cancel']]]) && r.fr.every(x => J(x[3]) === J(['More for ' + x[0]])), `sent: Olga with Cancel; every friend row has only its ... menu (no one-click Remove) (${J(r.out)})`);
 await shot(pg, 'view-desktop');
@@ -255,7 +255,7 @@ ok(r.line === 'Friends see when you’re online' && J(r.acts) === J(['Add friend
 await clickText(pg, '#lbp-friend', 'Add friend'); await sleep(500); r = await card();
 ok(r.line === 'Requested' && J(r.acts) === J(['Cancel']) && world.out.some(x => x.k === 'alice') && (await ev(pg, () => !!document.activeElement.closest('#lbp-card'))), `Add friend: Requested, the focus stays in the card (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(200);
-// a hidden account (Show me off) that is not my friend: found by search, its card has no rank at all (never 'Not ranked yet'), no stats, Add friend
+// a hidden account (Show me off) that is not my friend: found by search, its card has no rank at all (never 'No trophies yet'), no stats, Add friend
 await ev(pg, () => window.__ui.lobbyView('friends')); await sleep(600);
 await (await pg.$('#lobby-friends .fr-q')).type('hidden'); await sleep(900);
 await rowBtn(pg, '#lobby-friends .fr-results', 'hidden_hal', 'hidden_hal'); await sleep(900); r = await card();
@@ -390,7 +390,7 @@ await pg.ctx.close(); world = W0();
 // ---------- E. the gates in the lobby: a guest (Sign in), an account with no username (Pick a username) ----------
 pg = await page('guest-lobby', { acct: null }); await pg.goto(HOME); await sleep(1500); await pg.click('#btn-start'); await sleep(800);
 r = await ev(pg, () => ({ line: document.getElementById('friends-line-text').textContent, n: document.querySelector('#lobby-home .tiles').dataset.n }));
-ok(r.line === 'Sign in to add friends' && r.n === '7', `a guest's tile: "${r.line}" (${J(r)})`);
+ok(r.line === 'Sign in to add friends' && r.n === '6', `a guest's tile: "${r.line}" (${J(r)})`);
 await pg.click('#btn-friends'); await sleep(900);
 r = await ev(pg, () => ({ t: document.querySelector('#lobby-friends .fr-gate-t').textContent, b: document.querySelector('#lobby-friends .fr-gate-b').textContent, bv: !document.querySelector('#lobby-friends .fr-gate-b').hidden }));
 ok(r.t === 'Sign in to add friends' && r.b === 'Sign in' && r.bv, `a guest's view: the gate with Sign in (${J(r)})`);

@@ -18,7 +18,7 @@ const eleven = (wr, rec, ...v) => LABELS.map(([label, tag, unit], i) => ({ label
   ...(i === 0 ? { note: rec + ' vs people', hero: true } : i === 1 ? { note: 'all modes', hero: true } : i === 2 ? { note: v[1] === '1' ? 'win vs people' : 'wins vs people', hero: true } : {}) }));
 const TAGS = LABELS.map(l => l[1]);
 const NAMES = ['Dan', 'Kiko', 'Rallyqueen', 'Paddlebot', 'Mo', 'Ace_Vega', 'Lobster', 'Zed', 'Pickle_Rick', 'Nova', 'Dinkmaster', 'Juno'];
-const ROWS = NAMES.map((name, i) => ({ rank: i + 1, name, v: 60 - i * 4, tier: i < 8 ? 8 - (i >> 1) : null, div: 1 + (i % 3) }));      // Pickle_Rick .. Juno: never played Ranked
+const ROWS = NAMES.map((name, i) => ({ rank: i + 1, name, v: 60 - i * 4, tier: i < 8 ? 8 - (i >> 1) : null, div: 1 + (i % 3) }));      // Pickle_Rick .. Juno: no trophies yet
 const card = (name, rank, trophies, matt, stats) => ({ name, rank, trophies, matt, stats });
 const PLAYERS = {
   Dan: { delay: 300, body: card('Dan', { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, 1180, 'Pro', eleven('81%', '42-7', '31h 12m', '12', '86%', '58%', '60', '1570', '318', '41', '97', '4')) },
@@ -34,7 +34,7 @@ const API = { signin: true, acct: { username: 'Kiko' }, mePlaces: { listed: true
 const PLACES = { listed: true, hidden: false, rally: { rank: 2, v: 56 }, trophies: { rank: 2, v: 964 }, streak: { rank: 2, v: 5 } };
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { if (r.writableEnded) return; r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   API.log.push([q.method, q.url, body, q.headers]);
-  if (u === '/api/me') return send(200, { db: true, rkSignin: false, signin: { enabled: API.signin, clientId: API.signin ? 'test-client.apps.googleusercontent.com' : null }, account: API.signin ? API.acct : null, places: API.acct ? API.mePlaces : null });
+  if (u === '/api/me') return send(200, { db: true, signin: { enabled: API.signin, clientId: API.signin ? 'test-client.apps.googleusercontent.com' : null }, account: API.signin ? API.acct : null, places: API.acct ? API.mePlaces : null });
   if (u === '/api/stats') return setTimeout(() => send(200, { profile: { guest: !API.acct, played: 3, ladder: { tier: 7, div: 2, trophies: 964 }, places: API.acct ? PLACES : null } }), API.statsDelay);
   if (u === '/api/leaderboard') return send(200, { board: 'rally', total: ROWS.length, rows: ROWS });
   if (u === '/api/leaderboard/player') { const n = new URL(q.url, 'http://x').searchParams.get('u'), P = n === 'Zed' && API.zedOk ? { body: ZED_OK } : PLAYERS[n] || { status: 404 };
@@ -143,13 +143,9 @@ ok(s.open && s.name === 'Nova' && s.state === 'ok' && s.stats[0].v === '50%', `L
 await pg.keyboard.press('Escape'); await sleep(200);
 await pg.click(rowSel('Juno'), { clickCount: 2 }); await sleep(600); s = await sheet(pg);
 ok(s.open && s.name === 'Juno' && s.state === 'ok', `a double click opens the sheet once and leaves it open (${J({ open: s.open, state: s.state })})`);
-ok(s.rank === 'Not ranked yet' && !s.em && s.emA11y === '|' && s.tro === null && s.mbest === 'None yet' && s.stats.map(x => x.v).join() === '-,0m,0,-,-,0,-,0,0,0,0' && s.stats[0].note === '0-0 vs people', `never played Ranked: no emblem, "Not ranked yet", no trophies, the zeros and dashes as the card has them (${J({ rank: s.rank, v: s.stats.map(x => x.v) })})`);
+ok(s.rank === 'No trophies yet' && !s.em && s.emA11y === '|' && s.tro === null && s.mbest === 'None yet' && s.stats.map(x => x.v).join() === '-,0m,0,-,-,0,-,0,0,0,0' && s.stats[0].note === '0-0 vs people', `no trophies yet: no emblem, "No trophies yet", no trophies, the zeros and dashes as the card has them (${J({ rank: s.rank, v: s.stats.map(x => x.v) })})`);
 await pg.keyboard.press('Escape'); await sleep(250); s = await sheet(pg); ok(!s.open && s.focusRow === 'Juno', `Esc after the double click: focus on Juno's row (${s.focusRow})`);
 
-// ---------- 16: MATCH FOUND closes the sheet (main.js rkMove) ----------
-await pg.click(rowSel('Kiko')); await sleep(400);
-push({ type: 'rkvs', at: 3, you: 0, names: ['Kiko', 'Mo'], reg: [true, true], ranks: [{ tier: 7, div: 2 }, { tier: 6, div: 1 }], series: { bestOf: 3 } }); await sleep(500);
-s = await sheet(pg); ok(!s.open, `MATCH FOUND while the sheet is open: it closes (no veil over the VS card) (open ${s.open})`);
 await pg.close();
 
 // ---------- 10: the list redraws under the sheet (/api/stats answers late): focus finds the new row ----------

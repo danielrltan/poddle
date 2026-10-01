@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-09-30 (NOTES 157): the Ranked mode is gone.** docs/TROPHIES.md is the spec now: trophies are earned in every counted game by signed-in players with a username, there is no queue, series, stadium or Ranked view, and the rank emblem shows on every court. This file is history; where it disagrees with TROPHIES.md, TROPHIES.md wins.
+
 > **As built (2026-09-28):** sections 1-3, 5 and 6 were built as written. Section 7's own Pro board was NOT: a parallel session
 > shipped a global leaderboard first (NOTES 126: GET /api/leaderboard?b=trophies|rally|streak, accounts with a username only, a
 > Show me switch, "Pro #N" = the trophies board place), and this work keeps that. The share card reads that place for "PRO #N".

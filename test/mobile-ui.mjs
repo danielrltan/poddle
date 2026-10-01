@@ -1,5 +1,5 @@
 // The phone home (NOTES 149): web/main.js MOBILE + ui.js + index.html against a fake game and a fake /api. A phone (touch, under 600 px on its short side) skips the
-// title for the lobby's home: the paddle-code card (P- and 4 -> /pad.html?k=CODE), Watch a match, Your stats, Leaderboard, Friends; Quick play, Ranked and Play a bot are
+// title for the lobby's home: the paddle-code card (P- and 4 -> /pad.html?k=CODE), Watch a match, Your stats, Leaderboard, Friends; Quick play and Play a bot are
 // gone and the tile count follows. It never sends a seat: court rows, the code boxes and a ?court= link all WATCH, empty courts are left out, a hidden button pressed by
 // script still sends nothing (the request() gate), Back at home stays home. A tablet, a desktop and ?mobile=0 keep the title. Portrait and landscape fit with no sideways scroll.
 // Usage: node test/mobile-ui.mjs      MOBILE_UI_PORT=<base> moves the ports (default 9880: pages + /api, 9881: fake game, 9882: nothing = no AirPod). Screenshots: test/ui-shots/mobile-*.png.
@@ -14,7 +14,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 
 // ---------- the fake /api: stats and sign-in on, a guest ----------
 const apiAnswer = (q, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(J(o)); };
-  if (u === '/api/me') return send(200, { db: true, rkSignin: false, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: null, places: null });
+  if (u === '/api/me') return send(200, { db: true, signin: { enabled: true, clientId: 'test-client.apps.googleusercontent.com' }, account: null, places: null });
   if (u === '/api/stats') return send(200, { profile: { guest: true, played: 0 } });
   if (u === '/api/leaderboard') return send(200, { board: 'rally', total: 0, rows: [] });
   return send(404, { error: 'nope' }); };
@@ -34,7 +34,7 @@ const TOURS = [{ code: 'TRNY', host: 'Juno', n: 3, max: 16 }];
 const LIST = { type: 'lobby', online: 5, rooms: ROOMS, tours: TOURS }, frames = [];
 const wss = new WebSocketServer({ port: G, host: '127.0.0.1' });
 wss.on('connection', ws => { ws.send(J(LIST)); ws.on('message', raw => { let m; try { m = JSON.parse(raw); } catch { return; } if (m.type === 'ping') { ws.send(J({ type: 'pong', c: m.c })); return; } frames.push(m); }); });
-const SEAT = ['quick', 'create', 'join', 'rk', 'rkwarm', 'tcreate', 'ask', 'bot', 'twarm', 'tstart'];
+const SEAT = ['quick', 'create', 'join', 'tcreate', 'ask', 'bot', 'twarm', 'tstart'];
 const seats = () => frames.filter(m => SEAT.includes(m.type)).map(m => m.type + (m.code ? ':' + m.code : ''));
 const watches = () => frames.filter(m => m.type === 'watch').map(m => m.code);
 
@@ -68,7 +68,7 @@ await pg.goto(url(), { waitUntil: 'domcontentloaded' }); await sleep(2200);
 let s = await state(pg);
 ok(s.mobile && s.screen === 'screen-lobby' && s.view === 'home', `a phone skips the title for the lobby's home (${J({ mobile: s.mobile, screen: s.screen, view: s.view })})`);
 ok(s.card && !s.back && s.title === 'Poddle' && !s.nameRow, `the paddle-code card shows; no Back, the header says Poddle, no name row (${J({ card: s.card, back: s.back, title: s.title, nameRow: s.nameRow })})`);
-ok(J(s.tiles) === J(['btn-friends', 'btn-courts', 'btn-profile', 'btn-leaderboard']) && s.n === '4', `tiles: Friends, Watch a match, Your stats, Leaderboard; no Quick play, Ranked or Play a bot; data-n counts them (${J(s.tiles)} n=${s.n})`);
+ok(J(s.tiles) === J(['btn-friends', 'btn-courts', 'btn-profile', 'btn-leaderboard']) && s.n === '4', `tiles: Friends, Watch a match, Your stats, Leaderboard; no Quick play or Play a bot; data-n counts them (${J(s.tiles)} n=${s.n})`);
 ok(!s.sideways, 'portrait: no sideways scroll');
 await pg.screenshot({ path: path.join(SHOTS, 'mobile-home.png') });
 { const b = await ev(pg, () => { const r = document.getElementById('m-pad').getBoundingClientRect(), t = document.getElementById('btn-leaderboard').getBoundingClientRect(); return { l: r.left, r: innerWidth - r.right, bottom: t.bottom, h: innerHeight }; });
@@ -79,9 +79,8 @@ await pg.keyboard.press('Escape'); await sleep(400); await ev(pg, () => document
 s = await state(pg); ok(s.screen === 'screen-lobby' && s.view === 'home', `Esc and Back at home stay on the phone home (${s.screen} ${s.view})`);
 await ev(pg, () => { for (const id of ['btn-quick', 'btn-bot']) document.getElementById(id).click(); }); await sleep(300);
 await ev(pg, () => window.__ui.lobbyView('bot')); await sleep(200); await ev(pg, () => document.getElementById('btn-bot-1').click()); await sleep(300);
-await ev(pg, () => window.__ui.lobbyView('ranked')); await sleep(200); await ev(pg, () => document.getElementById('btn-ranked-go')?.click()); await sleep(300);
 await ev(pg, () => window.__ui.lobbyView('courts')); await sleep(200); await ev(pg, () => document.getElementById('btn-create').click()); await sleep(200); await ev(pg, () => document.getElementById('btn-create-go')?.click()); await sleep(300);
-ok(seats().length === 0, `hidden Quick play, Play a bot, Ranked, Create court pressed by script: no seat frame reaches the game (${J(seats())})`);
+ok(seats().length === 0, `hidden Quick play, Play a bot, Create court pressed by script: no seat frame reaches the game (${J(seats())})`);
 { const t = await ev(pg, () => [...document.querySelectorAll('#toast, .notices .notice')].map(e => e.textContent).join(' | ')); ok(/Play on a computer/.test(t), `and it says why ("${t.slice(0, 120)}")`); }
 await ev(pg, () => window.__ui.lobbyView('home')); await sleep(300);
 
@@ -146,7 +145,7 @@ for (const [tag, o, q] of [['ipad', { w: 820, h: 1180, ua: IPAD }, ''], ['deskto
   s = await state(pg);
   ok(!s.mobile && s.screen === 'screen-title', `${tag}: the title and Play as before, no phone home (${J({ mobile: s.mobile, screen: s.screen })})`);
   if (tag === 'desktop') { await pg.click('#btn-start'); await sleep(900); s = await state(pg);
-    ok(J(s.tiles) === J(['btn-friends', 'btn-quick', 'btn-ranked', 'btn-courts', 'btn-bot', 'btn-profile', 'btn-leaderboard']) && !s.card && s.title === 'Play', `desktop lobby: Friends | Quick play | Ranked (NOTES 150), Play a bot, no paddle card, "Play" (${J(s.tiles)} ${s.title})`); }
+    ok(J(s.tiles) === J(['btn-friends', 'btn-quick', 'btn-courts', 'btn-bot', 'btn-profile', 'btn-leaderboard']) && !s.card && s.title === 'Play', `desktop lobby: Friends | Quick play (NOTES 150, docs/TROPHIES.md 4), Play a bot, no paddle card, "Play" (${J(s.tiles)} ${s.title})`); }
   await pg.close();
 }
 

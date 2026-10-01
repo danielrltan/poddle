@@ -55,7 +55,7 @@ const win = (owner, extra = {}) => db.recordMatch({ now: Date.now(), kind: 'bot'
 ok(!!win(A.owner_id) && !!win(gOwner) && !!win(g2Owner), 'three profiles have a match on record');
 const raw = new DatabaseSync(DBF); raw.exec('PRAGMA busy_timeout=2000');
 raw.prepare('UPDATE profile SET hits = 140, returns = 120, chances = 150, winners = 30, aces = 12, smashes = 9 WHERE owner_id = ?').run(A.owner_id);   // part A's counters, by hand
-ok(!!db.ladderApply({ owner: A.owner_id, delta: 240, won: true, now }) && db.profileOf(A.owner_id).ladder.tier === 2 && db.profileOf(A.owner_id).ladder.div === 2, "A's Ranked ladder: 240 trophies, Silver II (db.ladderApply)");
+ok(!!db.ladderApply({ owner: A.owner_id, delta: 240, won: true, now }) && db.profileOf(A.owner_id).ladder.tier === 2 && db.profileOf(A.owner_id).ladder.div === 2, "A's ladder: 240 trophies, Silver II (db.ladderApply)");
 
 console.log('servers: ' + PORT + ' (SHARE_RENDERS 2), ' + P_NORES + ' (no resvg), ' + P_HOST + ' (hosted), ' + P_BUSY + ' (SHARE_RENDERS 24)');
 await Promise.all([up(PORT, { SHARE_RENDERS: '2' }), up(P_NORES, { NODE_OPTIONS: `--require ${root}test/no-resvg.cjs` }), up(P_HOST, { FLY_APP_NAME: 'poddle-test' }), up(P_BUSY, { SHARE_RENDERS: '24' })]);
@@ -73,12 +73,12 @@ ok(J(lose.big.slice(0, 3).map(b => [b.tag, b.sub, !!b.hero])) === J([['Win rate'
 ok(lose.big[2].value === '1', "the best streak is people-only (the global leaderboard's Win streak board): a 9-win Matt streak does not count");
 { const big = card.dataOf({ human: { wins: 4321, losses: 1234, bestStreak: 1234 }, titles: 1234, play: { winners: 88888, secs: 3599999 } }, 'x');
   ok(big.big[0].value === '78%' && big.big[0].sub === '4,321-1,234 vs people' && big.big[1].value === '999h 59m' && big.big[2].value === '1,234' && big.big[7].value === '88,888' && big.big[10].value === '1,234', `en-US commas, and hours past 100 keep their minutes, as Your stats' clock (${vals(big)})`); }
-// ---- the rank is the Ranked ladder's, drawn with web/emblems.js's own emblem (docs/SHARE.md 2; one rank per player, as on Your stats) ----
+// ---- the rank is the ladder's, drawn with web/emblems.js's own emblem (docs/SHARE.md 2; one rank per player, as on Your stats) ----
 const E = await import('../web/emblems.js'), L7 = require('../server/ladder.js');
 const silver = card.dataOf({ ladder: { tier: 2, div: 2, trophies: 240 } }, 'x'), none = card.dataOf({ played: 3 }, 'x'), top7 = card.dataOf({ ladder: { tier: 8, div: 1, trophies: 1200 }, places: { trophies: { rank: 3, v: 1200 } } }, 'x'), master = card.dataOf({ ladder: { tier: 6, div: 3, trophies: 880 } }, 'x'), proAnon = card.dataOf({ ladder: { tier: 8, div: 1, trophies: 1100 } }, 'x');
 ok(silver.rank === 'Silver II' && silver.tier === 2 && silver.div === 2 && silver.trophies === 240 && top7.rank === 'Pro #3' && top7.pro === 3 && top7.div === 1 && master.rank === 'Master III' && proAnon.rank === 'Pro' && proAnon.pro === null,
   `the rank is profile.ladder's: 'Silver II', 240 trophies; Master III; Pro has no divisions (NOTES 126): 'Pro #3' from its trophies leaderboard place, 'Pro' when not listed (${top7.rank}, ${master.rank}, ${proAnon.rank})`);
-ok(none.rank === 'Bronze I' && none.tier === 1 && none.div === 1 && none.trophies === 0, 'no Ranked games (no ladder): Bronze I with 0 trophies, as Your stats reads it');
+ok(none.rank === 'Bronze I' && none.tier === 1 && none.div === 1 && none.trophies === 0, 'no trophies yet (no ladder): Bronze I with 0 trophies, as Your stats reads it');
 ok(card.CARD_V === 9 && /^[0-9a-f]{8}$/.test(silver.em) && card.hashOf(silver) !== card.hashOf({ ...silver, v: 3 }) && card.hashOf(silver) !== card.hashOf({ ...silver, em: '00000000' }), 'CARD_V 9 and the emblem artwork are in the hash: a new look is a new ?v=');
 { const sv = card.svgOf(silver), pv = card.svgOf(top7), nv = card.svgOf(none), mv = card.svgOf(master);
   const sprite = E.SPRITE.replace(/\bid="([^"]+)"/g, 'id="em-$1"').replace(/href="#([^"]+)"/g, 'href="#em-$1"').replace(/url\(#([^)]+)\)/g, 'url(#em-$1)'), sym = (t, d) => sprite.match(new RegExp(`<symbol id="em-${E.emblemId(t, d)}" viewBox="0 0 64 64">([\\s\\S]*?)</symbol>`))[1];   // the division's own medal (docs/RANK8.md 6)
@@ -110,7 +110,7 @@ ok(meta(html, 'og:image') === a1.json.image && meta(html, 'og:url') === url && m
 ok(/^https?:\/\//.test(meta(html, 'og:image')) && /^https?:\/\//.test(meta(html, 'og:url')) && /^https?:\/\//.test(meta(html, 'twitter:image')), 'every og/twitter URL is absolute');
 ok(/Pickleball with your phone as the paddle\. Play free at poddleball\.com$/.test(meta(html, 'og:description') || '') && /^Silver II rank · \d+m on court · best win streak 0 vs people · \d+-hit rally · 80% return rate · beat Rookie Matt \(the bot\)\. /.test(meta(html, 'og:description')) && /, win rate vs people none yet \(0-0\), time on court \d+ minutes? in all modes, best win streak vs people 0, return rate 80%, points won [^,]+, longest rally \d+ hits, fastest swing \d+ degrees a second, winners 30, aces 12, smashes 9, tournament titles 0, beat the Rookie bot$/.test(meta(html, 'og:image:alt')) && (meta(html, 'og:image:alt') || '').startsWith("Share_Ace's Poddle player card"), `og:description: the rank, time on court, the people-only streak, rally, return rate, Matt (a win rate only once a person was played) + "Play free at poddleball.com"; og:image:alt reads all eleven as words (${meta(html, 'og:description')} | ${meta(html, 'og:image:alt')})`);
 ok((meta(html, 'og:description') || '').startsWith('Silver II rank · ') && (meta(html, 'og:image:alt') || '').startsWith("Share_Ace's Poddle player card: Silver II rank, 240 trophies, ") && (meta(html, 'twitter:image:alt') || '') === meta(html, 'og:image:alt') && /<img [^>]*alt="Share_Ace&#39;s Poddle player card: Silver II rank, 240 trophies, /.test(html),
-  "the Ranked rank leads og:description ('Silver II rank'); the alt texts (og, twitter, the page's img) say it with the trophies");
+  "the rank leads og:description ('Silver II rank'); the alt texts (og, twitter, the page's img) say it with the trophies");
 ok(/<a class="card" href="\/"><img [^>]*alt="Share_Ace/.test(html) && /plays pickleball/.test(html) && /href="\/"[^>]*>[\s\S]*Play Poddle free/.test(html) && /Make your own card/.test(html) && /src="\/vendor\/fonts\//.test(html.replace(/url\(/g, 'src="')) && !/url\(vendor/.test(html), 'the body: the Play Poddle free button to /, the make-your-own line, root-absolute font URLs');
 ok((await req(PORT, 'HEAD', `/c/${slug}`)).status === 200, 'HEAD /c/<slug>: 200');
 
@@ -162,7 +162,7 @@ ok(a3.status === 200 && slug3 && slug3 !== slug && (await req(PORT, 'GET', `/c/$
 // ---- an account with no username, a guest: "Poddle player" ----
 const b1 = await req(PORT, 'POST', '/api/share', {}, { cookie: cookieB }), pb = b1.status === 200 ? await req(PORT, 'GET', `/c/${slugOf(b1.json.url)}`) : { body: '' };
 ok(b1.status === 200 && /Poddle player/.test(meta(pb.body, 'og:image:alt') || '') && meta(pb.body, 'og:title') === 'A player on Poddle', 'an account with no username (and no matches): a card for "Poddle player"');
-ok((meta(pb.body, 'og:image:alt') || '').startsWith('A Poddle player card: Bronze I rank') && /^Bronze I rank( · |\. )/.test(meta(pb.body, 'og:description') || ''), '...never played Ranked: Bronze I, no trophy count');
+ok((meta(pb.body, 'og:image:alt') || '').startsWith('A Poddle player card: Bronze I rank') && /^Bronze I rank( · |\. )/.test(meta(pb.body, 'og:description') || ''), '...no trophies yet: Bronze I, no trophy count');
 const g1 = await req(PORT, 'POST', '/api/share', { dev: G }), gSlug = slugOf(g1.json && g1.json.url);
 ok(g1.status === 200 && gSlug && (await req(PORT, 'GET', `/c/${gSlug}.png`)).status === 200, 'a guest (device id in the body) gets a link and a card');
 

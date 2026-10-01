@@ -19,7 +19,8 @@ const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 
 let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
 let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null, lastBack = null, openAt = 0, meDone = false, lostP = null;      // openAt: when a card last opened (the veil ignores the rest of a double click). meDone: /api/me has answered (or failed). lostP: acctLost's /api/me check in flight      // saved: the server has a guest profile for this device (true / false / null = not asked)
-let me = { enabled: false, clientId: null, account: null, db: false, rkSignin: false };      // rkSignin (NOTES 133): Ranked is for signed-in players with a username      // GET /api/me: sign-in on or off, the Google client id, who is signed in
+let me = { enabled: false, clientId: null, account: null, db: false };      // GET /api/me: sign-in on or off, the Google client id, who is signed in
+let meLadder = null, loading = false;      // meLadder: my ladder as last heard (/api/me for a signed-in account, then every /api/stats answer and each game's trophies): the hero draws it while /api/stats is asked, so Your stats never opens on 'No trophies yet' and then grows (NOTES 150). loading: showProfile's first draw, before the answer
 let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
 // ---------- the device id (3.1): made at the first seat, never at load. A bearer secret for the guest profile: never in a URL or a log ----------
@@ -51,11 +52,10 @@ export async function loadMe() {                            // once after boot: 
   if (!on) return me;
   try { const r = await api('/api/me'), j = r.ok && r.j;
     if (j) { const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
-      me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true, rkSignin: j.rkSignin === true };
-      if (me.account) { const L = ladderOf(j); if (L) h.ladder(L); }
+      me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true }; meLadder = me.account ? ladderOf(j) : null;      // the account's ladder and places ride on /api/me (server/api.js)
       const seen = ls.get(LB_SEEN), listed = !!(j.places && j.places.listed === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140)
       if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }
-  meDone = true;      // /api/me carries the signed-in account's ladder for the home tile (docs/RANKED.md 9): its rank from the first screen, not 'Play your first match'
+  meDone = true;
   drawAcct(); return me;
 }
 // the notice the privacy page promises (NOTES 126): once per browser, only to a name that can be on a board. It waits until the lobby is up and has sat
@@ -78,10 +78,12 @@ export async function fetchProfile() {                      // -> the Profile of
 // ---------- after a match: one line on the result card (9.3) ----------
 const WHY = { not_counted: 'This match doesn’t count toward your record', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count' };
 const BEST = { rally: v => `longest rally ${v}`, speed: v => `fastest swing ${degs(v)}°/s` };      // hit (power) is kept and exported but never shown: it is a unitless internal number
-let overTour = false, overQuiet = false, nudged = false;      // nudged: the sign-in nudge shows once a visit, and on every first win
-export function matchover(tour, quiet) { overTour = !!tour; overQuiet = !!quiet; show('result-save', false); }      // a new result: last match's line goes (result() fills it again for this one). tour: a tournament's card (the line, no nudge). quiet: a game of a Ranked series that is not over (docs/RANKED.md 8.8): nothing until the final card
-export function result(p) {                                 // the 'profile' message (8.3), right after matchover, to my seat only
-  if (!on || !p || typeof p !== 'object' || overQuiet) return; const tour = overTour;
+let overTour = false, nudged = false;      // nudged: the sign-in nudge shows once a visit, and on every first win
+export function matchover(tour) { overTour = !!tour; show('result-save', false); }      // a new result: last match's line goes (result() fills it again for this one). tour: a tournament's card (the line, no nudge)
+export function result(p) {                                 // the 'profile' message (8.3), right after matchover, to my seat only. Its `trophies` object is main.js's (ui.trophyRow, docs/TROPHIES.md 4): this is the record line
+  if (!on || !p || typeof p !== 'object') return; const tour = overTour;
+  { const t = p.trophies; if (t && typeof t === 'object' && Number.isInteger(t.trophies) && t.saved === true) { const L = meLadder || { place: null, best: 1, bestDiv: 1, bestAt: 0, next: 0, wins: 0, losses: 0, streak: 0, botWins: 0, botLosses: 0, mattDayLeft: 0 }, tier = tierNum(t.tier), div = tier === TOP ? 1 : divNum(t.div), up = tier > L.best || tier === L.best && div > L.bestDiv;
+    meLadder = { ...L, tier, div, trophies: Math.max(0, t.trophies), best: up ? tier : L.best, bestDiv: up ? div : L.bestDiv }; } }      // the hero's next open starts from this count (drawRoad)
   if (p.saved === true && p.guest === true) saved = true;
   const lv = Number.isInteger(p.level) && LEVEL[p.level] ? LEVEL[p.level] : '', why = Array.isArray(p.why) ? p.why.filter(w => typeof w === 'string') : [], bests = Array.isArray(p.bests) ? p.bests.filter(b => b && BEST[b.what] && Number.isFinite(b.v)) : [];
   let line = '';
@@ -107,15 +109,13 @@ function rungs(p) {                                         // the four Matt row
   return { rows, won, beaten: won.filter(Boolean).length, top: won.lastIndexOf(true), nextI: won.indexOf(false) };      // top: the hardest Matt beaten = the rank (-1: none); nextI: -1 once all four are
 }
 function drawRoad(p) {
-  const { rows, won, beaten, top, nextI } = rungs(p), H = human(p), name = i => `${LEVEL[ORDER[i]]} Matt`;
-  // the hero is the Ranked ladder (docs/RANKED.md 2, one rank per player): "Gold II", its trophies, the bar across the current division and
-  // what the next step is. The crest wears the rank's emblem (ui.rankCrest). No ladder yet (never played Ranked, an older server): Bronze I, 0
-  const L = ladderOf(p) || { tier: 1, div: 1, trophies: 0 }, T = L.trophies, RF = RANK_FLOOR[L.tier - 1], rkTop = L.tier === TOP;      // Pro has no divisions (NOTES 126): reaching it is the top
-  const dFloor = RF + (L.div - 1) * DIV_W, nextName = L.tier === TOP ? '' : L.div < 3 ? `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div + 1]}` : `${RANK_NAME[L.tier]} I`;
-  const crest = $('st-crest'); if (crest) { crest.className = 'st-crest is-rk is-' + RANK_NAME[L.tier - 1].toLowerCase() + (rkTop ? ' is-top' : ''); h.crest(crest, { tier: L.tier, div: L.div }); }
-  text('st-rank', L.tier === TOP ? RANK_NAME[TOP - 1] : `${RANK_NAME[L.tier - 1]} ${ROMAN[L.div]}`); text('st-trophies', String(T));      // 'Pro' has no numeral: the #12 pill beside it says where (drawPlace)
-  text('st-rank-cap', !T && rkGate() === 'signin' ? 'Sign in to play Ranked' : !T && !ladderOf(p) ? 'Play Ranked for your first trophies' : rkTop ? '· top rank' : `· ${Math.max(1, dFloor + DIV_W - T)} to ${nextName}`);      // the trophy icon after the number stands for the word (NOTES 136)
-  const bar = $('st-rank-bar'); if (bar) { const f = rkTop ? 1 : Math.min(1, Math.max(0, (T - dFloor) / DIV_W)); bar.style.setProperty('--p', f.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(f * 100))); }
+  const { rows } = rungs(p), H = human(p), name = i => `${LEVEL[ORDER[i]]} Matt`;
+  // the hero is the trophy ladder (docs/TROPHIES.md 4, one rank per player): the crest, "Gold II", the place, the trophies, the bar to the next division
+  // or rank, the trophy road and the keep line, all drawn by ui.rankCrest (main.js's h.crest) from the ladder with its place. null = no trophies yet
+  // (nothing saved, an older server): the dimmed crest and 'Win a game for your first trophies', or 'Sign in to earn trophies' for a guest
+  if (p) { meLadder = ladderOf(p); h.crest(meLadder, signedIn()); }      // the answer: the hero is the trophy view
+  else if (p === null && !loading) { meLadder = null; h.crest(null, signedIn()); }      // answered: nothing saved yet
+  else if (meLadder) h.crest(meLadder, signedIn());      // asking (loading), or no answer (undefined): what is known, in the shape the answer takes; with nothing known the last draw (or the page's own markup) stands
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
   if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one
@@ -178,20 +178,19 @@ function drawHead(p) {
 }
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available). Guest or signed in changes only the header: every stat draws the same way
   shareable = !!p && typeof p === 'object' && 'share' in p; share = shareable ? shareOf(p.share) : null;      // fresh at every draw: the image's ?v= changes with the stats
-  drawHead(p); drawRoad(p || null); drawPlace(p || null); drawPeople(p || null); drawPlay(p || null); drawTiles(p || null); drawAcct();
+  drawHead(p); drawRoad(p); drawPlace(p || null); drawPeople(p || null); drawPlay(p || null); drawTiles(p || null); drawAcct();
   const msg = p === undefined ? 'Stats aren’t available right now. You can still play.' : '';      // nothing yet: no bar, the card's own lines say it (Start here, the people hint, the tile captions)
   text('pf-msg', msg); show('pf-msg', !!msg); // download and delete live on the privacy page (web/data-tools.js): the footer links there
 }
 export async function showProfile() {                      // the lobby view opened: draw what is known at once (empty), then the answer
-  const g = ++viewGen; drawProfile(on ? null : undefined); if (!on) return;
+  const g = ++viewGen; loading = on; drawProfile(on ? null : undefined); loading = false; if (!on) return;
   text('pf-msg', 'Loading your stats'); show('pf-msg', true);
   const p = await fetchProfile(); if (g === viewGen && h.view() === 'profile') drawProfile(p);
-  { const L = ladderOf(p); if (L) h.ladder(L); }      // the home tile follows what Your stats fetched (a guest's first sight of its rank)
 }
 
 // ---------- the global leaderboard (NOTES 126): three boards of counted results, GET /api/leaderboard; my places ride on /api/stats ----------
 const BOARD = {
-  trophies: { what: 'Ranked Trophies', unit: n => (n === 1 ? 'trophy' : 'trophies'), none: 'Play Ranked for your first trophies' },
+  trophies: { what: 'Trophies', unit: n => (n === 1 ? 'trophy' : 'trophies'), none: 'Win a game for your first trophies' },
   rally: { what: 'Longest rally, in hits', unit: n => (n === 1 ? 'hit' : 'hits'), none: 'Keep the ball in play for a rally of 3 or more' },
   streak: { what: 'Best win streak against people', unit: n => (n === 1 ? 'win' : 'wins'), none: 'Win a match against a person' },
 };
@@ -210,15 +209,15 @@ function drawPlace(p) {
 }
 const rankName = (t, d) => (t === TOP ? RANK_NAME[TOP - 1] : `${RANK_NAME[tierNum(t) - 1]} ${ROMAN[divNum(d)]}`);      // 'Gold II', 'Pro' (the place only comes with the profile)
 function boardRow(r, mine) {      // a row is a button (NOTES 140): it opens that player's profile card. li.lb-item > button.lb-row, like the court list
-  const li = mk('li', 'lb-item'), b = mk('button', 'lb-row' + (r.rank <= 3 ? ' is-top is-top' + r.rank : '') + (mine ? ' is-me' : '')), ranked = Number.isInteger(r.tier);
+  const li = mk('li', 'lb-item'), b = mk('button', 'lb-row' + (r.rank <= 3 ? ' is-top is-top' + r.rank : '') + (mine ? ' is-me' : '')), hasRank = Number.isInteger(r.tier);
   b.type = 'button'; b.dataset.name = r.name; b.setAttribute('aria-haspopup', 'dialog');
-  if (ranked) { b.dataset.tier = String(r.tier); b.dataset.div = String(r.div); }      // the sheet's hero draws from these at once, before the profile answers
+  if (hasRank) { b.dataset.tier = String(r.tier); b.dataset.div = String(r.div); }      // the sheet's hero draws from these at once, before the profile answers
   const who = mk('span', 'lb-who'), nm = mk('b', 'lb-name', r.name), v = Number(r.v).toLocaleString('en-US'), unit = BOARD[board].unit(r.v);
   who.append(nm); b.append(mk('span', 'lb-rank', String(r.rank)), who, mk('span', 'lb-v'));
   b.lastChild.append(mk('b', '', v), unitOf(r.v));      // the trophy icon for the Trophies board (NOTES 136)
   h.badge(nm, true);      // the hammer on the developer's name, as in a court
-  if (ranked) h.rankBadge(nm, { tier: r.tier, div: r.div });      // the Ranked emblem, as beside a name in a Ranked court. None for a player who has never played Ranked
-  b.setAttribute('aria-label', `${r.rank}. ${r.name}${nm.classList.contains('is-dev') ? ', Developer' : ''}${ranked ? ', ' + rankName(r.tier, r.div) : ''}, ${v} ${unit}${mine ? ', you' : ''}. Open profile`);
+  if (hasRank) h.rankBadge(nm, { tier: r.tier, div: r.div });      // the rank emblem, as beside a name on a court. None for a player with no trophies yet
+  b.setAttribute('aria-label', `${r.rank}. ${r.name}${nm.classList.contains('is-dev') ? ', Developer' : ''}${hasRank ? ', ' + rankName(r.tier, r.div) : ''}, ${v} ${unit}${mine ? ', you' : ''}. Open profile`);
   li.append(b); return li;
 }
 function drawYou() {
@@ -323,11 +322,11 @@ function drawPlayer(p, state) {
   const name = String(p.name || '').slice(0, 12), nm = $('lbp-name'); if (nm) { nm.textContent = name; h.badge(nm, true); }      // the hammer beside the developer's name
   const part = state === 'part' || state === 'partx';
   c.dataset.state = part ? 'part' : state;      // loading | ok | part (no stats: not on a board) | gone | error. An attribute, not a class: .panel.is-error is the red nudge of a form
-  const rk = p.rank && typeof p.rank === 'object' && Number.isInteger(p.rank.tier) ? { tier: tierNum(p.rank.tier), div: divNum(p.rank.div) } : null;
-  const hero = $('lbp-hero'); if (hero) { hero.className = 'lbp-hero well' + (rk ? ' is-' + RANK_NAME[rk.tier - 1].toLowerCase() : ' is-none') + (part ? ' no-matt' : ''); hero.hidden = part && !rk && !p.open; }      // no Matt without the board's answer. A hidden account's rank (not my friend): no hero at all, never 'Not ranked yet'
-  h.emblem($('lbp-em'), rk);
-  text('lbp-rank', rk ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rk.tier, rk.div)) : state === 'loading' ? '' : 'Not ranked yet');      // 'Pro #3' only from the board's answer
-  const tro = num(p.trophies); show('lbp-tro', !!rk && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
+  const rank = p.rank && typeof p.rank === 'object' && Number.isInteger(p.rank.tier) ? { tier: tierNum(p.rank.tier), div: divNum(p.rank.div) } : null;
+  const hero = $('lbp-hero'); if (hero) { hero.className = 'lbp-hero well' + (rank ? ' is-' + RANK_NAME[rank.tier - 1].toLowerCase() : ' is-none') + (part ? ' no-matt' : ''); hero.hidden = part && !rank && !p.open; }      // no Matt without the board's answer. A hidden account's rank (not my friend): no hero at all, never 'No trophies yet'
+  h.emblem($('lbp-em'), rank);
+  text('lbp-rank', rank ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rank.tier, rank.div)) : state === 'loading' ? '' : 'No trophies yet');      // 'Pro #3' only from the board's answer
+  const tro = num(p.trophies); show('lbp-tro', !!rank && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
   const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi);
   text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
   const pl = $('lbp-places');      // the place numbers /api/player gave (never the values): one short line
@@ -362,42 +361,38 @@ function retryPlayer() {
   loadPlayer(lbpName, null);
 }
 
-// ---------- Ranked (docs/RANKED.md 2): the view draws from the Profile's ladder ----------
-const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'], RANK_FLOOR = [0, 150, 300, 450, 600, 750, 900, 1050], DIV_W = 50, TOP = RANK_NAME.length;   // eight since Master (NOTES 124); TOP: Pro, no divisions      // web/emblems.js RANKS, by tier; the three divisions of a rank (this file imports nothing from ui.js or emblems.js: see the header)
+// ---------- the trophy ladder (docs/TROPHIES.md 1, 4): Your stats and the profile card draw from the Profile's ladder ----------
+const RANK_NAME = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Champion', 'Pro'], ROMAN = ['', 'I', 'II', 'III'], TOP = RANK_NAME.length;   // eight since Master (NOTES 124); TOP: Pro, no divisions      // web/emblems.js RANKS, by tier (this file imports nothing from ui.js or emblems.js: see the header)
 const tierNum = t => Number.isInteger(t) && t >= 1 && t <= TOP ? t : 1, divNum = d => (d === 2 || d === 3 ? d : 1);
 const trophyPlace = p => { const P = placeOf(p); return P && P.listed && P.trophies && Number.isInteger(P.trophies.rank) ? P.trophies.rank : null; };      // my trophy leaderboard place: Pro shows it as 'Pro #12'
 function ladderOf(p) {                                      // p.ladder as the server sends it (10.1 profileOf), or null when the Profile has none (an older server, nothing saved)
-  const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : null; if (!L) return null;
+  const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : null; if (!L || L.row === false) return null;      // row false: the server says no ladder row yet
+  if (!num(L.trophies) && tierNum(L.tier) === 1 && !num(L.wins) && !num(L.losses) && !num(L.botWins) && !num(L.botLosses)) return null;      // an older server sends tier 1 zeros for a player never paid or charged (db.ladderOf): no trophies yet, not Bronze I
   return { place: trophyPlace(p), tier: tierNum(L.tier), div: tierNum(L.tier) === TOP ? 1 : divNum(L.div), trophies: num(L.trophies), best: tierNum(L.bestTier), bestDiv: divNum(L.bestDiv), bestAt: Number.isFinite(L.bestTierAt) ? L.bestTierAt : 0, next: num(L.next), wins: num(L.wins), losses: num(L.losses), streak: num(L.streak), botWins: num(L.botWins), botLosses: num(L.botLosses), mattDayLeft: num(L.mattDayLeft) };
 }
-let rkGen = 0;
-// rkGate() -> '' when this player may play Ranked, else what is missing: 'signin' | 'username' (NOTES 133). Only when the server says Ranked needs a
-// sign-in (/api/me rkSignin; an older server or the test knob RK_GUESTS: '', as before)
-export const rkGate = () => (!on || !me.rkSignin ? '' : !me.account ? 'signin' : !me.account.username ? 'username' : '');
+let ranksGen = 0;
+const signedIn = () => (!on || !me.account ? false : !me.account.username ? 'username' : true);      // the hero's empty line (ui.rankCrest): a guest is asked to sign in, an account without a username to pick one, an account to win a game
 // acctGate() -> '' when this player can have friends (docs/SOCIAL.md 1), else 'off' (no sign-in or no database here: nobody can) | 'signin' | 'username' |
 // 'wait' (/api/me has not answered yet: until then `me` is its default, which would read as 'off', and a reload on /friends said 'not available')
 export const acctGate = () => (!on ? 'off' : !meDone ? 'wait' : !me.enabled || !me.db ? 'off' : !me.account ? 'signin' : !me.account.username ? 'username' : '');
 export const ready = () => mePromise;      // /api/me has answered (a reload straight onto /friends waits for it)
 // the server answered a signed-in call with 401 signin (the session expired, or was signed out or deleted elsewhere) or 403 username (no username after all):
 // /api/me is asked again first (a busy database answers a session lookup the same way), and only what it confirms is dropped; then this page follows, so the
-// gates (Ranked, Friends) ask for the right step and Sign in / Pick a username work again. web/social.js calls it. -> 'signin' | 'username' (what went) | '' (nothing)
+// Friends gate asks for the right step and Sign in / Pick a username work again. web/social.js calls it. -> 'signin' | 'username' (what went) | '' (nothing)
 export function acctLost() {
   if (!on || !me.account) return Promise.resolve(''); if (lostP) return lostP;
   lostP = (async () => { let r = null; try { r = await api('/api/me'); } catch { r = null; }
     if (!me.account || !r || !r.ok || !r.j) return '';      // no answer: unknown, so nothing is dropped
     const a = acct(r.j.account), what = !a ? 'signin' : !a.username ? 'username' : '';
-    if (what) { me.account = a; drawAcct(); redrawView(); } return what; })().finally(() => { lostP = null; });
+    if (what) { me.account = a; meLadder = null; drawAcct(); redrawView(); } return what; })().finally(() => { lostP = null; });
   return lostP;
 }
-const redrawView = () => { const v = h.view(); if (v === 'profile') showProfile(); else if (v === 'leaderboard') showBoard(); else if (v === 'ranked' || v === 'ranks') showRanked(); };      // after a sign-in, sign-out or new username: the open view redraws (Ranked's gate lifts, NOTES 133)
-export const pickName = () => claimCard();      // Pick a username, from the Ranked view
-export async function showRanked() {                       // the Ranked view opened: what is known at once, then /api/stats. Off (no stats server): a fresh Bronze, so the view still reads
-  const g = ++rkGen, base = { tier: 1, div: 1, trophies: 0, best: 1, queued: h.queued(), gate: rkGate() };
-  h.rkView(base); if (!on) return;
-  const p = await fetchProfile(); if (g !== rkGen || !['ranked', 'ranks'].includes(h.view())) return;      // the Ranks page draws from the same answer
-  base.gate = rkGate();      // again: /api/me has answered by now (fetchProfile waits for it), so a reload on /ranked knows who is signed in
-  if (p === undefined) { h.rkView({ ...base, note: 'Stats aren’t available right now. You can still play' }); return; }
-  const L = ladderOf(p); h.rkView({ ...base, ...(L || {}), queued: h.queued() }); if (L) h.ladder(L);      // an older server (no ladder) or nothing saved yet: Bronze, 0. The home tile's line follows what was fetched
+const redrawView = () => { const v = h.view(); if (v === 'profile') showProfile(); else if (v === 'leaderboard') showBoard(); else if (v === 'ranks') showRanks(); };      // after a sign-in, sign-out or new username: the open view redraws
+export const pickName = () => claimCard();      // Pick a username, from the friends gate (web/social.js)
+export async function showRanks() {                        // the Ranks page opened with no rank known (a reload on /ranks): /api/stats, then the crest (ui.rankCrest keeps the rank and its place for the page)
+  const g = ++ranksGen; if (!on) return;
+  const p = await fetchProfile(); if (g !== ranksGen || h.view() !== 'ranks' || p === undefined) return;      // no answer: the page reads as before (no rank of mine on it)
+  h.crest(ladderOf(p), signedIn());      // the same draw as Your stats' hero, so the two agree
 }
 
 // ---------- the account cards (9.5, 9.7): over everything, one at a time. Escape closes; game keys never reach main.js behind them ----------
@@ -451,7 +446,7 @@ async function onCredential(resp) {                        // Google's popup ans
   nonceP = null;                                            // single use: the server cleared it with this answer
   if (!r.ok || !r.j) { const msg = r.status === 403 ? 'That sign-in timed out. Try again.' : r.status === 503 ? 'Sign-in isn’t available right now. You can keep playing as a guest.' : 'Couldn’t sign you in. Try again.';
     if (r.status === 503) { show('signin-btn', false); show('signin-hint', false); err('signin-err', msg); } else loadGoogle().then(() => err('signin-err', msg)); return; }      // the nonce is single use: Google's button comes back with a new one
-  me.account = acct(r.j.account) || { username: null, renameAt: null }; saved = null; drawAcct(); h.redial();      // the socket opens again (after the match) so its upgrade carries the cookie
+  me.account = acct(r.j.account) || { username: null, renameAt: null }; saved = null; meLadder = null; drawAcct(); h.redial();      // the socket opens again (after the match) so its upgrade carries the cookie
   redrawView();
   if (!me.account.username) claimCard(); else { closeCard(); h.toast(`Signed in as ${me.account.username}`, 2400); }      // no username yet: pick one now (Skip for now is there)
 }
@@ -459,7 +454,7 @@ export async function signOut() {                           // only the server's
   if (!on) return;
   let r; try { r = await api('/api/signout', 'POST', {}); } catch { r = { ok: false, status: 0, j: null }; }
   if (r.status !== 204) { h.toast(r.status === 429 ? `Couldn’t sign you out. Try again in ${Math.max(1, num(r.j && r.j.retryAfter))} s.` : 'Couldn’t sign you out. Try again.', 2600); return; }
-  me.account = null; forgetDevice(); drawAcct(); h.redial(); h.toast('Signed out', 1800);
+  me.account = null; meLadder = null; forgetDevice(); drawAcct(); h.redial(); h.toast('Signed out', 1800);
   redrawView();
 }
 
@@ -566,20 +561,20 @@ function drawAcct() {
   { const b = $('btn-head-acct'); if (b) { b.hidden = !en; b.classList.toggle('is-in', !!a); text('head-acct-t', !a ? 'Sign in' : name || 'Pick a username');      // the header's account button (NOTES 151): only where accounts exist
     b.setAttribute('aria-label', !a ? 'Sign in' : name ? `${name}: your stats` : 'Pick a username'); b.dataset.tip = !a ? 'Sign in' : name ? 'Your stats' : 'Pick a username'; } }
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
-  show('btn-profile', on); show('btn-ranked', on && me.db && (!me.rkSignin || me.enabled)); show('btn-leaderboard', on && me.db); show('btn-friends', on && me.db && me.enabled); h.gate(); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // Ranked needs sign-in (NOTES 133): no tile where nobody can sign in; the tile's line follows the gate.      // the leaderboard reads the database too (NOTES 126)      // Ranked needs the stats server AND its database (trophies live there); the tiles lay out for what shows
+  show('btn-profile', on); show('btn-leaderboard', on && me.db); show('btn-friends', on && me.db && me.enabled); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // the leaderboard reads the database too (NOTES 126); the tiles lay out for what shows
 }
 
 // ---------- the site's storage cleared in another tab: the device id went with it. Its socket keeps the old hello, so the next match is on a new one (3.1) ----------
 function storageCleared() { if (!on) return; saved = null; drawAcct(); h.redial(); }
 
 // ---------- wiring: main.js calls init() once, while it loads (before the first socket opens) ----------
-// hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), ranked(), tiles(), rkView(s), queued(), ladder(L), crest(el, r), emblem(el, r), rankBadge(el, r), acct(), friend(box, p) }. on: this page's server keeps stats
+// hooks: { on, send(m), redial(), toast(text, ms), view(), badge(el, on), lockName(name|null), stats(), bot(level), tiles(), crest(L, signedIn), emblem(el, r), rankBadge(el, r), board(), cup(el), acct(), friend(box, p) }. on: this page's server keeps stats
 // (hosted, or ?acctest=1 for test/profile-ui.mjs). Off, nothing here sends a request, makes an id or shows a control.
 let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, ranked: noop, tiles: noop, rkView: noop, queued: () => 0, ladder: noop, crest: noop, emblem: noop, rankBadge: noop, board: noop, gate: noop, cup: noop, acct: noop, friend: noop };      // acct, friend: web/social.js (the account changed; the profile card's friend row)
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, tiles: noop, crest: noop, emblem: noop, rankBadge: noop, board: noop, cup: noop, acct: noop, friend: noop };      // acct, friend: web/social.js (the account changed; the profile card's friend row)
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now

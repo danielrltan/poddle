@@ -456,7 +456,7 @@ const S2 = (a, b, ra = true, rb = true) => [{ owner: a, record: ra, bests: ra },
   ok(db.mergeDevice(dev(3), acct.id, T0 + 102) === 'none', 'a device already merged into THIS account -> none');
   const acct2 = db.createAccount('sub-B', T0);
   ok(db.mergeDevice(dev(3), acct2.id, T0 + 103) === 'none' && db.accountByDevice(dev(3)) === acct.id, 'merged into a DIFFERENT account -> none, account_id untouched');
-  // the Ranked ladder folds too (RANKED.md 10.1, REVIEW FIX regression): a guest's trophies come along on sign-in, never doubled, the guest's row goes with its owner
+  // the trophy ladder folds too (RANKED.md 10.1, REVIEW FIX regression): a guest's trophies come along on sign-in, never doubled, the guest's row goes with its owner
   { const gd = db.ownerForDevice(dev('lad-g'), T0, { create: true }), ac = db.createAccount('sub-lad', T0), cap = db.ladderOf(ac.owner_id, T0).mattDayLeft;
     db.ladderApply({ owner: gd, delta: 372, won: true, vsBot: false, now: T0 + 1 }); db.ladderApply({ owner: gd, delta: 10, won: true, vsBot: true, now: T0 + 2 });
     const before = db.counts().ladder; ok(db.mergeDevice(dev('lad-g'), ac.id, T0 + 3) === 'merged', 'a guest with a ladder row signs in to an account with none');
@@ -500,7 +500,7 @@ const S2 = (a, b, ra = true, rb = true) => [{ owner: a, record: ra, bests: ra },
   ok(ex.matches.every(x => Number.isInteger(x.secs)) && db.exportOf(g1, T0 + 100 * DAY).matches.length === ex.matches.length, 'the export lists each match\'s length (secs), and every row still stored, whatever its age');
   db.close();
 }
-// ======================================================================= the Ranked ladder (docs/RANKED.md 10.1, migration 2)
+// ======================================================================= the trophy ladder (docs/RANKED.md 10.1, migration 2; docs/TROPHIES.md 1)
 console.log('ladder');
 {
   const LAD = require('../server/ladder.js');
@@ -514,10 +514,10 @@ console.log('ladder');
   ok(eq(Object.keys(db.counts()), ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs']) && db.counts().ladder === 0 && db.counts().match_log === 1, 'counts() includes ladder, share and the friends tables (docs/SOCIAL.md 2; empty); the old rows are kept');
   ok(eq(db.exportOf(7, T0 + 1).matches.map(m => [m.mode, m.trophyDelta]), [['casual', null]]) && db.ladderOf(7).tier === 1 && db.ladderOf(7).trophies === 0, 'an old row reads as mode casual with no trophy change; an owner without a ladder row is Bronze I, 0');
   db.close();
-  ok(fresh({ RK_MATT_DAY: '12' }) && db.ok(), 'open(:memory:) with RK_MATT_DAY 12');
+  ok(fresh({ MATT_DAY: '12' }) && db.ok(), 'open(:memory:) with MATT_DAY 12');
   ok(db.ladderApply({ owner: 1, delta: 5, won: true, vsBot: false, now: T0 }) === null && db.ladderApply({ owner: NaN, delta: 5, won: true, vsBot: false, now: T0 }) === null, 'ladderApply for an unknown or bad owner: null, nothing written');
   const a = db.ownerForDevice(dev(21), T0, { create: true }), b = db.ownerForDevice(dev(22), T0, { create: true });
-  ok(eq(db.ladderTier(a, T0), { tier: 1, div: 1, trophies: 0, bestTier: 1, bestDiv: 1, dayLeft: 12 }), 'ladderTier before any write: Bronze I, 0, the whole day cap left');
+  ok(eq(db.ladderTier(a, T0), { tier: 1, div: 1, trophies: 0, bestTier: 1, bestDiv: 1, dayLeft: 12, row: false }), 'ladderTier before any write: Bronze I, 0, the whole day cap left, row false (no emblem yet, docs/TROPHIES.md 3.9)');
   // a series: rows first (mode ladder, one series id), then the settlement writes delta_a / delta_b on that side's rows
   const HL = (o = {}) => ({ now: T0, kind: 'human', winner: 0, ending: 'won', score: [7, 4], secs: 120, ranked: true, flags: [], mode: 'ladder', series: 5, seats: S2(a, b), ...o });
   const r1 = db.recordMatch(HL({ now: T0 + 1 })), r2 = db.recordMatch(HL({ now: T0 + 2, score: [7, 5] }));
@@ -528,6 +528,7 @@ console.log('ladder');
   ok(db.recentPairs(a, b, T0 - DAY, 6) === 2 && db.recentPairs(a, b, T0 - DAY, 5) === 2 && db.recentPairs(a, b, T0 - DAY, 99) === 3, 'the series in progress is left out (its own game 1 never caps its game 2); an unknown one changes nothing');
   ok(eq(db.oneWay(a, b, T0 - DAY), { aOverB: 4, bOverA: 0 }) && eq(db.oneWay(a, b, T0 - DAY, 5), { aOverB: 2, bOverA: 0 }) && eq(db.oneWay(a, b, T0 - DAY, 6), { aOverB: 3, bOverA: 0 }), 'oneWay (R11b) is per game but leaves the series being played out: a clean best-of-3 cannot flag itself mid-series');
   let w = db.ladderApply({ owner: a, delta: 33, won: true, vsBot: false, seriesId: 5, side: 0, now: T0 + 5 }), l = db.ladderApply({ owner: b, delta: -20, won: false, vsBot: false, seriesId: 5, side: 1, now: T0 + 5 });
+  ok(db.ladderTier(a, T0 + 5).row === true && db.ladderTier(b, T0 + 5).row === true, 'after a write (paid or charged, held at the floor too) ladderTier says row true');
   ok(eq(w, { trophies: 33, tier: 1, div: 1, tierWas: 1, divWas: 1, floorHeld: false, delta: 33, dayLeft: 12 }) && eq(l, { trophies: 0, tier: 1, div: 1, tierWas: 1, divWas: 1, floorHeld: true, delta: 0, dayLeft: 12 }), `ladderApply: +33 for the winner; the loser's -20 is held at Bronze's floor (${JSON.stringify([w, l])})`);
   ok(eq(db.exportOf(a, T0 + 6).matches.map(m => m.trophyDelta), [33, 33, null, null]) && eq(db.exportOf(b, T0 + 6).matches.map(m => m.trophyDelta), [0, 0, null, null]), 'delta_a / delta_b written on the series\' rows from each side, the other series untouched');
   let L = db.ladderOf(a, T0 + 6); ok(L.wins === 1 && L.losses === 0 && L.streak === 1 && L.bestStreak === 1 && L.bestTrophies === 33 && L.bestTier === 1 && L.bestDiv === 1 && L.best_tier === 1 && L.best_div === 1 && L.bestTierAt === T0 + 5 && L.botWins === 0 && L.mattDayLeft === 12 && L.floor === 0 && L.divFloor === 0 && L.next === 150 && L.nextDiv === 50, `ladderOf: the 10.1 shape (${JSON.stringify(L)})`);

@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Poddle</title>
-<meta name="description" content="Swing your phone like a paddle. Play pickleball with friends, climb the Ranked ladder or take on Matt the bot. Any computer, any phone, nothing to install.">
+<meta name="description" content="Swing your phone like a paddle. Play pickleball with friends, earn trophies and climb the ranks or take on Matt. Any computer, any phone, nothing to install.">
 <link rel="canonical" href="https://poddleball.com/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#dfeef6">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Poddle">
 <meta property="og:title" content="Poddle: Pickleball You Play With Your Phone">
-<meta property="og:description" content="Swing your phone like a paddle. Play friends, climb Ranked or take on Matt. Any computer, any phone, free.">
+<meta property="og:description" content="Swing your phone like a paddle. Play friends, earn trophies or take on Matt. Any computer, any phone, free.">
 <meta property="og:url" content="https://poddleball.com/">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://poddleball.com/og.jpg?v=6">
@@ -26,7 +26,7 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Poddle: Pickleball You Play With Your Phone">
-<meta name="twitter:description" content="Swing your phone like a paddle. Play friends, climb Ranked or take on Matt. Any computer, any phone, free.">
+<meta name="twitter:description" content="Swing your phone like a paddle. Play friends, earn trophies or take on Matt. Any computer, any phone, free.">
 <meta name="twitter:image" content="https://poddleball.com/og.jpg?v=6">
 <meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod!">
 
@@ -42,7 +42,7 @@
   "name": "Poddle",
   "alternateName": "Poddle phone pickleball",
   "url": "https://poddleball.com/",
-  "description": "Poddle is a browser pickleball game where the phone in your hand is the paddle. It works on any computer, with an iPhone or an Android phone, and there is nothing to install. Play friends online, climb the Ranked ladder, play Matt the bot, or watch a match.",
+  "description": "Poddle is a browser pickleball game where the phone in your hand is the paddle. It works on any computer, with an iPhone or an Android phone, and there is nothing to install. Play friends online, earn trophies and climb the ranks, play Matt the bot, or watch a match.",
   "image": "https://poddleball.com/og.jpg",
   "screenshot": "https://poddleball.com/og.jpg",
   "genre": ["Sports", "Pickleball"],
@@ -109,9 +109,7 @@
       <span class="serve-ind" id="sv-me"></span>
       <span class="score-num" id="sc-me">0</span>
     </div>
-    <div class="rally" id="rally-box"><small id="rally-word">Rally</small><b id="rally">0</b>
-      <!-- a Ranked series (docs/RANKED.md 8.5): one pip per game, each side's row in its colour, filled by wins, the game in play pulsing (ui.setSeries) -->
-      <div class="series" id="series" role="img" aria-label="" hidden><ol class="pips is-me" id="series-me"></ol><ol class="pips is-them" id="series-them"></ol></div></div>
+    <div class="rally" id="rally-box"><small id="rally-word">Rally</small><b id="rally">0</b></div>
     <div class="score-tab is-them">
       <span class="chip chip-them"></span>
       <span class="score-who"><b id="name-them">Waiting</b><small id="sub-them"></small></span>
@@ -124,8 +122,6 @@
   <div class="callout-layer"><div class="callout" id="callout" data-text="" data-fit></div></div>
   <!-- the count into a match: 3, 2, 1 over the court, so a serve never arrives before the paddle is up (ui.countdown) -->
   <div class="countdown" id="count" role="status" data-fit hidden><b id="count-n" data-text=""></b><span>Get ready</span></div>
-  <!-- Ranked queue (docs/RANKED.md 8.2): the pill above the key hints while the warm-up looks for an opponent (ui.rkPill). Hidden under any overlay, like the toast -->
-  <div class="rk-pill" id="rk-pill" role="status" aria-atomic="false" data-fit hidden><i class="rk-dot" aria-hidden="true"></i><span class="rk-pill-text"><b id="rk-pill-text">Finding a match</b><small id="rk-pill-sub">You stay in the queue if you leave</small></span><b class="rk-pill-time" id="rk-pill-time" aria-hidden="true">0:00</b></div>
 
   <!-- bottom-right: the keys worth a hint. C always; 1 2 3 4 only while the other seat is Matt (ui.setBot). Every other key still works and says nothing. -->
   <div class="keyhints" id="keys" data-fit>
@@ -174,7 +170,7 @@
     <li class="is-wait" id="set-game"><span class="light"></span><b>Game</b><em id="set-game-state">Waiting</em></li>
     <li class="is-wait" id="set-camera"><span class="light"></span><b>Camera</b><em id="set-camera-state">Waiting</em></li>
   </ul></div>
-  <!-- no "You" group: renaming, signing in or out mid-match redials the socket (a Ranked forfeit). The name lives on the lobby name row, the account on Your stats -->
+  <!-- no "You" group: renaming, signing in or out mid-match redials the socket (a forfeit mid-match). The name lives on the lobby name row, the account on Your stats -->
   <section class="set-group" id="grp-paddle"><h3 class="set-label">Paddle</h3><div class="set-list">
     <div class="set-row set-pick set-wide" id="set-paddle" hidden><span class="vh">Paddle</span><span class="seg seg-sm" id="paddle-seg2" role="radiogroup" aria-label="Paddle"><button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone">Phone</button><button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod">AirPod</button></span></div>
     <div class="set-row" id="set-sens"><span>Sensitivity</span>
@@ -280,15 +276,6 @@
   </div>
 </div>
 
-<!-- Ranked search bar (docs/RANKED.md 8.1, OPTIONAL WARM-UP): queued and not on a court, it hangs from the top of the title and every lobby view
-     (ui.rkBanner). Outside #hud: it shows over the menus, never on the court (the warm-up has #rk-pill). Warm up with Matt takes the warm-up court;
-     Cancel leaves the queue. The timer is aria-hidden -->
-<section class="rk-search" id="rk-search" aria-label="Ranked search" data-fit hidden>
-  <span class="rk-search-em" id="rk-search-em" aria-hidden="true"></span>
-  <p class="rk-search-text" role="status"><b><span id="rk-search-title">Finding a match</span> <span class="rk-search-time" id="rk-search-time" aria-hidden="true">0:00</span></b><small id="rk-search-sub">Ranked</small></p>
-  <div class="rk-search-acts"><button class="btn btn-sm" id="btn-rk-warm">Warm up with Matt</button><button class="btn btn-sm btn-quiet" id="btn-rk-cancel">Cancel</button></div>
-</section>
-
 <!-- ============================================== TITLE ============================================== -->
 <section class="screen menu-glass" id="screen-title" data-screen="title" hidden>
   <div class="menu-body" style="gap:var(--s-6)">
@@ -327,8 +314,8 @@
 
     <div class="name-row" id="name-row" data-fit><label for="name-input">Name</label><input class="field" id="name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"><button class="btn btn-sm is-tall" id="btn-name-change" hidden>Change</button></div>
 
-    <!-- Five entries (docs/RANKED.md 1): a hero row (Quick play, Ranked) and a utility row (Courts, Play a bot, Your stats). The layout is keyed on
-         .tiles[data-n] written by ui.tilesFit() from the visible count, never on :has(nth-child): Ranked and Your stats show only where the server keeps stats -->
+    <!-- The home tiles (docs/TROPHIES.md 4): the heroes (Friends, Quick play) over the utilities (Courts, Play a bot, Your stats, Leaderboard). The layout is keyed on
+         .tiles[data-n] written by ui.tilesFit() from the visible count, never on :has(nth-child): Friends, Your stats and Leaderboard show only where the server keeps stats -->
     <div class="lobby-view lobby-home" id="lobby-home" data-view="home">
       <!-- A phone's home (NOTES 149): a phone cannot be the screen and the paddle at once, so here it is only ever the paddle. The code the computer shows
            opens /pad.html?k=CODE (ui.js); the tiles below keep what a phone can do: watch, stats, the leaderboard, friends. Hidden off a phone (ui.css .m-only) -->
@@ -342,7 +329,7 @@
       </form>
       <h2 class="caps m-only m-more">On this phone</h2>
       <div class="tiles" data-fit>
-        <!-- Friends (docs/SOCIAL.md 6): two people and a plus. The first hero, left of Quick play (NOTES 150: Friends | Quick play | Ranked): its line says who is online, the corner badge counts requests (web/social.js draws both).
+        <!-- Friends (docs/SOCIAL.md 6): two people and a plus. The first hero, left of Quick play (NOTES 150: Friends | Quick play): its line says who is online, the corner badge counts requests (web/social.js draws both).
              Shows where accounts are on (sign-in AND the database), like the leaderboard: a guest sees it too, with Sign in to add friends -->
         <button class="tile is-hero" id="btn-friends" data-nav hidden>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M47 80c1.5-15 10-22 22-22s20.5 7 22 22Z"/><circle cx="69" cy="40" r="12.5"/><path d="M5 82c2-18 12.5-26 27-26s25 8 27 26Z"/><circle cx="32" cy="35" r="15.5"/></g><path class="art-accent" d="M77 9v15M69.5 16.5h15" style="stroke-width:5.5"/></svg>
@@ -351,11 +338,6 @@
         <button class="tile is-hero desk-only" id="btn-quick" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><circle class="art-fill" cx="48" cy="48" r="34" style="stroke-width:4.5"/><path class="art-accent-fill" d="M40 33 66 48 40 63Z"/></svg>
           <b>Quick play</b></button>
-        <!-- Ranked: a trophy with a star emblem on its cup. The tile-line under the label carries the player's live emblem, rank and trophies (ui.rkTile) -->
-        <button class="tile is-hero desk-only" id="btn-ranked" data-nav hidden>
-          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-line" style="stroke-width:4.5"><path d="M29 26h-9v6a11 11 0 0 0 11 11M67 26h9v6a11 11 0 0 1-11 11"/></g><g class="art-fill" style="stroke-width:4.5"><path d="M29 17h38v22a19 19 0 0 1-38 0Z"/><path d="M42 57h12v9H42Z"/><path d="M32 81h32v-7a7 7 0 0 0-7-7H39a7 7 0 0 0-7 7Z"/></g><path class="art-accent-fill" d="M48 24l4.4 7.4 8.4 1.6-5.8 6.3 1.1 8.5L48 44.2l-8.1 3.6 1.1-8.5-5.8-6.3 8.4-1.6Z"/></svg>
-          <span class="tile-text"><b>Ranked</b><small class="tile-line" id="ranked-line"><span id="ranked-em"></span><span id="ranked-line-text" data-cup>Play your first match</span></small><span class="rk-bar rk-tile-bar" id="ranked-bar" role="progressbar" aria-label="Progress to the next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><i></i></span></span>
-          <small class="tile-sub is-off" id="ranked-n"></small></button>
         <button class="tile" id="btn-courts" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill" x="12" y="18" width="58" height="60" rx="10" style="stroke-width:4.5"/><path class="art-line" d="M12 48h58M41 18v60" style="stroke-width:3"/><circle cx="63" cy="59" r="13" style="fill:#fff;stroke:var(--line);stroke-width:6.5"/><path class="art-accent" d="m73 69 11 11" style="stroke-width:7"/></svg>
           <b>Courts</b><small class="tile-sub is-off" id="courts-n"></small></button>
@@ -365,7 +347,7 @@
         <button class="tile" id="btn-profile" data-nav hidden>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="14" y="52" width="18" height="28" rx="5"/><rect x="39" y="34" width="18" height="46" rx="5"/><rect x="64" y="44" width="18" height="36" rx="5"/></g><path class="art-accent" d="m43 17 5 5 9-10" style="stroke-width:5.5"/></svg>
           <b>Your stats</b></button>
-        <!-- Leaderboard (NOTES 126): the global boards. A podium with a star over the top step. Shows where the server keeps stats, like Ranked -->
+        <!-- Leaderboard (NOTES 126): the global boards. A podium with a star over the top step. Shows where the server keeps stats, like Your stats -->
         <button class="tile" id="btn-leaderboard" data-nav hidden>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="35" y="40" width="26" height="42" rx="4"/><rect x="10" y="56" width="25" height="26" rx="4"/><rect x="61" y="64" width="25" height="18" rx="4"/></g><path class="art-accent-fill" d="M48 10l4.1 7.6 8.5 1.5-6 6.2 1.2 8.5L48 30.1l-7.8 3.7 1.2-8.5-6-6.2 8.5-1.5Z"/></svg>
           <b>Leaderboard</b></button>
@@ -458,32 +440,12 @@
       <div class="bot-levels" id="bot-levels" role="group" aria-labelledby="bot-title"><button class="btn btn-lg" id="btn-bot-0" data-level="0"><b>Rookie</b><small>Slow and forgiving</small></button><button class="btn btn-lg" id="btn-bot-1" data-level="1"><b>Club</b><small>Medium pace, some mistakes</small></button><button class="btn btn-lg" id="btn-bot-3" data-level="3"><b>Tour</b><small>Quick, few mistakes</small></button><button class="btn btn-lg" id="btn-bot-2" data-level="2"><b>Pro</b><small>Fast and accurate</small></button></div>
     </div>
 
-    <!-- Ranked (docs/RANKED.md 2): the player's emblem, trophies and the road of eight ranks (NOTES 124), then Find a match. Drawn by ui.rkView from /api/stats (web/profile.js showRanked).
-         Opening it puts the stadium behind the glass (scene.setVenue). The emblem is the one thing of the ladder other players see (privacy.html section 4) -->
-    <div class="panel panel-mid lobby-view ranked-view" id="lobby-ranked" data-view="ranked" data-fit hidden>
-      <div class="rk-head">
-        <div class="rk-emblem" id="rk-emblem"></div>
-        <div class="rk-lines"><h2 class="rk-tier" id="rk-tier">Bronze</h2>
-          <p class="rk-count"><b id="rk-trophies">0</b><span id="rk-count-word" data-cup="all"> trophies</span></p>
-          <div class="rk-bar" id="rk-bar" role="progressbar" aria-label="Progress to the next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
-          <small class="rk-next" id="rk-next" data-cup>100 to Silver</small></div>
-      </div>
-      <ol class="rk-road" id="rk-road" aria-label="Ranks"></ol>
-      <div class="rk-keep-row">
-        <small class="rk-keep" id="rk-keep">Ranks up to Platinum are never lost once reached. Diamond and above can drop.</small>
-        <button class="rk-info" id="btn-rk-all" aria-label="See all ranks" title="See all ranks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M12 11.25v5.5"/><circle class="rk-info-dot" cx="12" cy="7.6" r="1.35"/></svg></button>
-      </div>
-      <button class="btn btn-xl" id="btn-ranked-go">Find a match</button>
-      <p class="t-note rk-status" id="rk-status" data-cup role="status">You can warm up with Matt while you wait</p>
-      <p class="t-note rk-rules" id="rk-rules">Best of 3, first to 7, win by 2. Leaving counts as a loss. Your opponent and anyone watching can see your rank emblem.</p>
-    </div>
-
-    <!-- Ranks: every medal there is to win, drawn by ui.js drawRanks from the last rank the page knows. Opened from the crest on Your stats, the emblem on the
-         Ranked view or See all ranks; Back returns to where it was opened from -->
+    <!-- Ranks: every medal there is to win, drawn by ui.js drawRanks from the last rank the page knows (ui.rankCrest sets it from /api/stats). Opened from the crest
+         on Your stats; Back returns there (docs/TROPHIES.md 4) -->
     <div class="panel panel-wide lobby-view ranks-view" id="lobby-ranks" data-view="ranks" data-fit hidden>
-      <p class="rkx-lead">Win Ranked matches to earn trophies. Every 50 trophies is a division, and three divisions make a rank.</p>
-      <ol class="rkx-grid" id="rkx-grid" aria-label="All ranks"></ol>
-      <p class="t-note rkx-note">Ranks up to Platinum are never lost once reached. Diamond and above can drop. Pro has no divisions: Pro players are ranked by their place on the global leaderboard.</p>
+      <p class="ranks-lead">Win games to earn trophies. A win against a person is worth about 30, a loss costs about 20; a win against Matt at your rank’s level or harder pays a few. Bronze to Platinum are never lost once reached.</p>
+      <ol class="ranks-grid" id="ranks-grid" aria-label="All ranks"></ol>
+      <p class="t-note ranks-note">Every 50 trophies is a division, and three divisions make a rank. Diamond and above can drop, never below Platinum. Pro has no divisions: Pro players are placed by the global leaderboard.</p>
     </div>
 
     <!-- Global leaderboard (NOTES 126): three boards of counted results, the top 100 of every signed-in player with a username who has not turned
@@ -493,7 +455,7 @@
       <p class="lb-scope"><svg class="lb-globe" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.6 3.7 5.6 3.7 9s-1.3 6.4-3.7 9M12 3c-2.4 2.6-3.7 5.6-3.7 9s1.3 6.4 3.7 9"/></svg><b>Global</b><span>All signed-in players, every country</span></p>
       <span class="seg seg-sm lb-tabs" id="lb-tabs" role="radiogroup" aria-label="Leaderboard">
         <button class="seg-opt" role="radio" aria-checked="true" data-board="rally">Longest rally</button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-board="trophies">Trophies</button><button class="seg-opt" role="radio" aria-checked="false" tabindex="-1" data-board="streak">Win streak</button></span>
-      <p class="lb-what" id="lb-what">Ranked Trophies</p>
+      <p class="lb-what" id="lb-what">Trophies</p>
       <div class="lb-wrap"><ol class="lb-list" id="lb-list" aria-labelledby="lb-what" aria-busy="true"></ol><p class="lb-state" id="lb-state" data-cup role="status" hidden></p></div>
       <div class="lb-you" id="lb-you" hidden><span class="lb-rank" id="lb-you-rank"></span><span class="lb-you-text"><b>You</b><small id="lb-you-cap" data-cup></small></span><span class="lb-v" id="lb-you-v"></span><button class="btn btn-sm is-tall lb-you-go" id="btn-lb-go" hidden></button></div>
       <button class="set-row set-switch lb-show" id="tog-lb-show" role="switch" aria-checked="true" hidden><span>Show me on the global leaderboard</span><i></i></button>
@@ -502,7 +464,7 @@
     <!-- Friends (docs/SOCIAL.md 6, 8): search, requests in and out, the friends list with who is online. web/social.js builds the panel inside (the same one as the in-game card's) -->
     <div class="panel panel-mid lobby-view fr-view" id="lobby-friends" data-view="friends" data-fit hidden></div>
 
-    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (the Ranked crest, rank and trophies, streak), the Matt badge (the toughest level beaten, and a chip a level with its record: any level can be played at any time, so it is a badge, not a road), the people strip, the play row (return rate and six figures from profile.play, docs/SHARE.md 3) and three number tiles; Share card in the header opens #share-card. The tile and this view show only where the server keeps stats -->
+    <!-- Your stats (docs/ACCOUNTS.md 9.4): the player card, drawn by web/profile.js. The hero (the rank crest, trophies, the next step, the trophy road, streak; docs/TROPHIES.md 4), the Matt badge (the toughest level beaten, and a chip a level with its record: any level can be played at any time, so it is a badge, not a road), the people strip, the play row (return rate and six figures from profile.play, docs/SHARE.md 3) and three number tiles; Share card in the header opens #share-card. The tile and this view show only where the server keeps stats -->
     <div class="panel panel-wide lobby-view pf-view st" id="lobby-profile" data-view="profile" data-fit hidden>
       <div class="pf-head">
         <p class="pf-who"><span class="pf-name-row"><b id="pf-name">Guest</b><button class="btn btn-icon pf-edit" id="btn-pf-rename" aria-label="Change username" title="Change username" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3ZM13.5 8.5l3 3"/></svg></button></span><small id="pf-sub">Stats saved on this device</small><small class="pf-notice" id="pf-notice" hidden>Delete them any time on the <a class="foot-link" href="/privacy.html#your-data" target="_blank" rel="noopener" onpointerdown="event.stopPropagation()" onkeydown="if(event.key==='Enter')event.stopPropagation()">Privacy Policy</a> page.</small></p>
@@ -518,13 +480,16 @@
         <div class="st-rank">
           <p class="caps">Rank</p>
           <div class="st-rank-row"><h2 class="st-rank-name" id="st-rank">Bronze</h2><button class="st-place" id="st-place" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.6 3.7 5.6 3.7 9s-1.3 6.4-3.7 9M12 3c-2.4 2.6-3.7 5.6-3.7 9s1.3 6.4 3.7 9"/></svg><b id="st-place-n"></b></button></div>
-          <p class="st-rank-cap"><b id="st-trophies">0</b><svg class="cup-ic" viewBox="0 0 24 24" role="img" aria-label="trophies"><path class="cup-h" d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4"/><path class="cup-c" d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z"/><path class="cup-s" d="M10.5 14.5h3v3h-3Z"/><rect class="cup-b" x="7" y="17" width="10" height="4" rx="1.2"/><path class="cup-g" d="M9 5.5v3.8a3.2 3.2 0 0 0 1.4 2.6"/></svg> <span id="st-rank-cap" data-cup>Play Ranked for your first trophies</span></p>
+          <p class="st-rank-cap"><b id="st-trophies">0</b><svg class="cup-ic" viewBox="0 0 24 24" role="img" aria-label="trophies"><path class="cup-h" d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4"/><path class="cup-c" d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z"/><path class="cup-s" d="M10.5 14.5h3v3h-3Z"/><rect class="cup-b" x="7" y="17" width="10" height="4" rx="1.2"/><path class="cup-g" d="M9 5.5v3.8a3.2 3.2 0 0 0 1.4 2.6"/></svg> <span id="st-rank-cap" data-cup>Win a game for your first trophies</span><small class="st-next" id="st-next" hidden>10 to Gold III</small></p>
           <div class="st-rank-bar" role="progressbar" id="st-rank-bar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progress to the next rank"><i></i></div>
+          <small class="st-keep-line"><span id="st-keep">Bronze to Platinum are yours to keep. Diamond and above can drop.</span> <span class="st-best" id="st-best" hidden></span></small>
         </div>
         <div class="st-streak" id="st-streak">
           <div class="st-ribbon"><svg class="st-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 4.5 5.5 5.5 5.5 10.5a5.5 5.5 0 0 1-11 0c0-2 1-3.2 2.2-4.2 0 2 1 3.2 2.3 3.2 0-3.5-1-5.5 1-9.5Z"/></svg><b id="st-streak-n">0</b> <span>win streak</span></div>
           <small id="st-streak-cap">Win a match to start a streak</small>
         </div>
+        <!-- the trophy road (docs/TROPHIES.md 4, ui.rankCrest): the eight medals under the streak, reached ones lit, the current one ringed, the rest dimmed, each titled with its floor. In the streak's column so the card still fits 1280x800 whole (NOTES 145) -->
+        <ol class="st-road" id="st-road" aria-label="Ranks"></ol>
       </section>
       <section class="st-matt" id="pf-matt" aria-labelledby="pf-matt-h">
         <div class="st-mbadge is-none" id="st-mbadge"><i class="st-mdisc"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.25" r="4.25"/><path d="M5 20.5c.5-4.75 3.25-6.75 7-6.75s6.5 2 7 6.75Z"/><path d="M10.25 8.5v.75M13.75 8.5v.75M10.5 17.25h3" style="stroke-width:2.5"/></svg></i><svg class="st-mstar" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg></div>
@@ -704,14 +669,11 @@
     <div class="medal is-gold" id="medal"><i class="medal-rays" aria-hidden="true"></i><div class="medal-disc"><svg class="medal-star" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.6 11.6 42.2 14 28.4 4 18.6l13.8-2Z"/></svg><svg class="medal-trophy" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8.5 20h7M10 17h4v3h-4Z"/></svg></div></div>
     <h2 id="result-title"></h2>
     <p id="result-note"></p>
-    <!-- a Ranked series (docs/RANKED.md 8.8): the final pips over the tally, the games in the tally, the per-game scores under it, then the trophy roll (8.9) -->
-    <div class="result-pips" id="result-pips" role="img" aria-label="" hidden><ol class="pips is-me" id="result-pips-me"></ol><ol class="pips is-them" id="result-pips-them"></ol></div>
     <div class="tally well">
       <div class="tally-side is-winner" id="tally-me"><span class="chip chip-me chip-lg"></span><svg class="tally-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M3 20 5 6l7 7 4-10 4 10 7-7 2 14Z"/></svg><svg class="tally-clap" viewBox="0 -7 40 39" aria-hidden="true"><g class="clap-fx"><path d="M20-1.5v-4M14-.5l-2.5-3.5M26-.5l2.5-3.5"/></g><g class="clap-l"><path d="M5.5 31V16C5.5 8 7.5 3.5 11 3.5S16.5 8 16.5 14v1.5c1-2.6 3.6-3 4-1 .4 2-1.6 5.4-3.6 8L15.5 31Z"/><path class="clap-line" d="M9 5.5v7M12.5 4.5v7"/></g><g class="clap-r"><g transform="matrix(-1 0 0 1 40 0)"><path d="M5.5 31V16C5.5 8 7.5 3.5 11 3.5S16.5 8 16.5 14v1.5c1-2.6 3.6-3 4-1 .4 2-1.6 5.4-3.6 8L15.5 31Z"/><path class="clap-line" d="M9 5.5v7M12.5 4.5v7"/></g></g></svg><b id="tally-name-me">You</b></div>
       <span class="tally-num" id="tally-sc-me">11</span><span class="tally-dash"></span><span class="tally-num is-them" id="tally-sc-them">0</span>
       <div class="tally-side" id="tally-them"><span class="chip chip-them chip-lg"></span><svg class="tally-crown" viewBox="0 0 32 24" aria-hidden="true"><path d="M3 20 5 6l7 7 4-10 4 10 7-7 2 14Z"/></svg><svg class="tally-clap" viewBox="0 -7 40 39" aria-hidden="true"><g class="clap-fx"><path d="M20-1.5v-4M14-.5l-2.5-3.5M26-.5l2.5-3.5"/></g><g class="clap-l"><path d="M5.5 31V16C5.5 8 7.5 3.5 11 3.5S16.5 8 16.5 14v1.5c1-2.6 3.6-3 4-1 .4 2-1.6 5.4-3.6 8L15.5 31Z"/><path class="clap-line" d="M9 5.5v7M12.5 4.5v7"/></g><g class="clap-r"><g transform="matrix(-1 0 0 1 40 0)"><path d="M5.5 31V16C5.5 8 7.5 3.5 11 3.5S16.5 8 16.5 14v1.5c1-2.6 3.6-3 4-1 .4 2-1.6 5.4-3.6 8L15.5 31Z"/><path class="clap-line" d="M9 5.5v7M12.5 4.5v7"/></g></g></svg><b id="tally-name-them">Opponent</b></div>
     </div>
-    <small class="tally-games" id="tally-games" hidden></small>
     <!-- the trophy moment (8.9, 8.10): the rank's emblem card (name + division tag), the total in tally digits over its word, the change and the Rank up / Division up pill -->
     <div class="trophy" id="trophy" role="status" hidden><div class="trophy-row"><span class="trophy-em" id="trophy-em"></span><span class="trophy-count"><b class="trophy-n" id="trophy-n"></b><small class="trophy-word" id="trophy-word" data-cup="all">trophies</small></span><span class="trophy-pills"><span class="trophy-d" id="trophy-d" data-cup></span><b class="rank-kicker" id="rank-kicker" hidden></b></span></div><small class="trophy-note" id="trophy-note" data-cup hidden></small></div>
     <ul class="result-stats" id="result-stats" aria-label="Match stats" hidden></ul>
@@ -724,7 +686,6 @@
       <div class="rematch-btns tour-res" id="tour-res" hidden><button class="btn" id="btn-see-bracket">See bracket</button></div>
       <div class="rematch-btns tour-res" id="champ-acts" hidden><button class="btn" id="btn-champ-back">Back to courts</button><button class="btn" id="btn-champ-bracket">See bracket</button></div>
       <div class="rematch-btns" id="rematch-btns"><button class="btn" id="btn-rematch">Rematch</button><button class="btn" id="btn-leave">Leave</button></div>
-      <div class="rematch-btns rk-acts" id="rk-acts" hidden><button class="btn" id="btn-rk-again">Play again</button><button class="btn" id="btn-rk-leave">Leave</button></div>
       <p id="rematch-note"></p>
       <div class="rematch-count" id="rematch-count" hidden><div class="rematch-bar" id="rematch-bar"><i></i></div><b id="rematch-left"></b></div>
     </div>
@@ -736,30 +697,11 @@
   <div class="vs-card" id="vs-card" role="status" data-fit>
     <p class="caps vs-round" id="vs-round"></p>
     <div class="vs-row">
-      <div class="vs-side is-me"><span class="chip chip-me chip-lg"></span><b id="vs-me">You</b><div class="vs-em" id="vs-me-em" hidden></div></div>
+      <div class="vs-side is-me"><span class="chip chip-me chip-lg"></span><b id="vs-me">You</b></div>
       <b class="vs-mark" data-text="VS" aria-label="versus">VS</b>
-      <div class="vs-side is-them"><span class="chip chip-them chip-lg"></span><b id="vs-them"></b><small class="br-tag" id="vs-them-tag" hidden>Tour</small><div class="vs-em" id="vs-them-em" hidden></div></div>
+      <div class="vs-side is-them"><span class="chip chip-them chip-lg"></span><b id="vs-them"></b><small class="br-tag" id="vs-them-tag" hidden>Tour</small></div>
     </div>
     <p class="vs-target" id="vs-target" data-cup></p>
-    <!-- Ranked (docs/RANKED.md 8.3): 'Get ready' and a bar draining to the seat, over the last stretch of the card -->
-    <div class="vs-ready" id="vs-ready" hidden><span class="caps">Get ready</span><div class="rematch-bar vs-bar" id="vs-bar"><i></i></div></div>
-  </div>
-</section>
-
-<!-- ============================================== RANKED: GAME CARD (rkgame, between the games of a series, for RK_GAME_GAP_S; docs/RANKED.md 8.7) ============================================== -->
-<section class="screen veil is-night" id="screen-rk-game" data-screen="rk-game" hidden>
-  <div class="panel round-card" id="round-card" role="status" data-fit>
-    <p class="caps round-kicker" id="game-kicker">Ranked · Best of 3</p>
-    <h2 id="game-title"></h2>
-    <div class="game-tally">
-      <span class="tally-num game-num" id="game-sc-me">0</span><span class="tally-dash"></span><span class="tally-num game-num is-them" id="game-sc-them">0</span>
-    </div>
-    <div class="game-rows" id="game-rows">
-      <div class="pip-row is-me"><span class="chip chip-me chip-sm"></span><b id="game-name-me">You</b><ol class="pips is-me" id="game-pips-me"></ol><span class="pip-n" id="game-n-me">0</span></div>
-      <div class="pip-row is-them"><span class="chip chip-them chip-sm"></span><b id="game-name-them"></b><ol class="pips is-them" id="game-pips-them"></ol><span class="pip-n" id="game-n-them">0</span></div>
-    </div>
-    <p class="caps game-deciding" id="game-deciding" hidden>Deciding game</p>
-    <div class="game-next"><div class="rematch-count game-count" id="game-count" aria-hidden="true"><div class="rematch-bar" id="game-bar"><i></i></div><b id="game-left"></b></div><small id="game-serve"></small></div>
   </div>
 </section>
 

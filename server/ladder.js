@@ -1,10 +1,10 @@
-// The Ranked ladder (docs/RANKED.md 5, DIVISIONS, NOTES 124): eight ranks, three divisions each below Pro (Pro has none, NOTES 126), their trophy floors, what a series and a queue game vs Matt
-// are worth. Pure CommonJS, no state, nothing runs on require. web/emblems.js mirrors the rank table (names, floors); test/ladder.test.mjs asserts they agree.
-// Vocabulary (RANKED.md 0.1): "trophies" is the count, "tier" the rank index 1..8, "div" the division 1..3 inside it (I lowest, III highest: after III you
+// The trophy ladder (docs/TROPHIES.md 1; docs/RANKED.md 5, DIVISIONS, NOTES 124 are history): eight ranks, three divisions each below Pro (Pro has none, NOTES 126), their trophy floors,
+// what a game against a person and a game against Matt are worth. Pure CommonJS, no state, nothing runs on require. web/emblems.js mirrors the rank table (names, floors); test/ladder.test.mjs asserts they agree.
+// Vocabulary (TROPHIES.md 0): "trophies" is the count, "tier" the rank index 1..8, "div" the division 1..3 inside it (I lowest, III highest: after III you
 // rank up to the next rank's I; always 1 in Pro). `ranked` elsewhere in this codebase means "counted", never this mode.
 
-// tier, name, floor (trophies where the rank starts), sticky (a floor you never fall below once reached), matt (Matt's WIRE level while you
-// wait in the queue: Rookie 0, Club 1, Pro 2, Tour 3), mattWin (trophies for a played-out counted win against him; 0 from Champion up, and MATT_CEILING stops him under Champion)
+// tier, name, floor (trophies where the rank starts), sticky (a floor you never fall below once reached), matt (the LOWEST Matt level, on the wire, a win pays at
+// for this rank: Rookie 0, Club 1, Pro 2, Tour 3; difficulty order 0 < 1 < 3 < 2, an easier Matt is practice), mattWin (trophies for a played-out counted win against him; 0 from Champion up, and MATT_CEILING stops him under Champion)
 const TIERS = Object.freeze([
   Object.freeze({ tier: 1, name: 'Bronze',   floor: 0,   sticky: true,  matt: 0, mattWin: 10 }),
   Object.freeze({ tier: 2, name: 'Silver',   floor: 150, sticky: true,  matt: 1, mattWin: 8 }),
@@ -48,7 +48,7 @@ function nextDivFloorOf(tier, div) { const t = clamp(int(tier), 1, TOP), d = cla
 // applyFloor(bestTier, trophies) -> trophies, never below the sticky floor of the best RANK reached (Bronze..Platinum), never below 0
 function applyFloor(bestTier, trophies) { return Math.max(int(trophies), floorOf(clamp(int(bestTier), 1, STICKY_TOP))); }
 
-// humanDelta(me, them, won, sweep) -> trophies for one side of a settled series, from BOTH sides' pre-series counts (RANKED.md 5.4):
+// humanDelta(me, them, won, sweep) -> trophies for one side of a game against a person, from BOTH sides' counts at the game's start (TROPHIES.md 3.3; sweep is history, always false now):
 //   gap = clamp(them - me, -300, 300); win = 30 + round(gap / 25) (+3 for a sweep) = 18..45; loss = -(20 - round(gap / 25)) = -32..-8
 function humanDelta(me, them, won, sweep) {
   const gap = clamp(int(them) - int(me), -300, 300), k = Math.round(gap / 25);
@@ -56,9 +56,9 @@ function humanDelta(me, them, won, sweep) {
 }
 // halveWin(delta) -> the winner's delta over a not-yet-established opponent (R11c new_opponent): half, never under 8
 function halveWin(delta) { return Math.max(8, Math.round(int(delta) / 2)); }
-// mattDelta(tier) -> a played-out counted win against Matt while queued, by the rank at the START of that game
+// mattDelta(tier) -> a played-out counted win against Matt, by the rank at the START of that game
 function mattDelta(tier) { return TIERS[clamp(int(tier), 1, TOP) - 1].mattWin; }
-// mattLevel(tier) -> Matt's wire level for the warm-up court
+// mattLevel(tier) -> the lowest Matt wire level a win pays at for this rank
 function mattLevel(tier) { return TIERS[clamp(int(tier), 1, TOP) - 1].matt; }
 // mattAward(delta, dayUsed, dayCap, trophies) -> what a Matt win may really pay: the day cap and the ceiling applied, never negative
 function mattAward(delta, dayUsed, dayCap, trophies) { return Math.max(0, Math.min(int(delta), int(dayCap) - int(dayUsed), MATT_CEILING - int(trophies))); }

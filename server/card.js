@@ -1,4 +1,4 @@
-// The share card (docs/SHARE.md 2): a player's Ranked rank (its emblem from web/emblems.js), Matt badge and best stats drawn as a 1200x630 SVG,
+// The share card (docs/SHARE.md 2): a player's rank (its emblem from web/emblems.js), Matt badge and best stats drawn as a 1200x630 SVG,
 // turned into a PNG by @resvg/resvg-js.
 // Pure until png(): dataOf picks exactly what is drawn (nothing from a request), hashOf names that picture, svgOf draws it. png() renders one
 // card at a time in a worker thread, keeps the last 64 in memory, and answers null when the renderer is missing or fails, so
@@ -35,8 +35,8 @@ const degs = v => Math.round(v * 180 / Math.PI / 10) * 10;      // rad/s -> deg/
 const rows = p => ORDER.map(lv => (p && Array.isArray(p.matt) ? p.matt : []).find(x => x && x.level === lv) || {});   // the four Matt rows in difficulty order
 const beaten = r => Number.isFinite(r.firstWinAt) && r.firstWinAt > 0;
 
-// rankOf(profile) -> { name: 'Gold II', tier (1..7), div (1..3), trophies }: the Ranked ladder, exactly what Your stats' hero shows (web/profile.js
-// drawRoad, docs/RANKED.md 2: one rank per player). No ladder (never played Ranked, an older server) is Bronze I with 0 trophies, as there
+// rankOf(profile) -> { name: 'Gold II', tier (1..7), div (1..3), trophies }: the trophy ladder, exactly what Your stats' hero shows (web/profile.js
+// drawRoad, docs/RANKED.md 2: one rank per player). No ladder (no trophies yet, an older server) is Bronze I with 0 trophies, as there
 const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b ? v : a;
 function rankOf(p) {
   const L = p && p.ladder && typeof p.ladder === 'object' ? p.ladder : {}, tier = int(L.tier, 1, TOP), div = int(L.div, 1, 3), E = emblems();
@@ -160,8 +160,8 @@ ${E ? E.defs : ''}
   out.push(text(cx + 3, 124, 'PICKLEBALL', { size: 28, wt: 900, fill: '#0e3f8c', anchor: 'middle', ls: 6, extra: ' filter="url(#lift)"' }));   // +3: half the trailing letter-spacing, so it centres on the wordmark
   const lh = 330 + 70 + 64, top = 132 + Math.max(0, (474 - lh) / 2);   // the trophies and the bot badge always show: every card's left column is laid out the same   // the emblem, the rank and its pills, centred under the tagline
   out.push(emblem(cx, top + 4, 222, d.tier, d.div, d.pro));
-  const rk = d.rank.toUpperCase();
-  out.push(text(cx, top + 290, rk, { size: fit(rk, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
+  const rankTxt = d.rank.toUpperCase();
+  out.push(text(cx, top + 290, rankTxt, { size: fit(rankTxt, 900, 58, 340, 3), wt: 900, fill: '#ffffff', anchor: 'middle', ls: 3, extra: ' stroke="#0e3f8c" stroke-width="10" stroke-linejoin="round" paint-order="stroke"' }));
   let ly = top + 314;
   {
     const tro = String(d.trophies), nw = measure(tro, 800, 28), IC = 34, tw = nw + 8 + IC + 44, x0 = cx - tw / 2 + 22;      // the number, then the gold trophy for the word (NOTES 138, web/ui.js CUP_SVG)

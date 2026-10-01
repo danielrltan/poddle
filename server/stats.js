@@ -67,7 +67,7 @@ function seatAcc(pl) {
     hits: 0, returns: 0, chances: 0, winners: 0, aces: 0, smashes: 0, ptsWon: 0, ptsLost: 0, shot: null };   // play counters (docs/SHARE.md 1); shot: the last contact's pl.hit, its kind read once it can no longer change
 }
 // newMatch({ revived, rank, seats: [pl|null, pl|null] }) -> the match object a room keeps in `match` (4.1)
-function newMatch({ revived = false, rank = null, seats = [null, null], mode = 'casual', series = null } = {}) {   // mode 'ladder' + series: a Ranked game (docs/RANKED.md 4)
+function newMatch({ revived = false, rank = null, seats = [null, null], mode = 'casual', series = null } = {}) {   // mode 'ladder': a seat can earn trophies (docs/TROPHIES.md 3.8); series is history (always null now, the column stays)
   const m = { id: ++seq, done: false, t0: 0, revived: !!revived, rank, levelChanged: false, rally: 0, mode: mode === 'ladder' ? 'ladder' : 'casual', series: Number.isSafeInteger(series) && series > 0 ? series : null, seats: [0, 1].map(i => seatAcc(seats[i] || null)) };
   live.add(m); return m;
 }
@@ -219,7 +219,7 @@ function onEnd(m, e) {
   const history = {};
   if (human && winner != null && info[0] && info[1]) {
     const W = info[winner], Lo = info[1 - winner];
-    if (store && W.owner != null && Lo.owner != null) { history.pairRanked24h = store.recentPairs(W.owner, Lo.owner, now - DAY, m.series); history.oneWay30d = store.oneWay(W.owner, Lo.owner, now - 30 * DAY, m.series); }   // R10 and R11b count OTHER series: the one this game belongs to is being played, not repeated (REVIEW FIX, RANKED.md 5.6)
+    if (store && W.owner != null && Lo.owner != null) { history.pairRanked24h = store.recentPairs(W.owner, Lo.owner, now - DAY, m.series); history.oneWay30d = store.oneWay(W.owner, Lo.owner, now - 30 * DAY, m.series); }   // series is always null now (docs/TROPHIES.md 3.8): every match is its own
     if (store && Lo.owner != null) history.loserHuman7d = store.recentLosses(Lo.owner, now - 7 * DAY);
     if (store && W.owner != null) history.winnerWins24h = store.recentWins(W.owner, now - DAY);
     history.cpuPair24h = L.pair(W.keys, Lo.keys, m.series); history.cpuLoser24h = L.loser(Lo.keys);
@@ -239,7 +239,7 @@ function onEnd(m, e) {
       nudge: !!(r && signin && r.guest && won && (!human || v.ranked)), created: info[i].created || undefined };
   });
   return { logged: !!(rec && rec.logged), ranked: v.ranked, level, msgs, rankedWin: [0, 1].map(i => human && winner === i && !!v.seats[i].record),
-    owners: info.map(i => (i ? i.owner : null)), flags: [...v.flags], logId: rec && rec.logId != null ? rec.logId : null };   // the Ranked settlement (RANKED.md 5.5) re-resolves owners and reads the flags per game; logId names the Matt game's row for its trophy delta
+    owners: info.map(i => (i ? i.owner : null)), flags: [...v.flags], logId: rec && rec.logId != null ? rec.logId : null };   // the trophy hook (game.js trophies(), docs/TROPHIES.md 3) reads the flags and logId (the row its delta_a / delta_b land on); owners is informational (it resolves its own through the frozen identity)
 }
 
 // title(members, champ, now) -> true when the champion's owner got tour_titles + 1 (4.3, R16). members: the tournament's member objects

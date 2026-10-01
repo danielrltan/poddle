@@ -14,7 +14,7 @@ import path from 'path';
 import crypto from 'crypto';
 const PORT = +process.env.STATS_PORT || 9400, P2 = PORT + 1, P3 = PORT + 2, root = new URL('..', import.meta.url).pathname;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-')), DBA = path.join(tmp, 'a.db');
-const BASE = { RK_GUESTS: '1', WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', STATS_MIN_POINT_S: '0', STATS_AFK_MIN: '0', STATS_FORFEIT_MIN: '1', STATS_ESTABLISHED: '0', TIMESCALE: '2' };
+const BASE = { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', STATS_MIN_POINT_S: '0', STATS_AFK_MIN: '0', STATS_FORFEIT_MIN: '1', STATS_ESTABLISHED: '0', TIMESCALE: '2' };
 const procs = new Set(), logs = [];                                // every byte any server printed (test 16)
 function up(port, env) {
   return new Promise(res => { const p = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: port, ...env } }); procs.add(p); const mine = { p, out: '' }; logs.push(mine);
@@ -326,24 +326,7 @@ console.log('20. database growth: only completed matches create profiles, and ne
   bye(...quitters, ...done.map(x => x[0])); await stop(C);
 }
 
-console.log('21. Ranked (docs/RANKED.md): a series records mode ladder, kind human, the same log line; /api/stats carries the ladder block');
-{
-  const C = await up(P3, { ...BASE, PODDLE_DB: path.join(tmp, 'r.db'), RK_WIN: '1', WIN_BY: '1', RK_VS_S: '0.3', RK_GAME_GAP_S: '0.3', RK_DONE_S: '0.5', READY_S: '0', SWING_SERVE: '0' }), out = logs.at(-1);
-  const a = tab({ port: P3, addr: ip(), d: dev() }), b = tab({ port: P3, addr: ip(), d: dev() }); await a.open(); await b.open(); await until(() => a.n('lobby') && b.n('lobby'));
-  a.send({ type: 'rk', name: 'Ann' }); await until(() => a.room && a.room.kind === 'warm'); b.send({ type: 'rk', name: 'Ben' });
-  ok(await until(() => a.n('rkvs') && b.n('rkvs')) && await until(() => a.room && a.room.kind === 'match' && b.room && b.room.kind === 'match' && a.side != null && b.side != null), 'two queued players are pulled into one series room');
-  hit(a); still(b);
-  ok(await until(() => a.n('rkres') && b.n('rkres'), 60000), 'the series settles (rkres to both)');
-  const ra = a.last('rkres'), rb = b.last('rkres');
-  ok(ra.won && ra.delta === 33 && ra.trophies === 33 && ra.tier === 1 && ra.div === 1 && ra.counted && rb.delta === 0 && rb.floorHeld, `+33 / held at 0 (${JSON.stringify([ra, rb])})`);
-  ok(a.n('profile') === 2 && a.got('profile').every(p => p.kind === 'human' && p.ranked === true && p.saved), 'a profile message per game, kind human, counted');
-  ok((out.out.match(/match recorded: human ranked/g) || []).length === 2 && !/match recorded: tour/.test(out.out), 'the log line per game is unchanged: match recorded: human ranked (never tour)');
-  const pa = await profileOf(a.d, a.addr, P3), pb = await profileOf(b.d, b.addr, P3);
-  ok(pa && pa.human.wins === 2 && pa.ladder && pa.ladder.trophies === 33 && pa.ladder.wins === 1 && pa.ladder.tier === 1 && pa.ladder.div === 1 && pb.ladder.losses === 1 && pb.ladder.trophies === 0, `/api/stats: two human wins on the record and the ladder block (${JSON.stringify(pa.ladder)})`);
-  const ex = await exportOf(a.d, a.addr, P3);
-  ok(ex && ex.format === 'poddle-export-2' && ex.matches.length === 2 && ex.matches.every(m => m.mode === 'ladder' && m.kind === 'human' && m.trophyDelta === 33) && ex.profile.ladder.trophies === 33, 'the export: format 2, each game mode ladder with the trophy change');
-  bye(a, b); await stop(C);
-}
+// 21. trophies (docs/TROPHIES.md 3, 6): the ladder block, mode ladder, trophyDelta and the profile message's trophies field live in test/trophies.test.mjs
 
 console.log('16. logs');
 {

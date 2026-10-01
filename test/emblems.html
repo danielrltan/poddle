@@ -20,7 +20,7 @@
   .card{display:flex;flex-direction:column;align-items:center;gap:.375rem;text-align:center} .card small{font-size:.6875rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)} .ground.is-navy .card small{color:#8fb3d6}
 </style>
 <h1>Rank emblems</h1>
-<p class="lead">web/emblems.js on the light ground and the stadium navy strip: all 22 medals (Bronze..Champion in divisions I, II, III, and Pro) at 20 px (.is-xs), 40 px (.is-md), 120 px (.is-xl), plus emblemCard() at 80 px, a name line, Silver beside Platinum at 20 px, a swap and a hidden one.</p>
+<p class="lead">web/emblems.js on the light ground and a navy strip: all 22 medals (Bronze..Champion in divisions I, II, III, and Pro) at 20 px (.is-xs), 40 px (.is-md), 120 px (.is-xl), plus emblemCard() at 80 px, a name line, Silver beside Platinum at 20 px, a swap and a hidden one.</p>
 <div id="grounds"></div>
 <script type="module">
   import { RANKS, THRESHOLDS, TOP, rankOf, emblem, emblemEl, emblemId, setEmblem, emblemCard, installSprite, SPRITE } from '../web/emblems.js';
@@ -43,7 +43,7 @@
     ${row('2 vs 4', `<span class="name">${emblem(2, 'is-xs')}${emblem(4, 'is-xs')}${emblem(2, 'is-xs')}${emblem(4, 'is-xs')} <small>· Silver, Platinum, Silver, Platinum at 20 px</small></span><span class="name" data-zoom>${emblem(2, 'is-xs')}${emblem(4, 'is-xs')}${emblem(2, 'is-md')}${emblem(4, 'is-md')}</span><span class="name">${emblem(2)}${emblem(4)} <small>· 24 px</small></span>`)}
     ${row('Swap', `<span class="name" data-swap>${emblem(1, 'is-md')}Bronze I &rarr; Pro</span><span class="name" data-evo>${emblem(3, 'is-md')}Gold I &rarr; III</span><span class="name" data-hide>${emblem(4, 'is-md')}hidden &rarr;</span><span class="name" data-pop>${emblem(5, 'is-md is-pop', 3)}pop</span><span class="name" data-el></span>`)}
   </div>`;
-  document.getElementById('grounds').innerHTML = ground('is-light', 'Light ground') + ground('is-navy', 'Stadium navy #0e2a4d');
+  document.getElementById('grounds').innerHTML = ground('is-light', 'Light ground') + ground('is-navy', 'Navy #0e2a4d');
   for (const g of document.querySelectorAll('.ground')) {
     const cards = g.querySelector('.is-cards');
     for (const [t, d] of [...ALL, [TOP, 0, 4]]) { const c = document.createElement('div'); c.className = 'card'; const ce = t === TOP ? emblemCard(t, 'is-lg', 0, d === 0 ? 4 : 0) : emblemCard(t, 'is-lg', d); if (g.classList.contains('is-navy')) ce.classList.add('is-inverse'); c.appendChild(ce); cards.appendChild(c); }

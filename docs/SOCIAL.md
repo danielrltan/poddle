@@ -8,7 +8,7 @@ game in the pause menu somewhere. think of edge cases and implement slowly and c
 ## 1. Who can use it
 - Friends are ACCOUNTS WITH A USERNAME only (usernames are unique and public already; guests' typed names are not).
 - Guest: the Friends entry shows "Sign in to add friends" (profile.signIn()). Signed in, no username: "Pick a username"
-  (profile.pickName()). Same gate as Ranked (profile.rkGate()).
+  (profile.pickName()). The same gate as trophies (docs/TROPHIES.md 3.1: signed in with a username).
 - Only shown where the account features are on (HOSTED && LOBBY, or ?acctest=1), like the leaderboard.
 - Friend rows key on accounts.id, NEVER on the username (renames keep friendships). The wire carries usernames only,
   never account/owner ids (the leaderboard rule; tests check it).
@@ -55,9 +55,9 @@ game in the pause menu somewhere. think of edge cases and implement slowly and c
 
 ## 4. Presence (server/game.js, memory only, gone on restart)
 - An account is online while it has at least one live lobby socket (ws.viaLobby, not a pad, ws.acct set).
-- Status, most engaged across its sockets: 'ranked' (in a Ranked series / VS card) > 'tour' (tourActive) > 'playing'
-  (seated with a person) > 'matt' (seated vs Matt or alone) > 'watching' (a spectator) > 'queue' (Ranked queue) >
-  'menu'. Offline otherwise.
+- Status, most engaged across its sockets: 'tour' (tourActive) > 'playing' (seated with a person) > 'matt' (seated vs
+  Matt or alone) > 'watching' (a spectator) > 'menu'. Offline otherwise. ('ranked' and 'queue' went with the Ranked mode,
+  2026-09-30, docs/TROPHIES.md 2.)
 - Shown ONLY to accepted friends. A presence tick (every 2 s) computes status per online account, diffs against the last
   tick and pushes fresh snapshots to that account's online friends. Sign-out / delete (stats.forget) clears at once.
 - Friend lists cached in memory per online account, invalidated by every friend change (same process as the API).
@@ -80,19 +80,18 @@ game in the pause menu somewhere. think of edge cases and implement slowly and c
   offline, the friendship ends, or on restart.
 
 ### 5.1 Kinds
-- watch: come watch the court the sender is on (as player or spectator). Any casual court (not Ranked, not tournament).
+- watch: come watch the court the sender is on (as player or spectator). Any casual court (not a tournament).
   Accept = out of wherever the invitee is (quit), then watchCode(sender's room). Refused 'full' at SPEC_CAP.
-- play: take a seat on the sender's casual court. Sender must be seated, court not Ranked/tournament, fewer than two
+- play: take a seat on the sender's casual court. Sender must be seated, court not a tournament, fewer than two
   people seated. Accept: a free seat and no match under way -> seat(). Sender playing Matt (under way or not) -> the
   invitee takes Matt's seat the way an accepted ask-to-play does (the G3 abandon record, join, promo). Two people
   already -> 'full' (nothing moves).
 - duel (default meaning, decision to confirm with the owner): a fresh PRIVATE court reserved for the two friends, no
   Matt, a normal casual match (first to 11, win by 2) with the usual rematch vote; counts as a match vs a person. It can
-  be sent from anywhere (the lobby Friends view too). Sender must not be in Ranked/tournament or in a match with a
+  be sent from anywhere (the lobby Friends view too). Sender must not be in a tournament or in a match with a
   person under way. On accept both are moved: each quits where they are (a Matt match the sender leaves this way is an
   abandon, not a loss), the court is created (only: the two cids), both seated.
-- Invitee busy: in a Ranked series / VS card or tourActive -> not delivered, sender gets 'busy'. In the Ranked queue:
-  delivered; accepting leaves the queue first.
+- Invitee busy: tourActive -> not delivered, sender gets 'busy'. (There is no Ranked series or queue since 2026-09-30.)
 - Invitee seated with a person mid-match: delivered; the card says accepting leaves the match and counts as a loss;
   accept = the normal forfeit.
 - A tab that cannot be a paddle (!CAN_PADDLE) can accept only watch.
@@ -102,7 +101,7 @@ game in the pause menu somewhere. think of edge cases and implement slowly and c
   for ADDR_ROOMS. The play promote is a room method (answer() closes over room state); refused while promo is set or
   the court is not askable().
 - Client: before building accept, verify main.js handles an unsolicited `room` for a new code while in a court (ask card,
-  notes, rematch, URL, reconnect params torn down), while `pending` is set, and during the Ranked queue bar. If not, the
+  notes, rematch, URL, reconnect params torn down) and while `pending` is set. If not, the
   client does its own leave/cleanup before sending inva.
 
 ## 6. Client
@@ -138,8 +137,8 @@ NOTES section. No home notice or "New:" toast (CLAUDE.md "No announcement notice
 REST (server/api.js ROUTES, needsSignin-feature flag true, needsDb true; a handler-level `session(req)` check -> 401
 `signin`; signed in without a username -> 403 `username`):
 - GET  /api/friends -> `{friends:[{name, st, rank}], inc:[{name, at}], out:[{name, at}]}`. friends sorted online first
-  (by status weight), then by name. st: off|menu|matt|playing|watching|queue|ranked|tour. rank: {tier,div}|null (the
-  friend's current Ranked tier/div; null if never ranked). at: ms epoch. `out` excludes declined-silent rows? NO: the
+  (by status weight), then by name. st: off|menu|matt|playing|watching|tour. rank: {tier,div}|null (the
+  friend's current ladder tier/div; null with no trophies yet). at: ms epoch. `out` excludes declined-silent rows? NO: the
   sender always sees their request as pending until it expires (a decline is silent).
 - GET  /api/friends/search?q=<2..12 chars> -> `{rows:[{name, rel}]}`, rel none|friend|out|in, top 20, never self.
   400 `q` for a bad query.
@@ -158,23 +157,23 @@ loses its account (sign-out / delete) so the client clears the panel.
 Menu path /friends (server MENU_PATHS) -> lobby view 'friends'.
 
 ## 10. Slice B accept flow (from reading main.js, 2026-09-29)
-main.js's `room` handler only tears down the old court's UI for a Ranked/tournament move (`moved`); an unsolicited `room`
+main.js's `room` handler only tears down the old court's UI for a tournament move (`moved`); an unsolicited `room`
 for another code while phase is 'play' just swaps the `room` variable under the old court's UI. So invites are
 CLIENT-DRIVEN, in two steps, and a failed accept never costs the invitee their game:
 1. invitee `{type:'inva', id, yes:true}` -> the server re-checks everything (friendship, sender still on that court,
-   court alive `!r.dead && rooms.get(code) === r`, not Ranked/tour, seats/stands room, invitee not in Ranked series /
+   court alive `!r.dead && rooms.get(code) === r`, not a tournament, seats/stands room, invitee not
    tourActive) WITHOUT moving anyone, and answers `{type:'invgo', id, k, code, t}` with a single-use ticket t (15 s, bound
    to that socket + room + kind). A duel creates its reserved court here (only: the two sockets' cids, no Matt,
    ROOM_CAP respected, counts toward the sender's address) and sends `invgo` to BOTH (the sender's inviting socket).
    Any failure: `{type:'invs'/'invgo', r:<why>}` and nobody moves.
 2. the client leaves where it is the normal way (leave(): a forfeit only if forfeits(), which the invite card warned
-   about; the Ranked queue is left first), then sends join/watch with `t`: `{type:'join', code, t}` /
+   about), then sends join/watch with `t`: `{type:'join', code, t}` /
    `{type:'watch', code, t}`. The server honours the ticket: play on a Matt court = the promote path (room method,
    G3 abandon record, join, promo; refused while promo is set or !askable()); a free seat = seat(); watch = watchCode.
    Without a valid ticket join/watch behave as today.
 - The sender's Matt match left because a duel was accepted is an abandon, not a loss (the leave carries the duel
   ticket).
-- A PHONE (NOTES 149, web/main.js `MOBILE`): the phone home never takes a seat. request() refuses quick/create/join/rk/rkwarm/tcreate on a phone, and
+- A PHONE (NOTES 149, web/main.js `MOBILE`): the phone home never takes a seat. request() refuses quick/create/join/tcreate on a phone, and
   the Courts `join` handler turns a join into a watch. So a play or duel invite accepted on a phone must become a watch invite, or say "Play on a
   computer". Leave the watch invite as it is, and never send an invite a phone can only refuse: a sender can see a friend's status but not their device,
   so the invitee's client decides. The gate only catches what goes through request() (refused with a "Play on a computer" toast): an accept that

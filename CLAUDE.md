@@ -38,7 +38,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
 
 ### Current data flows (diff new features against this)
 - Server (Fly.io, Toronto; memory): display name (12 chars), IP (4 courts per IP, 1 open tournament
-  per IP, ask-to-play cooldown, 2 Ranked queue entries per computer (Ranked only for signed-in accounts with a username, NOTES 133); one network may play and be paired, and those matches count: only one browser (device id, tab, account) is one person, NOTES 153), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
+  per IP, ask-to-play cooldown; one network may play, and those matches count: only one browser (device id, tab, account) is one person, NOTES 153), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings, bot
   level, emotes, pause/rematch, position (~60 Hz, relayed), phone motion (relayed to the paired tab only). Reconnect URL
   carries name, cid, code, score, side, bot (revive()); never the device id or any sign-in value. Logs: activity lines
   with court codes and ranked/unranked, no names/IPs/cids/device ids/account ids/Google subs/tokens (friends lines too: no names, no ids).
@@ -48,7 +48,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   single use. The raw IP is compared in memory at match end and never written to the database. Share cards
   (server/share.js, card.js): a keyed hash (own daily key) of the network address counting card renders a minute; and,
   until evicted or a restart, the last 64 card PNGs. Friends (docs/SOCIAL.md): each online account's presence (online + a coarse
-  status: menu|matt|playing|watching|queue|ranked|tour, from its lobby sockets; never the court code), its cached friend list, and
+  status: menu|matt|playing|watching|tour, from its lobby sockets; never the court code), its cached friend list, and
   per-account rate buckets (adds 30/h, searches 60/10 min); gone on restart. Search text is answered, never stored or in our logs (it is in the URL: Fly's platform logs may hold it ~7 d).
 - Server database (SQLite `node:sqlite` at PODDLE_DB=/data/poddle.db on the Fly volume poddle_data; server/db.js,
   docs/ACCOUNTS.md 2.2): owners (kind, created, last match/sign-in); devices (SHA-256 of the device id, merge date);
@@ -58,9 +58,9 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   play totals over counted matches: hits, returns, chances, winners, aces, smashes, points won/lost, seconds played);
   share (owner, random 10-char slug, created; one per owner, opt-in via Share card, deleted by Stop sharing, with the
   owner, for the guest on a merge, or by the operator: `admin.js unshare <link>` / `unshare-user <username>`);
-  match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length, and for
-  Ranked mode: mode 'ladder'|'casual', series id, the trophy change per side); ladder (per owner: trophies, rank tier 1..8 and
-  division (Pro: none; tier/div re-derived from the trophy counts at every open, NOTES 124), best rank/division and when, Ranked wins/losses/streaks, Matt queue wins/losses, Matt trophies awarded today);
+  match_log (time, kind, Matt level, the two owner ids, score, winner, ending, ranked flag + rule reasons, length, mode
+  'ladder' (a seat was eligible for trophies: signed in with a username) | 'casual', series always null since NOTES 157, the trophy change per side); ladder (per owner: trophies, rank tier 1..8 and
+  division (Pro: none; tier/div re-derived from the trophy counts at every open, NOTES 124), best rank/division and when, wins/losses/streaks in person games played for trophies (counted games and a leaver's loss, floored losses included), Matt wins/losses, Matt trophies awarded today);
   friends (the two account ids a<b + since; max 100 per account) and friend_reqs (from, to, created, declined_at, asked_at, sent; a decline is
   silent, a removal writes a declined row from the removed person so they cannot re-request for 30 d; created = the sender's clock,
   asked_at = when it reached the receiver (NULL: a removal's block), sent 0 = a row its sender does not see); both ON DELETE CASCADE,
@@ -74,16 +74,16 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
   (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a hammer badge
   (tooltip "Developer") and always plays as its own fixed character; so does the username Mae (a white lop-eared bunny, and a small pink bow on the corner of her name wherever it shows, NOTES 148) (scene.js LOOKS,
-  NOTES 137 and 144: derived from the public username on the client, nothing new sent or stored). In Ranked courts the rank emblem (the rank's tier and division only, never trophies or record) beside a
-  name, to the opponent and spectators (VS card, scoreboard, result card). The global leaderboard (NOTES 126; GET /api/leaderboard, public, no sign-in): the top 100 of three boards (Ranked
-  trophies, best rally, best win streak vs people), each row place + username + value + rank emblem (tier/div), accounts WITH a
+  NOTES 137 and 144: derived from the public username on the client, nothing new sent or stored). On every court the rank emblem (the rank's tier and division only, never trophies or record) beside the name of a player with trophies,
+  to the opponent and spectators (scoreboard, result card, tournament VS card and bracket; NOTES 157, docs/TROPHIES.md). The global leaderboard (NOTES 126; GET /api/leaderboard, public, no sign-in): the top 100 of three boards (trophies,
+  best rally, best win streak vs people), each row place + username + value + rank emblem (tier/div), accounts WITH a
   username only, never guests, never an owner id; accounts.lb_hidden = 1 (Show me on the global leaderboard off) takes a name off
   at once. Clicking a row opens that player's profile card (NOTES 140; GET /api/leaderboard/player?u=<name>, public, no sign-in, 60 a minute, 30 s
   cache cleared by hide/rename/delete; admin.js changes wait out the TTL): exactly the share card's subset (share.dataOf / card.dataOf: username,
-  Ranked rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the eleven card stats with the headline three's notes), rank null when never played Ranked, for every account on at
+  rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the eleven card stats with the headline three's notes), rank null when no trophies yet, for every account on at
   least one board, at any place (NOTES 141); unknown, guest, no-username, hidden, on-no-board, renamed-away and deleted all answer the same 404;
   never an owner id. A player's own places ride on /api/stats and /api/me. Stats are otherwise private to their owner unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
-  (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), Ranked rank + ladder trophies and its
+  (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), rank + ladder trophies and its
   emblem, toughest Matt beaten, the same eleven card stats for everyone, zeros included (NOTES 145: win rate vs people with the W-L record under it,
   time on court over counted matches of every kind, best win streak vs people; return rate, points won %, longest rally, fastest swing, winners, aces,
   smashes, tournament titles), also in the og tags and alt text; the apps it is pasted into fetch it for
@@ -99,7 +99,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140), poddle.view, poddle.airpod,
-  poddle.courts, poddle.device (random device id, made at the first seat or Ranked queue entry; rotated on sign-out and delete). Stats are recorded for
+  poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
   (session, HttpOnly, 180 d), `__Host-poddle_n` (sign-in nonce, 10 min).

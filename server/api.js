@@ -13,7 +13,7 @@ let names = null; try { names = require('./usernames'); } catch { /* usernames n
 
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, BODY_MAX = 8192, BODY_MS = 5000;
 const OLD_HOSTS = new Set(['poddle.fly.dev', 'www.poddleball.com']);   // the cookie is scoped to poddleball.com: never a redirect here (8.1)
-let rkSignin = true, verifier = null, clientId = null, limiter = null, salt = crypto.randomBytes(32), saltAt = Date.now(), hosted = false, renameDays = 30;
+let verifier = null, clientId = null, limiter = null, salt = crypto.randomBytes(32), saltAt = Date.now(), hosted = false, renameDays = 30;
 const logged = new Map();                                        // failure class -> last log time
 const NONCE_MS = 600e3, NONCES_MAX = 50000;                      // the nonce cookie's Max-Age (auth.nonceCookie); a bound on the map
 const nonces = new Map();                                        // SHA-256 of each nonce this process issued -> expiry, memory only. Single use: a sign-in takes it out
@@ -22,7 +22,7 @@ const nonces = new Map();                                        // SHA-256 of e
 // social (game.js, docs/SOCIAL.md 4): { status: accountId -> 'off'|'menu'|..., changed: (push ids, invalidate ids) }: the presence it keeps in memory,
 // and the hook that drops its friend-list caches and pushes fresh 'social' snapshots. Without it (the in-process tests) everyone is 'off' and nothing is pushed
 function init({ env = process.env, social: so = null } = {}) {
-  hosted = !!env.FLY_APP_NAME; rkSignin = !(env.RK_GUESTS === '1' && env.NODE_ENV !== 'production');   // game.js RK_SIGNIN, the same rule (NOTES 133)
+  hosted = !!env.FLY_APP_NAME;
   verifier = auth.verifierFromEnv(env);                          // logs 'auth: GOOGLE_JWKS_FILE ignored in production' when it applies
   clientId = verifier ? String(env.GOOGLE_CLIENT_ID).trim() : null;
   limiter = auth.createRateLimiter(); salt = crypto.randomBytes(32); saltAt = Date.now(); nonces.clear(); boardsChanged();
@@ -80,7 +80,7 @@ const deviceOf = (b, req) => {                                    // the body's 
 // ---- the routes (8.2) ----
 async function me(req, res) {
   const s = db.isOpen() ? session(req) : null;                   // a failed write elsewhere (a full disk) does not sign anyone out
-  send(res, 200, { rkSignin, signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok(), ladder: s ? db.ladderOf(s.ownerId, Date.now()) : null, places: s ? db.leaderPlaces(s.ownerId) : null });   // places (NOTES 126): the home tile's 'Pro #12' from the first screen   // ladder (docs/RANKED.md 10.1): the signed-in account's rank for the home tile; a guest reads it from /api/stats with its device id
+  send(res, 200, { signin: { enabled: signinOn(), clientId }, account: account(s), db: db.ok(), ladder: s ? db.ladderOf(s.ownerId, Date.now()) : null, places: s ? db.leaderPlaces(s.ownerId) : null });   // places (NOTES 126): the home tile's 'Pro #12' from the first screen   // ladder (docs/RANKED.md 10.1): the signed-in account's rank for the home tile; a guest reads it from /api/stats with its device id
 }
 const withShare = (p, o, req) => (p ? Object.assign(p, { share: share.linkOf(o, req) }) : p);   // the live share link ({ url, image } | null): the page knows it before any click (docs/SHARE.md 2)
 const withPlaces = (p, o) => (p ? Object.assign(p, { places: db.leaderPlaces(o) }) : p);   // the global leaderboard places (NOTES 126): Your stats shows 'Champion #301'. Not in profileOf: the export and the card stay as they are
@@ -199,7 +199,7 @@ async function shareStop(req, res, b) {                            // idempotent
 // ---- friends (docs/SOCIAL.md 3, 8) ----
 // Accounts WITH a username only; a typed name is found by its confusable key (usernames.skeleton), so case and look-alikes never matter. The wire
 // carries usernames, never an account or owner id. A friend change pushes fresh 'social' snapshots through the game's hook (social.changed)
-const ST_W = Object.freeze({ off: 0, menu: 1, queue: 2, watching: 3, matt: 4, playing: 5, tour: 6, ranked: 7 });   // most engaged last: game.js picks an account's status across its sockets with it, the list sorts by it
+const ST_W = Object.freeze({ off: 0, menu: 1, watching: 2, matt: 3, playing: 4, tour: 5 });   // most engaged last: game.js picks an account's status across its sockets with it, the list sorts by it
 let social = { status: () => 'off', changed: () => {} }, addsMax = 30, searchMax = 60;
 const acctHits = new Map();                                       // kind + account id -> { n, at }: a fixed window per account, memory only
 function acctRate(kind, id, max, win) {                           // -> 0 when allowed, else retry-after seconds

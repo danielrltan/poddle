@@ -77,7 +77,7 @@ const fit = pg => pg.evaluate(() => { const bad = [...document.querySelectorAll(
 const want = n => !FILTER || n.includes(FILTER);
 async function lobby(pg, view) { await pg.goto(URL0, { waitUntil: 'domcontentloaded' }); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(900);
   await pg.evaluate(v => window.__ui.lobbyView(v), view); await sleep(1300); }
-const VIEWS = ['home', 'courts', 'create', 'bot', 'profile', 'ranked', 'ranks', 'leaderboard'];
+const VIEWS = ['home', 'courts', 'create', 'bot', 'profile', 'ranks', 'leaderboard'];
 try {
   for (const [w, h] of SIZES) {
     const tag = `${w}x${h}`;

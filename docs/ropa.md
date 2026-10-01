@@ -4,7 +4,9 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-29 (Friends, slice A: friends, friend requests, search, online status to friends, and the profile card's friend row: section 3b, no invites
+Last reviewed: 2026-09-30 (Ranked mode removed, NOTES 157, docs/TROPHIES.md: no queue, no series, no stadium; trophies are earned in every
+counted match by a signed-in account with a username, the rank emblem shows on every court; no new data stored, `match_log.series` always null; sections 2, 3, 3a, 3b and 4
+reworded, together with web/privacy.html); 2026-09-29 (Friends, slice A: friends, friend requests, search, online status to friends, and the profile card's friend row: section 3b, no invites
 yet; the same day, leaderboard profile cards, NOTES 140: the share card's subset made public for every listed player (all places since NOTES 141), no new data stored, and the same card now
 also opens from Friends with /api/player's rank emblem and leaderboard places); 2026-09-28 (an eighth rank, Master, NOTES 124: no new data, ranks re-derived from stored trophies; Save my stats removed: stats are always recorded, NOTES 116; 2026-09-27 Ranked mode, NOTES 112-113; play counters and share cards, NOTES 114; before that 2026-09-24, the full launch).
 
@@ -25,8 +27,8 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
 
 ## 2. Abuse limits
 - Data: IP address (IPv4 whole, IPv6 first 64 bits), in memory; keyed hashes of it (key replaced daily) for API rate
-  limits; court/tournament counts per IP; ask-to-play cooldown; the Ranked queue: at most 2 entries per computer key
-  (IPv4 whole / IPv6 /64) and never paired within one computer group.
+  limits; court/tournament counts per IP; ask-to-play cooldown. (The Ranked queue's cap of 2 entries per computer key went with the
+  mode, 2026-09-30: there is no queue.)
 - Basis: legitimate interests (keeping a free service online without spam, flooding or attacks).
 - Retention: memory only, at most 24 h, pruned every minute, gone on restart.
 - Security: the raw IP never reaches the database or the logs.
@@ -36,8 +38,11 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   profile (matches played, W/L, streaks, points, tournament titles, best rally, hardest hit and fastest swing with
   dates; play totals over every counted match: hits, returns, chances, winners, aces, smashes, points won/lost,
   seconds played); Matt ladder (four rungs Rookie, Club, Tour, Pro: W/L, abandons, streaks, first win date, best margin);
-  Ranked ladder (`ladder` table, docs/RANKED.md 10.1: trophies, rank tier and division, best rank/division and when,
-  Ranked W/L and streaks, Matt queue W/L, Matt trophies awarded today; `match_log.mode`, `series`, `delta_a/b`).
+  trophy ladder (`ladder` table, docs/TROPHIES.md 1 and 3, written only for a signed-in account with a username, in every counted match of
+  any kind: trophies and best trophies, rank tier and division, best rank/division and when, W/L and streaks in matches against people played
+  for trophies (counted games and a leaver's loss, a loss held at a floor included), Matt W/L, Matt trophies awarded today, last change;
+  `match_log.mode` ('ladder' when a seat was eligible at the start, else 'casual'), `delta_a/b` (the trophy change per side), `series`
+  always null since 2026-09-30).
 - Basis: legitimate interests (Art. 6(1)(f)): giving every player a record of their progress. Recorded for every player who
   plays (a guest by the random device id, a signed-in player by the account); there is NO off switch (Save my stats REMOVED
   2026-09-28, NOTES 116; the client deletes a leftover `poddle.stats.on`). Safeguards: self-serve download and deletion
@@ -47,14 +52,17 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   verified parental consent under 16). The server still honours a `nostats` frame from a tab loaded before the removal
   (that socket stays anonymous) for compatibility only.
 - Recipients: only the owner; Fly.io. Exception, the global leaderboard (NOTES 126, 2026-09-28): anyone sees the top 100 of three
-  boards (Ranked trophies, best rally, best win streak vs people) with username, value, place and rank emblem, for signed-in accounts
+  boards (trophies, best rally, best win streak vs people) with username, value, place and rank emblem, for signed-in accounts
   WITH a username only (never guests); on by default, the account's Show me on the global leaderboard switch (accounts.lb_hidden)
   removes it at once; and, by clicking a name on the board (any place since NOTES 141), the profile card (NOTES 140, 2026-09-29): the share card's subset
   (rank/div/trophies/Pro place, toughest Matt beaten, the card's eleven stats, NOTES 145: win rate + W-L vs people, time on court, best
   streak vs people, return rate, points won %, rally, swing, winners, aces, smashes, titles); the same switch
-  removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, Ranked mode:
-  the rank emblem (the rank and its division, e.g. Gold II; never trophies or record) beside the name, to the opponent and to spectators
-  of that court (VS card, scoreboard, result card). Basis for that: contract (Art. 6(1)(b)), the mode the player entered.
+  removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, the rank emblem
+  (docs/TROPHIES.md 3.9, 2026-09-30; before that only in Ranked mode): the rank and its division, e.g. Gold II, never trophies or record,
+  beside the name, to the opponent and to spectators of ANY court the player sits on (scoreboard, result card, tournament VS card and
+  bracket; never the court list), for a player with a ladder row (one exists once a match against a person was played for trophies or Matt
+  paid trophies, so a 0-trophy Bronze I emblem can show after a first floored loss). Basis for that: contract (Art. 6(1)(b)), part of
+  playing on a court (web/privacy.html, the legal-basis table).
   The same profile card also opens from Friends (section 3b, 2026-09-29) and there adds GET /api/player: anyone who knows the username (the endpoint needs no
   sign-in; the game asks it only for a signed-in viewer with a username) gets the rank emblem and the leaderboard places
   ({rank} on each of the three boards, the place number only, never the value; for every listed account)
@@ -68,8 +76,8 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   date). One per owner. In memory only: a keyed hash (daily key) of the requester's network address counting card
   renders a minute (server/share.js), and the last 64 rendered PNGs (until replaced or a restart; privacy section 7 says so).
 - Made public to anyone with the link (page /c/<slug> and its PNG, both `noindex`): the username (or "Poddle player";
-  guest display names are never stored), the Ranked rank and division with its emblem and the ladder trophies
-  (Bronze I, 0 trophies, before any Ranked game), the toughest Matt beaten, the same eleven stats on every card, zeros
+  guest display names are never stored), the rank and division with its emblem and the trophies
+  (Bronze I, 0 trophies, before any trophies are earned), the toughest Matt beaten, the same eleven stats on every card, zeros
   included (NOTES 145: win rate vs people with the W-L record under it, time on court over counted matches of every kind, best win
   streak vs people; return rate, points won %, longest rally, fastest swing, winners, aces, smashes, tournament titles), read from the profile
   at request time.
@@ -96,7 +104,7 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   person TO the remover so the removed person cannot re-request for 30 days (the remover may still add them back, which deletes
   that row and sends a normal request, whether or not the removed person tried again). Adding a player whose request to you is
   still out on their side (pending, or declined by you) accepts it. In memory only: presence (online + a coarse status:
-  Online, Playing Matt, In a game, Watching, Looking for a Ranked match, In a Ranked match, In a tournament; never the court
+  Online, Playing Matt, In a game, Watching, In a tournament; never the court
   code), each online account's cached friend list, per-account rate buckets (adds 30/hour, searches 60/10 min). Search text
   (2..12 chars) is used to answer the query, never stored or written to our logs (it rides in the URL, so Fly.io's platform
   logs, ~7 days, may hold it, as for /api/player?name=). Browser: nothing (the one-time notice and its `poddle.friendsSeen` key were removed, NOTES 147).
@@ -126,10 +134,14 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
 - Data: at match end, the two players' IPs compared in memory; in memory for up to 24 h, keyed hashes of the network
   address linked to device-id hashes, cids, accounts and recent results (link map); in the database, `match_log`:
   time, kind, Matt level, the two owner ids (never names), score, winner, ending, counted flag (`ranked`), rule reasons, length.
-  Ranked mode: R10 (repeated pairs) counts series, not games. A series with a game that fails a fair-play rule awards
-  no trophies to the player who stayed; a player who leaves a Ranked series (Leave, or a seat held past its time; before
-  2026-09-28 also Save my stats switched off mid-series) always takes the full loss; a friendly series awards none. R11c (a win over a player who is not yet
-  established withheld, and halved in Ranked) is OFF since 2026-09-28 (NOTES 129, the owner's choice): it can be turned back on with STATS_ESTABLISHED=1. The players are told why with the same words as today.
+  Trophies (docs/TROPHIES.md 3, 2026-09-30; the Ranked series are history): for a signed-in account with a username, every counted game
+  against a person moves trophies (about +30 / -20 at a gap of 0, from both seats' counts at the start; the winner's gain is halved on
+  `new_opponent`); a game that does not count awards none. Leaving a game against a person after the first ball is struck (Leave, or a seat
+  held past its time) always costs the leaver the full loss, whatever the verdict; the stayer takes the win only when the game carries
+  nothing beyond the forfeit's own flags (`early_forfeit`, `leaver_ahead`, `afk`, `too_fast`); before the first strike nothing is written.
+  A played-out counted win against Matt at the rank's level or harder pays a few trophies under a daily cap (`MATT_DAY`) and the 899
+  ceiling; a Matt loss, leave or drop pays or costs nothing. R10 (repeated pairs) counts games. R11c (a win over a player who is not yet
+  established withheld, and the trophy gain halved) is OFF since 2026-09-28 (NOTES 129, the owner's choice): it can be turned back on with STATS_ESTABLISHED=1. The players are told why with the same words as today.
 - Basis: legitimate interests (keeping statistics fair; must run whatever an individual player would choose).
 - Automated decision: whether a match counts toward statistics. Effect limited to the player's own statistics; no
   legal or similarly significant effect (Art. 22 not engaged). Players can contact the operator to contest.

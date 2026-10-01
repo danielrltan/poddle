@@ -1,4 +1,4 @@
-// Rank emblems for Ranked: the eight tiers (Bronze .. Pro), their trophy floors, and the SVG sprite they are drawn from (docs/RANK8.md 1, 3, 6).
+// Rank emblems for the trophy ladder (docs/TROPHIES.md): the eight tiers (Bronze .. Pro), their trophy floors, and the SVG sprite they are drawn from (docs/RANK8.md 1, 3, 6).
 // No DOM at import time: call installSprite() once (ui.js, which owns the DOM) before any <use href="#rank-..."> is rendered. Sprite colours are
 // literal hexes; where a ui.css token exists it is that value (--ball/-deep, --gold-1..4, --silver-1..4, --line/-deep, --good).
 

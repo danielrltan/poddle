@@ -268,7 +268,7 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
     // groups(computerKeys) -> Set of canonical roots (hashed): two seats are one computer when their groups meet (R5, R16)
     groups: keys => groupsOfNodes(nodesFor(keys)),
     // result(winnerKeys, loserKeys, ranked, series): remember a human result for R10 / R11 by computer (after the transaction, ranked or not).
-    // series: the Ranked series id the game belongs to (RANKED.md 5.6), so pair() counts a best-of-3 once; null for a casual match
+    // series: history (the removed Ranked mode grouped a best-of-3 by it); always null now, so every match is its own
     result(wk, lk, ranked, series) { hist.push({ w: nodesFor(wk, true), l: nodesFor(lk, true), ranked: !!ranked, series: Number.isSafeInteger(series) && series > 0 ? series : null, at: clock() }); if (hist.length > maxEntries) hist.shift(); },
     // pair(keysA, keysB, series) -> ranked SERIES in the last ttl between the two computer groups, either direction (R10 cpuPair24h); a casual match is its own
     // series; `series` (the one being played) is left out, so its own first game never caps its second (REVIEW FIX, RANKED.md 5.6)
@@ -303,4 +303,4 @@ function createLinks({ now = Date.now, ttlMs = DAY, maxEntries = 50000, log = co
   };
 }
 
-module.exports = { BOT_ORDER, MATCH_WIDE, computerKey, meets, rank, config, judge, why, titleCounts, createLinks };   // MATCH_WIDE, meets: read by the Ranked matchmaker and settlement (docs/RANKED.md 3.6, 5.5), never loosened
+module.exports = { BOT_ORDER, MATCH_WIDE, computerKey, meets, rank, config, judge, why, titleCounts, createLinks };   // MATCH_WIDE: read by the trophy hook (game.js BAD_FLAGS, docs/TROPHIES.md 3.4), never loosened

@@ -45,7 +45,9 @@ Each module exports `create(THREE, S) -> { group, update(dt, t, camera) }` where
   their contrast, and the sun must stay high enough that court shadows stay short and readable.
 - Deterministic: seeded rng only, animation driven by the `t` passed in (the preview harness freezes time for screenshots).
 
-## Venues (ranked plays in a stadium)
+## Venues (removed 2026-09-30)
+The stadium venue went with the Ranked mode (docs/TROPHIES.md 2, NOTES 157): `scene.setVenue` / `scene.venue()`, `VENUE.stadium`, `scenery/stadium.js`,
+`PAL_STADIUM` / `LIGHT_STADIUM` / `VENUES`, `body[data-venue]` and `test/venue-shots.mjs` are gone; the park is the only look. What follows is history.
 `scene.setVenue('park' | 'stadium')` (default `park`; `scene.venue()` reads it back) rebuilds the court group with that venue's colours
 and plain fallback look (sky gradient, fog, sun/hemi colour and intensity: `VENUE` in web/scene.js), sets `document.body.dataset.venue`
 for the CSS, and hands the name to `scenery.setVenue(name)`. index.js keeps ONE shared context + root per venue (`makeShared(THREE, ctx,

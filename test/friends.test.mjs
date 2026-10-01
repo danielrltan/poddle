@@ -167,9 +167,9 @@ ok((await call('POST', '/api/friends', { op: 'add', name: 'Sol' }, cP1)).status 
 ok((await call('POST', '/api/friends', { op: 'cancel', name: 'Sol' }, cP1)).status === 200, 'other ops are not counted as adds');
 console.log('sorting and status');
 { const Z = [acct('o-1', 'Ola'), acct('o-2', 'bob'), acct('o-3', 'Cyd')]; for (const z of Z) { op(P3, z, 'add', Date.now()); op(z, P3, 'accept', Date.now()); }
-  ST.set(Z[2].id, 'ranked'); ST.set(Z[0].id, 'menu'); ST.set(P1.id, 'watching');
+  ST.set(Z[2].id, 'tour'); ST.set(Z[0].id, 'menu'); ST.set(P1.id, 'watching');
   const s = (await call('GET', '/api/friends', null, cP3)).j;
-  ok(s.friends.map(f => f.name + ':' + f.st).join() === 'Cyd:ranked,Pia:watching,Ola:menu,bob:off', `online first by status weight, then by name, case-insensitive (${s.friends.map(f => f.name + ':' + f.st)})`);
+  ok(s.friends.map(f => f.name + ':' + f.st).join() === 'Cyd:tour,Pia:watching,Ola:menu,bob:off', `online first by status weight, then by name, case-insensitive (${s.friends.map(f => f.name + ':' + f.st)})`);
   ST.set(P1.id, 'bogus'); ok((await call('GET', '/api/friends', null, cP3)).j.friends.find(f => f.name === 'Pia').st === 'off', 'an unknown status reads as off'); ST.clear(); }
 console.log('search route');
 ok((await call('GET', '/api/friends/search?q=R', null, cP1)).j.error === 'q' && (await call('GET', '/api/friends/search?q=R%25', null, cP1)).status === 400 && (await call('GET', '/api/friends/search?q=abcdefghijklm', null, cP1)).status === 400, '1 char, a %, 13 chars: 400 q');

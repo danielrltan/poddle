@@ -3,7 +3,7 @@
 //   counts                      rows per table (numbers only; friends and friend_reqs included, docs/SOCIAL.md 2)
 //   rename <username> <new>     operator rename of an offensive name; clears renamed_at so the player may choose their own at once
 //   release <username>          drop a name hold
-//   reset-stats <username>      the account's own stats, Matt record and Ranked ladder back to zero (the owner's request); the account stays
+//   reset-stats <username>      the account's own stats, Matt record and trophy ladder back to zero (the owner's request); the account stays
 //   delete-account <username>   OPERATOR-initiated only: an under-13 report (6.5) or a Terms breach. Never on an e-mailed username alone (8.1)
 //   backup [--clean]            VACUUM INTO /tmp/poddle-backup-YYYYMMDD-HHMM.db (outside /data: never in a volume snapshot, 11.6); --clean deletes them
 //   sweep                       the retention sweep of 10.5, now
@@ -54,7 +54,7 @@ async function main(argv) {
     }
     if (cmd === 'unshare-user') { const a = find(a1); if (!db.shareDrop(a.owner_id)) throw new Error('that account has no live link'); return console.log('removed (the link now answers 404)'); }
     if (cmd === 'release') { if (!db.releaseHold(keyOf(a1))) throw new Error('no hold on that name'); return console.log('released'); }
-    if (cmd === 'reset-stats') { const a = find(a1); if (!db.resetStats(a.owner_id, now)) throw new Error('reset failed'); return console.log('reset (profile, Matt record and Ranked ladder cleared; the account, name and sessions stay)'); }
+    if (cmd === 'reset-stats') { const a = find(a1); if (!db.resetStats(a.owner_id, now)) throw new Error('reset failed'); return console.log('reset (profile, Matt record and trophy ladder cleared; the account, name and sessions stay)'); }
     if (cmd === 'delete-account') {
       const a = find(a1);
       if (!db.deleteOwner(a.owner_id, now)) throw new Error('delete failed');

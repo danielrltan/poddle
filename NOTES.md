@@ -3317,3 +3317,90 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   A spectator's scoreboard already showed both names.
 - Tests: menu.mjs and spectate-e2e.mjs expect the player's name where they expected "You" (spectate-e2e: "Play a bot" and "names on the scoreboards" pass). menu.mjs Part B crashes on
   main before this change too (a ui stub gap from a later peer commit), so it could not confirm this; spectate-e2e did.
+
+## 157. Ranked mode removed; trophies in every counted game (docs/TROPHIES.md)
+- The owner (2026-09-30): "get rid of the ranked mode. i think it's pointless; we can keep the ranked medals as like trophy tiers / ranges,
+  like in brawlstars, just for fun and achievements, but the main mode should just be a ladder mode where you just get trophies and such.
+  so no more ranked mode, as that'll just confuse things ... the ranked gamemode itself should be removed and folded in to normal stream
+  of games to make things simpler." docs/TROPHIES.md is the spec; docs/RANKED.md and docs/RANK8.md carry superseded banners.
+- What changed. The MODE is gone: the Ranked tile and view, the queue (and the two-per-network queue cap), the Matt warm-up, the best-of-3
+  series and its VS / game / series cards, the stadium venue (scene.js VENUE.stadium, scenery/stadium.js, venue-shots), the `rk*` wire
+  messages, `/status.json.rk`, the presence strings `queue` and `ranked`, the pad FX `found`/`game`/`series`, `RK_*` env knobs (`MATT_DAY`
+  replaces `RK_MATT_DAY`), test/ranked.test.mjs, test/ranked-e2e.mjs and test/rksignin.test.mjs. `/ranked` 301s to `/ranks`. The ladder
+  STAYS: server/ladder.js untouched (eight ranks, three divisions below Pro, floors, humanDelta, mattDelta, the 899 Matt ceiling), the
+  `ladder` table and `ladderApply` (`series_id` always null now; `delta_a` / `delta_b` on the game's own match_log row), the emblems, the
+  Ranks page, the trophies board, the share card and the profile card's rank + trophies. Vocabulary: `ranked` in match_log / abuse / stats /
+  the `profile` message still means "counted toward stats"; the trophies are "trophies", the rank index is "tier".
+- How trophies are earned now: one hook in game.js `record()` after `stats.onEnd`, for every kind of game (bot, human, tour, tourbot) on every
+  path that records, once per match. The result rides the seat's `profile` message as `trophies: { delta, trophies, tier, div, tierWas,
+  divWas, floorHeld, counted, saved, why, matt, limit }` (or `{ none: 'signin' | 'username' }`); no new message type. The result card draws
+  the same trophy row the series card drew. `stats.newMatch` mode is `'ladder'` when a seat was eligible at start, else `'casual'`.
+- Decisions made without the owner (from the spec, to be confirmed):
+  - Eligibility = signed in with a username (the owner's 2026-09-29 rule for Ranked, NOTES 133, carried over). A guest or a username-less
+    account earns nothing; the result card says `Sign in to earn trophies` / `Pick a username to earn trophies` in the trophy row's place.
+  - Per-game humanDelta: every counted game against a person moves trophies (about +30 / -20 at a gap of 0), from both seats' trophies
+    frozen at match start; an ineligible or trophy-less opponent counts as the same rank. `new_opponent` halves the winner's gain.
+  - Matt pays in every game (Quick play alone, Play a bot, a tournament's Matt filler): a played-out counted WIN pays `mattDelta` only at
+    your rank's level or harder, through the day cap (`MATT_DAY`, default 40) and the 899 ceiling; the card names the limit that stopped a
+    win from paying (`easy`, `day`, `ceiling`). A loss, a leave or a drop against Matt: 0.
+  - The leaver rule: leaving a person game after the first strike costs the leaver the full loss whatever the verdict; the stayer takes the
+    win only when the game's flags hold nothing beyond the forfeit's own (`early_forfeit`, `leaver_ahead`, `afk`, `too_fast`), else +0 with
+    `left_early`. Before the first strike: void, no message.
+  - Emblems on every court: `ranks()` / `seatTier` are set for every seat with a ladder row, so opponents and watchers see the rank emblem
+    (tier and division only) on the scoreboard, result card, tournament VS card and bracket, in every kind of court.
+  - The stadium is removed rather than kept as a look; the park is the only venue.
+  - `/ranked` redirects to `/ranks` (old links and bookmarks).
+  - Home tiles: Quick play (+ Friends) as heroes, then Courts, Play a bot, Your stats, Leaderboard; 5 tiles without the Friends tile, 6
+    with it. The spec says "signed out: 5 tiles", but the Friends tile shows to guests too wherever sign-in is enabled (Sign in to add
+    friends, NOTES 146), so on poddleball.com a guest sees 6 tiles and the 5-tile home appears only where sign-in is off (a local copy,
+    the `?acctest` fixtures). Owner call: gate the Friends tile on an account (then guests need another way to the friends gate), or
+    accept 6 for guests (the code as shipped; docs/ui-spec.md describes it so). Your stats is the one trophy view (crest, rank, place, trophies, bar to the next division, the eight-medal road, the keep
+    line, Best when higher).
+- Edge cases (docs/TROPHIES.md 3): guest vs guest (nothing); guest vs account (only the account moves, gap 0); an account without a username
+  (`none: 'username'`); a sign-in mid-match (the identity frozen at hello decides; a sign-in after the first strike does not earn); a
+  reload mid-match (`revived`: not counted, 0); a server restart mid-match (revive, same); two tabs of one person (`same_*`: not counted);
+  a tournament's Matt filler games (Matt rules, day cap and ceiling apply); a phone paddle (no seat, nothing); watchers (see emblems only);
+  the day cap and the ceiling on Matt; a deleted account mid-match (`saved: false`); the db off (`saved: false`, "Couldn't save trophies
+  right now"); old clients after the deploy (`rk`, `rkleave`, `rkwarm`, `?rk=1` are ignored without a reply or a log line).
+- Tests: test/trophies.test.mjs (new, server: two accounts +30 / -20 and the ladder rows and export, a guest `none: 'signin'`, a
+  username-less account `none: 'username'`, a Matt win at the right level with the day cap and ceiling, an easy Matt win `limit: 'easy'`,
+  the leaver rule both sides of the first strike, the emblem on a plain court, old-client `rk` ignored); stats.test §21 points at it;
+  ladder.test unchanged; the client tests (menu, ui-next, profile-ui, lb-profile-ui, mobile-ui, social-ui, ui-mock, ui-shots) lose the Ranked
+  assertions and gain the 5- and 6-tile home, the Your stats road and the result card trophy row; deploy.sh swaps ranked.test for
+  trophies.test. seo.test.mjs checks the legal pages and sitemap below.
+- Legal pages updated (same commit): privacy.html and terms.html now say trophies are earned in every counted match by signed-in players
+  with a username; the rank emblem (tier and division only) is shown beside your name to your opponent and anyone watching any court you
+  play on, on the scoreboard, result card, tournament match card and bracket; the ladder row lists its fields without a series or "while
+  you wait"; the device id is created at the first seat; the two-per-network queue limit and the two Ranked presence strings are gone; the
+  emblem's legal basis stays contract, worded as part of playing on a court. Last updated / dateModified September 30, 2026 in both,
+  sitemap lastmod for the home page, how-to-play, privacy and terms, a dated line in privacy section 13. how-to-play's "Play Ranked"
+  section, FAQ and FAQ ld+json are "Trophies and ranks" (h2 id `trophies`). changelog.html: one entry at the top of September 30 and the
+  four meta descriptions ("trophies and ranks" instead of "Ranked mode"). No home-page notice (no new data is handled; NOTES 147 rule):
+  ask the owner if one is wanted. CLAUDE.md data flows, README, docs/ACCOUNTS.md (the RK rows), SOCIAL.md, SHARE.md, SCENERY.md and
+  ui-spec.md follow.
+- Copy fixes from the verify pass (same commit). docs/ropa.md (the GDPR record) reworded to the trophies world (no queue, the ladder row's
+  fields, the Trophies board, the emblem on every court under contract, the five presence strings, the per-game leaver rule) and its Last
+  reviewed line bumped. Three sentences made exact: the ladder row's W/L and streaks count every person game played for trophies
+  (db.ladderApply adds a win or a loss on every non-Matt call: a loss held at a floor and a leaver's loss count too), so privacy 2 and
+  CLAUDE.md say "played for trophies", not "that changed your trophies"; the emblem shows for any seat with a ladder row (readTier), and a
+  row is created by the first person game written even when it floors to 0, so privacy 4 says "once you have played a match against
+  another player for trophies, or have earned trophies from Matt" (a first Matt loss or a Matt win at a limit creates no row); the leaver
+  rule starts at the first strike (a forfeit before it is void), so terms 6, how-to-play (the section, the FAQ and its ld+json) and the
+  changelog say "once the first ball has been struck", not "once it has started". docs/SOCIAL.md's phone line lists SEATS as
+  quick/create/join/tcreate. Not changed here (other files): web/profile.js signedIn() is a boolean, so an account without a username reads
+  "Win a game for your first trophies" on the Your stats hero and the Ranks page though the server answers none:'username' (the result card
+  says "Pick a username to earn trophies"); wanted: a third state passed to ui.rankCrest and pinned in profile-ui.mjs. Stale comments in
+  test/social.test.mjs:1 (rksignin.test), test/share.test.mjs, leaderboard.test.mjs, share-shots.mjs, ladder.test.mjs and web/emblems.html
+  ("Ranked", "series", "stadium") are labels only.
+- From the review and fix rounds (same commit). A paid forfeit win (the stayer's +30) now counts toward R10 pair_cap, R11b one_way and R12
+  daily_cap (db.js pairs / winsOf / winsOver count a row that is `ranked = 1` OR whose winner was paid), so one pair cannot farm forfeits:
+  the fourth forfeit of a day is +0 `left_early` while the leaver still pays. A leaver on a court flagged `revived` or `same_*` pays nothing
+  (those games are 0 for everyone). An opponent without a ladder row is a gap of 0 even when eligible. The tournament VS card (`tmove`
+  `vs` / `you`), the `tour` snapshot's sides and the bracket carry `tier` / `div`, and the bracket draws the emblem. The Your stats hero
+  draws from /api/me's ladder first (`meLadder`), so the card opens whole (NOTES 150) and never on the empty hero; the road sits under the
+  streak so the panel still fits 1280x800 without a scroll (NOTES 145). A tournament final's champion card waits for the result card's
+  trophy row and rank-up (12 s fallback). `db.ladderOf` and `ladderTier` carry `row` (a ladder row exists); an account without a username
+  reads "Pick a username to earn trophies" on the hero (`signedIn()` is false | 'username' | true). test/menu.mjs's bail-out is 420 s (the
+  two trophies passes made the full run longer than its old 330 s). Pre-existing on main, not touched: ui-next.mjs 8 (settings rows, Sound
+  output row, Tab order, hostile name, at two sizes), menu.mjs 7 (Part B3 settings and swing), share.test.mjs 5 PNG checks where
+  @resvg is not installed, ui-shots/verify.mjs 5 (court list box heights).

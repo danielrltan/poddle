@@ -1,16 +1,14 @@
-// Everything beyond the fences. Contract: docs/SCENERY.md. This file only wires: one shared context + root per VENUE (park by default,
-// stadium for ranked: scene.setVenue), the modules of each (each isolated, so one broken module never takes the scene down), a hitch-free
+// Everything beyond the fences. Contract: docs/SCENERY.md. This file only wires: one shared context + root per VENUE (park, the one there
+// is since the Ranked stadium went, docs/TROPHIES.md 2), the modules of each (each isolated, so one broken module never takes the scene down), a hitch-free
 // arrival (staged build, shaders compiled off the frame, one-frame swap), lighting/fog from the shown venue's palette, update fan-out, debug handle.
 import { makeShared } from './shared.js';
 import * as sky from './sky.js';
 import * as flora from './flora.js';
 import * as park from './park.js';
 import * as wind from './wind.js';
-import * as stadium from './stadium.js';
 
 const MODULES = {                                                              // far to near, fx last
   park: [['sky', sky], ['park', park], ['flora', flora], ['wind', wind]],
-  stadium: [['stadium', stadium]],                                              // the whole arena, night sky included, is one module
 };
 
 export function createScenery(THREE, ctx) {
@@ -92,7 +90,7 @@ export function createScenery(THREE, ctx) {
   const api = {
     update(dt, t, camera) { const v = shown && V[shown]; if (!v) return; if (v.built.flora) pruneOldTrees(); fanOut(v, dt, t, camera); },
     // scene.js: the court has been rebuilt for `name` and its plain look applied. A venue built before is a one-frame swap; a new one is
-    // built staged like the first, with the plain look showing meanwhile (call it when the ranked queue starts, not when the court opens).
+    // built staged like the first, with the plain look showing meanwhile.
     setVenue(name) {
       if (!MODULES[name] || name === want) return; want = name;
       const v = V[name] || make(name);

@@ -89,14 +89,11 @@ const COL = {
   matt: { skin: 0x6b4226, shirt: 0xf26b1d, hair: 0x15110e },       // the bot is Matt: a Black man in an orange shirt, whichever end he plays
   shirt: [0xe5484d, 0xf5b324], hair: [0x3a2a1e, 0x1d1d26], face: ['#e5484d', '#f5b324'], kit: 0x20222c,      // kit: shorts and shoes
 };
-// Venues (setVenue): what the court and the plain fallback look (sky, fog, lights: the values web/scenery/ replaces when it arrives) are made of.
-// 'park' is exactly the scene as it always was; 'stadium' is the ranked evening arena (web/scenery/stadium.js): darker blue court, lighter
-// kitchen, plain dark hoardings instead of the PODDLE windscreens, no trees, a night sky, cool floodlight light. Players, ball and net are the same.
+// The venue: what the court and the plain fallback look (sky, fog, lights: the values web/scenery/ replaces when it arrives) are made of.
+// 'park' is the one venue (the Ranked stadium went with the mode, docs/TROPHIES.md 2): the table shape stays so web/scenery/ keys on a name.
 const VENUE = {
   park: { sky: [COL.skyTop, COL.skyMid, COL.horizon], fog: [COL.horizon, 38, 160], sun: [0xfff0d2, 3.3], hemi: [0xd6e9ff, 0x4f7a4a, 1.35], clouds: true, trees: true,
     grass: COL.grass, apron: COL.apron, court: COL.court, kitchen: COL.kitchen, line: COL.line, screen: COL.screen, rail: 0xd9dde3 },
-  stadium: { sky: ['#04071a', '#0d1a3a', '#0b1222'], fog: ['#0b1222', 34, 190], sun: [0xf2f6ff, 3.4], hemi: [0xb4c6ea, 0x4a5468, 1.9], clouds: false, trees: false,      // floodlit: the players as bright as in the park (the owner: too dark to see the opponent), the sky still night
-    grass: 0x1d2531, apron: 0x33476a, court: 0x2160ad, kitchen: 0x3d86d6, line: 0xffffff, screen: 0x13203a, rail: 0x6b7590 },
 };
 
 // Kinematic-arm fallback, replaced by motion.js's armOffset when that module loads.
@@ -402,7 +399,7 @@ function swingEuler(t, out) {
 }
 
 export function createScene(containerEl) {
-  let court = { ...DEFAULT_COURT }, localSide = 0, lastMs = 0, timeS = 0, venue = 'park';   // venue: a VENUE key (setVenue)
+  let court = { ...DEFAULT_COURT }, localSide = 0, lastMs = 0, timeS = 0; const venue = 'park';   // venue: the one VENUE key
   // Three switches (docs/API-NEXT.md 2.1). Camera: menu beats spectator (broadcast | split | pov | free) beats seated (today's play camera).
   let spectator = false, vName = 'broadcast', vSide = 0, menu = false, dim = false, frozen = false, drawn = 0, force = false, shadowHold = 0, easeT = 1;      // dim: paused behind the full blur. The menu's cheap picture, the play camera
   const VIEWS = ['broadcast', 'split', 'pov', 'free'], free = { yaw: 20, pitch: 25, dist: 17, tz: 0 }, size = { w: 1, h: 1 };      // free: degrees off +x, degrees up, metres from the target (0, 0.9, tz); tz slides along the court so a player can be framed up close. It outlives view changes. (Not 35 off: a floodlight head hangs exactly there)
@@ -475,17 +472,10 @@ export function createScene(containerEl) {
     m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.receiveShadow = true;
     return m;
   }
-  const banners = {}, keepTex = new Set([speckle]);        // per-venue windscreen art, drawn once; textures a rebuild must not dispose
+  const banners = {}, keepTex = new Set([speckle]);        // the windscreen art, drawn once; textures a rebuild must not dispose
   function bannerFor(v) {
     if (banners[v]) return banners[v];
     const t = banners[v] = canvasTex(2048, 256, (c, w, h) => {
-      if (v === 'stadium') {                               // ranked: a plain dark hoarding, panel seams, a thin light-blue LED line along the top. No words, nothing bright behind a baseline
-        c.fillStyle = '#0c1526'; c.fillRect(0, 0, w, h);
-        c.fillStyle = 'rgba(255,255,255,0.03)'; for (let x = 0; x < w; x += 256) c.fillRect(x, 0, 3, h);
-        c.fillStyle = '#2b6e9c'; c.fillRect(0, 14, w, 8); c.fillStyle = '#8fd6ff'; c.fillRect(0, 16, w, 3);
-        c.fillStyle = '#060b16'; c.fillRect(0, h - 10, w, 10);
-        return;
-      }
       c.fillStyle = '#17513a'; c.fillRect(0, 0, w, h);
       c.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 0; x < w; x += 8) c.fillRect(x, 0, 2, h);
       c.fillStyle = '#0f3a29'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 10, w, 10);
@@ -497,7 +487,7 @@ export function createScene(containerEl) {
     keepTex.add(t); return t;
   }
   function buildCourt() {
-    if (courtGroup) { scene.remove(courtGroup); courtGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map && !keepTex.has(o.material.map)) o.material.map.dispose(); o.material.dispose(); } }); }   // a venue switch rebuilds: nothing may leak
+    if (courtGroup) { scene.remove(courtGroup); courtGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map && !keepTex.has(o.material.map)) o.material.map.dispose(); o.material.dispose(); } }); }   // a court rebuild (setCourt): nothing may leak
     const g = courtGroup = new THREE.Group(), { halfW: W, halfL: L, kitchen: K, net: N } = court, LW = 0.07, V = VENUE[venue];
     const fenceZ = L + 7.2, fenceX = W + 5.2; backFence[0].length = backFence[1].length = sideFence[0].length = sideFence[1].length = 0;
     g.add(slab(600, 600, V.grass, -0.02));
@@ -548,7 +538,7 @@ export function createScene(containerEl) {
       const srail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, fenceZ * 2), railM); srail.position.set(s * fenceX, 1.33, 0); g.add(srail); sideFence[s > 0 ? 0 : 1].push(sd, srail);
       for (let i = -3; i <= 3; i++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.5, 8), railM); p.position.set(i * fenceX / 3, 1.25, s * (fenceZ + 0.05)); g.add(p); mine.push(p); }
     }
-    // trees outside the fence (the park only: the stadium's stands live in web/scenery/stadium.js)
+    // trees outside the fence
     if (V.trees) {
     const rnd = rng(11), N_T = 46, trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.3, 1, 8), new THREE.MeshStandardMaterial({ color: 0x7a5535, roughness: 1 }), N_T);
     const leafM = [0x3f8f45, 0x57a84f].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 1 }));
@@ -568,16 +558,6 @@ export function createScene(containerEl) {
     scene.add(g); if (menu) shadowHold = 1;                // a frozen shadow map belongs to the old court
   }
   buildCourt();
-  if (typeof document !== 'undefined' && document.body) document.body.dataset.venue = venue;   // CSS-facing: body[data-venue] (ui.css themes the HUD on it)
-  // The venue: 'park' (default) or 'stadium' (ranked). Rebuilds the court group and the plain look, then hands the scenery the name (a
-  // built venue is a one-frame swap; a new one builds staged, ~130 ms, with the plain look up meanwhile: call it when the ranked queue
-  // starts, not when the court opens). Players, ball, net logic and cameras are untouched. Returns the venue in force.
-  function setVenue(name) {
-    if (!VENUE[name]) return venue;
-    if (name !== venue) { venue = name; plainLook(); buildCourt(); if (scenery) scenery.setVenue(name); }
-    if (typeof document !== 'undefined' && document.body) document.body.dataset.venue = venue;
-    return venue;
-  }
 
   // ---------- ball, blob shadow, trail ----------
   const ballTex = canvasTex(512, 256, (c, w, h) => {
@@ -1220,15 +1200,11 @@ export function createScene(containerEl) {
       for (const f of [523.25, 659.25, 783.99, 1046.5]) n(f, 0.62, 1.0, 0.12);
       if (kind === 'champ') { [[1318.5, 0.95], [1568, 1.02], [2093, 1.09]].forEach(([f, at]) => tone(d, 'sine', f, f, 0.01, 0.08, 0.5, at)); noise(d, 7000, 5200, 3800, 0.6, 0.10, 0.7, 0.002, 0.95); }
     },
-    // Ranked (docs/RANKED.md 8.11). found: a low thump, a rising fifth G4 -> D5 at 120 ms, a short filtered shimmer at 400 ms (MATCH FOUND). game: the pickup's three
-    // notes alone and one soft crash on the GAME stamp's impact (114 ms). gamelose: the two-note A -> G sigh, no chord. rankup: the champion's sparkle and second crash,
-    // no thump (it follows the win jingle, 2.1 s later). divup: one bright fifth, the sting of a division gained. Each takes the jingle bus: it cuts what was still ringing
-    rkJingle(kind) {
+    // the trophy row's ceremony (docs/TROPHIES.md 4). rankup: the champion's sparkle and second crash, no thump (it follows the win jingle, 2.1 s later).
+    // divup: one bright fifth, the sting of a division gained. Each takes the jingle bus: it cuts what was still ringing
+    rankJingle(kind) {
       if (!ac) return; const d = jingleOut();
       const n = (f, at, dur, g, type = 'triangle') => { tone(d, type, f, f, 0.01, g, dur, at); tone(d, 'sine', 2 * f, 2 * f, 0.01, g * 0.25, dur * 0.6, at); };
-      if (kind === 'found') { tone(d, 'sine', 120, 50, 0.12, 0.4, 0.35, 0); n(392, 0.12, 0.3, 0.16); n(587.33, 0.26, 0.55, 0.18); noise(d, 6500, 9000, 4000, 0.7, 0.07, 0.5, 0.05, 0.4); return; }
-      if (kind === 'game') { noise(d, 7000, 5200, 3800, 0.6, 0.09, 0.5, 0.002, 0.114); n(392, 0.16, 0.16, 0.16); n(523.25, 0.25, 0.16, 0.16); n(659.25, 0.34, 0.5, 0.18); return; }
-      if (kind === 'gamelose') { n(440, 0.2, 0.4, 0.12); n(392, 0.4, 0.55, 0.12); return; }
       if (kind === 'divup') { n(523.25, 0, 0.25, 0.14); n(783.99, 0.12, 0.5, 0.16); tone(d, 'sine', 1568, 1568, 0.01, 0.06, 0.4, 0.12); return; }
       if (kind === 'rankup') { [[1318.5, 0], [1568, 0.07], [2093, 0.14], [2637, 0.21]].forEach(([f, at]) => tone(d, 'sine', f, f, 0.01, 0.09, 0.6, at)); noise(d, 7000, 5200, 3800, 0.6, 0.11, 0.8, 0.002, 0.02); for (const f of [523.25, 659.25, 783.99, 1046.5]) n(f, 0.3, 1.1, 0.11); }
     },
@@ -1241,7 +1217,7 @@ export function createScene(containerEl) {
   };
 
   // ---------- public API ----------
-  let smashAt = -9, pressure = null;                      // when the last shot's smash was shown: it is shown ONCE, at the impact or in flight, never both. pressure: the side at game / match point, for the tom (once per pressure)
+  let smashAt = -9;                                       // when the last shot's smash was shown: it is shown ONCE, at the impact or in flight, never both
   const smashHue = spin => (spin > 0.3 ? [0xd08bff, 0x8a5bff, 0xffffff] : [0xff5a1f, 0xffb340, 0xfff0a0]);      // purple with spin on it, fire without
   function smashFx(p, side, spin, rs, sk) { smashAt = timeS; ring(p, false, 0.1 * rs, 2.6 * rs, 0.6, spin > 0.3 ? 0xb070ff : 0xff5a1f, 0.7); flashAt(p, 2.2);
     burst(p, 1, 40, 9, smashHue(spin), -sgn(side) * 6); cam.shake = Math.max(cam.shake, sk === 1 ? 0.34 : sk ? 0.18 : 0); }
@@ -1298,7 +1274,6 @@ export function createScene(containerEl) {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
       const w = pads[m.winner]; if (w) { w.cheer = 1.05; if (w.has) burst([w.pos.x, 2.2, w.pos.z], 0.5, 22, 3.5, [0xff5d73, 0xffd23a, 0x5ad1ff, 0x7dff8a]); }
       if (!m.final) sfx.chime(spectator || m.winner === localSide);      // a spectator is on nobody's side: every point gets the winner's chime. The match point's sound is the result card's jingle (main.js showOver)
-      { const p = m.mp === 0 || m.mp === 1 ? m.mp : m.gp === 0 || m.gp === 1 ? m.gp : null; if (p != null && pressure == null) setTimeout(() => sfx.cue('tom'), 500); pressure = p; }      // game / match point (RANKED.md 8.6): one soft floor tom when the pressure first appears, after the point's chime
     } else if (m.type === 'whiff' && !spectator) { const me = pads[localSide]; if (ac) noise(out(panOf(me.pos.x)), 900, 500, 260, 1.0, 0.1, 0.22, 0.04); }
   }
 
@@ -1453,14 +1428,13 @@ export function createScene(containerEl) {
   resize();
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
-    setVenue, venue: () => venue,
     setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen,
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize,
-    jingle(kind) { if (['win', 'lose', 'watch', 'forfeit', 'champ'].includes(kind)) sfx.jingle(kind); else if (['found', 'game', 'gamelose', 'rankup', 'divup'].includes(kind)) sfx.rkJingle(kind); },      // the result card's sting: main.js showOver / showChamp only; the Ranked cards' (RANKED.md 8.11)
-    cue(kind) { if (kind === 'tick' || kind === 'tom') sfx.cue(kind); },      // small cues: the trophy count's clicks (main.js rkCeremony); the pressure tom is onEvent's own
+    jingle(kind) { if (['win', 'lose', 'watch', 'forfeit', 'champ'].includes(kind)) sfx.jingle(kind); else if (['rankup', 'divup'].includes(kind)) sfx.rankJingle(kind); },      // the result card's sting: main.js showOver / showChamp only; the trophy row's rank-up / division-up (docs/TROPHIES.md 4)
+    cue(kind) { if (kind === 'tick' || kind === 'tom') sfx.cue(kind); },      // small cues: the trophy count's clicks (main.js, the trophy ceremony)
     // Sound. setSink takes a deviceId ('' = the system default) and resolves false when that device is gone, so the panel
     // can fall back instead of naming a speaker nothing is coming out of.
     // devices() is empty until the page holds a media grant: Chrome blanks BOTH the id and the label of every audio output

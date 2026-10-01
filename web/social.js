@@ -14,9 +14,9 @@ const text = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
 const btn = (cls, t, fn) => { const b = mk('button', cls, t); b.type = 'button'; if (fn) b.addEventListener('click', fn); return b; };
 const low = n => String(n).toLowerCase();      // usernames are unique ignoring case on the server (usernames.skeleton): so is every match here
 // the presence words (docs/SOCIAL.md 4), and how engaged each is: the list is online first, the busiest on top (the server's own order, kept if a push arrives unsorted)
-const ST = { off: 'Offline', menu: 'Online', matt: 'Playing Matt', playing: 'In a game', watching: 'Watching', queue: 'Looking for a Ranked match', ranked: 'In a Ranked match', tour: 'In a tournament' };
-const WEIGHT = { ranked: 7, tour: 6, playing: 5, matt: 4, watching: 3, queue: 2, menu: 1, off: 0 };
-const BUSY = new Set(['matt', 'playing', 'ranked', 'tour']);      // in a match: the dot goes amber (slice B's invites read the same set)
+const ST = { off: 'Offline', menu: 'Online', matt: 'Playing Matt', playing: 'In a game', watching: 'Watching', tour: 'In a tournament' };
+const WEIGHT = { tour: 6, playing: 5, matt: 4, watching: 3, menu: 1, off: 0 };
+const BUSY = new Set(['matt', 'playing', 'tour']);      // in a match: the dot goes amber (slice B's invites read the same set)
 const Q_OK = /^[A-Za-z0-9_]*$/;      // what a username is made of (7.1): anything else can match nobody, so it is never sent
 
 // ---------- the wire, untrusted (docs/SOCIAL.md 8): the same shape from GET /api/friends, a POST's snap and a {type:'social'} push ----------
@@ -96,7 +96,7 @@ const ago = at => { if (!at) return ''; const s = Math.max(0, (Date.now() - at) 
 function whoEl(name, ctx, rank, sub) {                     // the name (a button: the profile card), the developer badge, the rank emblem, a small line under it
   const w = mk('span', 'fr-who'), top = mk('span', 'fr-top'), b = btn('fr-name', name, e => player(name, ctx, rank, e.currentTarget));
   b.setAttribute('aria-label', `${name}: open profile`); b.setAttribute('aria-haspopup', 'dialog'); top.append(b); w.append(top);
-  h.badge(b, true); if (rank) h.rankBadge(b, rank);      // the hammer beside the developer's name, the Ranked emblem beside everyone's who has one (ui.js draws both)
+  h.badge(b, true); if (rank) h.rankBadge(b, rank);      // the hammer beside the developer’s name, the rank emblem beside everyone’s who has one (ui.js draws both)
   if (sub) w.append(sub); return w;
 }
 function relActs(name, rel) {                              // what can be done about this name now: one control, never a destructive one

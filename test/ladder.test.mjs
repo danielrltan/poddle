@@ -1,4 +1,4 @@
-// The Ranked ladder, pure (docs/RANKED.md 5 with DIVISIONS, 11.2): server/ladder.js and web/emblems.js agree on the eight ranks (names, floors);
+// The trophy ladder, pure (docs/TROPHIES.md 1; docs/RANKED.md 5 with DIVISIONS is history): server/ladder.js and web/emblems.js agree on the eight ranks (names, floors);
 // tierOf / divOf / floorOf at every boundary; sticky floors through Platinum and demotion above (never below 450); Pro has no divisions (NOTES 126); the series deltas' bounds; Matt's
 // bounty per rank, the 899 ceiling (the Champion floor - 1) and the day cap; new_opponent halving (min 8). No server, no port. Last line: PASS or FAIL n.
 import { createRequire } from 'module';
@@ -70,6 +70,6 @@ ok(L.mattLevel(1) === 0 && L.mattLevel(2) === 1 && L.mattLevel(4) === 3 && L.mat
 ok(L.mattAward(10, 0, 40, 0) === 10 && L.mattAward(10, 35, 40, 0) === 5 && L.mattAward(10, 40, 40, 0) === 0, 'the day cap: 40 a day, the last win pays the rest');
 ok(L.mattAward(4, 0, 40, 896) === 3 && L.mattAward(4, 0, 40, 897) === 2 && L.mattAward(4, 0, 40, 899) === 0 && L.mattAward(4, 0, 40, 900) === 0, 'the ceiling: never past 899 (Master III at most)');
 ok(L.mattAward(-5, 0, 40, 0) === 0 && L.mattAward(10, 50, 40, 0) === 0, 'never negative');
-ok(L.mattAward(10, 0, 12, 0) === 10 && L.mattAward(10, 10, 12, 0) === 2, 'a test-sized cap (RK_MATT_DAY 12): the second win pays 2');
+ok(L.mattAward(10, 0, 12, 0) === 10 && L.mattAward(10, 10, 12, 0) === 2, 'a test-sized cap (MATT_DAY 12): the second win pays 2');
 
 console.log(fails ? `FAIL ${fails}` : 'PASS'); process.exit(fails ? 1 : 0);
