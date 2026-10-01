@@ -68,7 +68,7 @@ await pg.goto(url(), { waitUntil: 'domcontentloaded' }); await sleep(2200);
 let s = await state(pg);
 ok(s.mobile && s.screen === 'screen-lobby' && s.view === 'home', `a phone skips the title for the lobby's home (${J({ mobile: s.mobile, screen: s.screen, view: s.view })})`);
 ok(s.card && !s.back && s.title === 'Poddle' && !s.nameRow, `the paddle-code card shows; no Back, the header says Poddle, no name row (${J({ card: s.card, back: s.back, title: s.title, nameRow: s.nameRow })})`);
-ok(J(s.tiles) === J(['btn-friends', 'btn-courts', 'btn-profile', 'btn-leaderboard']) && s.n === '4', `tiles: Friends, Watch a match, Your stats, Leaderboard; no Quick play or Play a bot; data-n counts them (${J(s.tiles)} n=${s.n})`);
+ok(J(s.tiles) === J(['btn-courts', 'btn-friends', 'btn-profile', 'btn-leaderboard']) && s.n === '4', `tiles: Watch a match, Friends, Your stats, Leaderboard; no Quick play or Play a bot; data-n counts them (${J(s.tiles)} n=${s.n})`);
 ok(!s.sideways, 'portrait: no sideways scroll');
 await pg.screenshot({ path: path.join(SHOTS, 'mobile-home.png') });
 { const b = await ev(pg, () => { const r = document.getElementById('m-pad').getBoundingClientRect(), t = document.getElementById('btn-leaderboard').getBoundingClientRect(); return { l: r.left, r: innerWidth - r.right, bottom: t.bottom, h: innerHeight }; });
@@ -145,7 +145,7 @@ for (const [tag, o, q] of [['ipad', { w: 820, h: 1180, ua: IPAD }, ''], ['deskto
   s = await state(pg);
   ok(!s.mobile && s.screen === 'screen-title', `${tag}: the title and Play as before, no phone home (${J({ mobile: s.mobile, screen: s.screen })})`);
   if (tag === 'desktop') { await pg.click('#btn-start'); await sleep(900); s = await state(pg);
-    ok(J(s.tiles) === J(['btn-quick', 'btn-friends', 'btn-courts', 'btn-bot', 'btn-profile', 'btn-leaderboard']) && !s.card && s.title === 'Play', `desktop lobby: Quick play on top, then Friends, Courts, Play a bot, Your stats, Leaderboard (docs/MENU.md), no paddle card, "Play" (${J(s.tiles)} ${s.title})`); }
+    ok(J(s.tiles) === J(['btn-quick', 'btn-courts', 'btn-bot', 'btn-friends', 'btn-profile', 'btn-leaderboard']) && !s.card && s.title === 'Play', `desktop lobby: Quick play, Courts, Play a bot over Friends, Your stats, Leaderboard (NOTES 160), no paddle card, "Play" (${J(s.tiles)} ${s.title})`); }
   await pg.close();
 }
 

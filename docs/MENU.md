@@ -1,5 +1,7 @@
 # Poddle main menu: one panel, Quick play on top, five flat rows
 
+> SUPERSEDED 2026-10-01 (NOTES 160): the owner found the one-panel rows menu ugly and wanted the big playful blocks back. The home is tiles again, in a new arrangement; this spec is kept for the record only.
+
 Written 2026-10-01 on branch `menu-rework` (main `3953ee1`). The owner: "i dont think the big buttons / the layout of them works
 very nice anymore. would like to see something cleaner". Four prototypes were judged (rows 77, bar 71, launcher 69, twopane 54);
 this file is the implementation spec for the winner, "rows", with the judges' grafts folded in. Prototype and shots:

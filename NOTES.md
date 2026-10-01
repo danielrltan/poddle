@@ -3460,3 +3460,24 @@ no caption that repeats its label, no sentence explaining how something works.
   (Part B3), ui-shots/verify.mjs 5 (court list heights).
 - Not in this change (owner's call): a one-line rank + trophies under Your stats for an account (the two-pane idea); the title
   screen is untouched. No legal-page change: nothing new is stored, sent or shown.
+
+## 160. The home is big blocks again, rearranged (the rows menu of 159 is gone)
+
+The owner on the rows menu of NOTES 159 (2026-10-01): "the main menu is really ugly, i actually like the big blocks buttons before as it
+was more playful. surely you can think of something nicer? if not, revert it." So 2281abd's web and test changes are reverted (docs/MENU.md
+stays with a superseded banner) and the tiles come back in a new arrangement that answers his first complaint (the old 2-over-4 grid with
+two equal white heroes did not "work very nice anymore"):
+
+- Two rows on a 12-column grid (`.tiles:is([data-n="5"],[data-n="6"])`, ui.css). Row one is how you play: Quick play (the only `.is-hero`,
+  half the row, 13rem tall) beside Courts and Play a bot (`.is-play`, icon over label). Row two is the rest as three equal bars: Friends,
+  Your stats, Leaderboard (two bars when Friends does not show). DOM order = reading order = arrow order: Quick play, Courts, Play a bot,
+  Friends, Your stats, Leaderboard. Friends is no longer a hero (NOTES 150 had Friends | Quick play).
+- Quick play is the one filled block: the player's blue with white art. Every other block is white with its own accent (a local `--line`:
+  Courts green, Play a bot orange, Friends purple, Your stats the blue, Leaderboard gold) on the icon detail, the hover ring and the glow
+  (`.tile{--glow}` is built from `--line`).
+- Upright windows: Quick play the full width, then bars two by two, Friends the full width between them. Under 480px: one column, Quick
+  play first. A phone (html[data-mobile], data-n 1..4) is untouched apart from the order: Watch a match, Friends, Your stats, Leaderboard.
+- The name pill sits over the blocks again, as before 159. Nothing in main.js, profile.js or social.js changed; no data flow changed, so
+  the legal pages are untouched.
+- Tests: ui-next, menu, profile-ui, social-ui and mobile-ui pin the new order and row shapes (3,3 / 3,2 landscape; 1,2,1,2 / 1,2,2 upright;
+  one column on a phone-width window). Pre-existing reds unchanged: ui-next 8, menu.mjs 7.

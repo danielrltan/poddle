@@ -512,9 +512,7 @@ export const playerName = () => lockedName || cleanName(($('name-input') || {}).
 export function lockName(name) {                           // name: the username, or null to give the fields back (the typed guest name, which was never overwritten)
   lockedName = typeof name === 'string' ? name.slice(0, 12) : '';
   for (const id of ['name-input', 'set-name-input']) { const el = $(id); if (el) { el.readOnly = !!lockedName; el.value = lockedName || savedName; } }
-  show('btn-name-change', !!lockedName); show('btn-set-name-change', !!lockedName);
-  $('screen-lobby')?.classList.toggle('is-acct', !!lockedName);      // the home's name cap goes for an account (docs/MENU.md 4.2: the username is the header button); the row still shows on Courts / Create / Play a bot
-  nameGate();
+  show('btn-name-change', !!lockedName); show('btn-set-name-change', !!lockedName); nameGate();
 }
 function keepName(from) {                                  // typing in one field shows in the other; an empty name is never stored
   if (lockedName) return;
@@ -792,8 +790,8 @@ const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
 const viewFocus = () => ({ home: mobile ? $('btn-courts') : $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || (mobile ? $('btn-courts') : $('btn-quick')));
 const friendsFocus = () => { const v = $('lobby-friends'), q = v?.querySelector('.fr-q'); return vis(q) && matchMedia('(pointer: fine)').matches ? q : [...(v?.querySelectorAll('button, input') || [])].find(vis) || v; };      // a mouse: the search. A finger: the first button, so no keyboard pops up
-// The home list: how many entries show (Friends, Your stats and Leaderboard only where the server keeps stats), written to .tiles[data-n] for the tests (docs/MENU.md: every count is one
-// column, no CSS reads it any more). Called on every view change and by web/profile.js when it shows or hides an entry
+// The home tiles: how many show (Friends, Your stats and Leaderboard only where the server keeps stats) decides the layout, through .tiles[data-n] (ui.css). Never :has(nth-child): a hidden
+// tile in DOM slot 2 would make the visible fourth the 4th child. Called on every view change and by web/profile.js when it shows or hides a tile
 export function tilesFit() { const t = $('lobby-home')?.querySelector('.tiles'); if (!t) return 0; const n = t.querySelectorAll(mobile ? '.tile:not([hidden]):not(.desk-only)' : '.tile:not([hidden])').length; if (t.dataset.n !== String(n)) t.dataset.n = String(n); return n; }      // a phone never counts the tiles it hides (Quick play, Play a bot)
 // The list scrolls when it is full, and macOS hides scrollbars until you already know to scroll. So the bar is ours: a
 // track and a thumb that are always drawn while there is more to see, sized from the list's own scroll numbers. Drag it or wheel.
@@ -1020,7 +1018,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   $('m-pad')?.addEventListener('submit', e => { e.preventDefault(); const c = padClean(padIn.value);
     if (c.length !== 4) { $('m-pad-err').textContent = 'Paddle codes are P- and 4 letters or numbers.'; restart($('m-pad-field'), 'is-error'); return; }
     padIn.blur(); location.assign('/pad.html?k=' + c); });
-  // arrows walk the home list, DOM order (Tab works too)
+  // arrows walk the three tiles (Tab works too)
   $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
     const nav = [...$('lobby-home').querySelectorAll('[data-nav]:not([hidden])')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });      // hidden tiles (Your stats on localhost) are not in the ring: focus() on one is a no-op
 }

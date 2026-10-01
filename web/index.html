@@ -314,9 +314,11 @@
 
     <div class="name-row" id="name-row" data-fit><label for="name-input">Name</label><input class="field" id="name-input" maxlength="12" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done"><button class="btn btn-sm is-tall" id="btn-name-change" hidden>Change</button></div>
 
+    <!-- The home tiles (NOTES 160): big blocks in two rows. Ways to play on top (Quick play, the one blue hero, then Courts and Play a bot), the rest under them (Friends, Your stats, Leaderboard), each with its own accent colour. The layout is keyed on
+         .tiles[data-n] written by ui.tilesFit() from the visible count, never on :has(nth-child): Friends, Your stats and Leaderboard show only where the server keeps stats -->
     <div class="lobby-view lobby-home" id="lobby-home" data-view="home">
       <!-- A phone's home (NOTES 149): a phone cannot be the screen and the paddle at once, so here it is only ever the paddle. The code the computer shows
-           opens /pad.html?k=CODE (ui.js); the list below keeps what a phone can do: watch, stats, the leaderboard, friends. Hidden off a phone (ui.css .m-only) -->
+           opens /pad.html?k=CODE (ui.js); the tiles below keep what a phone can do: watch, stats, the leaderboard, friends. Hidden off a phone (ui.css .m-only) -->
       <form class="panel m-pad m-only" id="m-pad" autocomplete="off" aria-labelledby="m-pad-h" data-fit>
         <svg class="m-pad-art" viewBox="0 0 48 48" aria-hidden="true"><rect x="14" y="4" width="20" height="36" rx="5" class="art-fill"/><path class="art-line" d="M21 9h6"/><path class="art-accent" d="M40 12a14 14 0 0 1 0 16M8 12a14 14 0 0 0 0 16"/></svg>
         <h2 id="m-pad-h">Be the paddle</h2>
@@ -326,28 +328,27 @@
         <p class="code-err m-pad-err" id="m-pad-err" role="alert"></p>
       </form>
       <h2 class="caps m-only m-more">On this phone</h2>
-      <!-- The home list (docs/MENU.md): Quick play, the one primary, over five flat rows in one panel. DOM order = arrow order (ui.js, the [data-nav] ring).
-           "tile" is a marker for ui.tilesFit / nameGate / the dim rules and the tests; the layout classes are hm-list, hm-primary, hm-row.
-           Friends, Your stats and Leaderboard show only where the server keeps stats (web/profile.js drawAcct); a phone hides Quick play and Play a bot (.desk-only) -->
-      <div class="tiles hm-list" data-fit>
-        <button class="btn tile hm-primary is-hero desk-only" id="btn-quick" data-nav>
+      <div class="tiles" data-fit>
+        <button class="tile is-hero desk-only" id="btn-quick" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><circle class="art-fill" cx="48" cy="48" r="34" style="stroke-width:4.5"/><path class="art-accent-fill" d="M40 33 66 48 40 63Z"/></svg>
           <b>Quick play</b></button>
-        <!-- Friends (docs/SOCIAL.md 6): its line says who is online (web/social.js entry), the chip counts requests -->
-        <button class="tile hm-row" id="btn-friends" data-nav hidden>
-          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M47 80c1.5-15 10-22 22-22s20.5 7 22 22Z"/><circle cx="69" cy="40" r="12.5"/><path d="M5 82c2-18 12.5-26 27-26s25 8 27 26Z"/><circle cx="32" cy="35" r="15.5"/></g><path class="art-accent" d="M77 9v15M69.5 16.5h15" style="stroke-width:5.5"/></svg>
-          <b>Friends</b><small class="tile-line" id="friends-line"><i class="fr-dot" id="friends-dot" hidden></i><span id="friends-line-text">Sign in to add friends</span></small><small class="tile-sub is-off" id="friends-n"></small></button>
-        <button class="tile hm-row" id="btn-courts" data-nav>
+        <button class="tile is-play" id="btn-courts" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill" x="12" y="18" width="58" height="60" rx="10" style="stroke-width:4.5"/><path class="art-line" d="M12 48h58M41 18v60" style="stroke-width:3"/><circle cx="63" cy="59" r="13" style="fill:#fff;stroke:var(--line);stroke-width:6.5"/><path class="art-accent" d="m73 69 11 11" style="stroke-width:7"/></svg>
           <b>Courts</b><small class="tile-sub is-off" id="courts-n"></small></button>
-        <button class="tile hm-row desk-only" id="btn-bot" data-nav>
+        <button class="tile is-play desk-only" id="btn-bot" data-nav>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M20 82c2-19 13-27 28-27s26 8 28 27Z"/><circle cx="48" cy="33" r="17"/></g><g class="art-accent" style="stroke-width:5"><path d="M41 34v3M55 34v3"/></g><path class="art-accent" d="M42 69h12" style="stroke-width:6"/></svg>
           <b>Play a bot</b></button>
-        <button class="tile hm-row" id="btn-profile" data-nav hidden>
+        <!-- Friends (docs/SOCIAL.md 6): two people and a plus. First of the lower row (NOTES 160): its line says who is online, the corner badge counts requests (web/social.js draws both).
+             Shows where accounts are on (sign-in AND the database), like the leaderboard: a guest sees it too, with Sign in to add friends -->
+        <button class="tile" id="btn-friends" data-nav hidden>
+          <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><path d="M47 80c1.5-15 10-22 22-22s20.5 7 22 22Z"/><circle cx="69" cy="40" r="12.5"/><path d="M5 82c2-18 12.5-26 27-26s25 8 27 26Z"/><circle cx="32" cy="35" r="15.5"/></g><path class="art-accent" d="M77 9v15M69.5 16.5h15" style="stroke-width:5.5"/></svg>
+          <span class="tile-text"><b>Friends</b><small class="tile-line" id="friends-line"><i class="fr-dot" id="friends-dot" hidden></i><span id="friends-line-text">Sign in to add friends</span></small></span>
+          <small class="tile-sub is-off" id="friends-n"></small></button>
+        <button class="tile" id="btn-profile" data-nav hidden>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="14" y="52" width="18" height="28" rx="5"/><rect x="39" y="34" width="18" height="46" rx="5"/><rect x="64" y="44" width="18" height="36" rx="5"/></g><path class="art-accent" d="m43 17 5 5 9-10" style="stroke-width:5.5"/></svg>
           <b>Your stats</b></button>
-        <!-- Leaderboard (NOTES 126): the global boards. Shows where the server keeps stats, like Your stats -->
-        <button class="tile hm-row" id="btn-leaderboard" data-nav hidden>
+        <!-- Leaderboard (NOTES 126): the global boards. A podium with a star over the top step. Shows where the server keeps stats, like Your stats -->
+        <button class="tile" id="btn-leaderboard" data-nav hidden>
           <svg viewBox="0 0 96 96" aria-hidden="true"><g class="art-fill" style="stroke-width:4.5"><rect x="35" y="40" width="26" height="42" rx="4"/><rect x="10" y="56" width="25" height="26" rx="4"/><rect x="61" y="64" width="25" height="18" rx="4"/></g><path class="art-accent-fill" d="M48 10l4.1 7.6 8.5 1.5-6 6.2 1.2 8.5L48 30.1l-7.8 3.7 1.2-8.5-6-6.2 8.5-1.5Z"/></svg>
           <b>Leaderboard</b></button>
       </div>

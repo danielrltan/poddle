@@ -108,14 +108,14 @@ ok(!t.some(x => /sent you a friend request/.test(x)), `the first snapshot after 
 ok(!t.some(x => /^New\b|add friends and see/i.test(x)) && r.seen === null, `no feature-announcement toast on the home screen (NOTES 147), and no poddle.friendsSeen key (${J(t)}, ${r.seen})`);
 ok(socks.some(s => s.frames.some(f => f.type === 'hello')), 'the socket said hello (the device id was there)');
 await shot(pg, 'home-desktop');
-// six entries are one column at every size (docs/MENU.md: Quick play over five rows in one panel): never wider than the window, no label or Friends line cut
+// six tiles lay out as 2 over 4 (landscape), 2 / 2 / 2 (portrait) or one column (phone): never a lone straggler, never wider than the window
 { const SIZES = [[1920, 1080], [1440, 900], [1280, 720], [1024, 768], [900, 700], [760, 600], [1366, 500], [700, 900], [600, 900], [390, 844]], bad = [];
   for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250);
     const x = await ev(pg, () => { const ts = [...document.querySelectorAll('#lobby-home .tile')].filter(e => !e.hidden), m = new Map(); for (const e of ts) m.set(e.offsetTop, (m.get(e.offsetTop) || 0) + 1);
       const cut = [...document.querySelectorAll('#lobby-home .tile b, #friends-line-text')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
       return { rows: [...m.values()].join(), over: document.querySelector('#lobby-home .tiles').scrollWidth > innerWidth, cut }; });
-    if (x.rows !== '1,1,1,1,1,1' || x.over || x.cut.length) bad.push(`${w}x${h}: ${J(x)}`); }
-  ok(!bad.length, `home list: one column of six at ${SIZES.length} sizes, no label cut${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
+    if (!['3,3', '1,2,1,2', '1,1,1,1,1,1'].includes(x.rows) || x.over || x.cut.length) bad.push(`${w}x${h}: ${J(x)}`); }
+  ok(!bad.length, `home tiles (NOTES 160): 3 over 3, hero / 2 / Friends / 2 or one column at ${SIZES.length} sizes, no label cut${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 await pg.setViewport(PHONE); await sleep(300); await shot(pg, 'home-phone'); await pg.setViewport(DESK); await sleep(300);
 
 // the view: /friends in the address bar; requests, friends online first with their words, sent
