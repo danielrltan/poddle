@@ -145,7 +145,7 @@ for (const [tag, o, q] of [['ipad', { w: 820, h: 1180, ua: IPAD }, ''], ['deskto
   s = await state(pg);
   ok(!s.mobile && s.screen === 'screen-title', `${tag}: the title and Play as before, no phone home (${J({ mobile: s.mobile, screen: s.screen })})`);
   if (tag === 'desktop') { await pg.click('#btn-start'); await sleep(900); s = await state(pg);
-    ok(J(s.tiles) === J(['btn-friends', 'btn-quick', 'btn-courts', 'btn-bot', 'btn-profile', 'btn-leaderboard']) && !s.card && s.title === 'Play', `desktop lobby: Friends | Quick play (NOTES 150, docs/TROPHIES.md 4), Play a bot, no paddle card, "Play" (${J(s.tiles)} ${s.title})`); }
+    ok(J(s.tiles) === J(['btn-quick', 'btn-friends', 'btn-courts', 'btn-bot', 'btn-profile', 'btn-leaderboard']) && !s.card && s.title === 'Play', `desktop lobby: Quick play on top, then Friends, Courts, Play a bot, Your stats, Leaderboard (docs/MENU.md), no paddle card, "Play" (${J(s.tiles)} ${s.title})`); }
   await pg.close();
 }
 

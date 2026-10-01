@@ -3432,3 +3432,31 @@ no caption that repeats its label, no sentence explaining how something works.
 - Tests: profile-ui.mjs, ui-next.mjs and menu.mjs pin the absence (no #st-keep, no #st-people-hint, no chips or captions on empty tiles,
   the streak ribbon's text is the number alone, the tooltip carries who and best). profile-ui 85/85; ui-next keeps its 8 pre-existing
   fails (settings rows, Sound output, Tab order, hostile name, at two sizes); mobile-ui passes.
+
+## 159. The main menu is one panel: Quick play on top, five flat rows (docs/MENU.md)
+- The owner (2026-10-01): "do a main menu ui / ux rework? i dont think the big buttons / the layout of them works very nice anymore.
+  would like to see something cleaner." Four prototypes were built from different angles and scored by three judges (a 34rem panel of
+  rows 77, a hero pill over a row of small pills 71, a left-aligned launcher list 69, a two-pane Play / You split 54; the prototypes and
+  their shots live in the session's scratchpad, menu/protos); the rows design won on every lens, with grafts from the others.
+- What changed (web/index.html #lobby-home, web/ui.css, web/ui.js). The six glossy tiles (two hero cards over four squat utilities,
+  `.tiles[data-n]` grids) are gone. The home is ONE 34rem panel (`.hm-list`, the `.panel-narrow` width) centred over the court on the
+  same axis as the title's Play: for a guest the name as the panel's flat top cap (caps NAME, a borderless field; `.is-acct` set in
+  `lockName()` hides it for an account, whose username is already the header's button, NOTES 151); Quick play as a full-width 5rem
+  `.btn` pill in the title's Play material, the one blue-bordered thing on the page; then five flat rows (`.hm-row`: a 2.5rem icon, the
+  label, a quiet grey status at the right end, 1px hairlines between, no chevrons, no gloss, no corner badges): Friends (the friends
+  line, the request count as the one orange chip), Courts (8 open as grey text), Play a bot, Your stats, Leaderboard. Hover: a sky
+  tint and the row's contents step .25rem right; focus adds the inset ring; the deal-in is translate/opacity, off under reduced
+  motion. Panel and cap are white at .9 so the court no longer bands through. Order change: Quick play now leads and Friends is the
+  first row under it (NOTES 150 had Friends | Quick play as equal heroes). The phone home keeps its paddle card and lists the same
+  rows under it. Every id, data-nav, the `tile` marker class (ui.tilesFit, nameGate, the dim rules), the arrow ring (DOM order =
+  visual order) and Enter = Quick play on entry are kept, so main.js, profile.js and social.js are untouched.
+- Fit: 1366x600 with ~80 px to spare, 1280x720, 1440x900, 600x900 centred, 390x844; the ended-tournament notice now shares the
+  panel's width and radius. Review fixes in the same commit: the NAME cap label never below 12 px; the empty request chip takes no
+  width; the field keeps a fill and a focus ring so it reads as editable; the typed name sits on the rows' label column; the status
+  text transitions with the row; a downed lobby keeps its focus ring for keyboard users; `.is-bad` still colours the field.
+- Tests: menu.mjs, ui-next.mjs, profile-ui.mjs, mobile-ui.mjs, social-ui.mjs updated from the tile grids (row shapes, data-n) to the
+  panel (one column, order, the cap, the `lobby-acct` mock state); e2e's Enter = Quick play unchanged; test/ui-mock.html gained
+  `lobby-acct`. Pre-existing reds unchanged: ui-next 8 (settings rows, Sound output row, Tab order, hostile name x2), menu.mjs 7
+  (Part B3), ui-shots/verify.mjs 5 (court list heights).
+- Not in this change (owner's call): a one-line rank + trophies under Your stats for an account (the two-pane idea); the title
+  screen is untouched. No legal-page change: nothing new is stored, sent or shown.

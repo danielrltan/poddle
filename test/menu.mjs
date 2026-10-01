@@ -142,7 +142,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.close();
 }
 
-// Trophies (docs/TROPHIES.md 4): with a stats server (?acctest=1, the fake /api/me says db; sign-in off, so no Friends tile) the home has five tiles with one hero, and Your stats
+// Trophies (docs/TROPHIES.md 4, the home's shape docs/MENU.md): with a stats server (?acctest=1, the fake /api/me says db; sign-in off, so no Friends row) the home is one panel, Quick play over four rows, and Your stats
 // is the one trophy view: the crest, the rank and count, the line to the next step, the road of eight medals, the keep line; the crest opens the Ranks page and Back comes home to it
 for (const [w, h] of [[1280, 720], [600, 900]]) {
   const tag = `trophies ${w}x${h}`, pg = await open(tag, '&acctest=1', w, h); let s; got.length = 0; urls.length = 0;
@@ -151,7 +151,7 @@ for (const [w, h] of [[1280, 720], [600, 900]]) {
   await pg.click('#btn-start'); await sleep(900); s = await st(pg);
   const tiles = await pg.evaluate(() => { const ts = [...document.querySelectorAll('#lobby-home .tile:not([hidden])')], m = new Map(); for (const e of ts) m.set(e.offsetTop, (m.get(e.offsetTop) || 0) + 1);
     return { b: ts.map(b => b.querySelector('b').textContent.trim()), n: document.querySelector('#lobby-home .tiles').dataset.n, heroes: ts.filter(e => e.classList.contains('is-hero')).length, rows: [...m.values()].join(), gone: !document.getElementById('btn-ranked') && !document.getElementById('lobby-ranked') && !document.getElementById('rk-search'), venue: document.body.dataset.venue || null }; });
-  ok(tiles.b.join('|') === 'Quick play|Courts|Play a bot|Your stats|Leaderboard' && tiles.n === '5' && tiles.heroes === 1 && (w > h ? tiles.rows === '1,4' : tiles.rows === '1,2,2') && s.focus === 'btn-quick', `${tag} five tiles in order, one hero over four, data-n=5, Quick play focused (${tiles.b.join(' | ')}, n=${tiles.n}, rows ${tiles.rows}, ${s.focus})`);
+  ok(tiles.b.join('|') === 'Quick play|Courts|Play a bot|Your stats|Leaderboard' && tiles.n === '5' && tiles.heroes === 1 && tiles.rows === '1,1,1,1,1' && s.focus === 'btn-quick', `${tag} five entries in order, one primary over four rows in one column (docs/MENU.md), data-n=5, Quick play focused (${tiles.b.join(' | ')}, n=${tiles.n}, rows ${tiles.rows}, ${s.focus})`);
   ok(tiles.gone && tiles.venue === null, `${tag} no Ranked tile, view or search bar in the markup, no venue on the body (docs/TROPHIES.md 2)`);
   await shot('11-home-five');
   await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-courts', `${tag} Right from Quick play is Courts`); await pg.keyboard.press('ArrowRight'); ok((await st(pg)).focus === 'btn-bot', `${tag} then Play a bot`);

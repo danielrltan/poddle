@@ -152,13 +152,13 @@ ok(r.on.ro && r.on.btn && !r.off.ro && !r.off.btn && !r.gone.length, `username: 
 await pg.close(); pg = await page('stats');      // a new tab: same browser storage (the id), no court to rejoin
 await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
 await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start'); await sleep(900);
-// signed out with a stats server (docs/TROPHIES.md 4): five tiles with ONE hero (Quick play) over a row of four, hero then 2 x 2 in portrait, or a single column: never a lone straggler
+// signed out with a stats server (docs/TROPHIES.md 4, docs/MENU.md): five entries in one column at every size, Quick play the one primary over four rows; never wider than the window
 const SIZES = [[1920, 1080], [1280, 720], [1024, 768], [900, 700], [760, 600], [1366, 500], [700, 900], [600, 900], [390, 844]];
 const rows = () => ev(pg, () => { const t = [...document.querySelectorAll('#lobby-home .tile')].filter(e => !e.hidden).map(e => e.offsetTop), m = new Map();      // offsetTop: the focused or hovered tile is lifted by a transform
   for (const y of t) m.set(y, (m.get(y) || 0) + 1); return { n: t.length, rows: [...m.values()], over: document.querySelector('#lobby-home .tiles').scrollWidth > innerWidth, dn: document.querySelector('#lobby-home .tiles').dataset.n }; });
 { const bad = []; for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(250); const r = await rows();
-    if (r.n !== 5 || r.dn !== '5' || !['1,4', '1,2,2', '1,1,1,1,1'].includes(r.rows.join()) || r.over) bad.push(`${w}x${h}: ${J(r)}`); }
-  ok(!bad.length, `home tiles (docs/TROPHIES.md 4: five, signed out): one hero over 4, hero / 2 / 2 or one column at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
+    if (r.n !== 5 || r.dn !== '5' || r.rows.join() !== '1,1,1,1,1' || r.over) bad.push(`${w}x${h}: ${J(r)}`); }
+  ok(!bad.length, `home list (docs/MENU.md: five, signed out): one column of five at ${SIZES.length} window sizes${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 await pg.setViewport({ width: 1280, height: 720 }); await sleep(250);
 r = await ev(pg, () => ({ tile: !document.getElementById('btn-profile').hidden, none: !document.getElementById('btn-ranked') && !document.getElementById('lobby-ranked'), noRow: !document.getElementById('btn-set-ranked') }));
 ok(r.tile && r.none && r.noRow, `with a database the Your stats tile shows; no Ranked tile, view or Settings row (docs/TROPHIES.md 2) (tile ${r.tile}, none ${r.none}, no row ${r.noRow})`);

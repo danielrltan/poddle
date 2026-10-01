@@ -106,7 +106,7 @@ deploy.
   before or after `matchover`: park it like `rkRes` was parked (main.js:184, 413-422) and draw it once the `match` overlay is up.
   Check the card still fits at 1280x720 and 1366x600 (the `.result-card.is-rk` vertical budget, ui.css:1944-1948, becomes the
   ordinary card's when a trophy row is present: use a class like `.has-trophies`).
-- **Home**: tiles are Friends, Quick play (heroes) + Courts, Play a bot, Your stats, Leaderboard. Signed in with the stats server:
+- **Home** (SUPERSEDED 2026-10-01 by docs/MENU.md: one panel, Quick play on top, five flat rows; the tile grids below are history): tiles are Friends, Quick play (heroes) + Courts, Play a bot, Your stats, Leaderboard. Signed in with the stats server:
   6 tiles = the existing `data-n="6"` layout. Signed out with the stats server: 5 tiles with ONE hero: add a `[data-n="5"]` rule
   where Quick play spans the full hero row and the four utilities sit in one row of four (portrait: hero full width, 2x2 under it;
   phone: unchanged one column). Remove the old two-hero n=5 rule. `tilesFit` unchanged. Arrow order = DOM order.

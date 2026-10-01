@@ -564,7 +564,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .lobby-down{animation:hm-hang 420ms var(--ease-bounce) backwards} @keyframes hm-hang{from{opacity:0;transform:translateY(-1.25rem) scale(.9)}}      /* hangs down from the header */
 
 /* views: one at a time */
-#screen-lobby .menu-body{justify-content:flex-start} #screen-lobby .lobby-view:not(.lobby-home){margin:auto 0}      /* the name row sits at the same spot on every view (it used to ride up and down with each panel's height); a panel centres in the space under it */
+#screen-lobby .menu-body{justify-content:flex-start} #screen-lobby .lobby-view:not(.lobby-home){margin:auto 0}      /* the name row sits at the same spot on every view but the home (there it is the panel's cap, docs/MENU.md); a panel centres in the space under it */
 #screen-lobby .lobby-view{animation:hm-view-in 380ms var(--ease-out) backwards}      /* backwards, not both: nothing is held afterwards, so the busy dim below works */
 #screen-lobby[data-dir="fwd"] .lobby-view{animation-name:hm-view-fwd} #screen-lobby[data-dir="back"] .lobby-view{animation-name:hm-view-back}      /* deeper views come in from the right, Back brings the last one in from the left (ui.js lobbyView) */
 #screen-lobby #lobby-home{animation:hm-fade var(--d-med) var(--ease-soft) backwards}      /* the home view's tiles deal themselves in: the container only fades */
@@ -576,7 +576,6 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 #screen-lobby.is-down .tile,#screen-lobby.is-down .room-row,#screen-lobby.is-down .room-watch,#screen-lobby.is-down #btn-create-go,#screen-lobby.is-down #btn-join,#screen-lobby.is-down #btn-watch-code,#screen-lobby.is-down #btn-create,#screen-lobby.is-down #btn-tour,#screen-lobby.is-down .bot-levels .btn{pointer-events:none;opacity:.5}
 /* first visit, no name yet: the choices are dimmed but still take the click, which sends the player to the name field */
 #screen-lobby.needs-name .tile,#screen-lobby.needs-name .room-row,#screen-lobby.needs-name .room-watch,#screen-lobby.needs-name #btn-create-go,#screen-lobby.needs-name #btn-create,#screen-lobby.needs-name #btn-join,#screen-lobby.needs-name #btn-watch-code,#screen-lobby.needs-name .court-state .btn,#screen-lobby.needs-name .bot-levels .btn{opacity:.5}
-#screen-lobby.needs-name .tile:hover,#screen-lobby.needs-name .tile:focus-visible{transform:none;rotate:none;background-position:100% 0,0 0;border-color:rgba(255,255,255,.9)} #screen-lobby.needs-name .tile::after{display:none}
 
 /* name: one field above every lobby view but the share card. Also the look of the name field in the settings panel (.field) */
 .name-row{flex:none;display:flex;align-items:center;gap:var(--s-3);padding:var(--s-2) var(--s-2) var(--s-2) 1.5rem;border-radius:var(--r-pill);background:rgba(255,255,255,.72);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1);position:relative;transition:background-color var(--d-med) var(--ease-soft), border-color var(--d-med) var(--ease-soft)}
@@ -603,45 +602,67 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 #screen-lobby.is-asking .lobby-view,#screen-lobby.is-asking .name-row{filter:saturate(.7)}
 
 /* the four big tiles */
-.tiles{display:flex;flex-wrap:wrap;gap:var(--s-5);justify-content:center}
-.tile{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-3);width:17rem;height:14.5rem;padding:0;border-radius:var(--r-xl);
-  border:.25rem solid rgba(255,255,255,.9);background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.95) 50%,transparent 60%) 100% 0/250% 100% no-repeat, linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);color:var(--ink-strong);font:800 var(--t-xl)/1.1 var(--font);letter-spacing:.02em;
-  box-shadow:var(--sh-3), inset 0 0 0 .1875rem #fff;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 0s}      /* layer 1 is a sheen parked off the left edge; it snaps back unseen (0s) */
-.tile::before{content:"";position:absolute;inset:.375rem .375rem auto;height:46%;border-radius:calc(var(--r-xl) - .5rem) calc(var(--r-xl) - .5rem) 50% 50% / calc(var(--r-xl) - .5rem) calc(var(--r-xl) - .5rem) 1.25rem 1.25rem;background:linear-gradient(180deg,#fff,rgba(255,255,255,.4));pointer-events:none;z-index:-1}
-.tile::after{content:"";position:absolute;inset:-.25rem;border-radius:inherit;box-shadow:var(--glow), 0 1.25rem 1.75rem -.5rem rgba(40,80,110,.30);opacity:0;pointer-events:none;transition:opacity var(--d-med) var(--ease-soft)}      /* the halo carries a deeper drop shadow: the lift's shadow grows by opacity alone, never an animated box-shadow */
-.tile svg{width:6.5rem;height:6.5rem}
-.tile b{font-weight:800}
-.tile:hover,.tile:focus-visible{border-color:var(--line)}       /* the outline blue marks the ONE selected tile, as on a console menu; the rest are plain white */
-.tile:focus-visible{transform:translateY(-.25rem) scale(1.03);background-position:0 0,0 0;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 750ms var(--ease-soft)} .tile:focus-visible::after{opacity:1;animation:glow-pulse var(--d-pulse) var(--ease-soft) infinite}
-@media (hover:hover){ .tile:hover{transform:translateY(-.4375rem) scale(1.035);rotate:-.6deg;background-position:0 0,0 0;transition:transform 260ms var(--ease-bounce), rotate 260ms var(--ease-bounce), opacity var(--d-med) var(--ease-soft), background-position 750ms var(--ease-soft)} .tile:nth-child(2):hover{rotate:.6deg} .tile:hover::after{opacity:.75} }      /* lifts, tips a touch and a light runs across it. Before :active, or the lift beats the press */
-.tile:active,.tile:nth-child(n):active{transform:scale(.96);rotate:none;background:linear-gradient(180deg,#e4f3fa,#d3ebf6);transition-duration:90ms}      /* the press goes in fast; the 260ms spring plays on release */
-.tile svg{transition:scale var(--d-fast) var(--ease-bounce)} .tile:active svg{scale:.9}      /* the icon squashes under the thumb */
-.tile{animation:hm-tile 560ms var(--ease-bounce) backwards} .tile:nth-child(2){animation-delay:70ms} .tile:nth-child(3){animation-delay:140ms} .tile:nth-child(4){animation-delay:210ms}      /* dealt out left to right, a little springy. Individual properties with backwards fill: nothing is held, hover and focus still apply */
-.tile:nth-child(5){animation-delay:280ms} .tile:nth-child(6){animation-delay:350ms} .tile:nth-child(7){animation-delay:420ms}
-@media (max-width:480px){ #btn-quick{order:-1} }      /* the heroes read Friends | Quick play in a row (NOTES 150); stacked on a phone, Quick play stays on top */
-@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="4"]{display:grid;grid-template-columns:repeat(2,17rem)} }      /* four tiles need 72.5rem + the body's 6rem padding: under 785px the rem sits at its 10px floor and a plain wrap would leave three and a lone fourth, so 2x2 */
-@keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}
-/* Five entries (docs/TROPHIES.md 4: signed out, with a stats server): ONE hero, Quick play, spanning the row (art left of the label), over a row of four utilities (Courts, Play a bot,
-   Your stats, Leaderboard: icon over the label, as six has them). The count is .tiles[data-n], written by ui.tilesFit() from the visible tiles: Friends, Your stats and Leaderboard only
-   show where the server keeps stats, so a positional :has(nth-child) would count a hidden slot. 20rem tall in all: fits 1366x500 at the 10px floor and 1280x720 */
-.tiles[data-n="5"]{display:grid;grid-template-columns:repeat(4,1fr);width:min(58rem,92vw);gap:var(--s-4)}
-.tiles[data-n="5"] .tile{width:auto}
-.tiles[data-n="5"] .tile.is-hero{grid-column:1 / -1;height:10.5rem;flex-direction:row;justify-content:center;text-align:left;padding:0 var(--s-5);gap:var(--s-5)}
-.tiles[data-n="5"] .tile:not(.is-hero){grid-column:span 1;height:8.75rem;padding:0 var(--s-2);gap:var(--s-2);font-size:var(--t-lg)}
-.tiles[data-n="5"] .tile svg{width:5.5rem;height:5.5rem} .tiles[data-n="5"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
-.tiles[data-n="5"] .tile.is-hero b{font-size:var(--t-2xl)}
-.tile-text{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;min-width:0}      /* Friends: the label with its line under it. In a column layout both centre */
+/* ===== THE HOME (docs/MENU.md): one panel. The name row is the panel's cap for a guest; Quick play is the one primary; five flat rows under it.
+   Every entry keeps class "tile" as a bare marker (ui.tilesFit, nameGate, the dim rules above, the tests); the layout classes are .hm-list, .hm-primary, .hm-row. .tiles[data-n] is written for the tests only ===== */
+.hm-list{display:flex;flex-direction:column;align-items:stretch;gap:0;width:min(34rem,92vw);padding:var(--s-3);border-radius:var(--r-lg);
+  background:rgba(255,255,255,.9);border:.125rem solid rgba(255,255,255,.9);box-shadow:var(--sh-1)}      /* .9: the court's colour bands must not stripe the rows (the old .72 name row did) */
+#screen-lobby[data-view="home"] .menu-body{justify-content:safe center;gap:0}      /* the cap and the panel centre as one group (the other views keep the flex-start above) */
+#screen-lobby[data-view="home"] .lobby-home{flex:none}
+#screen-lobby[data-view="home"] .tour-ended{width:min(34rem,92vw);border-radius:var(--r-lg);margin-bottom:var(--s-5)}      /* the ended-tournament notice sits over the panel, in the same group: the panel's width and corner, so the two read as one column */
+/* the cap: the name row restyled as the panel's flat top bar. Only on the home, only for a guest (.is-acct hides it: an account's username is the header button) */
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row{width:min(34rem,92vw);min-height:max(3.75rem,44px);padding:0 1.75rem 0 var(--s-5);gap:var(--s-1);
+  border-radius:var(--r-lg) var(--r-lg) 0 0;border-bottom:0;background:rgba(255,255,255,.9);box-shadow:none;transition:none}      /* the rows' side padding plus the panel's .75rem; the bar is the panel's surface in every state (hover and focus light the field, below) */
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row label{flex:none;min-width:2.5rem;font-size:max(.75rem,12px)}      /* the label sits in the rows' icon column (2.5rem; the .25rem gap and the field's .75rem padding make up the rows' 1rem gap), so the typed name starts on the row labels' column, within .3rem at 1280 wide and up. Below that the 12px floor makes the label wider than the column and the name sits about 1rem right of the labels. .75rem (the capsule's label is --t-xs): the same 12px floor the rest of the panel keeps, and room for the field's ring beside the E */
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row .field{flex:1;width:auto;height:auto;min-height:max(3rem,40px);padding:0 var(--s-3);border:0;border-radius:var(--r-md);
+  background:none;box-shadow:inset 0 0 0 1px rgba(85,94,103,.14);font-size:max(var(--t-lg),16px);transition:box-shadow var(--d-fast) linear, background-color var(--d-fast) linear}      /* the hairline ring (the rows' colour): something to type in, not a caption. 16px: iOS zooms on anything smaller */
+@media (hover:hover){ #screen-lobby[data-view="home"]:not(.is-acct) .name-row .field:hover{background:rgba(52,190,237,.08)} }      /* lights like a row under the mouse */
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row .field:focus{box-shadow:inset 0 0 0 .1875rem var(--line)}      /* the one blue ring, as a focused row has */
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row:not([hidden]) + .lobby-home .hm-list{border-radius:0 0 var(--r-lg) var(--r-lg);border-top:0;padding-top:0}      /* the panel joins the cap */
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row:not([hidden]) + .lobby-home .hm-primary{margin-top:var(--s-1)}
+#screen-lobby.is-acct[data-view="home"] .name-row{display:none}      /* signed in: no cap. Change is on Your stats (#btn-pf-rename) */
+#screen-lobby.is-acct[data-view="home"] .hm-list{padding-top:var(--s-4);border-radius:var(--r-xl) var(--r-xl) var(--r-lg) var(--r-lg)}      /* no cap: Quick play's pill ends get the panel's larger corner and the room the cap gave them, so the pill is not wedged into the top corners */
+/* first visit: the cap stays joined (no capsule floating off the panel); the field is the one thing to do and breathes until it is in use */
+#screen-lobby.needs-name[data-view="home"] .name-row{border-color:rgba(255,255,255,.9)}      /* the capsule rule above would turn the bar's border blue (and the bar white, a step off the panel); here the blue is the field's */
+#screen-lobby.needs-name[data-view="home"] .name-row::after{display:none}      /* the capsule's pulsing halo: off on the home */
+#screen-lobby.needs-name[data-view="home"] .name-row .field:not(:focus){box-shadow:inset 0 0 0 .1875rem var(--line), var(--glow);animation:field-breathe var(--d-pulse) var(--ease-soft) infinite}
+@keyframes field-breathe{50%{transform:scale(1.015)}}
+#screen-lobby[data-view="home"]:not(.is-acct) .name-row.is-bad .field,#screen-lobby[data-view="home"]:not(.is-acct) .name-row.is-bad .field:focus{box-shadow:inset 0 0 0 .1875rem var(--bad)}      /* needName (a click on a dimmed entry): the ring goes red with the nudge, as the capsule's border does on the other views */
+/* Quick play: a full-width .btn at the top of the panel, the title's Play material a size down (.btn-xl is 5.75rem / --t-2xl; this is 5rem / --t-xl with the same .25rem border) */
+.hm-primary{width:100%;min-width:0;height:5rem;min-height:44px;padding:0 var(--s-5);margin:0 0 var(--s-3);border-width:.25rem;font-size:var(--t-xl);font-weight:800;letter-spacing:.04em;gap:var(--s-3)}
+.hm-primary svg{width:2.5rem;height:2.5rem}      /* one icon size for the whole panel */
+.hm-primary::after{inset:-.25rem}
+@media (hover:hover){ .hm-list .btn:hover{scale:none} }      /* a full-width pill never grows past its panel: the halo (.btn::after) says hover */
+/* a row: icon, label, the status at the right end. A flat list item: no border, no gloss, a hairline to the row above */
+.hm-row{position:relative;display:flex;align-items:center;gap:var(--s-4);width:100%;min-height:max(4rem,44px);padding:0 var(--s-4) 0 var(--s-3);border:0;border-radius:var(--r-md);
+  background:none;color:var(--ink-strong);font:800 var(--t-lg)/1.1 var(--font);letter-spacing:.02em;text-align:left;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;
+  transition:background-color var(--d-fast) linear, transform var(--d-fast) var(--ease-bounce), opacity var(--d-med) var(--ease-soft)}
+.hm-row > *{transition:translate 220ms var(--ease-bounce)}      /* the lit row's contents step right; the row box, its tint and the hairlines stay put */
+.hm-row svg{flex:none;width:2.5rem;height:2.5rem;transition:translate 220ms var(--ease-bounce), scale var(--d-fast) var(--ease-bounce)}
+.hm-row > b{flex:1 1 auto;min-width:max-content;font-weight:800}      /* the label never clips; the status shrinks (ellipsis from .tile-line) */
+.hm-row:not([hidden]) ~ .hm-row::before{content:"";position:absolute;left:calc(2.5rem + var(--s-3) + var(--s-4));right:var(--s-4);top:-.5px;height:1px;background:rgba(85,94,103,.14);pointer-events:none}      /* a hairline under every row but the first SHOWN one (a hidden Friends row is still a sibling, so not "+"). 1px on purpose: a rem hairline bands at some roots */
+/* the status, inline at the row end: Friends' line (dot + social.js's words), Courts' 'N open', Friends' request count. Quiet grey; the request chip is the one colour */
 .tile-line{display:inline-flex;align-items:center;gap:.35em;max-width:100%;font-size:var(--t-sm);font-weight:700;letter-spacing:0;color:var(--ink-soft);white-space:nowrap} .tile-line > span:last-child{overflow:hidden;text-overflow:ellipsis}
-.tile:not(.is-hero) .tile-text,.tiles:not([data-n="5"]):not([data-n="6"]) .tile-text{align-items:center;text-align:center}
-@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="5"]{width:min(58rem,94vw)} .tiles[data-n="5"] .tile.is-hero{height:9rem} }
-/* Six entries (NOTES 126: + Leaderboard): the same hero row over FOUR utilities, each an icon over its label (four across are too narrow for icon-left) */
-.tiles[data-n="6"]{display:grid;grid-template-columns:repeat(4,1fr);width:min(58rem,92vw);gap:var(--s-4)}
-.tiles[data-n="6"] .tile{width:auto}
-.tiles[data-n="6"] .tile.is-hero{grid-column:span 2;height:12rem;flex-direction:row;justify-content:flex-start;text-align:left;padding:0 var(--s-5);gap:var(--s-4)}
-.tiles[data-n="6"] .tile:not(.is-hero){grid-column:span 1;height:8.75rem;padding:0 var(--s-2);gap:var(--s-2);font-size:var(--t-lg)}
-.tiles[data-n="6"] .tile svg{width:5rem;height:5rem} .tiles[data-n="6"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
-.tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}
-@media (min-aspect-ratio:1/1) and (max-width:784px){ .tiles[data-n="6"]{width:min(58rem,94vw)} .tiles[data-n="6"] .tile.is-hero{height:10.5rem} }
+.hm-row .tile-line{flex:0 1 auto;min-width:0;font-size:max(var(--t-sm),13px);font-weight:700;color:var(--ink-soft);letter-spacing:0}
+.hm-row .tile-line:has(> span:last-child:empty){display:none}      /* social.js's '' state (a reload before /api/me): no gap, no stray dot */
+.hm-row .tile-sub{position:static;flex:none;height:auto;min-height:0;padding:0;border:0;background:none;color:var(--ink-soft);font-size:max(var(--t-sm),13px);font-weight:700;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap;transition:translate 220ms var(--ease-bounce)}      /* the same step as the row's other children (this rule outranks .hm-row > *); the old fade is gone with the corner badge */
+.hm-row .tile-sub.is-off{display:none}      /* an absent count takes no room (the old corner badge faded in place; nothing is to its right now, so nothing jumps) */
+.hm-row #friends-n{display:inline-flex;align-items:center;height:max(1.5rem,20px);padding:0 .5rem;border-radius:var(--r-pill);border:.0625rem solid transparent;font-weight:800}      /* #friends-n:not(.is-off) (the friends block) colours it orange when on; .pop (num-pop) still bumps it */
+.hm-row #friends-n.is-off{display:none}      /* the id rule above outranks .tile-sub.is-off: without this an empty chip and its gap held the Friends line short of the right edge */
+/* hover, focus, press */
+.hm-row:focus-visible{background:rgba(52,190,237,.10);box-shadow:inset 0 0 0 .1875rem var(--line)}      /* the keyboard ring: the one blue thing besides the primary's border */
+.hm-row:focus-visible > *{translate:.25rem 0}
+@media (hover:hover){ .hm-row:hover{background:rgba(52,190,237,.08)} .hm-row:hover > *{translate:.25rem 0} }
+.hm-row:active{transform:scale(.985);background:rgba(52,190,237,.16);transition-duration:60ms} .hm-row:active svg{scale:.9}      /* the press goes in fast; the icon squashes under the thumb (as before) */
+/* dimmed (first visit, socket down): the .5 opacity on .tile above covers every entry. On the first visit an entry shows no tint, ring, step or halo (a click goes to the name field), and its icon holds still (the rule after the icon play).
+   A downed lobby keeps the keyboard ring and halo (its entries take no pointer, .is-down .tile above, but Tab still lands on them and must show where it is) */
+#screen-lobby.needs-name .hm-row:hover,#screen-lobby.needs-name .hm-row:focus-visible{background:none;box-shadow:none}
+#screen-lobby.needs-name .hm-row > *{translate:none}
+#screen-lobby.needs-name .hm-primary::after{display:none}
+/* deal-in: the primary first, then the rows top to bottom: transform and opacity only, backwards fill, nothing held (hover and focus still apply). The global reduced-motion rule covers it */
+.hm-primary,.hm-row{animation:hm-row-in 420ms var(--ease-out) backwards}
+.hm-list > :nth-child(2){animation-delay:50ms} .hm-list > :nth-child(3){animation-delay:100ms} .hm-list > :nth-child(4){animation-delay:150ms} .hm-list > :nth-child(5){animation-delay:200ms} .hm-list > :nth-child(6){animation-delay:250ms}
+@keyframes hm-row-in{from{opacity:0;translate:0 .75rem}}
+@keyframes hm-tile{from{opacity:0;translate:0 1.75rem;scale:.88}}      /* kept: .ranks-card deals in with it */
 /* the tile icons play: Quick play's arrow nudges forward, Courts' magnifier swings across the court looking, the bot tilts its head and blinks, Your stats' bars spring up and its tick pops, the two friends hop hello and their plus pops.
    Origins are in each icon's own 96-unit grid. Keyboard or pad focus plays once (lobbyView focuses Quick play on every entry); a hovering mouse loops.
    The hover block comes after the focus one: both match a focused tile under the mouse, and the loop must win */
@@ -748,19 +769,6 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
 /* narrow / tall windows: stack the tiles as wide bars */
 @media (max-aspect-ratio: 1/1){
   .menu-glass .menu-body{padding:var(--s-4);justify-content:safe center;overflow-y:auto}
-  .tiles{display:grid;grid-template-columns:repeat(3,1fr);width:min(56rem,100%);gap:var(--s-3)}             /* three tiles: still three across (60rem wide at the 10px floor) */
-  .tiles[data-n="4"]{grid-template-columns:repeat(2,1fr);width:min(40rem,100%)}      /* four (Your stats shown): 2x2, never three and a lone fourth */
-  .tiles[data-n="5"]{grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}      /* five: the one hero the full width, the four utilities two by two as bars under it */
-  .tiles[data-n="5"] .tile.is-hero{grid-column:span 2;height:9rem;flex-direction:row;justify-content:center;padding:0 var(--s-4);gap:var(--s-4);text-align:left}
-  .tiles[data-n="5"] .tile:not(.is-hero){grid-column:span 1;height:6.5rem;flex-direction:row;justify-content:flex-start;padding:0 var(--s-4);gap:var(--s-3);text-align:left}
-  .tiles[data-n="5"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
-  .tiles[data-n="6"]{grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}      /* six: the two heroes side by side, the four utilities two by two as bars */
-  .tiles[data-n="6"] .tile.is-hero{grid-column:span 1;height:12rem;flex-direction:column;justify-content:center;padding:0;gap:var(--s-2);text-align:center}
-  .tiles[data-n="6"] .tile.is-hero .tile-text{align-items:center;text-align:center}
-  .tiles[data-n="6"] .tile:not(.is-hero){grid-column:span 1;height:6.5rem;flex-direction:row;justify-content:flex-start;padding:0 var(--s-4);gap:var(--s-3);text-align:left}
-  .tiles[data-n="6"] .tile:not(.is-hero) svg{width:3.75rem;height:3.75rem}
-  .tile{width:auto;height:13rem;gap:var(--s-2);font-size:var(--t-lg)}
-  .tile svg{width:5.5rem;height:5.5rem}
   .name-row .field{width:14rem}
   .rematch-btns .btn{min-width:0;padding:0 2rem} .result-card{padding-left:var(--s-5);padding-right:var(--s-5)} .tally-num{min-width:5rem;font-size:5rem} .tally-side{min-width:6rem}
   .menu-glass .logo-mark{font-size:6.25rem}
@@ -984,12 +992,10 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
    COURTS (docs/COURTS-TOURNEY.md 2.6-2.9): the home's three tiles, the one court list with search and Open | Full, a code to Join or
    Watch, Create court / Create tournament. Then asking to play: the player's corner card and the spectator's button.
    ========================================================================================================== */
-.lobby-home{flex:1;justify-content:center}                                               /* the home view holds only the tiles now */
-.tile-sub{position:absolute;top:.875rem;right:.875rem;height:1.75rem;padding:0 .625rem;border-radius:var(--r-pill);display:inline-flex;align-items:center;background:var(--me-tint);border:.125rem solid #cfe4fb;
-  color:var(--me-ink);font-size:var(--t-sm);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}      /* '5 open': a badge in the corner, so the tile never moves when it comes and goes */
-.tile-sub{transition:opacity var(--d-med) var(--ease-soft), scale var(--d-med) var(--ease-bounce), visibility 0s linear 0s} .tile-sub.is-off{opacity:0;scale:.5;visibility:hidden;transition-delay:0s,0s,var(--d-med)} .tile-sub.pop{animation:num-pop 450ms var(--ease-bounce)}      /* '5 open' pops in, and bumps when the count moves */
+.lobby-home{flex:1;justify-content:center}                                               /* the home view holds the one panel (docs/MENU.md); on the home itself it is flex:none so the cap and the panel centre as one group */
+/* the home's counts ('8 open', 'N requests') are inline text in their row now (docs/MENU.md 4.4, .hm-row .tile-sub); the bump on a change stays */
+.tile-sub.pop{animation:num-pop 450ms var(--ease-bounce)}
 .btn.is-tall,.is-tall{min-height:44px}
-.tiles[data-n="5"] .tile:not(.is-hero) .tile-sub,.tiles[data-n="6"] .tile:not(.is-hero) .tile-sub{top:var(--s-2);right:var(--s-2)}      /* the short utility tiles: clear of the icon (NOTES 139) */
 .btn svg{flex:none}
 .courts-code .btn svg,.courts-make .btn svg,.room-watch svg,.ask-play svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
@@ -1073,13 +1079,9 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
   #screen-lobby .panel-wide,#lobby-bot{width:100%}      /* narrow portrait: every wide panel fills the s-4 body, on the header's and the tiles' edges, not 92vw here and 94vw there */
 }
 @media (max-width:480px){
-  .tiles,.tiles[data-n="4"],.tiles[data-n="5"],.tiles[data-n="6"]{grid-template-columns:1fr;width:100%}
-  .tile,.tiles[data-n="5"] .tile,.tiles[data-n="5"] .tile.is-hero,.tiles[data-n="5"] .tile:not(.is-hero),.tiles[data-n="6"] .tile,.tiles[data-n="6"] .tile.is-hero,.tiles[data-n="6"] .tile:not(.is-hero){grid-column:auto;flex-direction:row;justify-content:flex-start;height:7.5rem;padding:0 var(--s-5);gap:var(--s-4);text-align:left} .tile svg,.tiles[data-n="5"] .tile svg,.tiles[data-n="6"] .tile svg,.tiles[data-n="6"] .tile:not(.is-hero) svg{width:4.5rem;height:4.5rem}
-  .tiles[data-n="5"] .tile-text,.tiles[data-n="6"] .tile.is-hero .tile-text{align-items:flex-start;text-align:left}      /* one column too (the heroes first), as six */
   .menu-glass .menu-body{padding-inline:var(--s-5)} .menu-glass .menu-foot{padding-inline:var(--s-5)} .lobby-online{right:var(--s-5)} .btn-back{left:var(--s-5);height:max(2.75rem,36px)} #screen-lobby .panel.lobby-view{width:100%}      /* phone gutter: head, body and foot share one s-5 inset, and every panel fills the body (NOTES 139) */
   #lobby-bot,#lobby-create,#lobby-share{padding:var(--s-5) var(--s-4)}      /* the phone panel inset, as courts and the rest */
   .bot-levels .btn small{white-space:normal;text-wrap:balance}      /* a two-up card is narrower than "Medium pace, some mistakes": it wraps here */
-  .tiles .tile-sub,.tiles[data-n] .tile:not(.is-hero) .tile-sub{top:var(--s-3);right:var(--s-5)}      /* the chip lines up with the tile's side padding */
   .search{flex-basis:14.5rem}      /* a 375px phone: the s-5 gutter took 7px, and the Open/Full switch still shares the search's line */
   .court-wrap{height:min(29rem,40dvh)} .code-hint{margin-bottom:0} .menu-glass .menu-foot:has(.foot-agree){padding-block:var(--s-2)}      /* the s-5 inset: the list gives up 10px, the hint and the agree footer their extra few, so the card clears the footer as before */
 }
@@ -1299,7 +1301,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
   .ask-card .keycap,.ask-play .keycap{font-size:max(.8125rem,11px);min-width:max(1.5rem,20px);height:max(1.5rem,20px)}
   .ask-card{width:min(36rem, calc(100vw - 2 * var(--edge)))}
   .ask-play{font-size:max(var(--t-md),13px)}
-  .ask-card .ask-btns .btn,.courts-seg .seg-opt{font-size:max(var(--t-md),13px)} .tile-sub{font-size:max(var(--t-sm),12px);height:max(1.75rem,22px)} .courts-code .code-err{font-size:max(var(--t-md),13px);font-weight:700}      /* Accept / Decline, Open / Full, the tile's '8 open' and 'Court not found' (the one word after a failed Join, in the hint's place) */
+  .ask-card .ask-btns .btn,.courts-seg .seg-opt{font-size:max(var(--t-md),13px)} .courts-code .code-err{font-size:max(var(--t-md),13px);font-weight:700}      /* Accept / Decline, Open / Full and 'Court not found' (the one word after a failed Join, in the hint's place) */
   .code-acts .btn,.courts-make .btn,.court-state,.court-state .btn{font-size:max(var(--t-md),13px)} .courts .caps{font-size:max(var(--t-xs),11px)} .bot-levels .btn small{font-size:max(var(--t-sm),12px)}      /* the bigger text still fits the question and both buttons on one row */
 }
 
@@ -2099,14 +2101,15 @@ html[data-mobile] .keyhints-inline{display:none} html[data-mobile] .foot-agree{f
 .m-more{margin:var(--s-2) 0 0;color:var(--ink-soft);font-size:max(var(--t-xs),12px);letter-spacing:var(--track-caps);text-transform:uppercase;font-weight:800}
 html[data-mobile] #screen-lobby .menu-body{overflow-y:auto;justify-content:flex-start}
 html[data-mobile] .lobby-home{gap:var(--s-3);padding-bottom:var(--s-4)}
-html[data-mobile] .lobby-home .tiles{display:grid;grid-template-columns:1fr 1fr;width:min(40rem,100%);gap:var(--s-3)}
-html[data-mobile] .lobby-home .tile,html[data-mobile] .lobby-home .tile.is-hero{grid-column:span 1;width:auto;height:10rem;padding:0 var(--s-2);gap:var(--s-2);flex-direction:column;justify-content:center;text-align:center;font-size:max(var(--t-lg),17px)}
-html[data-mobile] .lobby-home .tile svg{width:4.25rem;height:4.25rem}
-html[data-mobile] .lobby-home .tile .tile-text{align-items:center;text-align:center}
-html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{grid-column:span 2;height:7.5rem;flex-direction:row;gap:var(--s-4)}      /* an odd count: Watch a match takes the whole first row */
-@media (min-aspect-ratio:1/1){      /* a phone on its side: the card on the left, the tiles on the right, both under the header */
+/* the phone's list (docs/MENU.md 5): under the card and ON THIS PHONE, the same list as the computer's, as wide as the card and in the card's family of material (white, a soft blue border, the card's radius) */
+html[data-mobile] #screen-lobby[data-view="home"] .lobby-home{flex:1}      /* the body scrolls from the top (above); the card and the list centre in it as before (.lobby-home) */
+html[data-mobile] .lobby-home .hm-list{width:min(40rem,100%);padding:var(--s-2) var(--s-3);background:#fff;border:.1875rem solid var(--line-soft);border-radius:var(--r-xl);box-shadow:var(--sh-1)}
+html[data-mobile] .hm-row{min-height:max(4.75rem,52px);gap:var(--s-3);font-size:max(var(--t-lg),17px)}
+html[data-mobile] .hm-row svg{width:max(2.5rem,28px);height:max(2.5rem,28px)}
+html[data-mobile] .hm-row:not([hidden]) ~ .hm-row::before{left:calc(max(2.5rem,28px) + var(--s-3) * 2)}
+html[data-mobile] .m-more{margin-top:var(--s-3)}
+@media (hover:none) and (pointer:coarse){ html[data-mobile] .hm-row:focus-visible:not(:active){background:none;box-shadow:none} html[data-mobile] .hm-row:focus-visible:not(:active) > *{translate:none} }      /* a finger: no row is lit before it is touched (lobbyView focuses Watch a match on entry, and Chrome shows a script focus as :focus-visible until the first touch); the press tint still shows */
+@media (min-aspect-ratio:1/1){      /* a phone on its side: the card on the left, the list on the right, both under the header */
   html[data-mobile] .lobby-home{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"pad more" "pad tiles";align-items:start;column-gap:var(--s-5);width:min(80rem,100%);margin:0 auto}
   html[data-mobile] .m-pad{grid-area:pad;width:100%} html[data-mobile] .m-more{grid-area:more;justify-self:center} html[data-mobile] .lobby-home .tiles{grid-area:tiles;width:100%}
-  html[data-mobile] .lobby-home .tile,html[data-mobile] .lobby-home .tile.is-hero{height:8rem}
-  html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{height:6rem}
 }
