@@ -115,7 +115,7 @@ deploy.
   (Pro: `Top rank`), then a compact trophy road (`#st-road`: the eight medals `is-md`, reached ones lit, the current one ringed,
   the rest dimmed, each titled with its floor; moved from the Ranked view's `#rk-road`), one line `Bronze to Platinum are yours to
   keep. Diamond and above can drop.`, and `Best: Platinum I` when the best is above the current. Before any trophies: crest dimmed,
-  `No trophies yet`, `Win a game for your first trophies` (signed in) / `Sign in to earn trophies` (guest). Record lines stay as
+  `No trophies yet`, `Win a game for your first trophies` (signed in) / `Sign in to earn trophies` (guest). (Since NOTES 158 the signed-in line is gone, the keep line under the bar is gone and the streak is the flame and its number alone: how ranks work is the Ranks page, opened by the crest or the (i) beside the rank.) Record lines stay as
   they are. Keep `rankCrest` and `drawRoad` names if convenient.
 - **Ranks page**: copy becomes: `Win games to earn trophies. A win against a person is worth about 30, a loss costs about 20;
   a win against Matt at your rank's level or harder pays a few. Bronze to Platinum are never lost once reached.` `ranksFrom`

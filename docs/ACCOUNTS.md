@@ -1132,6 +1132,8 @@ builder at :383 and `backTo()` :377-378 are NOT changed.
      as the bot view does); it is hidden once all four are beaten.
   4. Against people: W-L, a tug-of-war bar ("{pct}% won" / "Points {w}-{l}"), Streak and Best chips. Nothing played
      yet: an empty track with "Play a person to start your record".
+     NOTES 158 removed every coaching line and repeated caption from this page: no people hint, no "Set on" / Personal best
+     / Champion chips (a best shows its day alone), streaks are the flame and a number, Titles reads "Tournaments won".
   5. Three tiles: Titles ("Tournament win(s)", a gold Champion chip), Longest rally ("{n} hits"), Fastest swing
      ("{n} °/s", `degs()` rounded to 10), each with "Set on {Mon d}" and a Personal best chip; no Hardest hit
      (unitless). Empty: a blue 0 and a coaching caption ("Win a tournament to lift a cup", "Keep the ball in play",

@@ -102,6 +102,7 @@ export function result(p) {                                 // the 'profile' mes
 
 // ---------- Your stats (9.4): the player card. drawRoad (the hero, then drawMatt: the Matt badge), drawPeople and drawTiles fill index.html's markup ----------
 const dayS = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(new Date(ms).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) }) : '';      // "Sep 19": the card's dates are chips, the long form is for sentences
+const FLAME = '<svg class="st-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 4.5 5.5 5.5 5.5 10.5a5.5 5.5 0 0 1-11 0c0-2 1-3.2 2.2-4.2 0 2 1 3.2 2.3 3.2 0-3.5-1-5.5 1-9.5Z"/></svg>';      // index.html's flame: it stands for the words 'win streak' wherever it shows
 const cls = (id, c, onOff) => { const el = $(id); if (el) el.classList.toggle(c, !!onOff); };
 const human = p => p && p.human && typeof p.human === 'object' ? p.human : {};
 function rungs(p) {                                         // the four Matt rows in difficulty order, and what the card makes of them
@@ -119,8 +120,8 @@ function drawRoad(p) {
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
   if (st) st.className = 'st-streak' + (hot.n >= 2 ? ' is-hot' : hot.n === 1 ? ' is-one' : '');      // gold from two wins up, never for one
-  text('st-streak-n', String(hot.n));
-  const cap = $('st-streak-cap'); if (cap) { cap.textContent = hot.n === 1 ? `vs ${hot.who} · win again to extend it` : hot.n ? `vs ${hot.who} · best ` : 'Win a match to start a streak'; if (hot.n >= 2) cap.append(mk('b', '', String(best))); }
+  text('st-streak-n', String(hot.n));      // the flame says streak: no words beside it (NOTES 158). Who it is against and the best ride in the tooltip
+  if (st) { const tip = hot.n ? `Win streak vs ${hot.who} · best ${best}` : best ? `Win streak · best ${best}` : 'Win streak'; st.title = tip; st.setAttribute('aria-label', tip.replace('Win streak', 'Win streak: ' + hot.n)); }
   drawMatt(p);
 }
 // the Matt badge: every level can be picked at any time, so this is a badge for the toughest one beaten (difficulty order, never the
@@ -130,12 +131,12 @@ function drawMatt(p) {
   if (badge) badge.className = 'st-mbadge ' + (top < 0 ? 'is-none' : 'is-lv' + top);
   text('st-mbest', top < 0 ? 'None yet' : `${LEVEL[ORDER[top]]} Matt`);
   const r = top < 0 ? null : rows[top];
-  text('st-mcap', !r ? 'Beat Matt at any level to earn a badge' : top === 3 ? `The top level · beaten ${dayS(r.firstWinAt)}` : `Beaten ${dayS(r.firstWinAt)}`);
+  text('st-mcap', r ? dayS(r.firstWinAt) : '');      // the day it was first beaten; nothing beaten: no coaching line
   if (!ul) return; ul.textContent = '';
   rows.forEach((row, i) => {
     const li = mk('li', 'st-mlv' + (won[i] ? ' is-won' : '') + (i === top ? ' is-top' : '')); li.dataset.level = ORDER[i];
     const rec = mk('small', '', `${num(row.wins)}-${num(row.losses)}`);      // the record (test/profile-ui.mjs reads it), the streak its small print
-    if (num(row.streak)) rec.append(mk('i', '', ` · streak ${num(row.streak)}`));
+    if (num(row.streak)) { const s = mk('i', ''); s.innerHTML = FLAME; s.append(String(num(row.streak))); s.title = 'Win streak'; rec.append(s); }      // the flame is the word
     li.append(mk('b', '', LEVEL[ORDER[i]]), rec); li.title = won[i] ? `${LEVEL[ORDER[i]]} Matt: beaten ${dayS(row.firstWinAt)}` : `${LEVEL[ORDER[i]]} Matt: not beaten yet`;
     ul.append(li);
   });
@@ -144,19 +145,19 @@ function drawPeople(p) {                                    // W-L, the tug-of-w
   const H = human(p), w = num(H.wins), l = num(H.losses), played = w + l, pct = played ? Math.round(100 * w / played) : 0;
   text('st-w', String(w)); text('st-l', String(l));
   const bar = $('st-bar'); if (bar) { bar.style.setProperty('--w', pct + '%'); bar.classList.toggle('is-empty', !played); }
-  text('st-bar-l', `${pct}% won`); text('st-pts', `${num(H.pointsWon)}-${num(H.pointsLost)}`); show('st-bar-l', !!played); show('st-bar-r', !!played); show('st-people-hint', !played);
+  text('st-bar-l', `${pct}% won`); text('st-pts', `${num(H.pointsWon)}-${num(H.pointsLost)}`); show('st-bar-l', !!played); show('st-bar-r', !!played);
   show('st-chips', !!played); text('st-hstreak', String(num(H.streak))); text('st-hbest', String(num(H.bestStreak))); cls('st-hchip', 'is-one', num(H.streak) >= 1);
 }
-function tile(id, v, cap, chip) {                           // one number tile: the number (blue even at 0), its unit only with a value, the caption (a coaching line in blue when there is nothing yet), the gold chip
-  const t = $(id); if (!t) return; const b = t.querySelector('.st-num b'), u = t.querySelector('.st-num small'), c = t.querySelector('.st-cap'), ch = t.querySelector('.st-chip');
-  if (b) b.textContent = String(v); if (u) u.hidden = !v || !u.textContent; if (c) { c.firstElementChild.textContent = cap; c.classList.toggle('is-hint', !v); } if (ch) { ch.hidden = !v; if (chip) ch.textContent = chip; }
+function tile(id, v, cap = '') {                            // one number tile: the number (blue even at 0), its unit only with a value, the day a best was set under it
+  const t = $(id); if (!t) return; const b = t.querySelector('.st-num b'), u = t.querySelector('.st-num small'), c = t.querySelector('.st-cap');
+  if (b) b.textContent = String(v); if (u) u.hidden = !v || !u.textContent; if (c) c.textContent = cap;
 }
 function drawTiles(p) {
   const B = p && p.bests && typeof p.bests === 'object' ? p.bests : {}, best = k => { const x = B[k] && typeof B[k] === 'object' ? B[k] : {}; return Number.isFinite(x.v) && x.v > 0 ? x : null; }, titles = num(p && p.titles);
-  tile('st-t-titles', titles, titles ? `Tournament win${titles === 1 ? '' : 's'}` : 'Win a tournament to earn a title', titles > 1 ? `Champion ×${titles}` : 'Champion');
+  tile('st-t-titles', titles);
   const r = best('rally'), s = best('speed');      // no Hardest hit: a unitless number nobody can read
-  tile('st-t-rally', r ? Math.round(r.v) : 0, r ? `Set on ${dayS(r.at)}` : 'Keep the ball in play');
-  tile('st-t-speed', s ? degs(s.v) : 0, s ? `Set on ${dayS(s.at)}` : 'Swing hard to set a record');
+  tile('st-t-rally', r ? Math.round(r.v) : 0, r ? dayS(r.at) : '');
+  tile('st-t-speed', s ? degs(s.v) : 0, s ? dayS(s.at) : '');
 }
 // the play row (docs/SHARE.md 3): profile.play's counters. An older server sends no play: the row stays hidden, nothing else changes
 const clock = s => s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m` : s ? '<1m' : '0m';      // time on court: "1h 20m", "12m"
@@ -165,7 +166,7 @@ function drawPlay(p) {
   const P = p && p.play && typeof p.play === 'object' ? p.play : null; if (!show('pf-play', !!P)) return;
   const ch = num(P.chances), rt = Math.min(num(P.returns), ch), ok = ch >= 10, f = ok ? rt / ch : 0;      // under 10 chances a percentage says nothing: the coaching line instead
   const ring = $('st-ring'); if (ring) { ring.style.setProperty('--p', f.toFixed(3)); ring.classList.toggle('is-zero', !f); }
-  text('st-ret-pct', ok ? `${Math.round(100 * f)}%` : ''); show('st-ret-pct', ok); text('st-ret-cap', ok ? `${rt.toLocaleString()} of ${ch.toLocaleString()} returned` : 'Shows after 10 balls are hit to you'); cls('st-ret', 'is-hint', !ok);
+  text('st-ret-pct', ok ? `${Math.round(100 * f)}%` : ''); show('st-ret-pct', ok); text('st-ret-cap', ok ? `${rt.toLocaleString()} of ${ch.toLocaleString()} returned` : ''); cls('st-ret', 'is-hint', !ok);      // under 10 chances: the empty ring alone, no coaching line
   const pw = num(P.pointsWon), pl = num(P.pointsLost);      // every kind of match (h_points_* in human stay people-only)
   fig('st-f-winners', num(P.winners).toLocaleString()); fig('st-f-aces', num(P.aces).toLocaleString()); fig('st-f-smashes', num(P.smashes).toLocaleString()); fig('st-f-hits', num(P.hits).toLocaleString());
   fig('st-f-points', `${pw + pl ? Math.round(100 * pw / (pw + pl)) : 0}%`); fig('st-f-time', clock(num(P.secs)));
@@ -173,7 +174,7 @@ function drawPlay(p) {
 function drawHead(p) {
   const n = $('pf-name'), name = me.account && me.account.username, typed = (($('name-input') || {}).value || '').trim().slice(0, 12);      // the lobby's name field holds the cleaned display name
   if (n) { n.textContent = name || typed || (me.account ? 'Signed in' : 'Guest'); h.badge(n, !!name); }
-  text('pf-sub', me.account ? 'Stats saved to your account' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
+  text('pf-sub', me.account ? '' : p && Number.isFinite(p.expiresAt) ? `Stats saved on this device until ${day(p.expiresAt)}` : 'Stats saved on this device');
   show('pf-notice', !!(p && p.guest === true && !me.account));      // the one-time notice (9.3) for everyone, always here: a player who left or forfeited never gets the result card's copy
 }
 export function drawProfile(p) {                           // p: a Profile, null (nothing yet) or undefined (not available). Guest or signed in changes only the header: every stat draws the same way

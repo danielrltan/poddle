@@ -134,6 +134,7 @@ cascade on delete, rate limit, resvg missing -> og.jpg fallback. Save rendered P
 ## 3. Your stats (part C: web/profile.js, web/index.html, web/ui.css, test/profile-ui.mjs)
 
 - **New stats** from `profile.play` (absent on an older server: draw nothing new then, no errors).
+  (NOTES 158: under 10 chances Your stats now shows the empty ring and no coaching line.)
   Return rate is the headline (big %, with "N of M returned"; under 10 chances a coaching line "Return 10 balls to see
   it"). Then compact figures: winners, aces, smashes, total hits, points won %, time on court (h m). Fit them into the
   existing card without making it scroll at 1280x800 (it fits today with room to spare only on phones — check the

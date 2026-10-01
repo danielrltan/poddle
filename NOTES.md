@@ -3404,3 +3404,31 @@ fit / consistency / regression checks at 1440x900, 1280x720, 600x900, 390x844 an
   two trophies passes made the full run longer than its old 330 s). Pre-existing on main, not touched: ui-next.mjs 8 (settings rows, Sound
   output row, Tab order, hostile name, at two sizes), menu.mjs 7 (Part B3 settings and swing), share.test.mjs 5 PNG checks where
   @resvg is not installed, ui-shots/verify.mjs 5 (court list box heights).
+
+## 158. Your stats without the filler text
+
+The owner's ask (2026-09-30): "thoroughly clean up the stats page ... of any useless stupid text", naming the streak caption ("vs people ·
+win again to extend it"), words beside an icon that already says it (the flame and "Streak 1"), and the rank info under the bar ("find a
+better place ... consider adding an info page"). The rule for this page from now on: a number, its label and an icon; no coaching lines,
+no caption that repeats its label, no sentence explaining how something works.
+
+- Removed from web/index.html / profile.js / ui.js: the "Rank" label over the rank name; the keep line under the bar ("Bronze to Platinum
+  are yours to keep..."); "win streak" beside the hero flame and the caption under it (all three variants); "Beat Matt at any level to earn
+  a badge", "The top level ·" and "Beaten" (the day alone stays); "· streak N" on a Matt chip (a small flame and the number); "Play a
+  person to start your record"; "Streak" inside the people chip (flame and number; "Best N" stays beside it); "Shows after 10 balls are
+  hit to you" (the empty ring alone: the menu copy has no dashes, test/menu.mjs); the tile captions "Tournament win(s)", "Win a tournament to earn a title", "Keep the
+  ball in play", "Swing hard to set a record", "Set on" (the day alone) and the Champion / Personal best chips; "Win a game for your first
+  trophies" under "No trophies yet"; "Stats saved to your account" under a signed-in name. The Titles tile is labelled "Tournaments won".
+- The info page is the Ranks page that already existed (one page per thing, NOTES 150): its lead and note already say what a win pays,
+  which ranks are kept and which can drop. A small (i) button beside the rank name (#btn-st-info) opens it, as the crest does; Back
+  returns to Your stats. profileFocus skips the (i), so an empty card still opens with nothing lit.
+- What a removed line carried that is data rides in a tooltip: the hero streak's "Win streak vs Rookie Matt · best 3" (data-tip and
+  aria-label on #st-streak).
+- Kept on purpose: "Sign in to earn trophies" / "Pick a username to earn trophies" (the one thing a player cannot guess), "10 to Silver
+  III", "60% won", "Points 50-41", "187 of 256 returned", "Best: Platinum I", and a guest's two header lines ("Stats saved on this device
+  until ..." and "Delete them any time on the Privacy Policy page": the retention and deletion notice, ask the owner before cutting).
+- Legal pages: nothing changes in what is collected, stored or shown to others, so privacy.html and terms.html are untouched.
+  changelog.html has an October 1 entry.
+- Tests: profile-ui.mjs, ui-next.mjs and menu.mjs pin the absence (no #st-keep, no #st-people-hint, no chips or captions on empty tiles,
+  the streak ribbon's text is the number alone, the tooltip carries who and best). profile-ui 85/85; ui-next keeps its 8 pre-existing
+  fails (settings rows, Sound output, Tab order, hostile name, at two sizes); mobile-ui passes.

@@ -153,7 +153,7 @@ export function rankCrest(L, signedIn = false) {
   if (legacy) return;
   crest.closest('.st-hero')?.classList.toggle('is-none', !known);      // ui.css: no count, no bar before the first trophies
   setText($('st-rank'), known ? (top ? RANKS[r.tier - 1].name : rankLabel(r.tier, r.div)) : 'No trophies yet'); setText($('st-trophies'), String(n));      // 'Pro' has no numeral: the #12 pill beside it says where (web/profile.js drawPlace)
-  setText($('st-rank-cap'), known ? '' : signedIn === 'username' ? 'Pick a username to earn trophies' : signedIn ? 'Win a game for your first trophies' : 'Sign in to earn trophies');
+  setText($('st-rank-cap'), known ? '' : signedIn === 'username' ? 'Pick a username to earn trophies' : signedIn ? '' : 'Sign in to earn trophies');      // signed in with a username: 'No trophies yet' says it all
   const floor = THRESHOLDS[r.tier - 1] || 0, dFloor = floor + (r.div - 1) * DIV_W, p = top ? 1 : Math.max(0, Math.min(1, (n - dFloor) / DIV_W));      // the bar: across the current division (Pro: full)
   { const b = $('st-rank-bar'); if (b) { b.style.setProperty('--p', (known ? p : 0).toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round((known ? p : 0) * 100))); } }
   const nextAt = r.div < 3 ? floor + r.div * DIV_W : THRESHOLDS[r.tier], nextName = top ? '' : r.div < 3 ? rankLabel(r.tier, r.div + 1) : rankLabel(r.tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
@@ -164,7 +164,6 @@ export function rankCrest(L, signedIn = false) {
       if (now) setDiv(li, r);
       li.title = `${now ? rankLabel(t, r.div) + ' · your rank' : done ? R.name + ' · reached' : R.name} · ${t === 1 ? 'the starting rank' : `from ${THRESHOLDS[i]} trophies`}`;      // the tooltip (and, with no text in it, the aria-label)
       road.append(li); }); }
-  setText($('st-keep'), 'Bronze to Platinum are yours to keep. Diamond and above can drop.');
   { const b = $('st-best'), above = known && (best > r.tier || best === r.tier && hasDivs(best) && bestDiv > r.div); if (b) { setText(b, above ? `Best: ${rankLabel(best, bestDiv)}` : ''); b.hidden = !above; } }      // Pro has no divisions: never 'Best: Pro' over Pro
 }
 const setDiv = (el, r) => { if (hasDivs(r.tier)) el.dataset.div = String(r.div); else delete el.dataset.div; };      // Pro has no divisions (NOTES 126): no numeral pill on its emblem
@@ -786,7 +785,7 @@ function courtsFocus() {                                                        
   return matchMedia('(pointer: fine)').matches ? $('court-search') : $('court-seg').querySelector('[aria-checked="true"]');
 }
 const vis = el => !!el && !el.hidden && !!el.offsetParent;
-const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button') || [])].find(vis) || $('lobby-profile');      // Next: beat Club Matt when there is one, else the first thing there is to press
+const profileFocus = () => [...($('lobby-profile')?.querySelectorAll('button:not(.st-info)') || [])].find(vis) || $('lobby-profile');      // the first thing there is to press; never the (i): nothing to press = the panel itself
 const tourFocus = () => (ts && !ts.you?.host && vis($('btn-tour-warm')) ? $('btn-tour-warm') : null) || (vis($('btn-tour-copy')) ? $('btn-tour-copy') : $('tour-code'));      // the host's first act is to share: Copy invite. A guest's: Warm up with Matt
 const brFocus = () => { const y = ts && ts.you && !ts.you.viewer && !ts.you.out && $('bracket').querySelector('.br-col.is-current .br-match.is-you'); return y && (y.querySelector('.br-watch') || y) || $('bracket').querySelector('.br-watch') || $('bracket'); };      // a player still in: their own card (what 'You're through' points at; its Watch if it is live). A viewer, or one who is out: the first Watch
 const viewFocus = () => ({ home: mobile ? $('btn-courts') : $('btn-quick'), courts: courtsFocus(), create: $('btn-create-go'), share: $('btn-share-go'), bot: $('btn-bot-1'), tour: tourFocus(), bracket: brFocus(), profile: profileFocus(), ranks: $('screen-lobby')?.querySelector('[data-back]'),      /* the Ranks page has no button of its own (its Play Ranked went, NOTES 142): Back */ leaderboard: $('lb-tabs')?.querySelector('[aria-checked="true"]'), friends: friendsFocus() }[view] || (mobile ? $('btn-courts') : $('btn-quick')));
@@ -960,6 +959,7 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   { const el = $('st-crest'); if (el) {      // the crest on Your stats opens the Ranks page: a button in all but tag
     el.setAttribute('role', 'button'); el.tabIndex = 0; el.title = 'See all ranks'; el.setAttribute('aria-label', 'See all ranks'); el.classList.add('is-link');
     el.addEventListener('click', () => lobbyView('ranks')); el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lobbyView('ranks'); } }); } }
+  on2('btn-st-info', 'click', () => lobbyView('ranks'));      // the (i) beside the rank: how ranks work is the Ranks page's job, not the hero's (NOTES 158)
   $('btn-create-go').addEventListener('click', () => { if (!needName() && on.create) on.create($('seg').querySelector('[aria-checked="true"]').dataset.public === '1'); });
   on2('bot-levels', 'click', e => { const b = e.target.closest('[data-level]'); if (b && !needName() && on.bot) on.bot(+b.dataset.level); });       // one click plays: no second confirm
   on2('lobby-bot', 'keydown', e => { let d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return; e.preventDefault(); const bs = [...$('bot-levels').children], i = bs.indexOf(document.activeElement);
