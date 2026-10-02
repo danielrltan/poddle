@@ -34,7 +34,7 @@
   --good:#3ecf72; --good-deep:#13803f; --good-lamp:#1fa353; --warn:#ffb534; --warn-deep:#a86400; --warn-lamp:#e08d00; --bad:#ff6464; --bad-deep:#d23232;
   --gold-1:#fff1a6; --gold-2:#ffd34a; --gold-3:#f2a81d; --gold-4:#c97f08;
   --silver-1:#fbfdff; --silver-2:#d8e2ea; --silver-3:#a9b8c4; --silver-4:#8093a1;
-  --ball:#e6f03c; --ball-deep:#b9c916;
+  --ball:#e8fb2a; --ball-deep:#cfae00;
 
   /* radii */
   --r-xs:.375rem; --r-sm:.625rem; --r-md:1rem; --r-lg:1.5rem; --r-xl:2.25rem; --r-pill:999px;
@@ -205,7 +205,7 @@ body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}       
 /* serve indicator: a little pickleball that bobs beside the server's score */
 .serve-ind{flex:none;width:1.125rem;height:1.125rem;border-radius:50%;visibility:hidden;
   background:radial-gradient(circle at 32% 34%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 66% 30%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 50% 62%, var(--ball-deep) 0 11%, transparent 12%),
-    radial-gradient(circle at 24% 66%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 76% 64%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 35% 30%, #f6fb8a, var(--ball) 60%, #cdd82a);
+    radial-gradient(circle at 24% 66%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 76% 64%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 35% 30%, #fbffd6, var(--ball) 60%, #ffe01a);
   box-shadow:0 0 0 .125rem #fff, 0 .0625rem .25rem rgba(10,30,50,.35)}
 .serve-ind{scale:0;transition:scale 180ms var(--ease-soft), visibility 0s linear 180ms}
 .serve-ind.on{visibility:visible;scale:1;animation:serve-bob 900ms var(--ease-soft) infinite;transition:scale 420ms var(--ease-bounce) 120ms, visibility 0s}      /* the serve changes sides: the ball shrinks away on one tab and springs up on the other just after (scale: composes with the bob) */
@@ -363,7 +363,7 @@ body[data-overlay="game-full"] #screen-game-full{z-index:calc(var(--z-screen) + 
 .logo-mark .lg-a,.logo-mark .lg-b{color:#39434d}      /* all one dark: the light blue "dle" washed into the sky */
 .logo-ball{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
   background:radial-gradient(circle at 50% 50%, var(--ball-deep) 0 .047em, transparent .052em), radial-gradient(circle at 50.0% 23.0%, var(--ball-deep) 0 .047em, transparent .052em), radial-gradient(circle at 73.4% 36.5%, var(--ball-deep) 0 .047em, transparent .052em), radial-gradient(circle at 73.4% 63.5%, var(--ball-deep) 0 .047em, transparent .052em), radial-gradient(circle at 50.0% 77.0%, var(--ball-deep) 0 .047em, transparent .052em), radial-gradient(circle at 26.6% 63.5%, var(--ball-deep) 0 .047em, transparent .052em), radial-gradient(circle at 26.6% 36.5%, var(--ball-deep) 0 .047em, transparent .052em),
-    radial-gradient(circle at 34% 28%, #fbffa8, var(--ball) 58%, #c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35), 0 .03em .06em rgba(40,80,110,.25)}
+    radial-gradient(circle at 34% 28%, #fbffd6, var(--ball) 58%, #ffe01a 100%);box-shadow:inset 0 -.04em .08em rgba(220,180,0,.5), 0 .03em .06em rgba(40,80,110,.25)}
 .logo-tag{font-size:var(--t-md);font-weight:800;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-soft);margin:0 -.42em 0 0}
 .title-prompt{display:flex;flex-direction:column;align-items:center;gap:var(--s-3)}
 .screen.is-active .logo-mark > span{animation:hm-letter 560ms var(--ease-bounce) backwards} .screen.is-active .logo-mark > span:nth-child(3){animation-delay:180ms} .screen.is-active .logo-mark > span:nth-child(4){animation-delay:240ms}      /* the letters pop up in turn */

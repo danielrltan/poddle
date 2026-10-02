@@ -109,8 +109,8 @@ function ball(cx, cy, r) {                                       // web/favicon.
   const k = r / 30.5, at = (x, y) => `${r2(cx + (x - 32) * k)}" cy="${r2(cy + (y - 32) * k)}`;
   const holes = [[32, 32, 4.7], [32.0, 15.0, 4.7], [46.72, 23.5, 4.7], [46.72, 40.5, 4.7], [32.0, 49.0, 4.7], [17.28, 40.5, 4.7], [17.28, 23.5, 4.7]];      // web/favicon.svg's seven even holes: one centred, six a ring apart
   return `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" fill="url(#ball)"/><circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" fill="url(#ballS)"/>` +
-    `<g fill="#a9b912">${holes.map(([x, y, rr]) => `<circle cx="${at(x, y)}" r="${r2(rr * k)}"/>`).join('')}</g>` +
-    `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r * 0.982)}" fill="none" stroke="#a3b310" stroke-width="${r2(1.1 * k)}"/>`;
+    `<g fill="#cfae00">${holes.map(([x, y, rr]) => `<circle cx="${at(x, y)}" r="${r2(rr * k)}"/>`).join('')}</g>` +
+    `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r * 0.982)}" fill="none" stroke="#dcbc00" stroke-width="${r2(1.1 * k)}"/>`;
 }
 function wordmark(x, base, S, fill) {                            // web/ui.css .logo-mark: P, the ball as the o, ddle. -> [svg, width]
   const P = measure('P', 900, S), d = measure('ddle', 900, S), br = 0.31 * S, gap = 0.035 * S, bx = x + P + gap + br;
@@ -146,8 +146,8 @@ function svgOf(d) {
 <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7cc6ff"/><stop offset="1" stop-color="#1670d8"/></linearGradient>
 <linearGradient id="cta" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ab6ff"/><stop offset=".5" stop-color="#3aa0ff"/><stop offset=".52" stop-color="#2b8df2"/><stop offset="1" stop-color="#1670d8"/></linearGradient>
 <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1a6"/><stop offset=".5" stop-color="#ffd34a"/><stop offset="1" stop-color="#f2a81d"/></linearGradient>
-<radialGradient id="ball" cx=".34" cy=".28" r=".977"><stop offset="0" stop-color="#fbffa8"/><stop offset=".58" stop-color="#e6f03c"/><stop offset="1" stop-color="#c5d124"/></radialGradient>
-<linearGradient id="ballS" x1="0" y1="0" x2="0" y2="1"><stop offset=".62" stop-color="#5a6e00" stop-opacity="0"/><stop offset="1" stop-color="#5a6e00" stop-opacity=".3"/></linearGradient>
+<radialGradient id="ball" cx=".34" cy=".28" r=".977"><stop offset="0" stop-color="#fbffd6"/><stop offset=".58" stop-color="#e8fb2a"/><stop offset="1" stop-color="#ffe01a"/></radialGradient>
+<linearGradient id="ballS" x1="0" y1="0" x2="0" y2="1"><stop offset=".62" stop-color="#ffcc00" stop-opacity="0"/><stop offset="1" stop-color="#ffcc00" stop-opacity=".42"/></linearGradient>
 <filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#143c64" flood-opacity=".26"/></filter>
 <filter id="lift" x="-10%" y="-20%" width="120%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#ffffff" flood-opacity=".85"/></filter>
 <filter id="emsh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#143c64" flood-opacity=".3"/></filter>

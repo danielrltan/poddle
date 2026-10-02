@@ -58,7 +58,7 @@ A normal browser window is shorter than 900px, so the title's start button also 
 **You (blue)** `--me #3aa0ff` · `--me-deep #1670d8` · `--me-ink #1b63b8` · `--me-navy #0e3f8c` · `--me-tint #e3f1ff`
 **Opponent (orange)** `--them #ff9440` · `--them-deep #e6561a` · `--them-ink #c4490f` · `--them-navy #8a2f06` · `--them-tint #fff0e2`
 **Signals** `--good #3ecf72 / --good-deep #13803f` · `--warn #ffb534 / --warn-deep #a86400` · `--bad #ff6464 / --bad-deep #d23232` (the `-deep` values are text colours, ≥ 4.5:1 on white; lamp gradients use `--good-lamp #1fa353` / `--warn-lamp #e08d00`)
-**Medals** `--gold-1..4` · `--silver-1..4` · **Ball** `--ball #e6f03c` · `--ball-deep #b9c916`
+**Medals** `--gold-1..4` · `--silver-1..4` · **Ball** `--ball #e8fb2a` · `--ball-deep #cfae00`
 **Radii** `--r-xs .375rem` · `--r-sm .625rem` · `--r-md 1rem` · `--r-lg 1.5rem` · `--r-xl 2.25rem` · `--r-pill 999px`
 **Shadows** short and tight — a hard 2–3px lower edge plus a small blur, never a wide floating-card haze: `--sh-1` hairline lift · `--sh-2` button/thumbnail · `--sh-3` panel · `--sh-hud` anything over the court · `--glow` focus halo · `--inner-hi` glossy inner highlight
 **Textures** `--tex-scan` faint horizontal scan lines · `--tex-diag` diagonal stripes (bars, wells) · `--tex-vignette` · `--gloss`

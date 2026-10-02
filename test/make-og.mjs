@@ -25,11 +25,11 @@ function ballSvg() {
   const S = 64, R = 30.5, o = (S - 2 * R) / 2, f = v => +v.toFixed(2);
   const holes = BALL.holes.map(([x, y, r]) => `<circle cx="${f(o + x * 2 * R)}" cy="${f(o + y * 2 * R)}" r="${f(r * 2 * R)}"/>`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}"><title>Poddle</title>
-<defs><radialGradient id="b" cx=".34" cy=".28" r=".977"><stop offset="0" stop-color="#fbffa8"/><stop offset=".58" stop-color="#e6f03c"/><stop offset="1" stop-color="#c5d124"/></radialGradient>
-<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset=".62" stop-color="#5a6e00" stop-opacity="0"/><stop offset="1" stop-color="#5a6e00" stop-opacity=".3"/></linearGradient></defs>
+<defs><radialGradient id="b" cx=".34" cy=".28" r=".977"><stop offset="0" stop-color="#fbffd6"/><stop offset=".58" stop-color="#e8fb2a"/><stop offset="1" stop-color="#ffe01a"/></radialGradient>
+<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset=".62" stop-color="#ffcc00" stop-opacity="0"/><stop offset="1" stop-color="#ffcc00" stop-opacity=".42"/></linearGradient></defs>
 <circle cx="32" cy="32" r="${R}" fill="url(#b)"/><circle cx="32" cy="32" r="${R}" fill="url(#s)"/>
-<g fill="#a9b912">${holes}</g>
-<circle cx="32" cy="32" r="${R - .55}" fill="none" stroke="#a3b310" stroke-width="1.1"/>
+<g fill="#cfae00">${holes}</g>
+<circle cx="32" cy="32" r="${R - .55}" fill="none" stroke="#dcbc00" stroke-width="1.1"/>
 </svg>
 `;
 }

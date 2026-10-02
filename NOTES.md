@@ -3500,3 +3500,17 @@ in that corner and already opened Your stats, so it grows into the card instead 
   edge. Phone: under the bar, on the rank column's left edge.
 - Nothing new is sent, stored or shown to anyone else: the legal pages are untouched.
 - Tests: profile-ui.mjs section G (the card on the home screen, its click, phone width, no trophies, a guest).
+
+## 162. The pickleball logo is shaded by hue, not by darkening
+The owner's ask: better colour theory on the ball, shading that shifts the hue to a deeper neon yellow instead of a darker
+lime (the old shade went olive: #c5d124 edge, #5a6e00 bottom wash, #a9b912 holes).
+- Body #e8fb2a (`--ball`, a touch more neon than #e6f03c), highlight #fbffd6, edge #ffe01a, bottom wash #ffcc00 at .42, holes
+  #cfae00 (`--ball-deep`), rim #dcbc00. Every shade sits at hue 50..56, warmer than the body (~68) and clear of the medal golds
+  (`--gold-2` 45, `--gold-3` 39), so it reads yellow, not gold or orange.
+- Holes vs body is 1.88:1 (WCAG ratio), above the old 1.75:1, so they still read at 16 px (favicon-check.png on light and dark).
+- Everywhere the ball is drawn: ui.css (tokens, .logo-ball and its inset shade, .serve-ind), how-to-play.css, pad.css,
+  server/share.js and server/card.js (the /c/ share card), test/og-card.html, test/make-og.mjs. Regenerated with
+  `node test/make-og.mjs`: favicon.svg, favicon-32.png, favicon.ico, apple-touch-icon.png, icon-192/512.png and og.jpg;
+  og:image is now ?v=7. The in-game 3D ball (scene.js ballTex) is gameplay art and unchanged.
+- The Poddle Helper's Resources/icon-512.png got the new icon; the released zip still carries the old one until the next build.
+- Changelog: October 2, "A brighter Poddle ball". Nothing is sent, stored or shown differently: the legal pages are untouched.

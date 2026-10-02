@@ -97,7 +97,7 @@ function html(d, url, image, img) {
 <style>
 @font-face{font-family:"Poddle Rounded";font-weight:800;font-style:normal;font-display:swap;src:url(/vendor/fonts/mplus-rounded-1c-800.woff2) format("woff2")}
 @font-face{font-family:"Poddle Rounded";font-weight:900;font-style:normal;font-display:swap;src:url(/vendor/fonts/mplus-rounded-1c-900.woff2) format("woff2")}
-:root{--ink:#555e67;--ink-strong:#39434d;--ink-soft:#65717b;--me:#3aa0ff;--me-deep:#1670d8;--me-navy:#0e3f8c;--gold-1:#fff1a6;--line-soft:#a9e0f6;--ball:#e6f03c;--ball-deep:#b9c916;
+:root{--ink:#555e67;--ink-strong:#39434d;--ink-soft:#65717b;--me:#3aa0ff;--me-deep:#1670d8;--me-navy:#0e3f8c;--gold-1:#fff1a6;--line-soft:#a9e0f6;--ball:#e8fb2a;--ball-deep:#cfae00;
   --font:"Poddle Rounded",ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN","Arial Rounded MT Bold","Nunito","Helvetica Neue",Arial,sans-serif}
 *{box-sizing:border-box}
 html{background:#7cc6ff}
@@ -110,7 +110,7 @@ main{width:100%;max-width:1000px;display:flex;flex-direction:column;align-items:
 .logo i{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
   background:radial-gradient(circle at 30% 32%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 62% 24%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 50% 52%,var(--ball-deep) 0 8%,transparent 9%),
     radial-gradient(circle at 22% 62%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 78% 54%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 48% 82%,var(--ball-deep) 0 7%,transparent 8%),
-    radial-gradient(circle at 34% 28%,#fbffa8,var(--ball) 58%,#c5d124 100%);box-shadow:inset 0 -.04em .08em rgba(90,110,0,.35)}
+    radial-gradient(circle at 34% 28%,#fbffd6,var(--ball) 58%,#ffe01a 100%);box-shadow:inset 0 -.04em .08em rgba(220,180,0,.5)}
 .card{display:block;width:min(100%,960px,max(440px,calc((100vh - 390px) * 1.905)));aspect-ratio:1200/630;border-radius:clamp(14px,2.4vw,28px);overflow:hidden;background:#dcecf6;border:4px solid #fff;box-shadow:0 3px 0 rgba(90,150,185,.25),0 18px 40px rgba(20,60,100,.28)}
 .card img{display:block;width:100%;height:100%}
 .card:focus-visible{outline:4px solid #fff;outline-offset:4px}
