@@ -285,6 +285,25 @@ function buildPaddle(side) {
   return g;
 }
 
+// ---------- the winner's trophy (NOTES 165): origin at the grip like the paddle, the cup up (+y), so the paddle's own attitude carries it ----------
+// A gold cup on a dark plinth. Shaded by hue (NOTES 162): the gold's own warm light (emissive) keeps its shaded side orange, never olive.
+function buildTrophy() {
+  const g = new THREE.Group(), cup = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xffc938, roughness: 0.3, metalness: 0.15, emissive: 0x9a4a00, emissiveIntensity: 0.4 });
+  const plinthM = new THREE.MeshStandardMaterial({ color: 0x2b303b, roughness: 0.55 });
+  // the lathe's profile, radius then height: foot, stem with a knot, the bowl's outside, its lip, and back down the inside
+  const prof = [[0, 0], [0.074, 0], [0.078, 0.012], [0.034, 0.034], [0.019, 0.058], [0.019, 0.096], [0.032, 0.108], [0.019, 0.122], [0.03, 0.148], [0.074, 0.186], [0.104, 0.246], [0.117, 0.326], [0.123, 0.362], [0.112, 0.362], [0.099, 0.3], [0.068, 0.226], [0, 0.204]];
+  const bowl = new THREE.Mesh(new THREE.LatheGeometry(prof.map(p => new THREE.Vector2(p[0], p[1])), 32), gold);
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.092, 0.07, 28), plinthM); plinth.position.y = -0.035;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0935, 0.0935, 0.014, 28), gold); band.position.y = -0.058;
+  cup.add(bowl, plinth, band);
+  for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.056, 0.0115, 10, 20, Math.PI), gold); h.position.set(sx * 0.1, 0.262, 0); h.rotation.z = -sx * Math.PI / 2; h.scale.y = 1.25; cup.add(h); }      // two ear handles, bulging outward
+  cup.position.y = -0.078;                                 // the hand closes on the stem
+  g.add(cup); g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.scale.setScalar(1.5);                                  // Wii-sized, like the paddle it replaces
+  return g;
+}
+
 // ---------- named looks (NOTES 137, 144): a character reserved for one registered username ----------
 // TEMPORARY, until cosmetics exist. The username Dan (the developer's account, the same one ui.js DEV_NAMES gives the hammer
 // badge) always plays as a plain white figure with glowing orange eyes and an orange headband tied at the back, no hair. The
@@ -758,6 +777,13 @@ export function createScene(containerEl) {
       // stance: how far the head is off the baseline (duck / tip), the bob spring it is driving, and the dip counter behind the taunt
       stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0 } };
   });
+  // The winner's shot (NOTES 165; setVictory): the result is drawn on the court. The winner holds a trophy where the paddle was (its attitude is the
+  // paddle's own, so a phone or AirPod turns it), solid even when it is me, and one camera stands in front of them. pane: where the picture is
+  // free of the result panel, as fractions of the window and its centre in NDC (ui.resultPane); the lens goes off-axis so the winner sits in it.
+  const trophy = buildTrophy(); trophy.visible = false; scene.add(trophy);
+  const vicLight = new THREE.DirectionalLight(0xfff3dc, 0); scene.add(vicLight, vicLight.target);      // the shot's fill light, from the lens: side 0 faces away from the sun, and a winner's face in shade is no portrait. Always in the scene at 0 (a light added later recompiles every material)
+  const vic = { side: -1, t: 0, cx: 0, cz: 0, hopAt: 0, pane: { fw: 0.6, fh: 1, px: -0.4, py: 0 } };
+  const vicOn = () => vic.side >= 0 && !menu && !at.on;
   const casters = []; for (const pd of pads) for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.castShadow) casters.push(m); });
   // ---------- seat status (docs/NEXT.md 14a): calibrating / paused / away. The character and its paddle go pale and see-through, a tag floats over the head ----------
   // One tween value per pad (pd.ghost, 0.25 s each way) drives the SAME materials toward white: nothing is swapped, nothing is allocated per frame.
@@ -819,7 +845,7 @@ export function createScene(containerEl) {
 
   function updatePads(dt) {
     for (const pd of pads) {
-      const vis = pd.has; pd.group.visible = pd.hand.visible = vis;             // avatar / forearm: dress(), once the camera is known
+      const vis = pd.has, won = vis && vicOn() && vic.side === pd.side; pd.group.visible = vis && !won; pd.hand.visible = vis;             // avatar / forearm: dress(), once the camera is known. won: the trophy is in this hand, not the paddle
       const want = pd.status && vis && !at.on ? 1 : 0; if (pd.ghost !== want) { pd.ghost = clamp(pd.ghost + (want ? dt : -dt) / 0.25, 0, 1); ghostify(pd); }      // whited out while calibrating / paused / away
       if (!vis) continue;
       const s = sgn(pd.side), local = isMe(pd.side), t = pd.tgt;
@@ -828,10 +854,12 @@ export function createScene(containerEl) {
       const kp = local ? 1 : damp(dt, 0.055);
       pd.pos.x = lerp(pd.pos.x, t.x, kp); pd.pos.y = lerp(pd.pos.y, t.y, kp); pd.pos.z = lerp(pd.pos.z, t.z, damp(dt, local ? 0.03 : 0.06));
       if (pd.bot) {                                        // bots never send a q: idle sway + canned swing
+        if (won) pd.swingT = -1;
         if (pd.swingT >= 0) { pd.swingT += dt; if (pd.swingT > SWING[SWING.length - 1][0]) pd.swingT = -1; }
         if (pd.swingT >= 0) swingEuler(pd.swingT, e3); else { e3[0] = IDLE[0]; e3[1] = IDLE[1]; e3[2] = IDLE[2]; }
         const br = Math.sin(timeS * 2.1 + pd.side);
-        E.set((e3[1] + br * 2.5) * D2R, e3[0] * pd.mirror * D2R, (e3[2] * pd.mirror + br * 3) * D2R);
+        if (won) E.set((-6 + Math.sin(timeS * 2.3) * 7) * D2R, Math.sin(timeS * 1.4) * 30 * D2R, Math.sin(timeS * 2.3 + 1) * 13 * D2R);      // Matt shows his cup off: it turns and tips, upright on average
+        else E.set((e3[1] + br * 2.5) * D2R, e3[0] * pd.mirror * D2R, (e3[2] * pd.mirror + br * 3) * D2R);
         qA.setFromEuler(E);
         if (pd.swingT >= 0) pd.q.copy(qA); else pd.q.slerp(qA, damp(dt, 0.08));
       } else if (local) pd.q.copy(t.q); else pd.q.slerp(t.q, damp(dt, 0.045));
@@ -855,9 +883,10 @@ export function createScene(containerEl) {
       // 80 ms read as a late contact. Only the paddle eases: the ball, pop, burst and shake all start on the event's frame.
       const ts = (1 - pd.lunge) * 0.32, rk = pd.lunge > 0 ? ease(Math.min(1, ts / 0.05)) * (1 - ease(ts / 0.32)) : 0;
       w.x += pd.reachV.x * rk; w.y = Math.max(0.12, w.y + pd.reachV.y * rk);
+      if (won) { w.y += 0.34 * ease(Math.min(1, vic.t / 0.5)); trophy.position.copy(w); trophy.quaternion.copy(pd.group.quaternion); }      // held up at the shoulder, turned by the hand that holds it
       pd.group.position.copy(w); pd.hand.position.copy(w);
       if (!pd.swoosh) pd.swoosh = makeSwoosh(local ? 0xfff1c9 : 0xffd0b8);
-      updateSwoosh(pd.swoosh, pd.group, dt, timeS < (pd.swooshUntil || 0));
+      updateSwoosh(pd.swoosh, pd.group, dt, !won && timeS < (pd.swooshUntil || 0));
       if (local || spectator) {                            // ghost forearm: from the hand back toward a virtual elbow (a spectator may look through either player's eyes)
         vA.set(pd.pos.x + s * 0.2, Math.max(0.2, pd.pos.y - 0.3), pd.pos.z + s * 0.72).sub(w).normalize();
         pd.forearm.position.copy(w); pd.forearm.quaternion.setFromUnitVectors(DOWN, vA);
@@ -871,6 +900,7 @@ export function createScene(containerEl) {
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
         pd.vz = lerp(pd.vz, (pd.bodyZ - pz) / Math.max(dt, 1e-3), damp(dt, 0.1));
+        if (won && !still && pd.cheer <= 0 && timeS >= vic.hopAt) { pd.cheer = 1.05; vic.hopAt = timeS + 3.6; }      // the winner cannot stand still: three little hops, now and again
         pd.cheer = Math.max(0, pd.cheer - dt);
         const hop = pd.cheer > 0 ? Math.abs(Math.sin(pd.cheer * 9)) * 0.28 : 0, run = Math.min(1, Math.abs(pd.vx) / 3);
         const a = pd.avatar, u = a.userData, sd = pd.stance;
@@ -922,7 +952,10 @@ export function createScene(containerEl) {
           vF.set(f.position.x, f.position.y, f.position.z).applyQuaternion(a.quaternion);
           f.position.y += Math.max(0, Math.hypot(0.066 * Math.cos(f.rotation.x), 0.165 * Math.sin(f.rotation.x)) - vF.y);
         }
-        if (ball.seen) {                                   // head tracks the ball, from wherever the crouch has actually left it
+        if (won) {                                         // the winner looks into the lens
+          const dx = (camera.position.x - pd.bodyX) * s, dz = Math.max(0.5, (pd.bodyZ - camera.position.z) * s);
+          u.head.rotation.y = lerp(u.head.rotation.y, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12)); sd.gaze = lerp(sd.gaze, 0, damp(dt, 0.12));
+        } else if (ball.seen) {                            // head tracks the ball, from wherever the crouch has actually left it
           const hy = a.position.y + (u.upper.position.y + u.head.position.y * u.upper.scale.y) * 1.3;
           const dx = (ballMesh.position.x - pd.bodyX) * s, dz = Math.max(0.5, (pd.bodyZ - ballMesh.position.z) * s);
           u.head.rotation.y = lerp(u.head.rotation.y, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12));
@@ -1114,11 +1147,35 @@ export function createScene(containerEl) {
     const s = sgn(menuSide()), d = still ? 0 : 1, y = 3.4 + Math.sin(timeS / 7.3 + 1) * 0.12 * d;
     camera.position.set(Math.sin(timeS / 5.2) * 0.9 * d, y, s * (court.halfL + 7)); camera.lookAt(vB.set(0, y, -s * court.halfL)); lens(fovFor(60, aspect), aspect);
   }
+  // The winner's shot: a cut to a camera in front of the winner, a little to the trophy's side, that pushes in over 1.5 s and then drifts. It frames
+  // 3.2 m of height (the Mii, the cup at its shoulder and room to stretch up or duck: Body still moves them) inside the pane the result panel leaves free: the lens axis lands on the pane's centre.
+  // Near the net the camera stays on the winner's own side of it and the lens widens instead. No seat there (they left): the same shot of where they stood.
+  function victoryPose(aspect, dt) {
+    const pd = pads[vic.side], s = sgn(vic.side), P = vic.pane, tx = pd.has ? pd.bodyX + s * 0.3 : 0, tz = pd.has ? pd.bodyZ : s * 6.5;
+    if (vic.t === 0) { vic.cx = tx; vic.cz = tz; } else { const k = damp(dt, 0.3); vic.cx = lerp(vic.cx, tx, k); vic.cz = lerp(vic.cz, tz, k); }
+    vic.t += dt;
+    const u = 1 - Math.min(1, vic.t / 1.5), zoom = still ? 1 : 1 + 0.85 * u * u * u, drift = still ? 0 : Math.sin(timeS / 4.3) * 0.28;
+    const D = clamp(vic.cz * s - 0.6, 1.9, 4.2), ref = Math.hypot(D, 0.75);
+    camera.position.set(vic.cx + s * (0.75 + drift), 1.3 + (zoom - 1) * 1.1, vic.cz - s * D * zoom); camera.lookAt(vB.set(vic.cx, 1.3, vic.cz));
+    vicLight.position.set(camera.position.x + s * 1.2, 3.2, camera.position.z); vicLight.target.position.copy(vB); vicLight.intensity = 1.5 * Math.min(1, vic.t / 0.4);
+    const hh = Math.max(1.6 / P.fh, 1.25 / P.fw / aspect), hw = hh * aspect, n = camera.near / ref;
+    camera.aspect = aspect; camera.fov = 2 * Math.atan(hh / ref) / D2R;
+    camera.projectionMatrix.makePerspective(-hw * (1 + P.px) * n, hw * (1 - P.px) * n, hh * (1 - P.py) * n, -hh * (1 + P.py) * n, camera.near, camera.far);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+  }
+  function setVictory(side, pane) {                        // side 0 | 1: that seat won, show it. Anything else: back to the game's own cameras (a cut both ways)
+    if (pane && isFinite(pane.fw + pane.fh + pane.px + pane.py)) { const P = vic.pane; P.fw = clamp(pane.fw, 0.2, 1); P.fh = clamp(pane.fh, 0.2, 1); P.px = clamp(pane.px, -0.8, 0.8); P.py = clamp(pane.py, -0.8, 0.8); }
+    const sd = side === 0 || side === 1 ? side : -1; if (sd === vic.side) return;
+    vic.side = sd; vic.t = 0; vic.hopAt = timeS + 0.5; easeT = 1; cam.shake = 0; povSt[0].cut = povSt[1].cut = true;
+    if (sd < 0) { trophy.visible = false; return; }
+    const w = pads[sd]; if (w.has) burst([w.world.x, w.world.y + 0.9, w.world.z], 0.9, 34, 3.4, [0xffd23a, 0xfff1a8, 0xffffff, 0xff9d2e]);      // the cup arrives in a puff of gold
+  }
   const easeFrom = { p: new THREE.Vector3(), q: new THREE.Quaternion(), m: new THREE.Matrix4() };
   // One picture: pose the camera for the mode, ease out of the menu pose if a menu just closed, dress the scene for that camera.
   function updateCamera(dt, aspect) {
-    let back = -1, sd = -1;
+    let back = -1, sd = -1; const v = vicOn();
     if (menu) { menuPose(aspect); back = menuSide(); }
+    else if (v) victoryPose(aspect, dt);                   // every fence stands, and nobody is see-through: the winner is looked at, not through
     else if (!spectator) { playPose(localSide, view, aspect, true, dt); back = localSide; }
     else if (vName === 'pov') { playPose(vSide, povSt[vSide], aspect, false, dt); back = vSide; }
     else if (vName === 'free') { freePose(aspect); const p = camera.position; sd = p.x > court.halfW + 5.2 ? 0 : p.x < -court.halfW - 5.2 ? 1 : -1; back = p.z > court.halfL + 7.2 ? 0 : p.z < -court.halfL - 7.2 ? 1 : -1; }
@@ -1128,7 +1185,7 @@ export function createScene(containerEl) {
       vA.copy(camera.position); camera.position.copy(easeFrom.p).lerp(vA, k); qA.copy(camera.quaternion); camera.quaternion.copy(easeFrom.q).slerp(qA, k);
       for (let i = 0; i < 16; i++) m[i] = lerp(a[i], m[i], k); camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
     }
-    dress(eyeSide(), back, sd);
+    dress(v ? -1 : eyeSide(), back, sd);
   }
 
   // ---------- WebAudio, no assets ----------
@@ -1405,10 +1462,11 @@ export function createScene(containerEl) {
     if ((menu || dim) && !force && lastMs && now >= lastMs && now - lastMs < 30) return false;      // a menu (or a pause behind the blur) runs at 30 fps. dt below is between DRAWN frames
     const dt = lastMs ? clamp((now - lastMs) / 1000, 0, 0.05) : 1 / 60; lastMs = now; timeS += dt; force = false; drawn++;
     if (at.on) attractStep(dt);
+    trophy.visible = vicOn() && pads[vic.side].has; if (!trophy.visible) vicLight.intensity = 0;
     updateBallVis(now, dt); updatePads(dt); if (!menu) updateFx(dt);
     cam.shake = Math.max(0, cam.shake - dt * (0.35 + cam.shake * 6));
     const w = size.w, h = size.h;
-    if (spectator && vName === 'split' && !menu) {         // two viewports, one scene: each half is that player's own picture (their fence gone, their avatar a ghost forearm)
+    if (spectator && vName === 'split' && !menu && !vicOn()) {         // two viewports, one scene: each half is that player's own picture (their fence gone, their avatar a ghost forearm)
       const tall = w <= h, wl = Math.floor(w / 2), ht = Math.floor(h / 2); renderer.setScissorTest(true);       // taller than wide: side 0 on top, side 1 under it (two 300 px columns cut both courts' corners off and gave 45 % of each to the sky). ui.css turns #split-line with the same test
       for (let i = 0; i < 2; i++) { const x = tall || !i ? 0 : wl, ww = tall ? w : i ? w - wl : wl, y = tall && !i ? h - ht : 0, hh = tall ? (i ? h - ht : ht) : h;      // (GL's y runs up from the bottom)
         vpW = ww; vpH = hh; playPose(i, povSt[i], ww / hh, false, dt); dress(i, i, -1); drawTrail(); faceFx();                // trail and rings are rebuilt for each camera
@@ -1428,7 +1486,7 @@ export function createScene(containerEl) {
   resize();
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
-    setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen,
+    setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen, setVictory,
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
@@ -1449,7 +1507,7 @@ export function createScene(containerEl) {
     },
     setSelfBody(on) { selfBody = !!on; },                   // Settings > Show player model (dress() reads it every frame)
     setLooks(a) { for (const pd of pads) { const k = Array.isArray(a) && LOOKS[a[pd.side]] ? a[pd.side] : null; if (k !== pd.look) { pd.look = k; paint(pd, pd.matt); } } },      // [side 0, side 1]: LOOKS keys (main.js, from lookFor(name, reg)) or null
-    _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at,               // test harness only
+    _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at, trophy, vic,               // test harness only
       view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }) },
   };
 }

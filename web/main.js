@@ -168,6 +168,9 @@ const seatsOn = () => [0, 1].filter(i => (spec() || i !== side) && regs[i] && na
 function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDim(); }
 
 // ---------- match end, rematch (docs/SPECTATE.md) ----------
+// The winner's shot (NOTES 165): once the result panel is in (after VICTORY!'s own beat, vicAt), the court behind it shows the winner holding the trophy.
+// The render loop hands scene.setVictory the seat while that panel is what is up, and null the moment it is not: no other code path has to remember to end it.
+let vicSide = null, vicAt = 0, revealT = 0;
 function showOver() {                              // the result card. A matchover that came while a set-up screen was up waits in `over` for the court to open
   const m = over; over = null; if (!m) return;
   const T = m.tour && typeof m.tour === 'object' ? { round: String(m.tour.round || '').slice(0, 24), next: m.tour.next ? String(m.tour.next).slice(0, 24) : null, final: !!m.tour.final, gap: Math.max(0, Math.round((+m.tour.gap || 0) - (performance.now() - overAt) / 1000)) } : null;      // a tournament match: no vote, back to the bracket after gap s
@@ -179,13 +182,16 @@ function showOver() {                              // the result card. A matchov
     : { rally: ms.rally, smashes: ms.smash[L], run: ms.best[L] }) : null; ms = null;      // every point seen from 0-0, or none at all (showOver runs once per matchover: it takes `over`)
   const endRanks = Array.isArray(m.rank) ? cleanRanks(m.rank) : ranks;      // the ranks as they were when it ended (docs/TROPHIES.md 3, item 9)
   overForfeit = !!m.forfeit && !spec();      // for the trophy row (drawTrophies): the stayer's win notes the forfeit
-  ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [rg[L], rg[1 - L]], rank: [endRanks[L], endRanks[1 - L]], stats: mstats });
-  if (trophyParked) { const t = trophyParked; trophyParked = null; drawTrophies(t); }      // its trophies came first (the 'profile' message can land before the matchover, or while a set-up screen was up): the row goes on the card now
+  const wait = +ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [rg[L], rg[1 - L]], rank: [endRanks[L], endRanks[1 - L]], stats: mstats }) || 0;      // ms the panel waits behind VICTORY! (0: it is in at once)
+  vicSide = W; vicAt = performance.now() + wait;
+  const reveal = () => { if (ui.currentOverlay() !== 'match') return; if (trophyParked) { const t = trophyParked; trophyParked = null; drawTrophies(t); }      // its trophies came first (the 'profile' message can land before the matchover, behind VICTORY!, or while a set-up screen was up): the row goes on the card as it comes in, so its roll and ceremony are seen
+    if (won && !spec() && wait) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); };      // the second burst belongs to the panel
+  clearTimeout(revealT); if (wait) revealT = setTimeout(reveal, wait); else reveal();
   scene.jingle(spec() ? (m.forfeit ? 'forfeit' : 'watch') : m.forfeit ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
   const left = Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000));      // less what was spent behind a set-up screen
   if (vote) ui.rematch(spec() ? { left } : { mine: null, theirs: null, left, name: nameOf(1 - L) });
-  else if (!T) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket
-  if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card: a quick 'No rematch' had it falling over the lobby
+  else if (!T) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000 + wait);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket
+  if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); if (!wait) burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card (reveal, when it waits): a quick 'No rematch' had it falling over the lobby
   if (spec()) ui.confetti(W ? ['#ff8a3d', '#ffd34a', '#ffffff'] : ['#3aa0ff', '#ffd34a', '#ffffff'], 60);      // a spectator: one smaller burst in the winner's colours
 }
 
@@ -350,7 +356,7 @@ const tourOn = () => !!tour && tour.phase !== 'done';      // still running: a f
 // ladder is kept in the browser beyond the last object (the __stats.trophies test hook). The message can land before or after the matchover, and either
 // can come while a set-up screen is up: it is drawn the moment the result card is up, else parked (trophyParked) and drawn by showOver with the card.
 let trophyUpT = 0, overForfeit = false;      // overForfeit: the result card up now is a forfeit's (showOver)
-function trophiesIn(t) { lastTrophies = t; if (ui.currentOverlay() === 'match') { trophyParked = null; drawTrophies(t); } else trophyParked = t; }
+function trophiesIn(t) { lastTrophies = t; if (ui.currentOverlay() === 'match' && performance.now() >= vicAt) { trophyParked = null; drawTrophies(t); } else trophyParked = t; }
 function drawTrophies(t) { ui.trophyRow?.(overForfeit && Number.isInteger(t.delta) && t.delta > 0 ? { ...t, forfeit: true } : t); trophyCeremony(t); }      // the row on the card (a stayer's win after a forfeit says so: the card's flag, never the server's object otherwise), and its sounds
 function trophyCeremony(m) {                        // the roll's ticks and the ceremony's sound, timed to the card's beats: ui.js swaps the emblem and stamps RANK UP at 2100 ms
   clearTimeout(trophyUpT); const now = rankRef(m), was = rankRef({ tier: m.tierWas, div: m.divWas }), d = Number.isInteger(m.delta) ? m.delta : 0;
@@ -409,7 +415,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
-  trophiesOff(); clearFar(); clearTimeout(burstT); ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
+  trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
@@ -841,6 +847,8 @@ let lastPos = null;
     lastPos = pos;
   }
   if (phase !== 'title' && phase !== 'lobby' && phase !== 'watch' && ui.isVisible('podwrap')) pod.update(p.Pd);      // (the menu camera drifts by itself now: scene.setMenu)
+  { const v = vicSide != null && seated() && !ui.currentScreen() && ui.currentOverlay() === 'match' && !ui.championShowing?.() && performance.now() >= vicAt;      // the winner's shot, exactly while the result panel is up over the court
+    scene.setVictory?.(v ? vicSide : null, v ? ui.resultPane?.() : null); }
   scene.render(now);
 })(performance.now());
 

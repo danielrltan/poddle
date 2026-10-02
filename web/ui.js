@@ -239,6 +239,13 @@ export function confetti(colors, n = 46) {
 // The old positional call (won, me, them, name) still works and means a room with no vote: the next game starts by itself.
 let resultRole = 'player', voted = false, votedYes = false, noCount = false, countT = 0, countLeft = 0, countTotal = 0;
 let stampT = 0;                                                  // the VICTORY! beat's timer: the card waits for it (NOTES 130)
+const STAMP_MS = 2600;                                           // how long VICTORY! has the court to itself (NOTES 165; ui.css ov-victory runs 2800 ms, so the panel comes in under its fade)
+const stacked = matchMedia('(max-aspect-ratio: 1/1), (max-width: 760px)');      // ui.css: the result panel lies along the bottom instead of down the right
+// Where the court shows beside the result panel, for the winner's shot (scene.setVictory): the free pane's share of the window and its centre in NDC
+export function resultPane() { const c = $('result'), W = innerWidth || 1, H = innerHeight || 1; if (!c) return null;
+  if (stacked.matches) { const f = Math.max(0.25, 1 - c.offsetHeight / H); return { fw: 1, fh: f, px: 0, py: 1 - f }; }
+  const f = Math.max(0.25, 1 - c.offsetWidth / W); return { fw: f, fh: 1, px: f - 1, py: 0 }; }
+// -> the ms the panel stays out of sight behind VICTORY! (0: it is in at once)
 export function matchResult(o, me, them, name) {
   const legacy = o === null || typeof o !== 'object';                                   // the old positional call: it never carries stats
   if (legacy) o = { won: !!o, me, them, nameThem: name, vote: false };
@@ -264,12 +271,14 @@ export function matchResult(o, me, them, name) {
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
   { const st = $('result-slam'), scr = $('screen-match'); if (st) { st.textContent = won && !watching && !o.forfeit ? 'VICTORY!' : ''; st.classList.remove('is-rank'); st.classList.toggle('is-victory', !!st.textContent); if (st.textContent) restart(st, 'go'); }
-    clearTimeout(stampT); const v = !!(st && st.textContent) && !matchMedia('(prefers-reduced-motion: reduce)').matches; scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => scr?.classList.remove('is-stamp'), 780); }      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
+    clearTimeout(stampT); const v = !!(st && st.textContent) && !matchMedia('(prefers-reduced-motion: reduce)').matches; scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => scr?.classList.remove('is-stamp'), STAMP_MS); }      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
   $('tally-sc-me').style.setProperty('--to', L | 0); $('tally-sc-them').style.setProperty('--to', R | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame (no stamp: NOTES 104)
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
-  if (T) { if (T.gap > 0) rematch({ left: T.gap }); setTimeout(() => { if (slots.overlay === 'match') $('btn-see-bracket')?.focus({ preventScroll: true, focusVisible: true }); }, 60); }
-  if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60);
+  const wait = $('screen-match')?.classList.contains('is-stamp') ? STAMP_MS : 0;      // nothing on the panel takes a key or a click until it is in sight
+  if (T) { if (T.gap > 0) rematch({ left: T.gap }); setTimeout(() => { if (slots.overlay === 'match') $('btn-see-bracket')?.focus({ preventScroll: true, focusVisible: true }); }, 60 + wait); }
+  if (vote) setTimeout(() => { if (slots.overlay === 'match' && !voted) ($('btn-rematch')?.disabled ? $('btn-leave') : $('btn-rematch'))?.focus({ preventScroll: true, focusVisible: true }); }, 60 + wait);
+  return wait;
 }
 // the trophy row back to nothing: the roll, its ceremony and the card's extra room for it (matchResult and champion both start clean)
 export function trophyReset() {

@@ -191,7 +191,7 @@ ok(s.result.rnote === 'Waiting for Ben' && t.result.rnote === 'Ann wants a remat
 await b.click('#btn-rematch'); [s, t, u] = await Promise.all([a, b, c].map(pg => until(pg, s => !s.overlay && s.scMe === 0 && s.scThem === 0, 5000, `${pg.tag}: rematch on`)));
 ok(u.phase === 'watch' && u.room === CODE && u.watchers === 1 && s.watchers === 1 && s.room === CODE && t.room === CODE, `yes / yes: a new match in ${CODE}, 0-0, Cat still watching (${s.watchers} watching)`);
 [s, t, u] = await Promise.all([until(a, s => s.result, 200000, 'match 2 ends for Ann'), until(b, s => s.result, 200000, 'for Ben'), until(c, s => s.result, 200000, 'for Cat')]);
-await a.click('#btn-rematch'); await sleep(400); await b.click('#btn-leave');
+await sleep(3200); /* the winner's panel waits behind VICTORY! (NOTES 165) */ await a.click('#btn-rematch'); await sleep(400); await b.click('#btn-leave');
 [s, t, u] = await Promise.all([a, b, c].map(pg => until(pg, s => s.screen === 'lobby' && s.lview === 'home' && !s.room, 6000, `${pg.tag}: back in the lobby`)));
 ok(s.toast === 'No rematch' && u.toast === 'No rematch' && t.toast === null && !s.overlay && !t.overlay && !u.overlay && !s.pill && !u.role, `yes / no: everyone in the lobby. Ann "${s.toast}", Cat "${u.toast}", Ben (who left) "${t.toast}"`);
 await sleep(1000); u = await st(c); ok(u.scene.attract && u.scene.menu && !u.scene.spectator && !u.views && !/watch=|room=|court=/.test(u.search), `Cat's lobby: menu rally back, no spectator bits, clean address bar "${u.search}"`);

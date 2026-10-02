@@ -1260,8 +1260,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 #screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-card{animation:panel-in var(--d-slow) var(--ease-out) both}
 #screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-flash{animation:ov-shine 900ms var(--ease-soft) 260ms both}
 #screen-match.is-active .result-slam.go{animation:ov-slam 380ms linear both}
-#screen-match.is-active .result-slam.is-victory.go{animation:ov-victory 950ms linear both}      /* NOTES 130: VICTORY! is its own beat: in by 114 ms (the win sting's impact), held, gone by 950 ms */
-#screen-match.is-stamp .result-card,#screen-match.is-stamp .result-card *,#screen-match.is-stamp .result-card *::before,#screen-match.is-stamp .result-card *::after,#screen-match.is-stamp .result-flash{animation-play-state:paused!important}      /* the card waits at its first frame (panel-in: unseen) until the stamp clears (ui.js drops is-stamp at 780 ms), then plays its whole entrance */
+#screen-match.is-stamp .result-card,#screen-match.is-stamp .result-card *,#screen-match.is-stamp .result-card *::before,#screen-match.is-stamp .result-card *::after,#screen-match.is-stamp .result-flash{animation-play-state:paused!important}      /* the card waits at its first frame (panel-in: unseen) until the stamp clears (ui.js drops is-stamp after STAMP_MS, NOTES 165), then plays its whole entrance */
 /* rays open as the medal lands, then turn: slow for a loss, fast for the champion */
 .screen.is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 14s linear 940ms infinite}
 [data-beat="lose"].is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 28s linear 940ms infinite}
@@ -1291,7 +1290,6 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 @keyframes ov-title-pop{from{opacity:0;scale:.6}}
 @keyframes ov-winner-bob{0%,100%{translate:0 0}50%{translate:0 -.375rem}}
 @keyframes ov-slam{0%{opacity:0;scale:2.4}30%{opacity:1;scale:.92}42%{scale:1}62%{opacity:1;scale:1}100%{opacity:0;scale:1.3}}
-@keyframes ov-victory{0%{opacity:0;scale:2.4}12%{opacity:1;scale:.92}18%{scale:1.04}24%{scale:1}80%{opacity:1;scale:1}100%{opacity:0;scale:1.12}}
 @keyframes ov-shine{0%{opacity:1;background-position:100% 0}80%{opacity:1}100%{opacity:0;background-position:-50% 0}}      /* left to right across the card, once */
 @keyframes ov-rays-in{0%{scale:0}70%{scale:1.15}100%{scale:1}}
 @keyframes ov-spin{to{rotate:360deg}}
@@ -2115,3 +2113,52 @@ html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{g
   html[data-mobile] .lobby-home .tile,html[data-mobile] .lobby-home .tile.is-hero{height:8rem}
   html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{height:6rem}
 }
+
+/* ==========================================================================================================
+   THE WINNER'S SHOT (NOTES 165). A match's result is drawn on the court, not on a white ground: VICTORY! has the court to itself (2.6 s),
+   then the picture cuts to the winner holding the trophy (scene.js setVictory) and the result card comes in as a panel down the right
+   two fifths: the same #result, every row of it. The champion card ([data-beat="champ"]) is off the court and keeps its own ground.
+   A tall or narrow window lays the panel along the bottom instead (ui.js resultPane tells the scene which pane is free).
+   ========================================================================================================== */
+#screen-match:not([data-beat="champ"]){background:none;flex-direction:row;align-items:stretch;justify-content:flex-end;pointer-events:none}
+#screen-match:not([data-beat="champ"])::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 420ms var(--ease-soft);
+  background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(8,34,54,.5),rgba(8,34,54,.2) 70%,rgba(8,34,54,.08))}      /* behind VICTORY! the court dims a little, so the word reads over grass and sky alike */
+#screen-match.is-stamp:not([data-beat="champ"])::before{opacity:1}
+#screen-match:not([data-beat="champ"]) .result-card{pointer-events:auto;flex:none;width:40vw;height:100%;margin:0;padding:var(--s-5) var(--s-6);border:0;border-left:.25rem solid var(--line);border-radius:0;
+  display:flex;flex-direction:column;align-items:center;overflow-y:auto;overscroll-behavior:contain;box-shadow:-.75rem 0 2.5rem rgba(8,34,54,.3), inset .1875rem 0 0 #fff}
+#screen-match.is-stamp:not([data-beat="champ"]) .result-flash{visibility:hidden}      /* paused at its first frame with the card: on a clear ground that frame is a white band */
+#screen-match.is-stamp:not([data-beat="champ"]) .result-card{pointer-events:none}      /* out of sight behind VICTORY!: nothing to press yet */
+#screen-match.is-active:not([data-beat="champ"]) .result-card{animation:vic-panel 560ms var(--ease-out) both}
+@keyframes vic-panel{from{transform:translateX(104%)}}
+/* in the panel the card's rows stack from a centred block (auto margins, so a tall card scrolls from its top instead of losing it) */
+#screen-match:not([data-beat="champ"]) .result-card > *{flex:none;max-width:100%}
+#screen-match:not([data-beat="champ"]) .medal{position:relative;left:auto;top:auto;margin:auto 0 var(--s-2);scale:.82;transform-origin:50% 100%}
+#screen-match:not([data-beat="champ"]) .result-card.has-trophies .medal{scale:.7;margin-bottom:0}
+#screen-match:not([data-beat="champ"]) .rematch{margin-bottom:auto;width:100%}
+#screen-match:not([data-beat="champ"]) .result-card h2{margin:0 0 var(--s-4);font-size:3.25rem;text-wrap:balance}
+#screen-match:not([data-beat="champ"]) .result-card.is-lose h2{font-size:2.75rem}
+#screen-match:not([data-beat="champ"]) .tally{gap:var(--s-2);padding:var(--s-4) var(--s-3);margin:0 0 var(--s-5);width:100%}
+#screen-match:not([data-beat="champ"]) .tally-side{min-width:0;flex:1 1 0}
+#screen-match:not([data-beat="champ"]) .tally-side b{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.2}
+#screen-match:not([data-beat="champ"]) .tally-num{font-size:4.5rem;min-width:4.5rem;flex:none}
+#screen-match:not([data-beat="champ"]) .tally-dash{width:1rem}
+#screen-match:not([data-beat="champ"]) .trophy{margin:calc(var(--s-2) * -1) 0 var(--s-4)} #screen-match:not([data-beat="champ"]) .trophy-row{gap:1rem} #screen-match:not([data-beat="champ"]) .trophy-n{font-size:4rem}
+#screen-match:not([data-beat="champ"]) .result-stats{margin:-.25rem 0 var(--s-4);gap:.5rem}
+#screen-match:not([data-beat="champ"]) .rematch-btns{width:100%} #screen-match:not([data-beat="champ"]) .rematch-btns .btn{min-width:0;flex:1 1 0;padding:0 1rem}
+/* the light sweep crosses the panel, not the court; RANK UP stamps over the court beside it */
+#screen-match:not([data-beat="champ"]) .result-flash{left:auto;right:0;width:40vw}
+#screen-match:not([data-beat="champ"]) .result-slam.is-rank{right:40vw;font-size:min(7rem,9vw)}
+/* VICTORY! is its own beat over the live court: in by 110 ms (the win sting's impact), held and slowly growing, gone by 2.8 s as the panel arrives */
+#screen-match .result-slam.is-victory{font-size:min(11rem,15vw)}
+#screen-match.is-active .result-slam.is-victory.go{animation:ov-victory 2800ms linear both}
+@keyframes ov-victory{0%{opacity:0;scale:2.4}4%{opacity:1;scale:.92}6%{scale:1.04}8%{scale:1}88%{opacity:1;scale:1.06}100%{opacity:0;scale:1.2}}
+@media (max-aspect-ratio: 1/1), (max-width: 760px){
+  #screen-match:not([data-beat="champ"]){flex-direction:column}
+  #screen-match:not([data-beat="champ"]) .result-card{width:100%;height:auto;max-height:58dvh;padding:var(--s-4) var(--s-5);border-left:0;border-top:.25rem solid var(--line);box-shadow:0 -.75rem 2.5rem rgba(8,34,54,.3), inset 0 .1875rem 0 #fff}
+  @keyframes vic-panel{from{transform:translateY(104%)}}
+  #screen-match:not([data-beat="champ"]) .medal{display:none}      /* the trophy is in the winner's hand, above: the panel keeps its height for the score */
+  #screen-match:not([data-beat="champ"]) .result-card h2{margin-top:auto}
+  #screen-match:not([data-beat="champ"]) .result-flash{top:auto;bottom:0;width:100%;height:58dvh}
+  #screen-match:not([data-beat="champ"]) .result-slam.is-rank{right:0;bottom:58dvh}
+}
+@media (prefers-reduced-motion: reduce){ #screen-match:not([data-beat="champ"])::before{display:none} }

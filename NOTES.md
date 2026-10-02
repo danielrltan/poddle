@@ -3546,3 +3546,43 @@ Time on court and the friend row were already on the card (NOTES 145, 146); what
   streak; Last updated / dateModified October 2, 2026, sitemap lastmod; docs/ropa.md and CLAUDE.md data flows follow; changelog.html has
   an October 2 entry linking the policy. No home-page notice was added (ask the owner if he wants one; NOTES 147).
 - Tests: lb-profile-ui.mjs and social-ui.mjs read the eleven by [data-stat], the record, the flame and the friend row's place.
+## 165. The winner's shot: VICTORY! holds, then the winner with a trophy on the court and the result as a panel on the right
+- The owner: VICTORY is "incredibly brief"; lengthen it, "and then, instead of the boring white rematch / end screen, it should cut to a zoom in of
+  the winning player on the left side of the screen on the court (about 3/5s). The player should be holding a trophy in their hand, in which they
+  can move their phone around to move it in game accordingly. Then on the 2/5 right side, you have the rematch buttons, leave, etc." And, while it
+  was being built: "camera tracking should still be enabled at that winner screen, so players can move up / down for fun".
+- VICTORY! (ui.js STAMP_MS 2600, ui.css ov-victory 2800 ms; it was 950 / 780, NOTES 130): over the LIVE court (dimmed a little so the word reads),
+  bigger (11rem), in by 110 ms on the win sting, held and slowly growing, fading as the panel arrives. Still only on a win of your own (NOTES 122):
+  a loss, a forfeit win and watching cut to the winner at once. Reduced motion: no stamp, no wait.
+- The result is the same #result card (one card per thing), restyled by ui.css's last section for `#screen-match:not([data-beat="champ"])`: no white
+  ground, the card is a full-height panel down the right 40vw (slides in, 560 ms), every row of it kept (medal, title, tally, trophy row and its
+  ceremony, stats, the save line, Rematch / Leave, the countdown, See bracket). RANK UP stamps over the court pane, the light sweep crosses the
+  panel only. A tall or narrow window (max-aspect-ratio 1/1 or max-width 760px: phones watching, a portrait window) lays the panel along the bottom
+  (max 58dvh, no medal). The champion card is off the court (the lobby is behind it) and keeps the old centred card and ground.
+- The shot (scene.js setVictory(side, pane), victoryPose): a cut to a camera 4.2 m in front of the winner, a little to the trophy's side, that
+  pushes in over 1.5 s and then drifts; it follows the winner's body. The lens is off-axis so the winner sits in the middle of the pane the panel
+  leaves free (ui.resultPane() measures it from the card each frame: {fw, fh, px, py}). 3.2 m of height is framed, so there is room to stretch and
+  duck. Near the net the camera stays on the winner's side of it and widens instead. Every fence stands, the winner is solid even when it is me
+  (dress(-1)), looks into the lens, hops now and then, and a fill light from the lens (always in the scene at intensity 0, so no recompile) lifts
+  the face: side 0 faces away from the sun. A spectator in split gets the one shot too.
+- The trophy (scene.js buildTrophy): a lathe-turned gold cup with two handles on a dark plinth, origin at the grip like the paddle. While the shot
+  is on, the winner's paddle is hidden and the trophy takes its position and attitude (pd.group's), lifted 0.34 m to the shoulder: so the phone /
+  AirPod turns it 1:1 for the winner, and the other player and spectators see it through the same relayed q as ever. Matt has no q: he turns and
+  tips his cup on a canned sway. A puff of gold sparks when it appears.
+- Body tracking needed nothing: main.js's loop keeps feeding my paddle from the camera behind the result, the 20 Hz 'paddle' send never stopped,
+  and the server keeps stepping and broadcasting 'state' while `over` is set. So stepping, ducking and stretching show on both screens.
+- main.js: showOver keeps the winner's seat (vicSide) and when the panel is due (vicAt = now + the ms ui.matchResult now returns). The render loop
+  calls scene.setVictory(seat) exactly while the match overlay is up over the court, not the champion card, and past vicAt, else null: nothing else
+  has to remember to end it (rematchon, serve, closed, Leave, Q Q all just close the overlay). The trophy row and its ticks / rank-up jingle wait
+  for the panel (trophiesIn parks until vicAt, reveal() draws), so the roll is seen; the second confetti burst moved there too.
+- Edge cases. Nothing on the panel takes focus or a click behind VICTORY! (pointer-events none, focus at 60 ms + the wait; an early Enter votes
+  nothing). The rematch clock is the server's 20 s from match point, so the panel opens at about 17. The winner left (a tournament no-show, a
+  forfeit seen by a spectator whose winner is gone): the same shot of where they stood, no trophy. A set-up screen up at match point: showOver runs
+  when the court opens, as before. Guests, signed-in, phones watching: the same. Legacy no-vote rooms close the card 6 s after it is in.
+- No data, storage, permission or third-party change: the legal pages are untouched. The changelog page has the entry.
+- Decisions made without asking: no DEFEAT stamp (NOTES 122's rule kept; the owner wrote "when you win / lose" but only VICTORY! exists); the
+  gold medal stays at the top of the panel; the champion card is unchanged.
+- test/victory-e2e.mjs (new, VICTORY_PORT, ~2 min): a real match to 3 with a spectator; the stamp's 2.8 s and the panel's wait, the cut on the
+  three screens, the panel's box, the winner's head and the trophy inside the free pane (also 600x900), the trophy turning with the hand on the
+  loser's screen, the rematch putting paddles back. Shots: test/ui-shots/victory-*.png. test/ui-next.mjs waits for the panel where it measured
+  the card at once; its 8 old reds are unchanged.
