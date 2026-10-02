@@ -3671,3 +3671,24 @@ the old 1.8% sine on the body's height, which nobody could see.
 - Tests: test/breathe.mjs (new, port 8744) drives scene-preview.html with the rally held still: the calm breath's depth and rate, a sprint
   winding it deeper and faster, and a rest bringing it back; screenshots of out / in / winded in test/ui-shots/breathe/. stance.mjs's
   side-1 height check now takes the breath off both heads (`breathY`), since the seats breathe out of step.
+
+## 170. No match starts on a player who is not on the court
+
+The owner (2026-10-02): "sometimes games will start early even while someone is calibrating ... its been around for multiplay and bot games
+for a long time now". The server was right (the count and every serve wait for `ready`: a first `paddle`, and no `status cal:true`); the tab
+lied to it. A calibration is kept between courts, and main.js sent `paddle` at 20 Hz whenever `calibrating` was false and it had a seat,
+whatever screen was up. So from the SECOND court of a visit on (never the first, which is why it was "sometimes"), the seat was ready:
+- on the share screen of a court just made (phase 'lobby', seated): a friend who joined was counted in and served at once;
+- on the connect screen (the phone asleep or its page closed, the AirPod not streaming) and behind the camera primer, against a person or
+  Matt; the paddle's first sample then started calibration, in a match already running;
+- on the 'All set' card: `status cal:false` went out 0.9 s plus the fade before the court showed, so a mid-match recalibration was served blind.
+
+- Fix (web/main.js only): the seat's state follows what the player sees. onCourt() = phase 'play' and no menu screen up. tellCal() takes no
+  argument: it sends `status cal:!onCourt()` when that changed (toldCal; reset by every `welcome`, i.e. a new seat or socket), from the same
+  20 Hz timer and at once from startCal / the paddle swap. `paddle` is only sent while onCourt(). The result card and VS card are overlays,
+  not screens: a seat under them is still on the court. Server and wire unchanged; an old tab behaves as before.
+- Seen by others: 'Calibrating' on the character of a player who is on the share / connect / primer screen (it used to show nothing).
+  A court's maker who stays on the share screen now holds the match until Start, as the first court of a visit always did.
+- No data, storage, permission or third-party change: the legal pages are untouched. Changelog entry added.
+- Tests: test/calstart-e2e.mjs (new, CALSTART_PORT, 7 checks; 3 fail on the old main.js): a kept calibration on the share screen holds the
+  count while the other seat is ready, Start releases it, and a C mid-match reads 'Calibrating' until the court is back.

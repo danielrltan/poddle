@@ -305,8 +305,13 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
 function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); }      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
 function openCourt() { screen(null); if (over) showOver(); padPhase(); }
-function startCal() { if (undo) undo.kept = false; calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(true); padPhase(); }
-function tellCal(on) { if (seated() && !spec()) game.send({ type: 'status', cal: on }); }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
+function startCal() { if (undo) undo.kept = false; calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(); padPhase(); }
+// The server is told whether this seat is ON THE COURT, from what the player is looking at, never from the calibration flags: a calibration is kept
+// between courts, so 'calibrated' was true behind the share screen, the camera primer, the connect screen (the phone asleep) and the 'All set' card,
+// paddles went out from all of them, and the match was counted in and served to a player who then calibrated through it (NOTES 170).
+let toldCal = null;      // what this seat last said: null = nothing yet
+const onCourt = () => phase === 'play' && !ui.currentScreen();
+function tellCal() { if (!seated() || spec()) { toldCal = null; return; } const cal = !onCourt(); if (cal !== toldCal) { toldCal = cal; game.send({ type: 'status', cal }); } }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
   phase = 'lobby'; screen('lobby'); if (MOBILE) wantWatch = true;      // a phone opens any court link as a spectator: a join link watches
@@ -507,13 +512,13 @@ function pickPaddle(kind) {
   const mid = phase === 'play' || phase === 'calibrate';
   if (phase === 'play' && !undo) { undo = { airpod: useAirpod, kept: stats.calibrated }; ui.backLabel('Cancel'); }
   setPaddleTo(want);
-  if (mid) { stats.calibrated = false; calibrating = true; lastSample = -1e9; phase = 'connect'; ui.settings(false); screen('connect'); tellCal(true); }
+  if (mid) { stats.calibrated = false; calibrating = true; lastSample = -1e9; phase = 'connect'; ui.settings(false); screen('connect'); tellCal(); }
 }
 function setPaddleTo(want) { if (want) padFx('idle'); useAirpod = want; chose = true; tryBridge = false; if (useAirpod) openBridge(); ls.set('poddle.airpod', useAirpod ? '1' : '0'); showPair(); if (!useAirpod) padPhase(); }
 // Cancel: the old paddle again. If the new one never started calibrating, the old calibration is untouched: straight back to the court.
 function cancelSwap() {
   const u = undo; undo = null; ui.backLabel('Back'); if (!u) return; setPaddleTo(u.airpod); lastSample = performance.now();      // the old paddle was live a moment ago: no 'signal lost' flash while its next sample arrives
-  if (u.kept) { stats.calibrated = true; calibrating = false; phase = 'play'; tellCal(false); openCourt(); }
+  if (u.kept) { stats.calibrated = true; calibrating = false; phase = 'play'; openCourt(); tellCal(); }
   else { stats.calibrated = false; phase = 'connect'; screen('connect'); }      // its next sample calibrates it again
 }
 ui.onPaddleSwap(pickPaddle);
@@ -539,7 +544,7 @@ function onSample(sample, from) {
   if (phase === 'connect') startCal();                              //  begins, so a bud lying on the desk cannot calibrate itself.
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
-    else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(false);
+    else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal();
       // 'All set' arrives in this same batch: hold the green card long enough to be read, then open the court
       setTimeout(() => { if (phase !== 'play') return; openCourt();
         setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve', null, 2600); }, 380); }, 900); }     // after the fade
@@ -624,7 +629,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'closed') { if (room) toLobby(tourKind && ['round', 'tourstart', 'tourend', 'empty'].includes(m.reason) ? '' : m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling. A tournament's court closing is the thing moving on: its screen says the rest
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
-  if (m.type === 'welcome') {
+  if (m.type === 'welcome') { toldCal = null;      // a new seat, or the old one on a new socket: say again where I am (tellCal)
     ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); ranks = cleanRanks(m.rank); holding = false; dressSeats();      // rank: each seat's emblem, on any court (docs/TROPHIES.md 3, item 9)
     if (LOBBY && room && !spec()) profile.seated();              // a seat of my own: the device id is made now if there is none, and its hello goes at once (docs/ACCOUNTS.md 3.1)
     if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
@@ -736,7 +741,7 @@ const net = (() => {
 })();
 
 setInterval(() => {                               // 20Hz: tell the server where my paddle is
-  if (calibrating || !seated() || spec()) return;
+  tellCal(); if (calibrating || !seated() || spec() || !onCourt()) return;      // a paddle message IS 'this seat is ready': only from the court itself
   const p = model.pose(performance.now());
   // r: how fast the hand is turning right now. Below the swing trigger nothing is ever reported, so without it a shove
   // into a held-up paddle at the net would be invisible: with it, a still paddle blocks and a push sends the ball deeper.
