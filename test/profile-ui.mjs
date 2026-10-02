@@ -23,7 +23,7 @@ const FIXTURE = { guest: true, since: day - 864e5, expiresAt: day + 90 * 864e5, 
 const API = { signin: false, profile: FIXTURE, delClears: false, acct: null, stale: false, signoutFail: false, slug: null, slugs: 0, shareFail: false, log: [] };      // log: [method, path, body] in arrival order. delClears: DELETE /api/account empties the fake store (section D)
 const apiAnswer = (q, body, r) => { const u = q.url.split('?')[0], send = (s, o) => { r.writeHead(s, { 'content-type': 'application/json' }); r.end(o === undefined ? '' : J(o)); };
   let b = null; try { b = body ? JSON.parse(body) : null; } catch { b = null; } API.log.push([q.method, u, b]);
-  if (u === '/api/me') return send(200, { db: true, signin: { enabled: API.signin, clientId: API.signin ? 'test-client.apps.googleusercontent.com' : null }, account: API.acct });
+  if (u === '/api/me') return send(200, { db: true, signin: { enabled: API.signin, clientId: API.signin ? 'test-client.apps.googleusercontent.com' : null }, account: API.acct, ...(API.acct && API.meLadder ? { ladder: API.meLadder } : {}) });      // meLadder: the account's ladder rides on /api/me (section G)
   const link = () => { const url = `http://127.0.0.1:${W}/c/${API.slug}`; return { url, image: `${url}.png?v=${API.slugs}` }; };      // the real shape (server/share.js): <url>.png?v=<hash>; the fake's hash is the slug count
   if (u === '/api/stats') { const p = b && b.dev ? API.profile : null; return send(200, { profile: p && 'share' in p ? { ...p, share: API.slug ? link() : null } : p }); }      // no share key in the profile: an older server, left as it is
   if (u === '/api/share' && q.method === 'POST') { if (API.shareFail) return send(503, { error: 'unavailable' }); if (!b || !b.dev || !API.profile) return send(404, { error: 'nothing' });
@@ -402,6 +402,30 @@ await pg.close();
   ok(r.signin && !r.share, `the name line opens the sign-in card (${J(r)})`);
   await pg.keyboard.press('Escape'); await sleep(300);
   await pg.close(); fs.rmSync(DL, { recursive: true, force: true }); API.signin = false; API.profile = FIXTURE; API.slug = null; }
+
+// ---------- G. The player card in the header's corner (NOTES 161): emblem, name and trophies on the home screen, from /api/me alone ----------
+{ const SHOTS = path.join(root, 'test/ui-shots/accounts'); API.signin = true; API.profile = FIXTURE; API.acct = { username: 'Tester', renameAt: null }; API.meLadder = FIXTURE.ladder;
+  const pg = await page('chip'); await pg.setViewport({ width: 1280, height: 800 }); await pg.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
+  await pg.goto(URL0); await sleep(2200); await pg.click('#btn-start').catch(() => {}); await sleep(1200);
+  const chip = () => ev(pg, () => { const g = id => document.getElementById(id), b = g('btn-head-acct'), r = b.getBoundingClientRect(); return { shown: !b.hidden && r.width > 0, card: b.classList.contains('is-card'), name: g('head-acct-t').textContent, n: g('head-acct-n').hidden ? null : g('head-acct-tr').textContent,
+    em: g('head-acct-em').hidden ? null : g('head-acct-em').getAttribute('aria-label'), label: b.getAttribute('aria-label'), view: window.__ui.lobbyView ? document.querySelector('.lobby-view:not([hidden])')?.dataset.view : '', inside: r.right <= innerWidth && r.top >= 0 }; });
+  let r = await chip();
+  ok(r.shown && r.card && r.name === 'Tester' && r.n === '240' && r.em === 'Rank: Silver II' && r.view === 'home' && r.inside && /^Tester, 240 trophies/.test(r.label), `player card on the home screen before Your stats is ever opened: Tester, 240 trophies, the Silver II emblem (${J(r)})`);
+  await pg.screenshot({ path: path.join(SHOTS, 'chip-1280x800.png') });
+  await pg.click('#btn-head-acct'); await sleep(1200);
+  r = await ev(pg, () => !document.getElementById('lobby-profile').hidden); ok(r, 'the player card opens Your stats');
+  await pg.setViewport({ width: 390, height: 844 }); await sleep(500); await ev(pg, () => window.__ui.lobbyView('home')); await sleep(600); await pg.screenshot({ path: path.join(SHOTS, 'chip-390x844.png') });
+  r = await ev(pg, () => { const b = document.getElementById('btn-head-acct').getBoundingClientRect(), t = document.querySelector('#screen-lobby .menu-title').getBoundingClientRect(); return { fits: b.right <= innerWidth && b.left >= t.right - 1, w: Math.round(b.width) }; });
+  ok(r.fits, `a phone-width header: the card is the emblem alone, clear of the title (${J(r)})`);
+  await pg.close();
+  API.meLadder = null; const p2 = await page('chip0'); await p2.setViewport({ width: 1280, height: 800 }); await p2.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
+  API.profile = null; await p2.goto(URL0); await sleep(2200); await p2.click('#btn-start').catch(() => {}); await sleep(1200);
+  r = await ev(p2, () => { const g = id => document.getElementById(id); return { card: g('btn-head-acct').classList.contains('is-card'), n: g('head-acct-n').hidden ? null : g('head-acct-tr').textContent, em: !g('head-acct-em').hidden }; });
+  ok(r.card && r.n === '0' && !r.em, `no trophies yet: the name, 0 and the person icon, no emblem (${J(r)})`); await p2.screenshot({ path: path.join(SHOTS, 'chip-none-1280x800.png') }); await p2.close();
+  API.acct = null; API.signin = true; API.profile = FIXTURE; const p3 = await page('chipg'); await p3.evaluateOnNewDocument(() => { try { localStorage.setItem('poddle.name', 'Daniel'); localStorage.setItem('poddle.camPrimer', 'allow'); } catch {} });
+  await p3.goto(URL0); await sleep(2200); await p3.click('#btn-start').catch(() => {}); await sleep(1000);
+  r = await ev(p3, () => { const g = id => document.getElementById(id); return { card: g('btn-head-acct').classList.contains('is-card'), t: g('head-acct-t').textContent, n: !g('head-acct-n').hidden }; });
+  ok(!r.card && r.t === 'Sign in' && !r.n, `a guest keeps the plain Sign in button (${J(r)})`); await p3.close(); API.signin = false; }
 
 const uniq = [...new Set(errs.map(e => e.split('\n')[0].slice(0, 220)))];
 ok(!uniq.length, 'no page errors' + (uniq.length ? ':\n  ' + uniq.join('\n  ') : ''));

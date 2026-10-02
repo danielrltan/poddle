@@ -83,7 +83,7 @@ export function matchover(tour) { overTour = !!tour; show('result-save', false);
 export function result(p) {                                 // the 'profile' message (8.3), right after matchover, to my seat only. Its `trophies` object is main.js's (ui.trophyRow, docs/TROPHIES.md 4): this is the record line
   if (!on || !p || typeof p !== 'object') return; const tour = overTour;
   { const t = p.trophies; if (t && typeof t === 'object' && Number.isInteger(t.trophies) && t.saved === true) { const L = meLadder || { place: null, best: 1, bestDiv: 1, bestAt: 0, next: 0, wins: 0, losses: 0, streak: 0, botWins: 0, botLosses: 0, mattDayLeft: 0 }, tier = tierNum(t.tier), div = tier === TOP ? 1 : divNum(t.div), up = tier > L.best || tier === L.best && div > L.bestDiv;
-    meLadder = { ...L, tier, div, trophies: Math.max(0, t.trophies), best: up ? tier : L.best, bestDiv: up ? div : L.bestDiv }; } }      // the hero's next open starts from this count (drawRoad)
+    meLadder = { ...L, tier, div, trophies: Math.max(0, t.trophies), best: up ? tier : L.best, bestDiv: up ? div : L.bestDiv }; drawChip(); } }      // the hero's next open starts from this count (drawRoad)
   if (p.saved === true && p.guest === true) saved = true;
   const lv = Number.isInteger(p.level) && LEVEL[p.level] ? LEVEL[p.level] : '', why = Array.isArray(p.why) ? p.why.filter(w => typeof w === 'string') : [], bests = Array.isArray(p.bests) ? p.bests.filter(b => b && BEST[b.what] && Number.isFinite(b.v)) : [];
   let line = '';
@@ -114,8 +114,8 @@ function drawRoad(p) {
   // the hero is the trophy ladder (docs/TROPHIES.md 4, one rank per player): the crest, "Gold II", the place, the trophies, the bar to the next division
   // or rank, the trophy road and the keep line, all drawn by ui.rankCrest (main.js's h.crest) from the ladder with its place. null = no trophies yet
   // (nothing saved, an older server): the dimmed crest and 'Win a game for your first trophies', or 'Sign in to earn trophies' for a guest
-  if (p) { meLadder = ladderOf(p); h.crest(meLadder, signedIn()); }      // the answer: the hero is the trophy view
-  else if (p === null && !loading) { meLadder = null; h.crest(null, signedIn()); }      // answered: nothing saved yet
+  if (p) { meLadder = ladderOf(p); h.crest(meLadder, signedIn()); drawChip(); }      // the answer: the hero is the trophy view
+  else if (p === null && !loading) { meLadder = null; h.crest(null, signedIn()); drawChip(); }      // answered: nothing saved yet
   else if (meLadder) h.crest(meLadder, signedIn());      // asking (loading), or no answer (undefined): what is known, in the shape the answer takes; with nothing known the last draw (or the page's own markup) stands
   let hot = { n: num(H.streak), who: 'people' }; rows.forEach((r, i) => { if (num(r.streak) && num(r.streak) >= hot.n) hot = { n: num(r.streak), who: name(i) }; });      // ties go to the harder Matt, people last
   const best = Math.max(num(H.bestStreak), ...rows.map(r => num(r.bestStreak))), st = $('st-streak');
@@ -553,6 +553,14 @@ export async function claimName(name) {                    // -> true when the s
 }
 
 // ---------- who is signed in, everywhere it shows. Everything signed-in-only stays hidden unless /api/me said sign-in is on (9) ----------
+// the player card in the header's corner (NOTES 161): my rank emblem, name and trophies without opening Your stats. Drawn from meLadder, so it follows
+// /api/me, every /api/stats answer and each game's trophies. No trophies yet: the person icon and 0. A guest or an account without a username keeps the plain button
+function drawChip() {
+  const b = $('btn-head-acct'); if (!b) return; const a = on && me.enabled ? me.account : null, name = a && a.username, L = name ? meLadder : null;
+  b.classList.toggle('is-card', !!name); show('head-acct-n', !!name); text('head-acct-tr', (L ? L.trophies : 0).toLocaleString('en-US'));
+  { const em = $('head-acct-em'); if (em && em.dataset.r !== (L ? L.tier + '.' + L.div : '')) { em.dataset.r = L ? L.tier + '.' + L.div : ''; h.emblem(em, L ? { tier: L.tier, div: L.div } : null); } show('head-acct-em', !!L); b.classList.toggle('has-em', !!L); }
+  if (name) b.setAttribute('aria-label', `${name}, ${(L ? L.trophies : 0).toLocaleString('en-US')} trophies: your stats`);
+}
 function drawAcct() {
   const en = on && me.enabled, a = en ? me.account : null, name = a && a.username;
   show('btn-pf-signin', en && !a); show('btn-pf-signout', !!a); show('btn-pf-rename', !!a); show('btn-pf-share', on && shareable); show('pf-acct', en || (on && shareable));      // Share card shows with sign-in off too
@@ -561,6 +569,7 @@ function drawAcct() {
   if (!en || a) show('btn-save-signin', false);      // the nudge is for guests only
   { const b = $('btn-head-acct'); if (b) { b.hidden = !en; b.classList.toggle('is-in', !!a); text('head-acct-t', !a ? 'Sign in' : name || 'Pick a username');      // the header's account button (NOTES 151): only where accounts exist
     b.setAttribute('aria-label', !a ? 'Sign in' : name ? `${name}: your stats` : 'Pick a username'); b.dataset.tip = !a ? 'Sign in' : name ? 'Your stats' : 'Pick a username'; } }
+  drawChip();
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
   show('btn-profile', on); show('btn-leaderboard', on && me.db); show('btn-friends', on && me.db && me.enabled); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // the leaderboard reads the database too (NOTES 126); the tiles lay out for what shows
 }

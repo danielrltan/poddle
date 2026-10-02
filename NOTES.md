@@ -3481,3 +3481,18 @@ two equal white heroes did not "work very nice anymore"):
   the legal pages are untouched.
 - Tests: ui-next, menu, profile-ui, social-ui and mobile-ui pin the new order and row shapes (3,3 / 3,2 landscape; 1,2,1,2 / 1,2,2 upright;
   one column on a phone-width window). Pre-existing reds unchanged: ui-next 8, menu.mjs 7.
+
+## 161. The player card in the corner of the menu
+
+The owner (2026-10-02): "add player stats bar / card in the corner of the menu screen so u dont have to go to stats to see your like trophy
+count and stuff? think brawlstars ui". One card per thing (NOTES 150): the header's account button (NOTES 151, #btn-head-acct) already sat
+in that corner and already opened Your stats, so it grows into the card instead of a second thing beside it.
+
+- Signed in with a username the button is `.is-card`: the rank emblem (ui.rankEmblem at 2.75rem, no numeral: the division is the medal's
+  shape), the username, and the trophy count with the gold cup under it. It shows on every lobby view and opens Your stats. profile.js
+  drawChip draws it from `meLadder`, so it is right from /api/me alone (before Your stats is ever opened) and follows every /api/stats
+  answer and each game's trophies; drawAcct calls it on sign-in, sign-out and rename.
+- No trophies yet: the person icon, the name and 0. A guest keeps "Sign in", an account without a username "Pick a username".
+- Under 480px the card is the emblem alone (the header holds Back, the title and one more thing); its aria-label carries the name and count.
+- Nothing new is sent, stored or shown to anyone else: the legal pages are untouched.
+- Tests: profile-ui.mjs section G (the card on the home screen, its click, phone width, no trophies, a guest).
