@@ -3525,3 +3525,24 @@ Follow-up to 162 at the owner's yes.
   1.0.1"): only the app icon changed since 1.0.0. web/download/Poddle-Helper.zip is the same file as the release asset (sha256
   19670dba84d6...). releases/latest now points at 1.0.1.
 - Changelog: the October 2 entry names the game ball and the Mac Helper too. Nothing sent, stored or shown changes: legal pages untouched.
+
+## 164. The profile card wears Your stats' layout, shows the current streak, and leads with the friend button
+
+The owner (2026-10-02): "you need to show streak on public player stat cards", "also include total time on court", "can u make public
+player cards nicer? like why dont u just use player cards on the stats page and have that? and then also add a friend add button on them".
+Time on court and the friend row were already on the card (NOTES 145, 146); what changed:
+
+- #lbp-card's body is Your stats' own pieces (.st-hero, .st-matt, .st-people, .st-play, .st-tiles; card width 46rem): the hero with the
+  emblem, rank, trophies and the flame; Hardest level beaten; the people strip (W-L, the bar, Best flame N); the play row (the return rate
+  ring, winners, aces, smashes, points won, on court); three tiles (tournaments won, longest rally, fastest swing). The eleven public
+  figures keep server/card.js dataOf's order and land in `[data-stat="0..10"]`; W and L are read from the first figure's note
+  ("31-12 vs people"). Not public, so not on the card: total hits, the per-level Matt records, the dates, the trophy road.
+- The flame is new public data: `/api/leaderboard/player` answers `streak`, the current win streak as Your stats' hero shows it (the
+  highest of the streak vs people and the streak at each Matt level; server/share.js streakOf). Profile card only: card.dataOf, the share
+  page and its PNG are untouched. An older server sends none: no pill.
+- The friend row (#lbp-friend, web/social.js) moved from the bottom to right under the name. A stranger's row is the Add friend button
+  alone (the "Friends see when you're online" line went, NOTES 158); a guest's "Sign in to add friends" is a real button, not a link.
+- Legal (same commit): privacy.html section 4 Profile cards, the legal-basis table and a dated line in 13 name the current winning
+  streak; Last updated / dateModified October 2, 2026, sitemap lastmod; docs/ropa.md and CLAUDE.md data flows follow; changelog.html has
+  an October 2 entry linking the policy. No home-page notice was added (ask the owner if he wants one; NOTES 147).
+- Tests: lb-profile-ui.mjs and social-ui.mjs read the eleven by [data-stat], the record, the flame and the friend row's place.

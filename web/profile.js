@@ -282,7 +282,6 @@ async function toggleShow() {
 // The friend row under it is web/social.js's (h.friend): it owns the lists and the requests. No URL of its own ----------
 let lbpGen = 0, lbpName = '', lbpFrom = 'board', lbpSaid = null, lbpRow = 'off';      // lbpRow: the friend row's kind now (on | self | off); lbpGen: this sheet's own generation (loadGen is sign-in's); lbpName: the name it shows, to find its row again (a list redraws under the sheet); lbpFrom: 'board' | 'friends' | 'court'; lbpSaid: /api/player's answer
 const STAT_LABELS = ['Win rate', 'On court', 'Best streak', 'Returns', 'Points won', 'Rally', 'Swing', 'Winners', 'Aces', 'Smashes', 'Titles'], HERO_N = 3, MATT = ['Rookie', 'Club', 'Tour', 'Pro'];      // the share card's eleven tags in its order (server/card.js dataOf, NOTES 145): the first three are its headline figures. MATT: difficulty order, as is-lv<i>
-const figB = v => { const b = mk('b'); if (v === '-' || v === '–') { b.textContent = v; b.className = 'is-none'; return b; } for (const r of v.match(/\d[\d,-]*|[^\d]+/g) || [v]) b.append(/^\d/.test(r) ? r : mk('i', '', r)); return b; };      // "72%", "11h 6m": the digits big, % h m small, as the card draws them (textContent stays the whole value)
 const PLACE_BOARDS = [['trophies', 'Trophies'], ['rally', 'Longest rally'], ['streak', 'Win streak']];      // /api/player's places, in the leaderboard's own words
 export const playerOpen = () => cardOpen() && !!$('lbp-card') && !$('lbp-card').hidden;
 export const inLobby = () => !!h.view();      // web/social.js: the lobby is up (not a court, not the title): a sign-in from the card is safe there, never mid-match
@@ -324,7 +323,7 @@ function drawPlayer(p, state) {
   const part = state === 'part' || state === 'partx';
   c.dataset.state = part ? 'part' : state;      // loading | ok | part (no stats: not on a board) | gone | error. An attribute, not a class: .panel.is-error is the red nudge of a form
   const rank = p.rank && typeof p.rank === 'object' && Number.isInteger(p.rank.tier) ? { tier: tierNum(p.rank.tier), div: divNum(p.rank.div) } : null;
-  const hero = $('lbp-hero'); if (hero) { hero.className = 'lbp-hero well' + (rank ? ' is-' + RANK_NAME[rank.tier - 1].toLowerCase() : ' is-none') + (part ? ' no-matt' : ''); hero.hidden = part && !rank && !p.open; }      // no Matt without the board's answer. A hidden account's rank (not my friend): no hero at all, never 'No trophies yet'
+  const hero = $('lbp-hero'); if (hero) { hero.className = 'st-hero well lbp-hero' + (rank ? ' is-' + RANK_NAME[rank.tier - 1].toLowerCase() : ' is-none') + (part ? ' no-matt' : ''); hero.hidden = part && !rank && !p.open; }      // no Matt without the board's answer. A hidden account's rank (not my friend): no hero at all, never 'No trophies yet'
   h.emblem($('lbp-em'), rank);
   text('lbp-rank', rank ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rank.tier, rank.div)) : state === 'loading' ? '' : 'No trophies yet');      // 'Pro #3' only from the board's answer
   const tro = num(p.trophies); show('lbp-tro', !!rank && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
@@ -335,15 +334,21 @@ function drawPlayer(p, state) {
     for (const [k, l] of PLACE_BOARDS) { const x = P && P[k] && Number.isInteger(P[k].rank) && P[k].rank > 0 ? P[k].rank : 0; if (!x) continue;
       const li = mk('li', 'lbp-place' + (x <= 3 ? ' is-top' + x : '')); li.append(mk('b', '', '#' + x.toLocaleString('en-US')), mk('span', '', l)); pl.append(li); }
     pl.hidden = !pl.children.length || (state !== 'ok' && !part); }
-  const dl = $('lbp-stats');
-  if (dl) {
+  const box = $('lbp-stats');      // the eleven public figures (server/card.js dataOf's order) in Your stats' layout: each lands in its [data-stat] (NOTES 164)
+  if (box) {
     const S = Array.isArray(p.stats) && p.stats.length === STAT_LABELS.length && p.stats.every(s => s && typeof s.label === 'string' && (typeof s.value === 'string' || Number.isFinite(s.value))) ? p.stats : null;
-    dl.textContent = ''; dl.setAttribute('aria-busy', String(state === 'loading'));
-    STAT_LABELS.forEach((l, i) => { const s = S ? S[i] : null, d = mk('div', 'lbp-stat' + (i < HERO_N ? ' is-hero' : '') + (s ? '' : ' is-skel')), dd = mk('dd');      // a div of dt + dd (+ the note's own dd): the only children a dl allows
-      dd.append(s ? figB(strOf(s.value, 12) || '–') : mk('b', '', '–')); if (s && s.unit) dd.append(mk('small', '', strOf(s.unit, 6)));
-      const dt = mk('dt', '', s ? strOf(s.tag, 16) || s.label.slice(0, 24) : l); if (s) dt.title = s.label.slice(0, 32);      // the card's short caps; the long name ("Win rate vs people") on hover
-      d.append(dt, dd); if (i < HERO_N) d.append(mk('dd', 'lbp-note', s ? strOf(s.note, 28) : '\u00a0')); dl.append(d); });      // the headline's note: "31-12 vs people", "all modes"
+    box.setAttribute('aria-busy', String(state === 'loading')); box.classList.toggle('is-skel', !S);
+    const val = i => (S ? strOf(S[i].value, 12) : '') || '–', pctOf = i => { const m = /^(\d+)%$/.exec(val(i)); return m ? Math.min(100, +m[1]) : null; };
+    for (const el of box.querySelectorAll('[data-stat]')) { const v = val(+el.dataset.stat); el.textContent = v; el.classList.toggle('is-none', v === '-' || v === '–'); }
+    const rec = /^([\d,]+)-([\d,]+)/.exec(S ? strOf(S[0].note, 28) : '') || [], wr = pctOf(0), bar = $('lbp-bar');      // '31-12 vs people'
+    text('lbp-w', rec[1] || (S ? '0' : '–')); text('lbp-l', rec[2] || (S ? '0' : '–'));
+    if (bar) { bar.style.setProperty('--w', (wr || 0) + '%'); bar.classList.toggle('is-empty', wr === null); } show('lbp-bar-l', wr !== null);
+    const rr = pctOf(3), ring = $('lbp-ring'); if (ring) { ring.style.setProperty('--p', ((rr || 0) / 100).toFixed(3)); ring.classList.toggle('is-zero', !rr); } cls('lbp-ret', 'is-hint', rr === null);
+    for (const n of box.querySelectorAll('.st-num')) { const u = n.querySelector('small'); if (u) u.hidden = !S || /^[-–0]$/.test(n.querySelector('b').textContent); }      // a unit only with a value, as on Your stats
   }
+  { const n = state === 'ok' && Number.isInteger(p.streak) && p.streak >= 0 ? Math.min(p.streak, 9999) : null, st = $('lbp-streak');      // the flame: the player's current win streak (an older server sends none: no pill)
+    if (st) { st.hidden = n === null; st.className = 'st-streak' + (n >= 2 ? ' is-hot' : n === 1 ? ' is-one' : ''); st.title = 'Win streak'; st.setAttribute('aria-label', 'Win streak: ' + (n || 0)); } text('lbp-streak-n', String(n || 0)); }
+  show('lbp-mattsec', !part && state !== 'gone' && state !== 'error');
   const msg = state === 'gone' ? (lbpFrom === 'board' ? 'This player isn’t on the leaderboard any more' : 'No player with that username any more') : state === 'error' ? 'Couldn’t load this player' : state === 'partx' ? 'Couldn’t load the stats' : state === 'part' ? 'Stats show for players on the global leaderboard' : '';
   text('lbp-msg', msg); show('lbp-msg', !!msg); $('lbp-msg')?.classList.toggle('is-note', part); show('lbp-retry', state === 'error' || state === 'partx');
   const mine = (state === 'ok' || part) && !!(me.account && me.account.username) && name.toLowerCase() === me.account.username.toLowerCase();      // my own card: the same public view, and the way to Your stats

@@ -84,7 +84,7 @@ const pl = async u => { const r = await call('GET', '/api/leaderboard/player' + 
 const J = JSON.stringify, LABELS = 'Win rate vs people,Time on court,Best win streak vs people,Return rate,Points won,Longest rally,Fastest swing,Winners,Aces,Smashes,Tournament titles';
 reinit();
 let p = await pl('Ace');
-ok(p.status === 200 && Object.keys(p.j).join(',') === 'name,rank,trophies,matt,stats', `Ace -> 200, exactly name, rank, trophies, matt, stats (${p.status} ${p.body})`);
+ok(p.status === 200 && Object.keys(p.j).join(',') === 'name,streak,rank,trophies,matt,stats' && Number.isInteger(p.j.streak) && p.j.streak >= 0, `Ace -> 200, exactly name, streak (the current win streak, NOTES 164), rank, trophies, matt, stats (${p.status} ${p.body})`);
 ok(p.j.name === 'Ace' && p.j.rank.tier === 8 && p.j.rank.label === 'Pro #1' && p.j.rank.pro === 1 && p.j.trophies === 1100, `Ace is Pro #1 with 1100 trophies (${J(p.j.rank)} ${p.j.trophies})`);
 ok(p.j.stats.map(s => s.label).join(',') === LABELS && J(p.j.stats[5]) === J({ label: 'Longest rally', tag: 'Rally', value: '30', unit: 'hits' }), `the eleven card stats in card order; rally 30 hits (${J(p.j.stats[5])})`);
 ok(J(p.j.stats[0]) === J({ label: 'Win rate vs people', tag: 'Win rate', value: '0%', note: '0-1 vs people', hero: true }) && p.j.stats.map(s => !!s.hero).join() === 'true,true,true,false,false,false,false,false,false,false,false' && p.j.stats[1].note === 'all modes' && p.j.stats[2].note === 'wins vs people',

@@ -263,7 +263,7 @@ export function cardRow(box, info) {
   const who = mk('div', 'lbp-fr-who'), acts = mk('div', 'lbp-fr-acts'), B = (cls, t, fn) => { const b = btn('btn btn-sm is-tall ' + cls, t, fn); b.disabled = wait; return b; }, line = t => mk('p', 'lbp-fr-line', t);
   if (g) {      // a guest, or no username yet: the step, quiet. A button only in the lobby: signing in or naming yourself mid-match redials (a forfeit)
     const t = g === 'signin' ? 'Sign in to add friends' : 'Pick a username to add friends';
-    if (lobby) who.append(btn('share-lnk lbp-fr-go', t, () => { closeCard(); if (gate() === 'signin') signIn(); else if (gate() === 'username') pickName(); }));
+    if (lobby) who.append(btn('btn btn-sm is-tall lbp-fr-go', t, () => { closeCard(); if (gate() === 'signin') signIn(); else if (gate() === 'username') pickName(); }));
     else who.append(line(t));
   } else if (sure === k) {
     who.append(line(`Remove ${name}?`));
@@ -278,8 +278,8 @@ export function cardRow(box, info) {
   } else if (rel === 'in') {
     who.append(line('Wants to be friends'));
     acts.append(B('lbp-fr-add', 'Accept', () => act('accept', name)), B('btn-quiet', 'Decline', () => act('decline', name)));
-  } else { who.append(line('Friends see when you’re online')); acts.append(addIc(B('lbp-fr-add fr-add', 'Add friend', () => act('add', name)))); }
-  box.append(who); if (acts.children.length) box.append(acts);
+  } else { acts.append(addIc(B('lbp-fr-add fr-add', 'Add friend', () => act('add', name)))); }
+  if (who.children.length) box.append(who); if (acts.children.length) box.append(acts);
   if (had && !box.contains(document.activeElement)) (box.querySelector('button:not(:disabled)') || box.closest('[tabindex]'))?.focus({ preventScroll: true });      // rebuilt under the focus (a request went out): it stays in the card, where its Tab trap and Esc work
 }
 

@@ -1931,30 +1931,26 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 @media (max-width:480px){ .lb-view{padding:var(--s-5) var(--s-4)!important} .lb-tabs .seg-opt{padding:0 .8rem;font-size:var(--t-sm)} .lb-row{padding-right:.625rem;gap:.5rem} .lb-you{padding-right:var(--s-3);gap:var(--s-2)} .lb-you:not(.is-on){padding-left:var(--s-4)} .lb-show{padding-right:.625rem} .lb-tabs .seg-opt{height:max(2.125rem,32px)} }
 
 /* ---------- a player's profile card from the leaderboard (NOTES 140): the share sheet's frame, Your stats' pieces (the emblem, the Matt disc, the figure tiles) ---------- */
-.lbp-card{width:min(32rem,100%)}
+/* NOTES 164: the profile card wears Your stats' layout (the .st-* pieces): hero with the flame, Matt badge, people strip, play row, tiles */
+.lbp-card{width:min(46rem,100%)} .lbp-card .acct-body{gap:var(--s-2)}
+.lbp-card .lbp-hero{grid-template-rows:auto;padding:.5rem 1rem} .lbp-card .lbp-hero > *{grid-row:1} .lbp-card .lbp-hero .st-streak{align-self:center;animation:none} .lbp-hero[hidden],.lbp-mattsec[hidden],.lbp-card .st-streak[hidden]{display:none}
+.lbp-card .caps{display:flex;align-items:center;gap:.4rem} .lbp-card .caps svg{width:1.25rem;height:1.25rem;fill:none;stroke:var(--line-deep);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex:none}      /* .st .caps, off the stats page */
+.lbp-card .st-rank-name{margin:0;font:900 2rem/1.05 var(--font);letter-spacing:.02em;color:var(--me-ink)} .lbp-card .st-mbest{margin:0;font:900 var(--t-xl)/1.1 var(--font);color:var(--lv-deep)} .lbp-card .st-wl,.lbp-card .st-num,.lbp-card .st-ret-n,.lbp-card .st-chips{margin:0}
+.lbp-card .st-wl b{font-size:2.25rem;font-weight:900;line-height:1} .lbp-card .st-num b,.lbp-card .st-ret-n b{font-size:2rem;font-weight:900;line-height:1;color:var(--me-ink)} .lbp-card .st-fig{padding:.375rem .125rem} .lbp-card .st-fig dd{font-size:1rem;letter-spacing:-.01em} .lbp-card .st-fig dt{white-space:nowrap;letter-spacing:0;font-size:max(10px,.6875rem)} .lbp-card .st-badge svg{animation:none} @media (min-width:761px){ .lbp-card .st-tile .st-badge{display:none} }
+.lbp-card .lbp-friend{min-height:0} .lbp-friend.is-none{justify-content:flex-end;padding:0;background:none;box-shadow:none}      /* a stranger: the Add friend button alone, no line beside it (NOTES 158) */ .lbp-card .st-rank-name:empty{height:1.1em;width:9rem;border-radius:var(--r-sm);background:var(--sky-2)}      /* loading a player with no emblem on the row */
+.lbp-card .lbp-mattsec{grid-template-columns:auto minmax(0,1fr)} .lbp-card .st-mbadge{width:3.5rem;height:3.5rem} .lbp-card .st-mstar{animation:none} .lbp-mattsec:has(.is-none) .st-mbest{color:var(--ink-soft)}
+.lbp-stats{display:flex;flex-direction:column;gap:var(--s-2)} .lbp-card .st-people,.lbp-card .st-tile,.lbp-card .st-matt,.lbp-card .st-play{animation:none} .lbp-card .st-wl b,.lbp-card .st-num b,.lbp-card .st-ret-n b,.lbp-card .st-ribbon b{animation:none} .lbp-card .st-bar i{animation:none;transform:none}
+.lbp-card .st-bar-l b{color:inherit} .lbp-card .lbp-figs{grid-template-columns:repeat(5,minmax(0,1fr))} .lbp-card .st-chip .st-flame{fill:var(--them);stroke:var(--them-deep)}
+.lbp-card [data-stat].is-none{color:var(--ink-soft)} .lbp-stats.is-skel [data-stat],.lbp-stats.is-skel .st-wl b{color:var(--sky-4)}
+.lbp-card[data-state="gone"] .lbp-hero,.lbp-card[data-state="gone"] .lbp-stats,.lbp-card[data-state="error"] .lbp-hero,.lbp-card[data-state="error"] .lbp-stats{display:none}
+@media (max-width:760px){ .lbp-card .lbp-figs{grid-template-columns:repeat(3,minmax(0,1fr))} .lbp-card .lbp-hero .st-streak{grid-row:auto} .lbp-card .lbp-hero > *{grid-row:auto} }
 .lbp-title{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem .5rem;min-width:0} .lbp-card .lbp-title h2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-xl);font-weight:900;line-height:1.15}
-.lbp-hero{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"em rank" "m mt";column-gap:var(--s-4);row-gap:var(--s-3);align-items:center;padding:var(--s-4) var(--s-5) var(--s-4) var(--s-4);
-  --lv:#8fa3b1;--lv-deep:#5d6f7c}
-.lbp-hero:has(.is-lv0){--lv:#3ecf72;--lv-deep:#13803f} .lbp-hero:has(.is-lv1){--lv:#3aa0ff;--lv-deep:#1b63b8} .lbp-hero:has(.is-lv2){--lv:#a77bf3;--lv-deep:#6a3fc2} .lbp-hero:has(.is-lv3){--lv:var(--gold-2);--lv-deep:var(--warn-deep)}      /* .st-matt's level colours: the disc reads them */
-.lbp-em{grid-area:em;position:relative;display:grid;place-items:center;width:5.75rem;min-height:5.75rem}
+.lbp-em{position:relative;display:grid;place-items:center;width:5.75rem;min-height:5.75rem}
 .lbp-em::before{content:"";position:absolute;inset:.25rem;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--rank-mid,var(--sky-3)) 45%,transparent) 0,transparent 70%)}      /* the rank's own colour, a halo behind the medal */
 .lbp-em:empty::before{inset:.75rem;background:var(--sky-2);box-shadow:inset 0 0 0 .125rem var(--sky-3)}      /* no trophies yet: a quiet disc where the medal would be */
 .lbp-em .st-em{position:relative}
 .lbp-card .caps{margin:0;font-size:var(--t-xs);line-height:1.3}
-.lbp-rank{grid-area:rank;min-width:0;display:flex;flex-direction:column;gap:.125rem}
-.lbp-card .lbp-rank-name{margin:0;font:900 var(--t-xl)/1.1 var(--font);color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lbp-card .lbp-rank-name:empty{height:1.1em;width:7rem;border-radius:var(--r-sm);background:var(--sky-2)}      /* loading a player with no emblem on the row */
 .lbp-card .lbp-tro{display:flex;align-items:center;gap:.35rem;font-weight:700;color:var(--ink-soft)} .lbp-tro b{color:var(--ink-strong);font-weight:900;font-variant-numeric:tabular-nums} .lbp-tro .cup .cup-ic{width:1.35rem;height:1.35rem}
-.lbp-matt{grid-area:m;justify-self:center;width:3.25rem;height:3.25rem} .lbp-matt .st-mdisc svg{width:1.75rem;height:1.75rem} .lbp-matt .st-mstar{width:1.4rem;height:1.4rem;animation:none}
-.lbp-mtext{grid-area:mt;min-width:0;display:flex;flex-direction:column;gap:.0625rem}
-.lbp-card .lbp-mbest{margin:0;font:900 var(--t-lg)/1.15 var(--font);color:var(--lv-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .lbp-matt.is-none + .lbp-mtext .lbp-mbest{color:var(--ink-soft)}
-.lbp-stats{margin:0;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--s-2)}      /* the share card's eleven (NOTES 145): three headline tiles (4 columns each), then the eight in fours (3 each) */
-.lbp-stat{grid-column:span 3;position:relative;overflow:hidden;container-type:inline-size;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1875rem;min-width:0;min-height:4.25rem;padding:.5rem .375rem;border-radius:var(--r-md);background:var(--sky-1);box-shadow:inset 0 0 0 .125rem var(--sky-2);text-align:center;line-height:1.1}      /* Your stats' figure tiles: dt first for screen readers, the number on top for the eye (order) */
-.lbp-stat dt{order:1;max-width:100%;font-size:max(11px,.75rem);font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lbp-stat dd{order:0;margin:0;max-width:100%;white-space:nowrap;color:var(--me-ink)} .lbp-stat dd b{font-size:min(1.5rem,20cqi);font-weight:900;font-variant-numeric:tabular-nums} .lbp-stat dd b i{font-style:normal;font-size:.6em} .lbp-stat dd b.is-none{color:var(--ink-soft)} .lbp-stat dd small{margin-left:.2rem;font-size:var(--t-xs);font-weight:800;color:var(--ink-soft)}
-.lbp-stat.is-hero{grid-column:span 4;min-height:5.5rem;padding:.625rem .375rem;background:#fff;box-shadow:inset 0 0 0 .1875rem #bfe0f2} .lbp-stat.is-hero dd b{font-size:min(1.875rem,19cqi)} .lbp-stat.is-hero dd b i{font-size:.52em}      /* the headline figures: white tiles, as on the card */
-.lbp-stat .lbp-note{order:2;white-space:normal;overflow-wrap:anywhere;font-size:max(11px,.75rem);font-weight:700;line-height:1.2;color:var(--ink-soft)}
-.lbp-stat.is-skel dd{color:var(--sky-4)} .lbp-stat.is-skel::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:translateX(-100%);animation:skel 1.2s linear infinite}
 .lbp-card[data-state="gone"] .lbp-hero,.lbp-card[data-state="gone"] .lbp-stats,.lbp-card[data-state="error"] .lbp-hero,.lbp-card[data-state="error"] .lbp-stats{display:none}
 .lbp-card .lbp-msg{margin:0;padding:var(--s-5) var(--s-3);border-radius:var(--r-lg);background:var(--sky-1);text-align:center;font-size:var(--t-md);font-weight:800;color:var(--ink-soft)}
 .lbp-card .lbp-retry{justify-content:center;margin-top:0!important}
@@ -1962,7 +1958,6 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 @media (max-width:480px){ .lbp-card{padding:var(--s-4)} .lbp-stat{grid-column:span 6} .lbp-stat.is-hero{grid-column:span 4;padding:.5rem .25rem} .lbp-hero{column-gap:var(--s-3);padding:var(--s-3) var(--s-4) var(--s-3) var(--s-3)} .lbp-em{width:4.75rem;min-height:4.75rem} .lbp-em .st-em{--em-h:4.25rem} .lbp-em .st-em .rank-em{width:4.5rem;height:4.5rem} }
 @media (prefers-reduced-motion:reduce){ .lbp-stat.is-skel::after{animation:none;display:none} }
 /* opened from a friends list, search or On this court (docs/SOCIAL.md 6): not on a board = no stats and no Matt (only /api/player answered), a quiet line instead */
-.lbp-hero.no-matt{grid-template-areas:"em rank"} .lbp-hero.no-matt .lbp-matt,.lbp-hero.no-matt .lbp-mtext{display:none} .lbp-hero[hidden]{display:none}
 .lbp-card[data-state="part"] .lbp-stats{display:none}
 .lbp-card .lbp-msg.is-note{padding:0 var(--s-3);font-size:var(--t-sm);font-weight:700;background:none}      /* a quiet line, not the not-found box */
 .lbp-places{list-style:none;margin:0 0 0 .25rem;padding:0;display:flex;flex-wrap:wrap;gap:var(--s-1) var(--s-2)} .lbp-places[hidden]{display:none}      /* the place numbers from /api/player: pills on the name's line (NOTES 150), not a row of their own under the rank */

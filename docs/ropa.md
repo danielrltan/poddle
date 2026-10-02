@@ -4,7 +4,7 @@ Controller: Daniel Tan, operator of Poddle (poddleball.com), hello@danielrltan.c
 below. No EU/UK representative appointed (see NOTES.md 94, Q18: pending counsel). Source of truth for the fields and
 periods: docs/ACCOUNTS.md 2.2 (schema) and 10.5 (retention), server/db.js (`sweep`). Update this file in the same
 commit as any change to those, together with web/privacy.html.
-Last reviewed: 2026-09-30 (Ranked mode removed, NOTES 157, docs/TROPHIES.md: no queue, no series, no stadium; trophies are earned in every
+Last reviewed: 2026-10-02 (the profile card shows the current win streak, NOTES 164; before that 2026-09-30: Ranked mode removed, NOTES 157, docs/TROPHIES.md: no queue, no series, no stadium; trophies are earned in every
 counted match by a signed-in account with a username, the rank emblem shows on every court; no new data stored, `match_log.series` always null; sections 2, 3, 3a, 3b and 4
 reworded, together with web/privacy.html); 2026-09-29 (Friends, slice A: friends, friend requests, search, online status to friends, and the profile card's friend row: section 3b, no invites
 yet; the same day, leaderboard profile cards, NOTES 140: the share card's subset made public for every listed player (all places since NOTES 141), no new data stored, and the same card now
@@ -56,7 +56,8 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   WITH a username only (never guests); on by default, the account's Show me on the global leaderboard switch (accounts.lb_hidden)
   removes it at once; and, by clicking a name on the board (any place since NOTES 141), the profile card (NOTES 140, 2026-09-29): the share card's subset
   (rank/div/trophies/Pro place, toughest Matt beaten, the card's eleven stats, NOTES 145: win rate + W-L vs people, time on court, best
-  streak vs people, return rate, points won %, rally, swing, winners, aces, smashes, titles); the same switch
+  streak vs people, return rate, points won %, rally, swing, winners, aces, smashes, titles) plus, since 2026-10-02 (NOTES 164), the current win
+  streak (the highest of the streak vs people and at each Matt level; profile card only, not the share card); the same switch
   removes it at once; basis legitimate interests (Art. 6(1)(f)) with that switch and objection by email. Exception, the rank emblem
   (docs/TROPHIES.md 3.9, 2026-09-30; before that only in Ranked mode): the rank and its division, e.g. Gold II, never trophies or record,
   beside the name, to the opponent and to spectators of ANY court the player sits on (scoreboard, result card, tournament VS card and

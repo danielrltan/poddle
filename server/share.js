@@ -31,6 +31,10 @@ function dataOf(o) {
 }
 const links = (base, slug, d) => { const url = base + '/c/' + slug; return { url, image: url + '.png?v=' + card.hashOf(d) }; };
 // linkOf(ownerId, req) -> { url, image } | null: the owner's live link (for /api/stats), null when none
+// the hottest current win streak, as Your stats' flame shows it: the highest of the streak against people and the streak at each Matt level (NOTES 164).
+// Only the profile card (api.js playerRoute) sends it; the share card's picture does not draw it
+function streakOf(o) { const p = db.profileOf(o); if (!p) return 0; const n = v => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  return Math.max(n(p.human && p.human.streak), ...(Array.isArray(p.matt) ? p.matt : []).map(r => n(r && r.streak))); }
 function linkOf(o, req) { const s = db.shareOf(o), d = s && dataOf(o); return s && d ? links(origin(req), s.slug, d) : null; }
 // make(ownerId, req, now) -> { url, image } | 'nothing' (no saved profile) | null (the database failed). An owner's existing link is returned as it is.
 function make(o, req, now) {
@@ -167,4 +171,4 @@ async function page(req, res, rel, notFound) {
   }
 }
 
-module.exports = { make, drop, forget, linkOf, page, newSlug, origin, SLUG, dataOf };
+module.exports = { make, drop, forget, linkOf, page, newSlug, origin, SLUG, dataOf, streakOf };

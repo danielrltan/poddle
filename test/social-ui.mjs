@@ -22,7 +22,7 @@ const LABELS = [['Win rate vs people', 'Win rate'], ['Time on court', 'On court'
 const ELEVEN = (wr, rec, ...v) => LABELS.map(([label, tag, unit], i) => ({ label, tag, value: i ? v[i - 1] : wr, ...(unit ? { unit } : {}),
   ...(i === 0 ? { note: rec + ' vs people', hero: true } : i === 1 ? { note: 'all modes', hero: true } : i === 2 ? { note: 'wins vs people', hero: true } : {}) }));
 const LBP = { Dan: { name: 'Dan', rank: { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, trophies: 1400, matt: 'Pro', stats: ELEVEN('86%', '42-7', '11h 6m', '12', '81%', '58%', '58', '1570', '318', '40', '22', '3') },
-  Bea: { name: 'Bea', rank: { tier: 3, div: 2, label: 'Gold II', pro: null }, trophies: 340, matt: 'Club', stats: ELEVEN('50%', '7-7', '2h 5m', '3', '64%', '51%', '41', '1100', '60', '4', '9', '0') } };
+  Bea: { name: 'Bea', streak: 2, rank: { tier: 3, div: 2, label: 'Gold II', pro: null }, trophies: 340, matt: 'Club', stats: ELEVEN('50%', '7-7', '2h 5m', '3', '64%', '51%', '41', '1100', '60', '4', '9', '0') } };
 const W0 = () => ({ friends: new Set(['bea', 'cy', 'dan', 'eve']), st: { bea: 'matt', cy: 'menu', dan: 'off', eve: 'playing' }, inc: [{ k: 'rex', at: now - 3 * 3600e3 }], out: [{ k: 'olga', at: now - 86400e3 }] });
 let world = W0();
 const API = { acct: { username: 'Sam', renameAt: null }, fail: null, slow: {}, meSlow: 0, log: [] };      // fail: the next POST answers { status, error }. slow: search q -> delay ms (the stale-answer test). meSlow: /api/me's delay
@@ -196,7 +196,7 @@ pushAll({ type: 'social', ...snap() }); await sleep(300);
 // status. The friend row: Friends, the status (live), Remove behind a confirm; Esc closes the card only
 const card = () => ev(pg, () => { const g = id => document.getElementById(id), f = g('lbp-friend'), vis = e => !!e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none';
   return { open: !g('acct-layer').hidden && !g('lbp-card').hidden, state: g('lbp-card').dataset.state, name: g('lbp-name').textContent, dev: !!g('lbp-name').nextElementSibling?.classList.contains('reg-badge'), rank: g('lbp-rank').textContent, hero: vis(g('lbp-hero')),
-    stats: vis(g('lbp-stats')) ? [...document.querySelectorAll('#lbp-stats dd b')].map(b => b.textContent) : null, places: vis(g('lbp-places')) ? [...document.querySelectorAll('#lbp-places li')].map(l => l.textContent) : [], msg: vis(g('lbp-msg')) ? g('lbp-msg').textContent : '',
+    stats: vis(g('lbp-stats')) ? [...Array(11).keys()].map(i => document.querySelector(`#lbp-stats [data-stat="${i}"]`).textContent) : null, places: vis(g('lbp-places')) ? [...document.querySelectorAll('#lbp-places li')].map(l => l.textContent) : [], msg: vis(g('lbp-msg')) ? g('lbp-msg').textContent : '',
     row: vis(f), line: [...f.querySelectorAll('.lbp-fr-line')].map(l => l.textContent).join('|'), dot: f.querySelector('.fr-dot')?.className || '', tag: f.querySelector('.lbp-fr-tag')?.textContent || '', acts: [...f.querySelectorAll('button')].map(b => b.textContent), foot: vis(g('lbp-foot')) }; });
 const apiHits = p => API.log.filter(l => l[1].startsWith(p)).length;
 { const h0 = [apiHits('/api/leaderboard/player'), apiHits('/api/player')];
@@ -251,7 +251,7 @@ ok(r.state === 'part' && r.hero && r.rank === 'Bronze III' && r.stats === null &
   `alice (not on the board's profile, requested earlier): her rank from /api/player, no stats but a quiet line, Requested + Cancel (${J(r)})`);
 await shot(pg, 'card-part-desktop');
 await clickText(pg, '#lbp-friend', 'Cancel'); await sleep(500); r = await card();
-ok(r.line === 'Friends see when you’re online' && J(r.acts) === J(['Add friend']) && !world.out.some(x => x.k === 'alice'), `Cancel: the request goes, Add friend is back (${J(r)})`);
+ok(r.line === '' && J(r.acts) === J(['Add friend']) && !world.out.some(x => x.k === 'alice'), `Cancel: the request goes, Add friend is back (${J(r)})`);
 await clickText(pg, '#lbp-friend', 'Add friend'); await sleep(500); r = await card();
 ok(r.line === 'Requested' && J(r.acts) === J(['Cancel']) && world.out.some(x => x.k === 'alice') && (await ev(pg, () => !!document.activeElement.closest('#lbp-card'))), `Add friend: Requested, the focus stays in the card (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(200);
@@ -402,7 +402,7 @@ await pg.keyboard.press('Escape'); await sleep(300);
 { const n0 = apiHits('/api/player'); await ev(pg, () => window.__ui.lobbyView('leaderboard')); await sleep(1000);
   await ev(pg, () => [...document.querySelectorAll('#lb-list button.lb-row')].find(b => b.dataset.name === 'Bea').click()); await sleep(900);
   const c = await ev(pg, () => ({ state: document.getElementById('lbp-card').dataset.state, go: document.querySelector('#lbp-friend .lbp-fr-go')?.textContent, btns: document.querySelectorAll('#lbp-friend .btn').length }));
-  ok(c.state === 'ok' && c.go === 'Sign in to add friends' && !c.btns && apiHits('/api/player') === n0, `a guest's profile card: the stats, a quiet "Sign in to add friends", no /api/player (${J(c)})`);
+  ok(c.state === 'ok' && c.go === 'Sign in to add friends' && c.btns === 1 && apiHits('/api/player') === n0, `a guest's profile card: the stats, one "Sign in to add friends" button over the stats, no /api/player (${J(c)})`);
   await shot(pg, 'card-guest-desktop'); await pg.setViewport(PHONE); await sleep(300); await shot(pg, 'card-guest-phone'); await pg.setViewport(DESK); await sleep(300);
   await pg.click('#lbp-friend .lbp-fr-go'); await sleep(500);
   ok(await seenEl(pg, '#signin-card') && !(await seenEl(pg, '#lbp-card')), 'and it opens the sign-in card in its place (in the lobby)'); }

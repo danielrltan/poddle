@@ -80,7 +80,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   username only, never guests, never an owner id; accounts.lb_hidden = 1 (Show me on the global leaderboard off) takes a name off
   at once. Clicking a row opens that player's profile card (NOTES 140; GET /api/leaderboard/player?u=<name>, public, no sign-in, 60 a minute, 30 s
   cache cleared by hide/rename/delete; admin.js changes wait out the TTL): exactly the share card's subset (share.dataOf / card.dataOf: username,
-  rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the eleven card stats with the headline three's notes), rank null when no trophies yet, for every account on at
+  rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the eleven card stats with the headline three's notes, and since NOTES 164 `streak`: the current win streak, the highest of the streak vs people and at each Matt level, on this card only, never the share card), rank null when no trophies yet, for every account on at
   least one board, at any place (NOTES 141); unknown, guest, no-username, hidden, on-no-board, renamed-away and deleted all answer the same 404;
   never an owner id. A player's own places ride on /api/stats and /api/me. Stats are otherwise private to their owner unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
   (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), rank + ladder trophies and its

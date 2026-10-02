@@ -104,7 +104,7 @@ async function leaderRoute(req, res) {
 }
 // one player's profile card from the board (NOTES 140): exactly the share card's subset (share.dataOf), for any account on a board (NOTES 141: at any place, not only the top 100).
 // Unknown, guest, no username, hidden, on no board, renamed away, deleted and a malformed u: the same 404, and the name is never logged
-const publicCard = (d, ranked) => ({ name: d.name, rank: ranked ? { tier: d.tier, div: d.div, label: d.rank, pro: d.pro } : null, trophies: ranked ? d.trophies : 0, matt: d.matt,
+const publicCard = (d, ranked, streak = 0) => ({ name: d.name, streak, rank: ranked ? { tier: d.tier, div: d.div, label: d.rank, pro: d.pro } : null, trophies: ranked ? d.trophies : 0, matt: d.matt,
   stats: d.big.map(b => ({ label: b.label, tag: b.tag, value: b.value, ...(b.cap ? { unit: b.cap } : {}), ...(b.sub ? { note: b.sub } : {}), ...(b.hero ? { hero: true } : {}) })) });   // the card's eleven, in its order: the three headline figures first (hero, with their note: '31-12 vs people'). Never v, em, guest, mattI or the slug
 async function playerRoute(req, res) {
   const u = new URL(String(req.url || ''), 'http://x').searchParams.get('u');
@@ -114,7 +114,7 @@ async function playerRoute(req, res) {
   if (c && t - c.at < PL_MS) return c.body ? send(res, 200, c.body) : fail(res, 404, 'not_found');
   const who = db.leaderOwnerByKey(key); if (who === undefined) return fail(res, 503, 'db_unavailable');
   const d = who ? share.dataOf(who.owner) : null;                 // the share card's own subset (Pro: with its place)
-  const body = d && !d.guest ? publicCard(d, who.ranked) : null;   // guest: no username any more (a race with a delete)
+  const body = d && !d.guest ? publicCard(d, who.ranked, share.streakOf(who.owner)) : null;   // guest: no username any more (a race with a delete)
   if (plCache.size >= PL_MAX) plCache.delete(plCache.keys().next().value);
   plCache.set(key, { at: t, body });
   return body ? send(res, 200, body) : fail(res, 404, 'not_found');
