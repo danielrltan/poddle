@@ -3707,3 +3707,12 @@ whatever screen was up. So from the SECOND court of a visit on (never the first,
   with `node test/make-og.mjs`: favicon.svg, favicon-32.png, favicon.ico, apple-touch-icon.png, icon-192/512.png and og.jpg; og:image is ?v=9 on
   every page. favicon-check.png: the holes still read at 16 px on light and dark. Poddle Helper's bundled icon is the old six-hole one until its
   next build. Nothing sent, stored or shown differently: the legal pages are untouched.
+
+## 173. The corner title is white, outlined in its colour, and twice the size
+
+The owner (2026-10-02): "the VICTORY text in the corner of the win cutscene is kinda bad... you can't see it due to the sky. i'd make it white
+and outline it with the color, same with defeat text. and make it larger. like 2x larger." The slam itself (NOTES 167: coloured, white stroke) is
+unchanged; once it shrinks into the corner (.result-slam.is-corner) it turns white with a .5rem stroke in its colour (blue for VICTORY!, slate for
+DEFEAT, the winner's colour for a spectator's '<name> wins!') and a shadow in the deep shade, with the colours gliding over the 640 ms of the move.
+ui.js cornerStamp scales it to 6.5rem tall instead of 3.25, capped at 7vw so a narrow window (600 px: 42 px) keeps it inside the court pane's corner,
+clear of the emote row. victory-e2e passes as it was (24 checks). Shipped in bd7cd0a; these notes and the changelog entry followed.
