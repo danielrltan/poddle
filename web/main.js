@@ -184,12 +184,12 @@ function showOver() {                              // the result card. A matchov
   overForfeit = !!m.forfeit && !spec();      // for the trophy row (drawTrophies): the stayer's win notes the forfeit
   const wait = +ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [rg[L], rg[1 - L]], rank: [endRanks[L], endRanks[1 - L]], stats: mstats }) || 0;      // ms the panel waits behind VICTORY! (0: it is in at once)
   vicSide = W; vicAt = performance.now() + wait;
-  const reveal = () => { if (ui.currentOverlay() !== 'match') return; if (trophyParked) { const t = trophyParked; trophyParked = null; drawTrophies(t); }      // its trophies came first (the 'profile' message can land before the matchover, behind VICTORY!, or while a set-up screen was up): the row goes on the card as it comes in, so its roll and ceremony are seen
+  const reveal = () => { if (ui.currentOverlay() !== 'match') return; if (vote) ui.rematch({ left: Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000)) });      // the vote's clock starts with the panel (the server gave the title its 2.6 s on top: STAMP_S)
+    if (trophyParked) { const t = trophyParked; trophyParked = null; drawTrophies(t); }      // its trophies came first (the 'profile' message can land before the matchover, behind VICTORY!, or while a set-up screen was up): the row goes on the card as it comes in, so its roll and ceremony are seen
     if (won && !spec() && wait) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); };      // the second burst belongs to the panel
   clearTimeout(revealT); if (wait) revealT = setTimeout(reveal, wait); else reveal();
   scene.jingle(spec() ? (m.forfeit ? 'forfeit' : 'watch') : m.forfeit ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
-  const left = Math.max(0, Math.round((+m.rematchBy || 20) - (performance.now() - overAt) / 1000));      // less what was spent behind a set-up screen
-  if (vote) ui.rematch(spec() ? { left } : { mine: null, theirs: null, left, name: nameOf(1 - L) });
+  if (vote) { if (!spec()) ui.rematch({ mine: null, theirs: null, name: nameOf(1 - L) }); }      // the clock is drawn by reveal(), with the panel
   else if (!T) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000 + wait);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket
   if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); if (!wait) burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card (reveal, when it waits): a quick 'No rematch' had it falling over the lobby
   if (spec()) ui.confetti(W ? ['#ff8a3d', '#ffd34a', '#ffffff'] : ['#3aa0ff', '#ffd34a', '#ffffff'], 60);      // a spectator: one smaller burst in the winner's colours
@@ -676,7 +676,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'match' || m.type === 'matchover') { ui.countdown(0); struck = votedYes = false; over = m; overAt = performance.now(); votedNo = false;
     profile.matchover(!!m.tour); if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
   if (m.type === 'profile') { if (spec()) return; profile.result(m); if (m.trophies && typeof m.trophies === 'object') trophiesIn(m.trophies); return; }      // what this match did to my own stats: a line on the result card (docs/ACCOUNTS.md 9.3) and, when it carries `trophies`, the trophy row (docs/TROPHIES.md 4), to my seat only
-  if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
+  if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { mine: v[0], theirs: v[1], left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
   if (m.type === 'rematchon') { over = null; struck = false; ms = null; trophiesOff(); redialDue(); if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
   if (m.type === 'hold') { holding = true; scene.setFrozen(true); setPaused(false); if (live()) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // their wifi dropped: the seat is held, the ball waits where it is
   if (m.type === 'holdoff') { holding = false; ui.hold(null); return; }                     // frozen follows the next 'state'
@@ -780,7 +780,7 @@ ui.onSettings({
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });
-ui.onRematch(yes => { if (!room || spec()) return;
+ui.onRematch(yes => { if (!room) return; if (spec()) { if (!yes) leave(); return; }      // a spectator's panel has Leave alone: back to the lobby
   if (!yes && votedYes) { votedNo = true; return leave(); }      // Leave after Rematch: the server takes one answer each, and a player leaving the vote closes the court for everyone just the same
   votedYes = !!yes; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
   if (!yes) { const r = room; setTimeout(() => { if (room === r && votedNo) leave(); }, 3000); } });      // unless it never answers

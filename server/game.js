@@ -181,6 +181,7 @@ const SMASH = 0.76;                                            // n above this i
 const SMASH_UP = [0.4, 0.55];                                  // lob (0..0.8) over which a hard swing stops being a smash: a smash comes DOWN or level through the ball. Recorded smashes send lob <= 0.27 (<= 0.45 with the reworked lob gate): called at 0.475, upward share 0.6
 const LOB_ARC = [0.25, 0.6];                                   // underhand() over which the flight turns from the drive's into the lob's: 0.8 of the way by 0.5, all of it by 0.6
 const ASK_S = +process.env.ASK_S || 10, ASK_COOL_S = +process.env.ASK_COOL_S || 10, ASK_GAP_S = process.env.ASK_GAP_S != null ? +process.env.ASK_GAP_S : 3;   // s on the wall clock (docs/SPECTATE.md Asking to play): a request lives 10 s; a requester waits 10 s after it ENDS; a court rests 3 s between requests
+const STAMP_S = process.env.STAMP_S != null ? +process.env.STAMP_S : 2.6;   // s the title has the court to itself before the vote (web/ui.js STAMP_MS)
 const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
 const PROMO_S = +process.env.PROMO_S || CAL_S;                 // s a spectator who was let into Matt's seat has to get their paddle ready before Matt is back
 // Trophies (docs/TROPHIES.md 3.4): what a forfeit itself puts on the game it cut short (nobody struck, too few points, the leaver ahead): never held against the
@@ -606,7 +607,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (!reported) { reported = true; opts.onResult(winner, [...score], !!forfeit, { struck, score: [...score] }); }
       return;
     }
-    over = { winner, forfeit, names: nm || names(), reg: regs(), rank: [...seatTier], until: Date.now() + (LEGACY ? 5 : REMATCH_S) * 1000,
+    over = { winner, forfeit, names: nm || names(), reg: regs(), rank: [...seatTier], until: Date.now() + (LEGACY ? 5 : REMATCH_S + STAMP_S) * 1000,      // the vote's clock starts when the result panel comes in, after the VICTORY! / DEFEAT title (NOTES 167)
       votes: [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? true : null) : false; }) };      // Matt always wants another; a seat that was forfeited cannot
     if (LEGACY) newMatchAt = now + 5;                            // LOCAL: a new match after 5 s whatever anyone says (test/e2e.mjs lives there)
     broadcast(overMsg()); tellProfiles(rec);

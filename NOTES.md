@@ -3611,3 +3611,28 @@ The owner (2026-10-02): "the friends / add friend row could be combined and put 
   unless Show me is off; docs/ropa.md and CLAUDE.md follow; the changelog's October 2 entry says so.
 - Tests: social-ui.mjs (the control in the header for every state, the status line), lb-profile-ui.mjs (the notice at '3'),
   leaderboard.test.mjs (an account on no board answers 200 with zeros; a hidden one still 404).
+
+## 167. Everyone gets a title, it shrinks into the corner, the vote starts at the cut; spectators see the votes, react and can leave
+- The owner, on NOTES 165: "no there should be a defeat stamp, both sides get a stamp title for the 2.6s, then it goes over to the winner cut,
+  where the rematch timer starts counting down. Spectators then get that screen and get to see who wants to rematch (and they can emote still) and
+  can leave if they want." And: "when it goes over to the court view, the victory / defeat text shrinks into an appropriate corner of the screen".
+  This replaces NOTES 122's "never on a loss".
+- Titles (ui.js matchResult): VICTORY! for the winner, DEFEAT (slate) for the loser, "<NAME> WINS!" in the winner's colour for a spectator (sized
+  to the name so it always fits). All hold the court for 2.6 s (STAMP_MS; ov-victory is now 2600 ms and ends at full size). A forfeit has no title
+  for anyone (nothing was won on the court), and reduced motion has none: both go straight to the winner's shot.
+- At the cut the title does not leave: ui.js cornerStamp() measures it and glides it (640 ms) to the court pane's top left corner at about 3.25rem,
+  where it stays while the panel is up. A window resize re-places it at once. RANK UP has its own element now (#rank-slam), since it used to
+  overwrite the title's.
+- The vote's clock starts at the cut. server/game.js gives the vote REMATCH_S + STAMP_S (2.6 s, env STAMP_S) from match point, so the panel opens
+  on 20; main.js draws the clock in reveal(), not at match point. No clock, button or focus behind the title, as before.
+- Spectators: the same title beat, then the same shot and panel. Their panel has Leave alone (it calls leave(): back to the lobby); a tournament
+  match keeps See bracket. The vote messages they already received are now drawn: a green tick on the chip of each player who wants a rematch
+  (.tally-side.is-ready; players see the ticks too), and the line reads "Ann wants a rematch" instead of "Waiting for a rematch". The emote row
+  stays up over the court pane (bottom right of it; top right when the panel lies along the bottom), and emote pops show over the court pane for
+  everyone, never over the panel.
+- A bug of this change caught by the e2e before it shipped: a spectator's panel closed by itself after
+  8.6 s (the legacy no-vote timer ran for them).
+- No data, storage, permission or third-party change (votes and emotes were already sent to spectators): the legal pages are untouched.
+- Tests: test/victory-e2e.mjs now checks the three titles, the corner on all three screens (and after a resize), the clock starting at 18-20 after
+  the cut, the spectator's Leave / emote / tick / line and leaving from the panel (23 checks). ui-next, fixes-e2e and spectate-e2e wait out the
+  title where they pressed or measured the card at once; ui-next's 8 old reds are unchanged.

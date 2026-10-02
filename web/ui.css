@@ -2155,9 +2155,20 @@ html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{g
 #screen-match:not([data-beat="champ"]) .result-flash{left:auto;right:0;width:40vw}
 #screen-match:not([data-beat="champ"]) .result-slam.is-rank{right:40vw;font-size:min(7rem,9vw)}
 /* VICTORY! is its own beat over the live court: in by 110 ms (the win sting's impact), held and slowly growing, gone by 2.8 s as the panel arrives */
-#screen-match .result-slam.is-victory{font-size:min(11rem,15vw)}
-#screen-match.is-active .result-slam.is-victory.go{animation:ov-victory 2800ms linear both}
-@keyframes ov-victory{0%{opacity:0;scale:2.4}4%{opacity:1;scale:.92}6%{scale:1.04}8%{scale:1}88%{opacity:1;scale:1.06}100%{opacity:0;scale:1.2}}
+#screen-match .result-slam.is-victory{font-size:min(11rem,15vw);width:fit-content;max-width:100%;white-space:nowrap}
+#screen-match.is-active .result-slam.is-victory.go{animation:ov-victory 2600ms linear both}
+@keyframes ov-victory{0%{opacity:0;scale:2.4}4%{opacity:1;scale:.92}6%{scale:1.04}8%{scale:1}55%{scale:1.05}100%{opacity:1;scale:1}}
+/* everyone gets a title (NOTES 167): DEFEAT in slate for the loser, '<name> wins!' in the winner's colour for a spectator. At the cut it shrinks into
+   the court's top left corner (ui.js cornerStamp sets the transform) and stays there while the panel is up */
+.result-slam.is-defeat{color:#8794a1;text-shadow:0 .5rem 0 #4b535b}
+.result-slam.is-watch{text-transform:uppercase} .result-slam.is-watch.is-them{color:var(--them);text-shadow:0 .5rem 0 var(--them-deep,#c2410c)}
+.result-slam.is-corner{opacity:1;transform-origin:0 0;transition:transform 640ms var(--ease-out)}
+/* who wants another game: a tick on their chip, for players and spectators alike */
+.tally-side.is-ready::after{content:"\2713";position:absolute;top:2.1rem;left:calc(50% + .7rem);display:grid;place-items:center;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--good-lamp);color:#fff;border:.125rem solid #fff;
+  font-size:.9375rem;font-weight:900;line-height:1;box-shadow:0 .0625rem .25rem rgba(20,60,90,.35);animation:ov-title-pop 320ms var(--ease-bounce) both}
+/* spectators keep their reactions on the winner's shot: the row moves to the court pane's corner, the pops show over the court */
+body[data-overlay="match"][data-role="spectator"] .emotes{opacity:1;pointer-events:auto;right:calc(40vw + var(--edge));z-index:calc(var(--z-screen) + 1)}
+body[data-overlay="match"] .emote-layer{opacity:1;right:40vw;z-index:calc(var(--z-screen) + 1)}      /* the pops come in at the court pane's edge, never over the panel */
 @media (max-aspect-ratio: 1/1), (max-width: 760px){
   #screen-match:not([data-beat="champ"]){flex-direction:column}
   #screen-match:not([data-beat="champ"]) .result-card{width:100%;height:auto;max-height:58dvh;padding:var(--s-4) var(--s-5);border-left:0;border-top:.25rem solid var(--line);box-shadow:0 -.75rem 2.5rem rgba(8,34,54,.3), inset 0 .1875rem 0 #fff}
@@ -2166,5 +2177,7 @@ html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{g
   #screen-match:not([data-beat="champ"]) .result-card h2{margin-top:auto}
   #screen-match:not([data-beat="champ"]) .result-flash{top:auto;bottom:0;width:100%;height:58dvh}
   #screen-match:not([data-beat="champ"]) .result-slam.is-rank{right:0;bottom:58dvh}
+  body[data-overlay="match"][data-role="spectator"] .emotes{right:var(--edge);top:var(--edge);bottom:auto}
+  body[data-overlay="match"] .emote-layer{right:0;bottom:58dvh}
 }
 @media (prefers-reduced-motion: reduce){ #screen-match:not([data-beat="champ"])::before{display:none} }

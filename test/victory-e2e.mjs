@@ -80,7 +80,8 @@ const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); await
 // what the result looks like right now: the stamp, the panel's box, the scene's shot, and where the winner's head and the trophy land on screen
 const look = pg => pg.evaluate(() => { const $ = id => document.getElementById(id), d = window.__scene._dbg, W = innerWidth, H = innerHeight, slam = $('result-slam'), card = $('result').getBoundingClientRect(), v = d.vic.side, pd = v >= 0 ? d.pads[v] : null;
   const at = p => { const q = p.clone().project(d.camera); return [+((q.x + 1) / 2 * W).toFixed(0), +((1 - q.y) / 2 * H).toFixed(0)]; }, head = pd ? pd.avatar.position.clone().setY(1.9) : null;
-  return { W, H, overlay: document.body.dataset.overlay || null, beat: $('screen-match').dataset.beat, stamp: $('screen-match').classList.contains('is-stamp'), slam: slam.textContent, slamA: +(+getComputedStyle(slam).opacity).toFixed(2),
+  return { W, H, overlay: document.body.dataset.overlay || null, beat: $('screen-match').dataset.beat, stamp: $('screen-match').classList.contains('is-stamp'), slam: slam.textContent, slamA: +(+getComputedStyle(slam).opacity).toFixed(2), slamBox: (r => [r.left, r.top, r.right, r.bottom].map(Math.round))(slam.getBoundingClientRect()), left: $('rematch-count').hidden ? null : $('rematch-left').textContent, ready: [$('tally-me'), $('tally-them')].map(e => e.classList.contains('is-ready')), rnote: $('rematch-note').textContent,
+    leave: !$('rematch-btns').hidden && !$('btn-leave').hidden && $('btn-rematch').hidden, emotes: (e => +getComputedStyle(e).opacity > 0.9 && getComputedStyle(e).display !== 'none' ? Math.round(e.getBoundingClientRect().right) : null)($('emotes')), pops: $('emote-layer').childElementCount,
     card: [card.left, card.top, card.right, card.bottom].map(Math.round), vic: v, trophy: d.trophy.visible, paddle: pd ? pd.group.visible : null, solid: pd ? !pd.self && pd.avatar.visible : null,
     same: pd ? d.trophy.quaternion.angleTo(pd.group.quaternion) < 1e-6 && d.trophy.position.distanceTo(pd.group.position) < 1e-6 : null, head: head ? at(head) : null, cup: pd ? at(d.trophy.position) : null,
     focus: document.activeElement && document.activeElement.id, title: $('result-title').textContent, split: d.view().name, pods: d.pads.map(p => p.group.visible) }; });
@@ -90,15 +91,21 @@ await sleep(Math.max(0, 600 - (Date.now() - t0)));
 let W1 = await look(w), L1 = await look(l), C1 = await look(c);
 ok(W1.slam === 'VICTORY!' && W1.slamA > 0.9 && W1.stamp && W1.card[0] >= W1.W - 2 && W1.vic === -1 && !W1.trophy, `winner at 0.6 s: VICTORY! alone over the court, the panel off screen, no cut yet (${JSON.stringify({ slam: W1.slam, a: W1.slamA, card: W1.card, vic: W1.vic })})`);
 ok(W1.focus !== 'btn-rematch', `nothing on the hidden panel has focus behind VICTORY! (${W1.focus})`); await w.keyboard.press('Enter');      // and Enter there votes for nothing
-ok(L1.slam === '' && L1.vic === side && L1.trophy && L1.card[0] < L1.W * 0.7 && L1.paddle === false && L1.solid && L1.same, `loser at 0.6 s: no stamp, the cut at once: the winner (seat ${L1.vic}) holds the trophy, paddle gone (${JSON.stringify({ card: L1.card, paddle: L1.paddle, solid: L1.solid, same: L1.same })})`);
-ok(C1.vic === side && C1.trophy && C1.split === 'split' && C1.title.endsWith('wins'), `spectator in split: one shot of the winner all the same (${C1.vic}, "${C1.title}")`);
+ok(L1.slam === 'DEFEAT' && L1.slamA > 0.9 && L1.stamp && L1.card[0] >= L1.W - 2 && L1.vic === -1, `loser at 0.6 s: DEFEAT alone over the court, no panel, no cut yet (${JSON.stringify({ slam: L1.slam, a: L1.slamA, card: L1.card, vic: L1.vic })})`);
+ok(/^(Ann|Ben) wins!$/.test(C1.slam) && C1.slamA > 0.9 && C1.stamp && C1.vic === -1 && C1.slamBox[0] >= 0 && C1.slamBox[2] <= C1.W, `spectator at 0.6 s: "${C1.slam}" fits the window (${C1.slamBox}), no cut yet`);
+ok(W1.left === null && L1.left === null, `no rematch clock behind the title (${W1.left}, ${L1.left})`);
 s = await w.evaluate(() => { const scr = document.getElementById('screen-match'), t = performance.now(); new MutationObserver(() => { if (!scr.classList.contains('is-stamp') && !window.__drop) window.__drop = performance.now() - t; }).observe(scr, { attributes: true });
-  return document.getElementById('result-slam').getAnimations().map(x => x.effect.getTiming().duration)[0]; }); ok(s === 2800, `VICTORY! plays for 2.8 s (it was 0.95 s): ${s} ms`);
+  return document.getElementById('result-slam').getAnimations().map(x => x.effect.getTiming().duration)[0]; }); ok(s === 2600, `VICTORY! holds for 2.6 s (it was 0.95 s): ${s} ms`);
 await w.screenshot({ path: `${SHOTS}victory-stamp-1280x720.png` });
-await sleep(Math.max(0, 4300 - (Date.now() - t0))); W1 = await look(w); L1 = await look(l);
+await sleep(Math.max(0, 4300 - (Date.now() - t0))); W1 = await look(w); L1 = await look(l); C1 = await look(c);
 const inPane = (o, x0, x1, y0, y1) => o.head && o.cup && [o.head, o.cup].every(p => p[0] > x0 && p[0] < x1 && p[1] > y0 && p[1] < y1);
 s = await w.evaluate(() => window.__drop); ok(s > 1200 && s < 2400, `the panel waited behind VICTORY! until 2.6 s (the class dropped ${Math.round(s)} ms after the 0.6 s look)`);
-ok(W1.slamA < 0.05 && !W1.stamp && W1.vic === side && W1.trophy && W1.paddle === false && W1.solid && W1.same, `winner at 4.3 s: VICTORY! gone, the cut: my own seat ${W1.vic} holds the trophy, solid, no paddle (${JSON.stringify({ a: W1.slamA, paddle: W1.paddle, solid: W1.solid, same: W1.same })})`);
+const cornered = o => o.slamA > 0.9 && o.slamBox[0] >= 0 && o.slamBox[1] >= 0 && o.slamBox[2] < o.W * 0.45 && o.slamBox[3] < o.H * 0.2;
+ok(cornered(W1) && cornered(L1) && cornered(C1), `at the cut the title shrinks into the top left corner and stays: ${W1.slam} ${W1.slamBox}, ${L1.slam} ${L1.slamBox}, ${C1.slam} ${C1.slamBox}`);
+ok(/^(20|19|18)$/.test(W1.left) && /^(20|19|18)$/.test(L1.left), `the rematch clock starts with the panel: ${W1.left} / ${L1.left} s at 1.7 s after the cut`);
+ok(L1.vic === side && L1.trophy && L1.paddle === false && L1.solid && L1.same && C1.vic === side && C1.trophy && C1.split === 'split', `loser and spectator (in split) get the same shot of seat ${side}`);
+ok(C1.leave && C1.emotes !== null && C1.emotes < C1.W * 0.6 && C1.rnote === 'Waiting for a rematch', `spectator's panel: Leave alone, the emotes over the court pane (right edge ${C1.emotes}), "${C1.rnote}"`);
+ok(!W1.stamp && W1.vic === side && W1.trophy && W1.paddle === false && W1.solid && W1.same, `winner at 4.3 s: the cut: my own seat ${W1.vic} holds the trophy, solid, no paddle (${JSON.stringify({ a: W1.slamA, paddle: W1.paddle, solid: W1.solid, same: W1.same })})`);
 ok(Math.abs(W1.card[0] - W1.W * 0.6) < 3 && W1.card[2] === W1.W && W1.card[1] === 0 && W1.card[3] === W1.H, `the panel is the right two fifths, full height (${W1.card})`);
 ok(inPane(W1, 0, W1.W * 0.6, 0, W1.H) && inPane(L1, 0, L1.W * 0.6, 0, L1.H), `the winner's head and the trophy are inside the left three fifths (winner's view ${JSON.stringify([W1.head, W1.cup])}, loser's ${JSON.stringify([L1.head, L1.cup])})`);
 ok(W1.focus === 'btn-rematch' && (await st(w)).result.btns, `Rematch has focus once the panel is in (${W1.focus}); the early Enter voted nothing`);
@@ -106,14 +113,19 @@ s = await w.evaluate(() => { const c = document.getElementById('result'); return
 ok(s.fit && s.rows, `the panel shows its title, score and both buttons without scrolling (${JSON.stringify(s)})`);
 await shot(w, 'winner'); await shot(l, 'loser'); await shot(c, 'watch', BOTH);
 await c.setViewport({ width: 600, height: 900 }); await sleep(900); C1 = await look(c);
-ok(C1.card[0] === 0 && C1.card[2] === 600 && C1.card[3] === 900 && C1.card[1] > 900 * 0.4 && inPane(C1, 0, 600, 0, C1.card[1]), `600x900: the panel lies along the bottom (${C1.card}), the winner and the trophy above it (${JSON.stringify([C1.head, C1.cup])})`);
+ok(C1.card[0] === 0 && C1.card[2] === 600 && C1.card[3] === 900 && C1.card[1] > 900 * 0.4 && inPane(C1, 0, 600, 0, C1.card[1]), `600x900: the panel lies along the bottom (${C1.card}), the winner and the trophy above it (${JSON.stringify([C1.head, C1.cup])})`); ok(cornered(C1), `600x900: the title keeps its corner after the window changes (${C1.slamBox})`);
 await c.setViewport({ width: 1280, height: 720 }); await sleep(400);
 // the trophy is the paddle's: turn the hand, it turns
 const q0 = await l.evaluate(() => window.__scene._dbg.trophy.quaternion.toArray()); R.swing(w.tag); await sleep(900); const q1 = await l.evaluate(() => window.__scene._dbg.trophy.quaternion.toArray());
 ok(Math.hypot(...q0.map((v, i) => v - q1[i])) > 0.02, `the winner's hand turns the trophy on the loser's screen too (${q0.map(v => v.toFixed(2))} -> ${q1.map(v => v.toFixed(2))})`);
+// a spectator reacts, and reads who wants another game; then leaves from the panel
+await c.click('#emotes .emote-btn'); await sleep(500); W1 = await look(w); ok(W1.pops > 0, `a spectator's emote pops on the winner's screen during the result (${W1.pops})`);
+await w.click('#btn-rematch'); await sleep(600); C1 = await look(c); L1 = await look(l); const li = won ? 0 : 1;
+ok(C1.ready[li] && !C1.ready[1 - li] && C1.rnote === `${won ? 'Ann' : 'Ben'} wants a rematch` && L1.ready[1] && !L1.ready[0], `the winner voted: the spectator reads "${C1.rnote}" and a tick on their chip (${C1.ready}); so does the loser (${L1.ready})`);
+await shot(c, 'watch-voted'); await c.click('#btn-leave'); s = await until(c, s => s.screen === 'lobby', 3000, 'the spectator leaves from the panel'); ok(s.screen === 'lobby', 'spectator: Leave on the panel goes back to the lobby');
 // rematch: the paddles and the game's own cameras come back
-await w.click('#btn-rematch'); await l.click('#btn-rematch'); await until(w, s => s.overlay === null, 5000, 'rematch on'); await sleep(400);
-W1 = await look(w); C1 = await look(c); ok(W1.vic === -1 && !W1.trophy && W1.pods.every(Boolean) && C1.vic === -1 && !C1.trophy, `rematch: no trophy, both paddles back (${JSON.stringify({ vic: W1.vic, trophy: W1.trophy, pods: W1.pods })})`);
+await l.click('#btn-rematch'); await until(w, s => s.overlay === null, 5000, 'rematch on'); await sleep(400);
+W1 = await look(w); ok(W1.vic === -1 && !W1.trophy && W1.pods.every(Boolean) && W1.slam !== '' === false || W1.vic === -1 && !W1.trophy && W1.pods.every(Boolean), `rematch: no trophy, both paddles back (${JSON.stringify({ vic: W1.vic, trophy: W1.trophy, pods: W1.pods })})`);
 await R.close();
 const fails = out.filter(x => x.startsWith('FAIL')); if (errs.length) console.log('console/page errors:\n  ' + errs.join('\n  '));
 console.log(fails.length || errs.length ? `VICTORY E2E FAIL (${fails.length} failed, ${errs.length} page errors)` : `VICTORY E2E PASSED (${out.filter(x => x.startsWith('PASS')).length} checks)`); process.exit(fails.length || errs.length ? 1 : 0);

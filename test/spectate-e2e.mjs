@@ -182,9 +182,10 @@ u = await st(c); ok(u.phase === 'watch' && u.room === CODE && !u.hold, 'Cat is s
 // =====================================================================================================================
 rest('b');                                         // Ben stops swinging: Ann wins the points
 [s, t, u] = await Promise.all([until(a, s => s.result, 200000, 'the match ends for Ann'), until(b, s => s.result, 200000, 'for Ben'), until(c, s => s.result, 200000, 'for Cat')]);
+await sleep(3200); [s, t, u] = await Promise.all([a, b, c].map(st));      // past the title's 2.6 s (VICTORY! / DEFEAT / 'Ann wins!', NOTES 167): the panel is in and the vote's clock runs
 const annWon = s.result.title === 'You win', W = annWon ? 'Ann' : 'Ben';
 ok((annWon ? t.result.title === 'Ann wins' : t.result.title === 'You win' && s.result.title === 'Ben wins') && u.result.title === `${W} wins`, `result: Ann "${s.result.title}", Ben "${t.result.title}", Cat "${u.result.title}"`);
-ok(s.result.btns && t.result.btns && !u.result.btns && u.result.rnote === 'Waiting for a rematch' && u.result.me === 'Ann' && u.result.them === 'Ben' && s.result.them === 'Ben' && /^\d+$/.test(s.result.left), `result: players vote, Cat reads "${u.result.rnote}", ${s.result.left} s left`);
+ok(s.result.btns && t.result.btns && u.result.btns && await c.evaluate(() => document.getElementById('btn-rematch').hidden && !document.getElementById('btn-leave').hidden) && u.result.rnote === 'Waiting for a rematch' && u.result.me === 'Ann' && u.result.them === 'Ben' && s.result.them === 'Ben' && /^\d+$/.test(s.result.left), `result: players vote, Cat reads "${u.result.rnote}", ${s.result.left} s left`);
 await shot(a, '15-result', BOTH); await shot(c, '15-result-spectator', BOTH);
 await a.click('#btn-rematch'); [s, t] = await Promise.all([until(a, s => s.result && s.result.rnote, 3000, 'a voted'), until(b, s => s.result && s.result.rnote, 3000, 'b hears of it')]);
 ok(s.result.rnote === 'Waiting for Ben' && t.result.rnote === 'Ann wants a rematch', `votes: Ann reads "${s.result.rnote}", Ben reads "${t.result.rnote}"`); await shot(b, '16-result-asked', BOTH); await shot(a, '16-result-voted');

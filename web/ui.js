@@ -245,7 +245,12 @@ const stacked = matchMedia('(max-aspect-ratio: 1/1), (max-width: 760px)');      
 export function resultPane() { const c = $('result'), W = innerWidth || 1, H = innerHeight || 1; if (!c) return null;
   if (stacked.matches) { const f = Math.max(0.25, 1 - c.offsetHeight / H); return { fw: 1, fh: f, px: 0, py: 1 - f }; }
   const f = Math.max(0.25, 1 - c.offsetWidth / W); return { fw: f, fh: 1, px: f - 1, py: 0 }; }
-// -> the ms the panel stays out of sight behind VICTORY! (0: it is in at once)
+// At the cut the title does not leave: it shrinks into the court pane's top left corner and stays while the panel is up
+function cornerStamp(st, instant) { if (!st || slots.overlay !== 'match') return; const r = st.getBoundingClientRect(), fs = parseFloat(getComputedStyle(st).fontSize) || 1, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  st.classList.remove('go'); st.classList.add('is-corner'); void st.offsetWidth; st.style.transition = instant ? 'none' : ''; st.style.transform = `translate(${(rem * 1.5 - r.left).toFixed(1)}px, ${(rem * 1.25 - r.top).toFixed(1)}px) scale(${Math.min(1, 3.25 * rem / fs).toFixed(3)})`; }
+addEventListener('resize', () => { const st = $('result-slam'); if (!st || !st.classList.contains('is-corner')) return; st.style.transition = 'none'; st.style.transform = 'none'; cornerStamp(st, true); });      // the corner is measured in pixels: a new window size, a new corner (no glide)
+let resNames = ['', ''];      // the result's left and right names, for a spectator's 'Ann wants a rematch'
+// -> the ms the panel stays out of sight behind the title (0: it is in at once)
 export function matchResult(o, me, them, name) {
   const legacy = o === null || typeof o !== 'object';                                   // the old positional call: it never carries stats
   if (legacy) o = { won: !!o, me, them, nameThem: name, vote: false };
@@ -264,14 +269,17 @@ export function matchResult(o, me, them, name) {
   { const r = Array.isArray(o.rank) ? o.rank : []; rankBadge($('tally-name-me'), r[0], 'is-md'); rankBadge($('tally-name-them'), r[1], 'is-md'); }      // rank: [left, right], the tiers on any court (docs/TROPHIES.md 3.9); absent = none. .is-md: the emblem with its division tag beside each name
   countWord = T ? 'Bracket in ' : '';
   resultRole = watching ? 'spectator' : 'player'; voted = votedYes = false; noCount = !!o.forfeit; stopCount();      // a forfeit leaves one thing to press (Leave): a bar ticking down beside it read as a rematch clock nobody could answer. The court still closes by itself countTotal = 0; votes = { mine: null, theirs: null, name: nameThem };
-  show('rematch-btns', vote); show('rematch-count', false);
+  show('rematch-btns', vote || watching && !T); show('btn-rematch', !watching); show('rematch-count', false);      // a spectator's panel has Leave alone
+  resNames = [nameMe, nameThem]; votes = { mine: null, theirs: null, name: nameThem }; $('tally-me').classList.remove('is-ready'); $('tally-them').classList.remove('is-ready');
   for (const id of ['btn-rematch', 'btn-leave']) { const b = $(id); if (b) { b.disabled = false; b.classList.remove('is-pressed'); } }
   setText($('rematch-note'), T ? '' : watching ? (o.forfeit ? '' : 'Waiting for a rematch') : vote ? '' : 'Rematch starting');
   if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
-  { const st = $('result-slam'), scr = $('screen-match'); if (st) { st.textContent = won && !watching && !o.forfeit ? 'VICTORY!' : ''; st.classList.remove('is-rank'); st.classList.toggle('is-victory', !!st.textContent); if (st.textContent) restart(st, 'go'); }
-    clearTimeout(stampT); const v = !!(st && st.textContent) && !matchMedia('(prefers-reduced-motion: reduce)').matches; scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => scr?.classList.remove('is-stamp'), STAMP_MS); }      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
+  { const st = $('result-slam'), scr = $('screen-match'), word = o.forfeit ? '' : watching ? `${winner} wins!` : won ? 'VICTORY!' : 'DEFEAT';      // the title (NOTES 167): everyone gets one, a forfeit excepted (nothing was won on the court)
+    if (st) { st.textContent = word; st.className = 'result-slam' + (!word ? '' : ' is-victory' + (watching ? ' is-watch' + (won ? '' : ' is-them') : won ? '' : ' is-defeat')); st.style.cssText = '';
+      if (word && watching) st.style.fontSize = `min(9rem, ${(125 / word.length).toFixed(1)}vw)`; if (word) restart(st, 'go'); }      // a name is as long as it is: the line always fits the window
+    clearTimeout(stampT); const v = !!(st && word) && !reduced(); scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => { scr?.classList.remove('is-stamp'); cornerStamp(st); }, STAMP_MS); }      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
   $('tally-sc-me').style.setProperty('--to', L | 0); $('tally-sc-them').style.setProperty('--to', R | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame (no stamp: NOTES 104)
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
@@ -285,7 +293,7 @@ export function trophyReset() {
   clearTimeout(upT); upT = 0; const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll', 'is-none'); } $('result')?.classList.remove('has-trophies');
   const em = $('trophy-em'); if (em) { em.querySelector('.medal-rays')?.remove(); em.querySelector('.rank-em')?.classList.remove('is-pop', 'is-down'); em.querySelector('.rank-card-em')?.classList.remove('is-flip'); em.classList.remove('is-up'); }
   { const k = $('rank-kicker'); if (k) { k.hidden = true; k.textContent = ''; } } $('result-flash')?.classList.remove('is-sweep');
-  const n = $('result-note'); n?.querySelector('.result-note-sub')?.remove(); n?.classList.remove('is-quiet'); $('result-slam')?.classList.remove('is-rank');
+  const n = $('result-note'); n?.querySelector('.result-note-sub')?.remove(); n?.classList.remove('is-quiet'); { const rs = $('rank-slam'); if (rs) { rs.textContent = ''; rs.classList.remove('go'); } }
 }
 // the emblem card in the trophy row: the rank's emblem at .is-lg, its name and division under it (emblems.js emblemCard), re-pointed in place on a change
 function trophyCard(tier, div) {
@@ -311,12 +319,14 @@ export function onRematch(fn) { onVote = fn; }                                  
 // { mine, theirs, left, name }: each vote true | false | null, a missing key = unchanged. The server only speaks when a vote changes, so the seconds tick here.
 let votes = { mine: null, theirs: null, name: '' };
 export function rematch(o = {}) {
-  if ('mine' in o) { votes.mine = o.mine; if (o.mine === true || o.mine === false) lockVote(o.mine); }      // null never re-opens the buttons: my click may still be on its way
-  if ('theirs' in o) { votes.theirs = o.theirs; const r = $('btn-rematch'); if (o.theirs === false && r && !voted) { const had = document.activeElement === r; r.disabled = true; if (had) $('btn-leave')?.focus({ preventScroll: true }); } }      // they left (a forfeit): there is nobody to play again, only Leave
+  if ('mine' in o) { votes.mine = o.mine; if (resultRole !== 'spectator' && (o.mine === true || o.mine === false)) lockVote(o.mine); }      // null never re-opens the buttons: my click may still be on its way
+  if ('theirs' in o) { votes.theirs = o.theirs; const r = $('btn-rematch'); if (resultRole !== 'spectator' && o.theirs === false && r && !voted) { const had = document.activeElement === r; r.disabled = true; if (had) $('btn-leave')?.focus({ preventScroll: true }); } }      // they left (a forfeit): there is nobody to play again, only Leave
   if (o.name != null) votes.name = String(o.name);
   if (typeof o.left === 'number' && isFinite(o.left)) { const n = Math.max(0, Math.round(o.left)); countTotal = Math.max(countTotal, n) || 1;       // the bar drains from the first number it was given
     stopCount(); show('rematch-count', !noCount); drawCount(n); countT = setInterval(() => { if (countLeft > 0) drawCount(countLeft - 1); else stopCount(); }, 1000); }
-  if (resultRole === 'spectator') return;                                                // their note stays "Waiting for a rematch"
+  $('tally-me')?.classList.toggle('is-ready', votes.mine === true); $('tally-them')?.classList.toggle('is-ready', votes.theirs === true);      // a tick on the chip of whoever wants another game: players and spectators read the same thing
+  if (resultRole === 'spectator') { if (('mine' in o || 'theirs' in o) && !noCount) { const w = [0, 1].filter(i => [votes.mine, votes.theirs][i] === true).map(i => resNames[i]);
+      swapText($('rematch-note'), w.length === 2 ? 'Rematch' : w.length ? `${w[0]} wants a rematch` : 'Waiting for a rematch', 'ov-note'); } return; }      // who has said yes
   // (after a forfeit the card already says "<name> left" under the title: not twice)
   if ('mine' in o || 'theirs' in o || o.name != null) { const who = votes.name || 'Opponent';
     swapText($('rematch-note'), votes.theirs === true ? `${who} wants a rematch` : votes.theirs === false ? ($('result-note')?.textContent ? '' : `${who} left`) : votes.mine === true ? `Waiting for ${who}` : '', 'ov-note'); }      // a new note slides up into place
@@ -749,7 +759,7 @@ function drawAsk() {
 on2('btn-ask', 'click', e => { if (e.pointerType) e.currentTarget.blur(); if (askCan() && onAskFn) onAskFn(); });
 
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });
-on2('btn-leave', 'click', () => { if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
+on2('btn-leave', 'click', () => { if (resultRole === 'spectator') { if (onVote) onVote(false); return; } if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
 on2('rematch-btns', 'keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const b = $(e.key === 'ArrowLeft' ? 'btn-rematch' : 'btn-leave'); if (b && !b.disabled) { e.preventDefault(); b.focus(); } });
 
 // ---------- lobby ----------
@@ -1229,7 +1239,7 @@ function brPick(k) { brTab = k; drawBracket(); $('br-tabs').querySelector('[aria
 export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
-  { const st = $('result-slam'); if (st) { st.textContent = ''; st.classList.remove('is-victory'); } clearTimeout(stampT); $('screen-match')?.classList.remove('is-stamp'); }      // the champion's card has no stamp: the final's VICTORY! goes with its card
+  { const st = $('result-slam'); if (st) { st.textContent = ''; st.className = 'result-slam'; st.style.cssText = ''; } clearTimeout(stampT); $('screen-match')?.classList.remove('is-stamp'); }      // the champion's card has no stamp: the final's VICTORY! goes with its card
   $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won'); resultStats(null, card); trophyReset();      // the final's own card is replaced at once: its stats, beat and any trophy row go with it
   setText($('result-title'), me ? 'You’re the champion' : `${name} is the champion`); setText($('result-note'), me ? 'Your tournament matches' : `${name}’s tournament matches`);
   const road = $('result-road'); road.textContent = '';
@@ -1361,7 +1371,7 @@ export function rankUp(o) {
   em.classList.add('is-up'); { const f = $('result-flash'); if (f) restart(f, 'is-sweep'); }      // rank up: the emblem grows and stays grown, and one band of light crosses the card
   let rays = em.querySelector('.medal-rays'); if (!rays) { rays = document.createElement('i'); rays.className = 'medal-rays'; rays.setAttribute('aria-hidden', 'true'); em.prepend(rays); }
   rays.style.setProperty('--rank-ray', `color-mix(in srgb, ${R.colour.mid} 55%, transparent)`); restart(rays, 'is-on');
-  const s = $('result-slam'); if (s) { s.textContent = 'RANK UP'; s.classList.remove('is-them', 'is-gold', 'is-victory'); s.classList.add('is-rank'); s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
+  const s = $('rank-slam') || $('result-slam'); if (s) { s.textContent = 'RANK UP'; s.className = 'result-slam is-rank'; s.style.cssText = ''; s.style.setProperty('--rank-c', R.colour.mid); s.style.setProperty('--rank-deep', R.colour.deep); restart(s, 'go'); }
   { const sub = r.tier <= 4 ? 'Ranks up to Platinum are never lost once reached' : 'Diamond and above can drop, but never below Platinum'; note(label, sub); if ($('trophy-note')?.hidden) line(sub); }
   confetti([R.colour.mid, '#ffd34a', '#ffffff'], 120);
 }
