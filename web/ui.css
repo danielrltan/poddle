@@ -1260,7 +1260,7 @@ body[data-role="spectator"] .ask-play:not([hidden]){animation:ov-pill-in 380ms v
 #screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-card{animation:panel-in var(--d-slow) var(--ease-out) both}
 #screen-match.is-active:is([data-beat="win"],[data-beat="watch"],[data-beat="champ"]) .result-flash{animation:ov-shine 900ms var(--ease-soft) 260ms both}
 #screen-match.is-active .result-slam.go{animation:ov-slam 380ms linear both}
-#screen-match.is-stamp .result-card,#screen-match.is-stamp .result-card *,#screen-match.is-stamp .result-card *::before,#screen-match.is-stamp .result-card *::after,#screen-match.is-stamp .result-flash{animation-play-state:paused!important}      /* the card waits at its first frame (panel-in: unseen) until the stamp clears (ui.js drops is-stamp after STAMP_MS, NOTES 165), then plays its whole entrance */
+#screen-match.is-stamp .result-card,#screen-match.is-stamp .result-card *,#screen-match.is-stamp .result-card *::before,#screen-match.is-stamp .result-card *::after,#screen-match.is-stamp .result-flash{animation-play-state:paused!important}      /* the card waits at its first frame (panel-in: unseen) until the stamp clears (ui.js drops is-stamp after STAMP_MS, NOTES 166), then plays its whole entrance */
 /* rays open as the medal lands, then turn: slow for a loss, fast for the champion */
 .screen.is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 14s linear 940ms infinite}
 [data-beat="lose"].is-active .medal-rays{animation:ov-rays-in 420ms var(--ease-bounce) 520ms both, ov-spin 28s linear 940ms infinite}
@@ -1964,6 +1964,12 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .lbp-place b{font-weight:900;color:var(--line-deep);font-variant-numeric:tabular-nums} .lbp-place.is-top1 b{color:var(--gold-4)} .lbp-place.is-top2 b{color:var(--silver-4)} .lbp-place.is-top3 b{color:#b8662a}
 /* the friend row: a figure tile's frame (sky-1, the sky-2 hairline) with what we are on the left and the one thing to do on the right */
 .lbp-friend{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s-2) var(--s-3);min-height:4.25rem;padding:var(--s-2) var(--s-2) var(--s-2) var(--s-4);border-radius:var(--r-md);background:var(--sky-1);box-shadow:inset 0 0 0 .125rem var(--sky-2)} .lbp-friend[hidden]{display:none}
+/* NOTES 166: the friend control lives in the header, left of Close: bare buttons, no box. What it has to say is #lbp-st, the line under the name */
+.lbp-card .acct-head{align-items:flex-start;gap:var(--s-2)} .lbp-card .lbp-title{flex:1 1 auto}
+.lbp-card .lbp-friend,.lbp-card .lbp-friend.is-friend,.lbp-card .lbp-friend.is-confirm{flex:none;min-height:0;padding:0;background:none;box-shadow:none;flex-wrap:nowrap;gap:var(--s-2)} .lbp-card .lbp-fr-acts{margin:0;gap:var(--s-2)}
+.lbp-card .lbp-friend .btn{height:2.5rem;min-height:36px;padding:0 var(--s-3);font-size:var(--t-sm);white-space:nowrap} .lbp-card .lbp-friend .btn-icon{width:2.5rem;padding:0} .lbp-fr-no svg{width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round}
+.lbp-card .lbp-fr-tag.btn{display:inline-flex;align-items:center;gap:.3rem;color:var(--good-deep);letter-spacing:0;text-transform:none}
+.lbp-card .lbp-st{flex-basis:100%;margin:0;display:flex;align-items:center;gap:.5rem;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft)} .lbp-card .lbp-st[hidden]{display:none} .lbp-friend.is-confirm ~ * {}
 .lbp-friend.is-gate{justify-content:center;min-height:0;padding:0;background:none;box-shadow:none} .lbp-friend.is-gate .lbp-fr-who{flex:none;align-items:center;text-align:center}      /* a guest, no username: one quiet line, not a tile */
 .lbp-friend.is-friend{background:linear-gradient(180deg,#f3fcf6,var(--sky-1));box-shadow:inset 0 0 0 .125rem #cdeed8}
 .lbp-friend.is-confirm{background:linear-gradient(180deg,#fff,#fff7f7);box-shadow:inset 0 0 0 .125rem #f3c4c4}
@@ -2115,7 +2121,7 @@ html[data-mobile] .lobby-home .tiles:is([data-n="1"],[data-n="3"]) #btn-courts{g
 }
 
 /* ==========================================================================================================
-   THE WINNER'S SHOT (NOTES 165). A match's result is drawn on the court, not on a white ground: VICTORY! has the court to itself (2.6 s),
+   THE WINNER'S SHOT (NOTES 166). A match's result is drawn on the court, not on a white ground: VICTORY! has the court to itself (2.6 s),
    then the picture cuts to the winner holding the trophy (scene.js setVictory) and the result card comes in as a panel down the right
    two fifths: the same #result, every row of it. The champion card ([data-beat="champ"]) is off the court and keeps its own ground.
    A tall or narrow window lays the panel along the bottom instead (ui.js resultPane tells the scene which pane is free).

@@ -83,7 +83,7 @@ async function page(tag, { device = true, seen = true, acct } = {}) {      // a 
   pg.on('request', q => { if (/^https:\/\/([a-z0-9-]+\.)*(accounts\.google\.com|gstatic\.com)\//.test(q.url())) return q.abort(); q.continue(); });
   pg.on('pageerror', e => errs.push(`[${tag}] PAGEERROR ${e.message}`));
   pg.on('console', m => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|ERR_FAILED|WebSocket connection|Failed to load resource/.test(m.text())) errs.push(`[${tag}] ${m.text()}`); });
-  await pg.evaluateOnNewDocument((dev, seen) => { try { localStorage.setItem('poddle.name', 'Sam'); localStorage.setItem('poddle.camPrimer', 'allow'); localStorage.setItem('poddle.lbSeen', '1'); if (seen) localStorage.setItem('poddle.friendsSeen', '1'); if (dev) localStorage.setItem('poddle.device', dev); } catch {}
+  await pg.evaluateOnNewDocument((dev, seen) => { try { localStorage.setItem('poddle.name', 'Sam'); localStorage.setItem('poddle.camPrimer', 'allow'); localStorage.setItem('poddle.lbSeen', '3'); if (seen) localStorage.setItem('poddle.friendsSeen', '1'); if (dev) localStorage.setItem('poddle.device', dev); } catch {}
     window.__toasts = []; document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('toast'); new MutationObserver(() => { if (t.textContent && window.__toasts.at(-1) !== t.textContent) window.__toasts.push(t.textContent); }).observe(t, { childList: true, characterData: true, subtree: true }); }); }, device ? DEV : '', seen);
   if (acct !== undefined) API.acct = acct;
   pg.ctx = ctx; return pg; }
@@ -197,23 +197,23 @@ pushAll({ type: 'social', ...snap() }); await sleep(300);
 const card = () => ev(pg, () => { const g = id => document.getElementById(id), f = g('lbp-friend'), vis = e => !!e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none';
   return { open: !g('acct-layer').hidden && !g('lbp-card').hidden, state: g('lbp-card').dataset.state, name: g('lbp-name').textContent, dev: !!g('lbp-name').nextElementSibling?.classList.contains('reg-badge'), rank: g('lbp-rank').textContent, hero: vis(g('lbp-hero')),
     stats: vis(g('lbp-stats')) ? [...Array(11).keys()].map(i => document.querySelector(`#lbp-stats [data-stat="${i}"]`).textContent) : null, places: vis(g('lbp-places')) ? [...document.querySelectorAll('#lbp-places li')].map(l => l.textContent) : [], msg: vis(g('lbp-msg')) ? g('lbp-msg').textContent : '',
-    row: vis(f), line: [...f.querySelectorAll('.lbp-fr-line')].map(l => l.textContent).join('|'), dot: f.querySelector('.fr-dot')?.className || '', tag: f.querySelector('.lbp-fr-tag')?.textContent || '', acts: [...f.querySelectorAll('button')].map(b => b.textContent), foot: vis(g('lbp-foot')) }; });
+    row: vis(f), line: vis(g('lbp-st')) ? g('lbp-st').textContent : '', dot: g('lbp-st').querySelector('.fr-dot')?.className || '', tag: f.querySelector('.lbp-fr-tag')?.textContent || '', acts: [...f.querySelectorAll('button')].map(b => b.textContent || b.getAttribute('aria-label')), head: !!f.closest('.acct-head') && f.getBoundingClientRect().right <= g('btn-lbp-close').getBoundingClientRect().left + 1, foot: vis(g('lbp-foot')) }; });
 const apiHits = p => API.log.filter(l => l[1].startsWith(p)).length;
 { const h0 = [apiHits('/api/leaderboard/player'), apiHits('/api/player')];
   await rowBtn(pg, '#lobby-friends .fr-friends', 'Bea', 'Bea'); await sleep(900); r = await card();
   ok(r.open && r.state === 'ok' && r.name === 'Bea' && r.rank === 'Gold II' && J(r.stats) === J(['50%', '2h 5m', '3', '64%', '51%', '41', '1100', '60', '4', '9', '0']) && J(r.places) === J(['#12Trophies', '#3Longest rally']) && !r.foot, `a friend's name opens THE profile card: the board's stats and /api/player's places (${J(r)})`);
   ok(apiHits('/api/leaderboard/player') === h0[0] + 1 && apiHits('/api/player') === h0[1] + 1, 'one GET of each, at once');
-  ok(r.row && r.tag === 'Friends' && r.line === 'Playing Matt' && /is-busy/.test(r.dot) && J(r.acts) === J(['Remove']), `the friend row: Friends, "Playing Matt" with the amber dot, Remove (${J(r)})`); }
+  ok(r.row && r.head && r.tag === 'Friends' && r.line === 'Playing Matt' && /is-busy/.test(r.dot) && J(r.acts) === J(['Friends']), `the friend control in the header left of Close: the Friends pill, "Playing Matt" with the amber dot under the name (${J(r)})`); }
 await shot(pg, 'card-desktop');
 await pg.setViewport(PHONE); await sleep(300); await shot(pg, 'card-phone');
 r = await ev(pg, () => { const c = document.getElementById('lbp-card').getBoundingClientRect(); return { in: c.left >= 0 && c.right <= innerWidth && c.top >= 0 && c.bottom <= innerHeight, side: document.documentElement.scrollWidth > innerWidth }; });
 ok(r.in && !r.side, `the card with its friend row fits 390x844 (${J(r)})`);
 await pg.setViewport(DESK); await sleep(200);
-await clickText(pg, '#lbp-friend', 'Remove'); await sleep(200); r = await card();
+await clickText(pg, '#lbp-friend', 'Friends'); await sleep(200); r = await card();
 ok(r.line === 'Remove Bea?' && J(r.acts) === J(['Remove', 'Keep']) && (await ev(pg, () => document.activeElement.textContent)) === 'Keep', `Remove asks first; Keep has the focus (${J(r)})`);
 await shot(pg, 'card-confirm-desktop');
 await clickText(pg, '#lbp-friend', 'Keep'); await sleep(200); r = await card();
-ok(r.tag === 'Friends' && J(r.acts) === J(['Remove']) && world.friends.has('bea'), `Keep: still friends, nothing sent (${J(r)})`);
+ok(r.tag === 'Friends' && J(r.acts) === J(['Friends']) && world.friends.has('bea'), `Keep: still friends, nothing sent (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(300);
 r = await ev(pg, () => ({ card: document.getElementById('acct-layer').hidden, view: !document.getElementById('lobby-friends').hidden }));
 ok(r.card && r.view, `Esc closes the profile card only (the view stays) (${J(r)})`);
@@ -226,14 +226,14 @@ await ev(pg, () => { const li = [...document.querySelectorAll('#lobby-friends .f
 // Close gives the focus back to the name's row even when a push replaced it meanwhile; the card follows the lists (a removal elsewhere ends Friends there)
 await ev(pg, () => { window.__keep[1].focus(); window.__keep[1].click(); }); await sleep(900);
 world.st.bea = 'menu'; pushAll({ type: 'social', ...snap() }); await sleep(500);
-r = await ev(pg, () => ({ st: document.querySelector('#lbp-friend .lbp-fr-line')?.textContent, old: window.__keep[1].isConnected }));
+r = await ev(pg, () => ({ st: document.getElementById('lbp-st')?.textContent, old: window.__keep[1].isConnected }));
 ok(r.st === 'Online' && !r.old, `Bea's status moves on her open card with the push (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(300);
 r = await ev(pg, () => ({ cls: document.activeElement.className, name: document.activeElement.closest('.fr-row')?.dataset.name }));
 ok(r.cls === 'fr-name' && r.name === 'Bea', `Close: the focus is back on Bea's name, on the row that replaced the one it came from (${J(r)})`);
 await ev(pg, () => { const b = document.activeElement; window.__keep[1] = b; b.click(); }); await sleep(900);
 world.friends.delete('bea'); pushAll({ type: 'social', ...snap() }); await sleep(500);
-r = await ev(pg, () => ({ acts: document.querySelector('#lbp-friend .lbp-fr-acts')?.textContent, st: !!document.querySelector('#lbp-friend .fr-dot'), old: window.__keep[1].isConnected }));
+r = await ev(pg, () => ({ acts: document.querySelector('#lbp-friend .lbp-fr-acts')?.textContent, st: !!document.querySelector('#lbp-st .fr-dot'), old: window.__keep[1].isConnected }));
 ok(r.acts === 'Add friend' && !r.st && !r.old, `Bea removed me while her card was open: Add friend, no status (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(300);
 r = await ev(pg, () => ({ cls: document.activeElement.className, name: document.activeElement.closest('.fr-row')?.dataset.name, inView: !!document.activeElement.closest('#lobby-friends') }));
@@ -244,22 +244,22 @@ await ev(pg, () => document.querySelector('#screen-lobby [data-back]').click());
 r = await ev(pg, () => [...document.querySelectorAll('#lb-list button.lb-row')].map(b => b.dataset.name));
 ok(J(r) === J(['Dan', 'Bea', 'alice']), `leaderboard rows are the buttons (${J(r)})`);
 await ev(pg, () => [...document.querySelectorAll('#lb-list button.lb-row')].find(b => b.dataset.name === 'Dan').click()); await sleep(900); r = await card();
-ok(r.name === 'Dan' && r.dev && r.rank === 'Pro #1' && r.stats && r.stats.length === 11 && r.tag === 'Friends' && r.line === 'Offline' && J(r.acts) === J(['Remove']), `from the leaderboard: Dan's card with the hammer, Pro #1, the eleven stats, and the friend row (a friend, offline) (${J(r)})`);
+ok(r.name === 'Dan' && r.dev && r.rank === 'Pro #1' && r.stats && r.stats.length === 11 && r.tag === 'Friends' && r.line === 'Offline' && J(r.acts) === J(['Friends']), `from the leaderboard: Dan's card with the hammer, Pro #1, the eleven stats, and the friend row (a friend, offline) (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(200);
 await ev(pg, () => [...document.querySelectorAll('#lb-list button.lb-row')].find(b => b.dataset.name === 'alice').click()); await sleep(900); r = await card();
-ok(r.state === 'part' && r.hero && r.rank === 'Bronze III' && r.stats === null && r.msg === 'Stats show for players on the global leaderboard' && r.line === 'Requested' && J(r.acts) === J(['Cancel']),
-  `alice (not on the board's profile, requested earlier): her rank from /api/player, no stats but a quiet line, Requested + Cancel (${J(r)})`);
+ok(r.state === 'part' && r.hero && r.rank === 'Bronze III' && r.stats === null && r.msg === 'No stats to show' && r.line === '' && J(r.acts) === J(['Requested']),
+  `alice (not on the board's profile, requested earlier): her rank from /api/player, no stats but a quiet line, the Requested button (pressing it cancels) (${J(r)})`);
 await shot(pg, 'card-part-desktop');
-await clickText(pg, '#lbp-friend', 'Cancel'); await sleep(500); r = await card();
+await clickText(pg, '#lbp-friend', 'Requested'); await sleep(500); r = await card();
 ok(r.line === '' && J(r.acts) === J(['Add friend']) && !world.out.some(x => x.k === 'alice'), `Cancel: the request goes, Add friend is back (${J(r)})`);
 await clickText(pg, '#lbp-friend', 'Add friend'); await sleep(500); r = await card();
-ok(r.line === 'Requested' && J(r.acts) === J(['Cancel']) && world.out.some(x => x.k === 'alice') && (await ev(pg, () => !!document.activeElement.closest('#lbp-card'))), `Add friend: Requested, the focus stays in the card (${J(r)})`);
+ok(r.line === '' && J(r.acts) === J(['Requested']) && world.out.some(x => x.k === 'alice') && (await ev(pg, () => !!document.activeElement.closest('#lbp-card'))), `Add friend: Requested, the focus stays in the card (${J(r)})`);
 await pg.keyboard.press('Escape'); await sleep(200);
 // a hidden account (Show me off) that is not my friend: found by search, its card has no rank at all (never 'No trophies yet'), no stats, Add friend
 await ev(pg, () => window.__ui.lobbyView('friends')); await sleep(600);
 await (await pg.$('#lobby-friends .fr-q')).type('hidden'); await sleep(900);
 await rowBtn(pg, '#lobby-friends .fr-results', 'hidden_hal', 'hidden_hal'); await sleep(900); r = await card();
-ok(r.open && r.name === 'hidden_hal' && !r.hero && !r.places.length && r.stats === null && r.msg === 'Stats show for players on the global leaderboard' && J(r.acts) === J(['Add friend']), `a hidden stranger from search: no hero, no places, no stats, Add friend (${J(r)})`);
+ok(r.open && r.name === 'hidden_hal' && !r.hero && !r.places.length && r.stats === null && r.msg === 'No stats to show' && J(r.acts) === J(['Add friend']), `a hidden stranger from search: no hero, no places, no stats, Add friend (${J(r)})`);
 await shot(pg, 'card-hidden-desktop');
 await pg.keyboard.press('Escape'); await sleep(200); await ev(pg, () => { const q = document.querySelector('#lobby-friends .fr-q'); q.value = ''; q.dispatchEvent(new Event('input')); }); await sleep(200);
 
@@ -402,7 +402,7 @@ await pg.keyboard.press('Escape'); await sleep(300);
 { const n0 = apiHits('/api/player'); await ev(pg, () => window.__ui.lobbyView('leaderboard')); await sleep(1000);
   await ev(pg, () => [...document.querySelectorAll('#lb-list button.lb-row')].find(b => b.dataset.name === 'Bea').click()); await sleep(900);
   const c = await ev(pg, () => ({ state: document.getElementById('lbp-card').dataset.state, go: document.querySelector('#lbp-friend .lbp-fr-go')?.textContent, btns: document.querySelectorAll('#lbp-friend .btn').length }));
-  ok(c.state === 'ok' && c.go === 'Sign in to add friends' && c.btns === 1 && apiHits('/api/player') === n0, `a guest's profile card: the stats, one "Sign in to add friends" button over the stats, no /api/player (${J(c)})`);
+  ok(c.state === 'ok' && c.go === 'Add friend' && c.btns === 1 && apiHits('/api/player') === n0, `a guest's profile card: the stats, one Add friend button in the header (it opens sign-in), no /api/player (${J(c)})`);
   await shot(pg, 'card-guest-desktop'); await pg.setViewport(PHONE); await sleep(300); await shot(pg, 'card-guest-phone'); await pg.setViewport(DESK); await sleep(300);
   await pg.click('#lbp-friend .lbp-fr-go'); await sleep(500);
   ok(await seenEl(pg, '#signin-card') && !(await seenEl(pg, '#lbp-card')), 'and it opens the sign-in card in its place (in the lobby)'); }
@@ -412,8 +412,8 @@ r = await ev(pg, () => ({ t: document.querySelector('#lobby-friends .fr-gate-t')
 ok(r.t === 'Pick a username to add friends' && r.b === 'Pick a username', `no username: "${r.t}" / ${r.b} (${J(r)})`);
 await ev(pg, () => window.__ui.lobbyView('leaderboard')); await sleep(1000);
 await ev(pg, () => [...document.querySelectorAll('#lb-list button.lb-row')].find(b => b.dataset.name === 'Dan').click()); await sleep(900);
-r = await ev(pg, () => document.querySelector('#lbp-friend .lbp-fr-go')?.textContent);
-ok(r === 'Pick a username to add friends', `no username: the card's friend row says "${r}"`);
+r = await ev(pg, () => document.querySelector('#lbp-friend .lbp-fr-go')?.getAttribute('aria-label'));
+ok(r === 'Pick a username to add friends', `no username: the card's Add friend button is labelled "${r}"`);
 await pg.ctx.close();
 
 clearTimeout(bail); await browser.close(); wss.close(); web.close();

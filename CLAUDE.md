@@ -80,8 +80,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   username only, never guests, never an owner id; accounts.lb_hidden = 1 (Show me on the global leaderboard off) takes a name off
   at once. Clicking a row opens that player's profile card (NOTES 140; GET /api/leaderboard/player?u=<name>, public, no sign-in, 60 a minute, 30 s
   cache cleared by hide/rename/delete; admin.js changes wait out the TTL): exactly the share card's subset (share.dataOf / card.dataOf: username,
-  rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the eleven card stats with the headline three's notes, and since NOTES 164 `streak`: the current win streak, the highest of the streak vs people and at each Matt level, on this card only, never the share card), rank null when no trophies yet, for every account on at
-  least one board, at any place (NOTES 141); unknown, guest, no-username, hidden, on-no-board, renamed-away and deleted all answer the same 404;
+  rank/div + emblem + trophies, Pro #N, toughest Matt beaten, the eleven card stats with the headline three's notes, and since NOTES 164 `streak`: the current win streak, the highest of the streak vs people and at each Matt level, on this card only, never the share card), rank null when no trophies yet, for every account with a username that is not lb_hidden, on a board or not, played or not (zeros; NOTES 166; before that only accounts on a board, NOTES 141); unknown, guest, no-username, hidden, renamed-away and deleted all answer the same 404;
   never an owner id. A player's own places ride on /api/stats and /api/me. Stats are otherwise private to their owner unless the owner presses Share card: then anyone with poddleball.com/c/<slug> sees the card page and PNG
   (noindex, max-age 300): username or "Poddle player" (never a guest's typed name), rank + ladder trophies and its
   emblem, toughest Matt beaten, the same eleven card stats for everyone, zeros included (NOTES 145: win rate vs people with the W-L record under it,
@@ -92,13 +91,13 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   chars, top 20, never self; lb_hidden accounts ARE findable) and send requests (the target sees the sender's username + time).
   Accepted friends see each other's online status + coarse activity (never the court code), rank {tier,div} and leaderboard places.
   The profile card (NOTES 140's #lbp-card) is the ONE card a name opens: leaderboard rows, friend search, friends lists, On this court. It asks
-  /api/leaderboard/player (above: the eleven stats etc., NOTES 145, any account on a board, NOTES 141; a 404 = no stats line) and, signed in with a username, GET /api/player?name= (public on
+  /api/leaderboard/player (above: the eleven stats etc., NOTES 145, any account that is not lb_hidden, NOTES 166; a 404 = no stats line) and, signed in with a username, GET /api/player?name= (public on
   the server, no sign-in needed): username (+ the developer badge drawn client-side) and, when the account is not lb_hidden or the viewer is a friend (or
   the player), rank emblem + places ({rank} per board, never the value, for EVERY listed account); rel (none|friend|out|in) and
   st only to a friend. The card's friend row (web/social.js): Add / Requested + Cancel / Accept + Decline / Friends + Remove (confirm), a friend's live status.
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140), poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140; '3': that the card shows stats for every player, NOTES 166), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`

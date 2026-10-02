@@ -113,7 +113,7 @@ async function playerRoute(req, res) {
   const t = Date.now(), c = plCache.get(key);
   if (c && t - c.at < PL_MS) return c.body ? send(res, 200, c.body) : fail(res, 404, 'not_found');
   const who = db.leaderOwnerByKey(key); if (who === undefined) return fail(res, 503, 'db_unavailable');
-  const d = who ? share.dataOf(who.owner) : null;                 // the share card's own subset (Pro: with its place)
+  const d = who ? share.dataOf(who.owner, true) : null;                 // the share card's own subset (Pro: with its place)
   const body = d && !d.guest ? publicCard(d, who.ranked, share.streakOf(who.owner)) : null;   // guest: no username any more (a race with a delete)
   if (plCache.size >= PL_MAX) plCache.delete(plCache.keys().next().value);
   plCache.set(key, { at: t, body });

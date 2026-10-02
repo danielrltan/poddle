@@ -59,7 +59,7 @@ const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new'
 const out = [], errs = [], ok = (c, what) => { out.push((c ? 'PASS ' : 'FAIL ') + what); if (!c) console.log('FAIL', what); };
 setTimeout(() => { console.log(out.join('\n')); console.log('LB PROFILE UI FAIL (timeout)'); process.exit(2); }, 360000);
 const URL0 = `http://127.0.0.1:${W}/web/index.html?uitest=1&acctest=1&cam=0&game=${G}&bridge=${DEAD}`;
-async function page(tag, { w = 1280, h = 720, seen = '2' } = {}) {
+async function page(tag, { w = 1280, h = 720, seen = '3' } = {}) {
   const pg = await browser.newPage(); await pg.setViewport({ width: w, height: h }); await pg.setRequestInterception(true);
   pg.on('request', q => (/google\.com|gstatic\.com/.test(q.url()) ? q.abort() : q.continue()));
   pg.on('pageerror', e => errs.push(`[${tag}] PAGEERROR ${e.message}`));
@@ -185,16 +185,18 @@ await pg.hover(rowSel('Kiko')); await sleep(300);
 await pg.close();
 
 // ---------- 15: the one-time notice (poddle.lbSeen) ----------
-const notice = async (seen, listed) => { API.mePlaces = { listed }; const p = await page('notice-' + seen + listed, { seen }); await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await sleep(1500); await p.click('#btn-start').catch(() => {}); await sleep(3200);
+const notice = async (seen, listed) => { API.mePlaces = { listed, hidden: !listed }; const p = await page('notice-' + seen + listed, { seen }); await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await sleep(1500); await p.click('#btn-start').catch(() => {}); await sleep(3200);
   const r = await ev(p, () => ({ toast: document.getElementById('toast')?.textContent || '', seen: localStorage.getItem('poddle.lbSeen') })); await p.close(); return r; };
 { let r = await notice('1', true);
-  ok(r.toast === 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page' && r.seen === '2', `lbSeen '1', listed: the profile-card notice, then '2' (${J(r)})`);
+  ok(r.toast === 'Anyone can now open your profile card to see your stats and win streak. You can turn this off on the Leaderboard page' && r.seen === '3', `lbSeen '1', not hidden: the profile-card notice, then '3' (${J(r)})`);
   r = await notice(null, true);
-  ok(/^Your username can now appear on the global leaderboard, and anyone can open your profile card from it\./.test(r.toast) && r.seen === '2', `lbSeen unset: both at once, then '2' (${J(r)})`);
+  ok(/^Your username can appear on the global leaderboard, and anyone can open your profile card to see your stats\./.test(r.toast) && r.seen === '3', `lbSeen unset: both at once, then '3' (${J(r)})`);
   r = await notice('1', false);
   ok(!/profile card/.test(r.toast) && r.seen === '1', `lbSeen '1' but hidden (not listed): not told, stays '1' (${J(r)})`);
   r = await notice('2', true);
-  ok(!/leaderboard/.test(r.toast) && r.seen === '2', `lbSeen '2': nothing more (${J(r)})`); }
+  ok(/see your stats and win streak/.test(r.toast) && r.seen === '3', `lbSeen '2': told once that the card shows stats for every player (NOTES 166), then '3' (${J(r)})`);
+  r = await notice('3', true);
+  ok(!/leaderboard|profile card/.test(r.toast) && r.seen === '3', `lbSeen '3': nothing more (${J(r)})`); }
 API.mePlaces = { listed: true };
 
 // ---------- 17: turning Show me back on tells a '1' browser about the profile card at once, then '2' ----------
@@ -203,9 +205,9 @@ API.mePlaces = { listed: true };
   const tog = async () => { await p.click('#tog-lb-show'); await sleep(400); return ev(p, () => ({ toast: document.getElementById('toast')?.textContent || '', seen: localStorage.getItem('poddle.lbSeen'), on: document.getElementById('tog-lb-show').getAttribute('aria-checked') })); };
   const a = await ev(p, () => document.getElementById('tog-lb-show')?.getAttribute('aria-checked'));
   let r = await tog();
-  ok(a === 'false' && r.on === 'true' && r.toast === 'You’re on the global leaderboard. Anyone can open your profile card from it' && r.seen === '2', `lbSeen '1', hidden, Show me turned on: told about the profile card at once, then '2' (${J({ was: a, ...r })})`);
+  ok(a === 'false' && r.on === 'true' && r.toast === 'You’re on the global leaderboard. Anyone can open your profile card to see your stats' && r.seen === '3', `lbSeen '1', hidden, Show me turned on: told about the profile card at once, then '3' (${J({ was: a, ...r })})`);
   r = await tog(); const r2 = await tog();
-  ok(r.toast === 'You’re hidden from the global leaderboard' && r2.toast === 'You’re on the global leaderboard' && r2.seen === '2', `off again, then on again with '2': the plain toasts (${J([r.toast, r2.toast])})`);
+  ok(r.toast === 'You’re hidden from the global leaderboard' && r2.toast === 'You’re on the global leaderboard' && r2.seen === '3', `off again, then on again with '3': the plain toasts (${J([r.toast, r2.toast])})`);
   await p.close(); API.mePlaces = { listed: true }; PLACES.hidden = false; PLACES.listed = true; }
 
 const uniq = [...new Set(errs.map(e => e.split('\n')[0].slice(0, 220)))];

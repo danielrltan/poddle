@@ -16,6 +16,7 @@ const dev = s => require('node:crypto').createHash('sha256').update(s).digest();
 ok(db.open(':memory:'), 'the database opens (in memory)');
 const acct = (sub, name) => { const a = db.createAccount(sub, T0); if (name) db.claimUsername(a.id, name, U.skeleton(name), T0); return a; };
 const A = acct('s-a', 'Ace'), B = acct('s-b', 'Bree'), C = acct('s-c', 'Cato'), D = acct('s-d', 'Dino'), N = acct('s-n', null);
+const E = acct('s-e', 'Echo');   // a username and nothing else: never played, on no board (NOTES 166: still has a profile card, of zeros)
 const G = db.ownerForDevice(dev('guest'), T0, { create: true });
 const tro = (o, n) => db.ladderApply({ owner: o, delta: n, won: true, vsBot: false, now: T0 + 1 });
 tro(A.owner_id, 1100); tro(B.owner_id, 400); tro(C.owner_id, 400); tro(N.owner_id, 1199); tro(G, 1199);   // D has never played Ranked; Ace is Pro (1050+ since Master, NOTES 124)
@@ -98,6 +99,7 @@ ok(p.status === 200 && p.j.rank === null && p.j.trophies === 0 && p.j.matt === n
 p = await pl('ACE'); ok(p.status === 200 && p.j.name === 'Ace', `u=ACE -> Ace (${p.status} ${p.j && p.j.name})`);
 ok(U.skeleton('D1no') === U.skeleton('Dino'), 'D1no folds to the same key as Dino');
 p = await pl('D1no'); ok(p.status === 200 && p.j.name === 'Dino', `u=D1no -> the canonical name Dino (${p.j && p.j.name})`);
+p = await pl('Echo'); ok(p.status === 200 && p.j.name === 'Echo' && p.j.rank === null && p.j.trophies === 0 && p.j.streak === 0 && p.j.stats.length === 11 && p.j.stats[0].value === '-' && p.j.stats[0].note === '0-0 vs people', `Echo, on no board and never played: 200 with a card of zeros, no rank (NOTES 166) (${p.status} ${p.body && p.body.slice(0, 120)})`);
 { const miss = [['hidden Bree', 'Bree'], ['unknown', 'Nobody1'], ['no u', undefined], ['empty u', ''], ['40 chars', 'a'.repeat(40)], ['<script>', '<script>'], ['%00', '\u0000'], ['a guest\'s typed name', 'Guesty'], ['spaces', '   ']];
   const got = []; for (const [what, u] of miss) { const r = await pl(u); got.push(r.status === 404 && r.body === '{"error":"not_found"}' ? '' : `${what}: ${r.status} ${r.body}`); }
   ok(got.every(g => !g), `hidden, unknown, missing, empty, too long, <script>, %00, a guest's name, spaces: the same 404 {"error":"not_found"} (${got.filter(Boolean).join('; ')})`); }

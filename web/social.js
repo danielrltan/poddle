@@ -257,29 +257,32 @@ export function cardRow(box, info) {
   const said = rels.has(k) ? rels.get(k) : ['none', 'friend', 'out', 'in'].includes(info.rel) ? info.rel : 'none', rel = g ? '' : relNow(name, said), wait = busy.has(k);
   const fr = rel === 'friend' && snap ? snap.friends.find(f => low(f.name) === k) : null, st = rel !== 'friend' ? null : fr ? fr.st : ST[info.st] ? info.st : null;      // a friend's status follows the pushes; nobody else's is ever shown
   const sig = [name, g, lobby, rel, st, wait, sure === k].join('\n');
-  box.hidden = g === 'off' || g === 'wait'; if (box.hidden) { box.textContent = ''; delete box.dataset.sig; return; }
+  box.hidden = g === 'off' || g === 'wait'; if (box.hidden) { box.textContent = ''; delete box.dataset.sig; const e = document.getElementById('lbp-st'); if (e) { e.textContent = ''; e.hidden = true; } return; }
   if (box.dataset.sig === sig) return;
   const had = box.contains(document.activeElement); box.dataset.sig = sig; box.textContent = ''; box.className = 'lbp-friend' + (rel ? ' is-' + rel : ' is-gate') + (sure === k ? ' is-confirm' : '');
-  const who = mk('div', 'lbp-fr-who'), acts = mk('div', 'lbp-fr-acts'), B = (cls, t, fn) => { const b = btn('btn btn-sm is-tall ' + cls, t, fn); b.disabled = wait; return b; }, line = t => mk('p', 'lbp-fr-line', t);
-  if (g) {      // a guest, or no username yet: the step, quiet. A button only in the lobby: signing in or naming yourself mid-match redials (a forfeit)
+  // NOTES 166: the friend control sits in the card's header, left of Close: one compact button a state (two for an incoming request and for the Remove confirm).
+  // What a state has to say (a friend's live status, 'Wants to be friends', 'Remove Bea?') is the line under the name, #lbp-st
+  const acts = mk('div', 'lbp-fr-acts'), B = (cls, t, fn) => { const b = btn('btn btn-sm is-tall ' + cls, t, fn); b.disabled = wait; return b; }, stEl = document.getElementById('lbp-st');
+  const say = (t, dot) => { if (!stEl) return; stEl.textContent = t || ''; if (t && dot) stEl.prepend(dot); stEl.hidden = !t; };
+  say('');
+  if (g) {      // a guest, or no username yet. A button only in the lobby: signing in or naming yourself mid-match redials (a forfeit)
     const t = g === 'signin' ? 'Sign in to add friends' : 'Pick a username to add friends';
-    if (lobby) who.append(btn('btn btn-sm is-tall lbp-fr-go', t, () => { closeCard(); if (gate() === 'signin') signIn(); else if (gate() === 'username') pickName(); }));
-    else who.append(line(t));
+    if (lobby) { const b = addIc(btn('btn btn-sm is-tall lbp-fr-add fr-add lbp-fr-go', 'Add friend', () => { closeCard(); if (gate() === 'signin') signIn(); else if (gate() === 'username') pickName(); })); b.setAttribute('aria-label', t); b.title = t; acts.append(b); }
+    else say(t);
   } else if (sure === k) {
-    who.append(line(`Remove ${name}?`));
+    say(`Remove ${name}?`);
     acts.append(B('btn-danger', 'Remove', () => { sure = ''; act('remove', name); }), B('btn-quiet', 'Keep', () => { sure = ''; cardRedraw(); box.querySelector('.lbp-fr-rm')?.focus({ preventScroll: true }); }));
   } else if (rel === 'friend') {
-    const tag = mk('p', 'caps lbp-fr-tag', 'Friends'); tag.prepend(tick()); who.append(tag);
-    if (st) { const l = line(ST[st]), dot = mk('i', 'fr-dot' + (st === 'off' ? '' : BUSY.has(st) ? ' is-busy' : ' is-on')); dot.setAttribute('aria-hidden', 'true'); l.prepend(dot); who.append(l); }
-    const rm = B('btn-quiet lbp-fr-rm', 'Remove', () => { sure = k; cardRedraw(); box.querySelector('.btn-quiet')?.focus({ preventScroll: true }); }); rm.setAttribute('aria-label', `Remove ${name} from friends`); acts.append(rm);      // Remove asks first (Keep has focus)
-  } else if (rel === 'out') {
-    who.append(line('Requested'));      // a decline is silent: it stays Requested until it expires
-    const c = B('btn-quiet', 'Cancel', () => act('cancel', name)); c.setAttribute('aria-label', `Cancel the request to ${name}`); acts.append(c);
+    if (st) { const dot = mk('i', 'fr-dot' + (st === 'off' ? '' : BUSY.has(st) ? ' is-busy' : ' is-on')); dot.setAttribute('aria-hidden', 'true'); say(ST[st], dot); }
+    const rm = B('btn-quiet lbp-fr-rm lbp-fr-tag', 'Friends', () => { sure = k; cardRedraw(); box.querySelector('.btn-quiet')?.focus({ preventScroll: true }); }); rm.prepend(tick()); rm.setAttribute('aria-label', `Friends with ${name}. Remove`); rm.title = 'Remove friend'; acts.append(rm);      // Remove asks first (Keep has focus)
+  } else if (rel === 'out') {      // a decline is silent: it stays Requested until it expires. Pressing it takes the request back
+    const c = B('btn-quiet lbp-fr-out', 'Requested', () => act('cancel', name)); c.setAttribute('aria-label', `Requested. Cancel the request to ${name}`); c.title = 'Cancel request'; acts.append(c);
   } else if (rel === 'in') {
-    who.append(line('Wants to be friends'));
-    acts.append(B('lbp-fr-add', 'Accept', () => act('accept', name)), B('btn-quiet', 'Decline', () => act('decline', name)));
-  } else { acts.append(addIc(B('lbp-fr-add fr-add', 'Add friend', () => act('add', name)))); }
-  if (who.children.length) box.append(who); if (acts.children.length) box.append(acts);
+    say('Wants to be friends');
+    const no = B('btn-quiet btn-icon lbp-fr-no', '', () => act('decline', name)); no.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>'; no.setAttribute('aria-label', 'Decline'); no.title = 'Decline';
+    acts.append(B('lbp-fr-add', 'Accept', () => act('accept', name)), no);
+  } else acts.append(addIc(B('lbp-fr-add fr-add', 'Add friend', () => act('add', name))));
+  box.append(acts);
   if (had && !box.contains(document.activeElement)) (box.querySelector('button:not(:disabled)') || box.closest('[tabindex]'))?.focus({ preventScroll: true });      // rebuilt under the focus (a request went out): it stays in the card, where its Tab trap and Esc work
 }
 

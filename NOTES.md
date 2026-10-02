@@ -3586,3 +3586,28 @@ Time on court and the friend row were already on the card (NOTES 145, 146); what
   three screens, the panel's box, the winner's head and the trophy inside the free pane (also 600x900), the trophy turning with the hand on the
   loser's screen, the rematch putting paddles back. Shots: test/ui-shots/victory-*.png. test/ui-next.mjs waits for the panel where it measured
   the card at once; its 8 old reds are unchanged.
+
+
+## 166. The friend control in the card's header; stats on every player's card
+
+The owner (2026-10-02): "the friends / add friend row could be combined and put to the left of the x button on the public stat card" and
+"regarding the stats showing for only players on the global leaderboard, remove that, let it show for all players".
+
+- The friend control (#lbp-friend, web/social.js cardRow) is in the card's header, left of Close: one compact button a state. A stranger:
+  Add friend. A request sent: Requested (pressing it cancels). A friend: a green Friends pill (pressing it asks, Remove / Keep in its
+  place, Keep focused). An incoming request: Accept and a small Decline cross. A guest in the lobby: Add friend, which opens sign-in (or
+  the username card); its label says so. What a state has to say (a friend's live status with its dot, "Wants to be friends",
+  "Remove Bea?", a guest in a match) is one line under the name, #lbp-st. The old full-width row is gone.
+- Stats for everyone: db.leaderOwnerByKey no longer needs a board (and its query LEFT JOINs profile), so /api/leaderboard/player answers
+  for every account with a username that is not lb_hidden, played or not (share.dataOf(o, true): a card of zeros; the share card itself
+  still needs a profile). Show me on the global leaderboard stays the one way off: a hidden account answers the same 404 as nobody, and
+  its card says "No stats to show" (it said "Stats show for players on the global leaderboard").
+- The notice the Privacy Policy promises for an important change: poddle.lbSeen goes to '3'. Every signed-in account with a username that
+  is not hidden is told once ("Anyone can now open your profile card to see your stats and win streak. You can turn this off on the
+  Leaderboard page"); a first-time browser gets the combined line; turning Show me on says it at once. The owner was not asked first
+  (CLAUDE.md says to ask): it reuses the lbNotice mechanism of NOTES 126 / 140 and is one line to remove.
+- Legal (same commit): privacy.html section 4 (Profile cards, Global leaderboard, Statistics), the purposes table, the legal-basis table,
+  the storage table (lbSeen 3) and the dated line in 13 say every signed-in player with a username has the statistics on their card
+  unless Show me is off; docs/ropa.md and CLAUDE.md follow; the changelog's October 2 entry says so.
+- Tests: social-ui.mjs (the control in the header for every state, the status line), lb-profile-ui.mjs (the notice at '3'),
+  leaderboard.test.mjs (an account on no board answers 200 with zeros; a hidden one still 404).

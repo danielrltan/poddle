@@ -259,9 +259,8 @@
        a username, GET /api/player adds the rank and place numbers for anyone else and the friend row (web/social.js). web/profile.js openPlayer() fills it; every value goes in as textContent -->
   <div class="panel panel-sm acct-card lbp-card" id="lbp-card" role="dialog" aria-modal="true" aria-labelledby="lbp-name" tabindex="-1" data-fit hidden>
     <div class="acct-body">
-      <div class="acct-head"><div class="lbp-title"><h2 id="lbp-name"></h2><ul class="lbp-places" id="lbp-places" aria-label="Global leaderboard places" hidden></ul></div><button class="btn btn-icon acct-close" id="btn-lbp-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="acct-head"><div class="lbp-title"><h2 id="lbp-name"></h2><ul class="lbp-places" id="lbp-places" aria-label="Global leaderboard places" hidden></ul><p class="lbp-fr-line lbp-st" id="lbp-st" role="status" hidden></p></div><div class="lbp-friend" id="lbp-friend" role="group" aria-label="Friends" hidden></div><button class="btn btn-icon acct-close" id="btn-lbp-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <!-- the body is Your stats' own layout (NOTES 164): the hero with the flame, the Matt badge, the people strip, the play row, three tiles. The eleven public figures sit in [data-stat="0..10"] (server/card.js dataOf's order) -->
-      <section class="lbp-friend" id="lbp-friend" aria-label="Friends" hidden></section>
       <section class="st-hero well lbp-hero" id="lbp-hero" aria-label="Rank and streak">
         <div class="lbp-em" id="lbp-em"></div>
         <div class="st-rank"><p class="st-rank-name" id="lbp-rank"></p>

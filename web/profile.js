@@ -53,8 +53,8 @@ export async function loadMe() {                            // once after boot: 
   try { const r = await api('/api/me'), j = r.ok && r.j;
     if (j) { const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
       me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true }; meLadder = me.account ? ladderOf(j) : null;      // the account's ladder and places ride on /api/me (server/api.js)
-      const seen = ls.get(LB_SEEN), listed = !!(j.places && j.places.listed === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140)
-      if (me.account && me.account.username && me.db && seen !== '2' && (!seen || listed)) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }
+      const seen = ls.get(LB_SEEN), hidden = !!(j.places && j.places.hidden === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140); '3': that every player's card shows stats, on a board or not (NOTES 166)
+      if (me.account && me.account.username && me.db && seen !== '3' && !hidden) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }
   meDone = true;
   drawAcct(); return me;
 }
@@ -63,10 +63,10 @@ export async function loadMe() {                            // once after boot: 
 // so both are said at once; else (it said '1' and the player is listed now) only the profile card's (NOTES 140). A hidden '1' is not told here: toggleShow's own toast tells it when Show me is turned on
 let lbT = 0;
 function lbNotice(n = 0, first = true) {
-  clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN) === '2') return;      // gives up after ten minutes on the title or in a court: the next load tries again
+  clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN) === '3') return;      // gives up after ten minutes on the title or in a court: the next load tries again
   if (!h.view()) { lbT = setTimeout(() => lbNotice(n + 1, first), 1000); return; }
   lbT = setTimeout(() => { if (!h.view()) return lbNotice(n + 1, first);
-    h.toast(first ? 'Your username can now appear on the global leaderboard, and anyone can open your profile card from it. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card from the global leaderboard. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '2'); }, 1200);
+    h.toast(first ? 'Your username can appear on the global leaderboard, and anyone can open your profile card to see your stats. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card to see your stats and win streak. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '3'); }, 1200);
 }
 // No "New: ..." feature announcements (NOTES 147, CLAUDE.md "No announcement notices"): the Friends one is gone, and its key with it (below)
 export async function fetchProfile() {                      // -> the Profile of 8.2, null = nothing saved yet, undefined = the request failed
@@ -270,7 +270,7 @@ async function toggleShow() {
   let r = null; try { r = await api('/api/leaderboard/hide', 'POST', { hidden: hide }); } catch { r = null; }
   if (r && r.ok && r.j) { places = placeOf(r.j);
     if (hide) h.toast('You’re hidden from the global leaderboard', 2000);
-    else if (ls.get(LB_SEEN) !== '2') { clearTimeout(lbT); h.toast('You’re on the global leaderboard. Anyone can open your profile card from it', 5000); ls.set(LB_SEEN, '2'); }      // the profile-card notice the privacy page promises, said now, not on the next load (NOTES 140)
+    else if (ls.get(LB_SEEN) !== '3') { clearTimeout(lbT); h.toast('You’re on the global leaderboard. Anyone can open your profile card to see your stats', 5000); ls.set(LB_SEEN, '3'); }      // the profile-card notice the privacy page promises, said now, not on the next load (NOTES 140)
     else h.toast('You’re on the global leaderboard', 2000); }
   else { t.setAttribute('aria-checked', String(hide)); h.toast('Couldn’t change that. Try again.', 2400); }
   if (h.view() === 'leaderboard') drawBoard();
@@ -349,7 +349,7 @@ function drawPlayer(p, state) {
   { const n = state === 'ok' && Number.isInteger(p.streak) && p.streak >= 0 ? Math.min(p.streak, 9999) : null, st = $('lbp-streak');      // the flame: the player's current win streak (an older server sends none: no pill)
     if (st) { st.hidden = n === null; st.className = 'st-streak' + (n >= 2 ? ' is-hot' : n === 1 ? ' is-one' : ''); st.title = 'Win streak'; st.setAttribute('aria-label', 'Win streak: ' + (n || 0)); } text('lbp-streak-n', String(n || 0)); }
   show('lbp-mattsec', !part && state !== 'gone' && state !== 'error');
-  const msg = state === 'gone' ? (lbpFrom === 'board' ? 'This player isn’t on the leaderboard any more' : 'No player with that username any more') : state === 'error' ? 'Couldn’t load this player' : state === 'partx' ? 'Couldn’t load the stats' : state === 'part' ? 'Stats show for players on the global leaderboard' : '';
+  const msg = state === 'gone' ? (lbpFrom === 'board' ? 'This player isn’t on the leaderboard any more' : 'No player with that username any more') : state === 'error' ? 'Couldn’t load this player' : state === 'partx' ? 'Couldn’t load the stats' : state === 'part' ? 'No stats to show' : '';
   text('lbp-msg', msg); show('lbp-msg', !!msg); $('lbp-msg')?.classList.toggle('is-note', part); show('lbp-retry', state === 'error' || state === 'partx');
   const mine = (state === 'ok' || part) && !!(me.account && me.account.username) && name.toLowerCase() === me.account.username.toLowerCase();      // my own card: the same public view, and the way to Your stats
   show('lbp-foot', mine);
@@ -357,7 +357,7 @@ function drawPlayer(p, state) {
 }
 function drawFriend() {      // the friend row (web/social.js draws it into #lbp-friend): only on a card that loaded, never on my own
   const f = $('lbp-friend'); if (!f) return;
-  if (lbpRow !== 'on') { f.hidden = true; f.textContent = ''; delete f.dataset.sig; return; }
+  if (lbpRow !== 'on') { f.hidden = true; f.textContent = ''; delete f.dataset.sig; text('lbp-st', ''); show('lbp-st', false); return; }
   h.friend(f, { name: lbpName, rel: lbpSaid && lbpSaid.rel, st: lbpSaid && lbpSaid.st, gen: lbpGen });      // gen: a new opening (a confirm left open last time starts closed)
 }
 export function friendRow() { if (playerOpen()) drawFriend(); }      // web/social.js: a push, a request answered, a sign-in: the open card's row follows

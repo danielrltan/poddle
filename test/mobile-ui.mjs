@@ -50,7 +50,7 @@ async function page(tag, { w = 390, h = 844, touch = true, ua = IPHONE, name = '
   await pg.setRequestInterception(true); pg.on('request', q => (/google\.com|gstatic\.com/.test(q.url()) ? q.abort() : q.continue()));
   pg.on('pageerror', e => errs.push(`[${tag}] PAGEERROR ${e.message}`));
   pg.on('console', m => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|ERR_FAILED|WebSocket connection|Failed to load resource/.test(m.text())) errs.push(`[${tag}] ${m.text()}`); });
-  await pg.evaluateOnNewDocument(n => { try { if (n) localStorage.setItem('poddle.name', n); else localStorage.removeItem('poddle.name'); localStorage.setItem('poddle.camPrimer', 'allow'); localStorage.setItem('poddle.lbSeen', '2'); } catch {} }, name);
+  await pg.evaluateOnNewDocument(n => { try { if (n) localStorage.setItem('poddle.name', n); else localStorage.removeItem('poddle.name'); localStorage.setItem('poddle.camPrimer', 'allow'); localStorage.setItem('poddle.lbSeen', '3'); } catch {} }, name);
   return pg;
 }
 const ev = (pg, fn, ...a) => pg.evaluate(fn, ...a);

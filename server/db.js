@@ -406,7 +406,7 @@ function prepare() {                                             // every statem
     swReqs: q(`DELETE FROM friend_reqs WHERE rowid IN (SELECT rowid FROM friend_reqs WHERE created_at <= ? LIMIT ${BATCH})`),
     // the leaderboard profile (NOTES 140): the account behind a username key, and whether it sits inside a board's top LB_MAX rows (the same WHERE and ORDER BY as lbTop_)
     lbKey: q(`SELECT a.owner_id, a.username, a.username_key, a.lb_hidden, l.owner_id IS NOT NULL AS ranked, l.trophies, p.best_rally, p.h_best_streak
-              FROM accounts a JOIN profile p ON p.owner_id = a.owner_id LEFT JOIN ladder l ON l.owner_id = a.owner_id WHERE a.username_key = ?`),
+              FROM accounts a LEFT JOIN profile p ON p.owner_id = a.owner_id LEFT JOIN ladder l ON l.owner_id = a.owner_id WHERE a.username_key = ?`),
   };
 }
 
@@ -735,15 +735,13 @@ const leaderPlaces = guard(null, (o, evenHidden = false) => {
   for (const b of Object.keys(BOARDS)) if (v[b] >= BOARDS[b].min) out[b] = { rank: S['lbAbove_' + b].get(v[b]).n + 1, v: v[b] };
   return out;
 });
-// leaderOwnerByKey(key) -> { owner, name, ranked } for an account on at least one board, at any place (the leaderboard profile, NOTES 140; every
-// listed player since NOTES 141, not only the top 100); null for nobody (unknown key, no username, hidden, on no board yet); undefined when the
+// leaderOwnerByKey(key) -> { owner, name, ranked } for any account with a username that is not lb_hidden (the profile card, NOTES 140; every
+// listed player since NOTES 141; every such account, on a board or not, since NOTES 166); null for nobody (unknown key, no username, hidden); undefined when the
 // database is closed or the read threw (the route says 503)
 const leaderOwnerByKey = guard(undefined, key => {
   if (typeof key !== 'string' || !key || key.length > 64) return null;
   const r = S.lbKey.get(key); if (!r || !r.username || r.lb_hidden === 1) return null;
-  const v = { trophies: r.trophies || 0, rally: r.best_rally || 0, streak: r.h_best_streak || 0 };
-  const on = Object.keys(BOARDS).some(b => (b !== 'trophies' || r.ranked) && v[b] >= BOARDS[b].min);   // trophies: FROM ladder, so never without a ladder row
-  return on ? { owner: r.owner_id, name: r.username, ranked: !!r.ranked } : null;
+  return { owner: r.owner_id, name: r.username, ranked: !!r.ranked };   // on a board or not (NOTES 166: the owner, "let it show for all players"); lb_hidden is the one way off
 });
 // leaderHide(ownerId, hidden) -> true when the account's switch was written (a guest has no switch: false)
 const leaderHide = guard(false, (o, hidden) => isId(o) && S.lbHide.run(hidden ? 1 : 0, o).changes > 0);
