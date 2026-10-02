@@ -3623,8 +3623,10 @@ The owner (2026-10-02): "the friends / add friend row could be combined and put 
 - At the cut the title does not leave: ui.js cornerStamp() measures it and glides it (640 ms) to the court pane's top left corner at about 3.25rem,
   where it stays while the panel is up. A window resize re-places it at once. RANK UP has its own element now (#rank-slam), since it used to
   overwrite the title's.
-- The vote's clock starts at the cut. server/game.js gives the vote REMATCH_S + STAMP_S (2.6 s, env STAMP_S) from match point, so the panel opens
-  on 20; main.js draws the clock in reveal(), not at match point. No clock, button or focus behind the title, as before.
+- The vote's clock starts at the cut. server/game.js closes the vote REMATCH_S + STAMP_S (2.6 s, env STAMP_S) after match point, except after a
+  forfeit (no title there). The wire is unchanged: `rematchBy` and `rematch.left` never say more than REMATCH_S (voteLeft()), so the panel opens on
+  20; main.js draws the clock in reveal(), not at match point. No clock, button or focus behind the title, as before. rooms.test and auth.test
+  run their short-clock servers with STAMP_S=0. A reduced-motion player has no title, so their clock reads 20 while the court closes at 22.6.
 - Spectators: the same title beat, then the same shot and panel. Their panel has Leave alone (it calls leave(): back to the lobby); a tournament
   match keeps See bracket. The vote messages they already received are now drawn: a green tick on the chip of each player who wants a rematch
   (.tally-side.is-ready; players see the ticks too), and the line reads "Ann wants a rematch" instead of "Waiting for a rematch". The emote row

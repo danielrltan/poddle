@@ -9,7 +9,7 @@ const PORT = +process.env.ROOMS_PORT || 8300, PORT2 = PORT + 1, PORT3 = PORT + 2
 const READY_S = 3;                                              // server/game.js: the count into a match's first serve (test/countdown.test.mjs owns it; here it only moves the clock)
 const up = (port, env) => spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: port, ...env }, stdio: 'ignore' });
 const procs = [up(PORT, {}), up(PORT2, { ROOM_CAP: '2', ROOM_TTL: '2' }),                   // the second one only for the cap and the closing of empty rooms
-  up(PORT3, { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', PAUSE_S: '3', CAL_S: '5' })];       // the third: a match is 2 points, and the four countdowns are short enough to sit through
+  up(PORT3, { WIN_AT: '2', REMATCH_S: '4', STAMP_S: '0', HOLD_S: '3', PAUSE_S: '3', CAL_S: '5' })];       // the third: a match is 2 points, and the four countdowns are short enough to sit through
 process.on('exit', () => procs.forEach(p => p.kill()));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const until = async (f, ms = 3000) => { const t = Date.now(); while (Date.now() - t < ms) { if (f()) return true; await wait(20); } return !!f(); };

@@ -18,7 +18,7 @@ const require = createRequire(import.meta.url);
 const PORT = +process.env.AUTH_PORT || 9410, P_OFF = PORT + 1, P_PROD = PORT + 2, P_HOST = PORT + 3, root = new URL('..', import.meta.url).pathname;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-')), DBB = path.join(tmp, 'b.db'), DBC = path.join(tmp, 'c.db'), JWKS = path.join(tmp, 'jwks.json');
 const CLIENT = 'test-client.apps.googleusercontent.com', EMAIL = 'secret.tester.' + crypto.randomBytes(4).toString('hex') + '@example.com';
-const STATS = { WIN_AT: '2', REMATCH_S: '4', HOLD_S: '3', STATS_MIN_POINT_S: '0', STATS_AFK_MIN: '0', STATS_FORFEIT_MIN: '1', STATS_ESTABLISHED: '0', TIMESCALE: '2' };
+const STATS = { WIN_AT: '2', REMATCH_S: '4', STAMP_S: '0', HOLD_S: '3', STATS_MIN_POINT_S: '0', STATS_AFK_MIN: '0', STATS_FORFEIT_MIN: '1', STATS_ESTABLISHED: '0', TIMESCALE: '2' };
 const SES = '__Host-poddle_s', NON = '__Host-poddle_n';
 const procs = new Set(), logs = [];
 function up(port, env) {

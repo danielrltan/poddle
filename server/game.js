@@ -591,9 +591,10 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
 
   // ---------- match end, rematch vote, closing (docs/SPECTATE.md). A finished match no longer restarts by itself ----------
-  const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, rematchBy: secsTo(over.until), names: over.names, reg: over.reg, rank: over.rank,   // names: as they were when it ended (a forfeit has emptied a seat by now). rank: the emblems as the hook left them. tour: a tournament match: no vote, back to the bracket in gap s
+  const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, rematchBy: voteLeft(), names: over.names, reg: over.reg, rank: over.rank,   // names: as they were when it ended (a forfeit has emptied a seat by now). rank: the emblems as the hook left them. tour: a tournament match: no vote, back to the bracket in gap s
     tour: MATCH ? { ...opts.info, gap: secsTo(over.until) } : undefined });
-  const voteMsg = () => ({ type: 'rematch', votes: over.votes, left: secsTo(over.until) });
+  const voteLeft = () => (MATCH || LEGACY ? secsTo(over.until) : Math.min(REMATCH_S, secsTo(over.until)));   // the vote is REMATCH_S long on the wire; the title's STAMP_S before it is not part of it
+  const voteMsg = () => ({ type: 'rematch', votes: over.votes, left: voteLeft() });
   function endMatch(winner, forfeit, nm) {
     const rec = record(winner, forfeit ? 'forfeit' : 'won');     // rows A-F: a win, a forfeit, a stall, a tournament result
     ball.live = false; ball.serving = null; serveAt = Infinity; counting = null; for (const pl of players) pl.swing = pl.servePending = null;
@@ -607,7 +608,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (!reported) { reported = true; opts.onResult(winner, [...score], !!forfeit, { struck, score: [...score] }); }
       return;
     }
-    over = { winner, forfeit, names: nm || names(), reg: regs(), rank: [...seatTier], until: Date.now() + (LEGACY ? 5 : REMATCH_S + STAMP_S) * 1000,      // the vote's clock starts when the result panel comes in, after the VICTORY! / DEFEAT title (NOTES 167)
+    over = { winner, forfeit, names: nm || names(), reg: regs(), rank: [...seatTier], until: Date.now() + (LEGACY ? 5 : REMATCH_S + (forfeit ? 0 : STAMP_S)) * 1000,      // the vote's clock starts when the result panel comes in, after the VICTORY! / DEFEAT title (NOTES 167)
       votes: [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? true : null) : false; }) };      // Matt always wants another; a seat that was forfeited cannot
     if (LEGACY) newMatchAt = now + 5;                            // LOCAL: a new match after 5 s whatever anyone says (test/e2e.mjs lives there)
     broadcast(overMsg()); tellProfiles(rec);
