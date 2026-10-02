@@ -1,5 +1,5 @@
 // The winner's shot (NOTES 165): real server/game.js, fake AirPods, real Chromes. Ann + Ben play to 3, Cat watches.
-// The winner: VICTORY! holds the court for 2.6 s with no panel, then the cut: the result panel down the right two fifths, the winner in the left
+// The winner: the title holds the court for 2 s with no panel, then the cut: the result panel down the right two fifths, the winner in the left
 // three fifths holding the trophy where the paddle was (it turns with the paddle), solid, looked at by one camera. The loser and the spectator get
 // the cut at once. A tall window lays the panel along the bottom. A rematch puts the paddle back and the play camera with it.
 // VICTORY_PORT=<base> moves the block (base .. base+2). Screenshots: test/ui-shots/victory-*.png. LOOK at them.
@@ -95,11 +95,12 @@ ok(L1.slam === 'DEFEAT' && L1.slamA > 0.9 && L1.stamp && L1.card[0] >= L1.W - 2 
 ok(/^(Ann|Ben) wins!$/.test(C1.slam) && C1.slamA > 0.9 && C1.stamp && C1.vic === -1 && C1.slamBox[0] >= 0 && C1.slamBox[2] <= C1.W, `spectator at 0.6 s: "${C1.slam}" fits the window (${C1.slamBox}), no cut yet`);
 ok(W1.left === null && L1.left === null, `no rematch clock behind the title (${W1.left}, ${L1.left})`);
 s = await w.evaluate(() => { const scr = document.getElementById('screen-match'), t = performance.now(); new MutationObserver(() => { if (!scr.classList.contains('is-stamp') && !window.__drop) window.__drop = performance.now() - t; }).observe(scr, { attributes: true });
-  return document.getElementById('result-slam').getAnimations().map(x => x.effect.getTiming().duration)[0]; }); ok(s === 2600, `VICTORY! holds for 2.6 s (it was 0.95 s): ${s} ms`);
+  return document.getElementById('result-slam').getAnimations().map(x => x.effect.getTiming().duration)[0]; }); ok(s === 2000, `VICTORY! holds for 2 s (it was 0.95 s): ${s} ms`);
+s = await l.evaluate(() => { const e = document.getElementById('result-slam'), c = getComputedStyle(e); return c.color + ' ' + c.scale; }); ok(/^rgb\(255, 100, 100\) (none|1)$/.test(s), `DEFEAT is red and stands still at 0.6 s (${s})`);
 await w.screenshot({ path: `${SHOTS}victory-stamp-1280x720.png` });
 await sleep(Math.max(0, 4300 - (Date.now() - t0))); W1 = await look(w); L1 = await look(l); C1 = await look(c);
 const inPane = (o, x0, x1, y0, y1) => o.head && o.cup && [o.head, o.cup].every(p => p[0] > x0 && p[0] < x1 && p[1] > y0 && p[1] < y1);
-s = await w.evaluate(() => window.__drop); ok(s > 1200 && s < 2400, `the panel waited behind VICTORY! until 2.6 s (the class dropped ${Math.round(s)} ms after the 0.6 s look)`);
+s = await w.evaluate(() => window.__drop); ok(s > 700 && s < 1800, `the panel waited behind VICTORY! until 2 s (the class dropped ${Math.round(s)} ms after the 0.6 s look)`);
 const cornered = o => o.slamA > 0.9 && o.slamBox[0] >= 0 && o.slamBox[1] >= 0 && o.slamBox[2] < o.W * 0.45 && o.slamBox[3] < o.H * 0.2;
 ok(cornered(W1) && cornered(L1) && cornered(C1), `at the cut the title shrinks into the top left corner and stays: ${W1.slam} ${W1.slamBox}, ${L1.slam} ${L1.slamBox}, ${C1.slam} ${C1.slamBox}`);
 ok(/^(20|19|18)$/.test(W1.left) && /^(20|19|18)$/.test(L1.left), `the rematch clock starts with the panel: ${W1.left} / ${L1.left} s at 1.7 s after the cut`);

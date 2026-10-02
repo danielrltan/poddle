@@ -3692,3 +3692,9 @@ whatever screen was up. So from the SECOND court of a visit on (never the first,
 - No data, storage, permission or third-party change: the legal pages are untouched. Changelog entry added.
 - Tests: test/calstart-e2e.mjs (new, CALSTART_PORT, 7 checks; 3 fail on the old main.js): a kept calibration on the share screen holds the
   count while the other seat is ready, Start releases it, and a C mid-match reads 'Calibrating' until the court is back.
+
+## 171. The result title: DEFEAT is red, no pulse, 2 seconds
+- The owner: "defeat should be in red. and also, get rid of the pulsing text effect. it should just stay there. and change it to 2 seconds".
+- DEFEAT is var(--bad) with a --bad-deep drop (it was slate). ov-victory slams in over the first 0.2 s and then holds at scale 1: the slow
+  swell to 1.05 and back is gone. The title has the court for 2 s: ui.js STAMP_MS 2000, the animation 2000 ms, server/game.js STAMP_S 2 (the
+  court closes REMATCH_S + 2 s after match point), main.js's clock sum to match. test/victory-e2e.mjs checks the 2 s, the red and the still scale.

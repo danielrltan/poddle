@@ -239,7 +239,7 @@ export function confetti(colors, n = 46) {
 // The old positional call (won, me, them, name) still works and means a room with no vote: the next game starts by itself.
 let resultRole = 'player', voted = false, votedYes = false, noCount = false, countT = 0, countLeft = 0, countTotal = 0;
 let stampT = 0;                                                  // the VICTORY! beat's timer: the card waits for it (NOTES 130)
-const STAMP_MS = 2600;                                           // how long VICTORY! has the court to itself (NOTES 165; ui.css ov-victory runs 2800 ms, so the panel comes in under its fade)
+const STAMP_MS = 2000;                                           // how long the title has the court to itself (NOTES 171; ui.css ov-victory runs as long, server/game.js STAMP_S matches)
 const stacked = matchMedia('(max-aspect-ratio: 1/1), (max-width: 760px)');      // ui.css: the result panel lies along the bottom instead of down the right
 // Where the court shows beside the result panel, for the winner's shot (scene.setVictory): the free pane's share of the window and its centre in NDC
 export function resultPane() { const c = $('result'), W = innerWidth || 1, H = innerHeight || 1; if (!c) return null;
