@@ -3489,10 +3489,14 @@ count and stuff? think brawlstars ui". One card per thing (NOTES 150): the heade
 in that corner and already opened Your stats, so it grows into the card instead of a second thing beside it.
 
 - Signed in with a username the button is `.is-card`: the rank emblem (ui.rankEmblem at 2.75rem, no numeral: the division is the medal's
-  shape), the username, and the trophy count with the gold cup under it. It shows on every lobby view and opens Your stats. profile.js
+  shape), the username, and the trophy count with the gold cup under it, and under that the trophy bar (ui.rankProgress: the hero bar, across the current division; added the same day at the owner's ask). It shows on every lobby view and opens Your stats. profile.js
   drawChip draws it from `meLadder`, so it is right from /api/me alone (before Your stats is ever opened) and follows every /api/stats
   answer and each game's trophies; drawAcct calls it on sign-in, sign-out and rename.
 - No trophies yet: the person icon, the name and 0. A guest keeps "Sign in", an account without a username "Pick a username".
-- Under 480px the card is the emblem alone (the header holds Back, the title and one more thing); its aria-label carries the name and count.
+- Under 480px (fixed 2026-10-02: the owner found the emblem-only circle broken on his phone) the card is the emblem and the count over the bar,
+  no name and no cup, clear of Back and the title on every view (profile-ui section G checks 390x844, 844x390 and 320x568 under an iPhone
+  user agent); under 350px the emblem alone. Its aria-label carries the name and count.
+- Same day, Your stats: the streak pill no longer floats over the middle of the road. Desktop: in the hero's corner, on the road's right
+  edge. Phone: under the bar, on the rank column's left edge.
 - Nothing new is sent, stored or shown to anyone else: the legal pages are untouched.
 - Tests: profile-ui.mjs section G (the card on the home screen, its click, phone width, no trophies, a guest).

@@ -154,7 +154,7 @@ export function rankCrest(L, signedIn = false) {
   crest.closest('.st-hero')?.classList.toggle('is-none', !known);      // ui.css: no count, no bar before the first trophies
   setText($('st-rank'), known ? (top ? RANKS[r.tier - 1].name : rankLabel(r.tier, r.div)) : 'No trophies yet'); setText($('st-trophies'), String(n));      // 'Pro' has no numeral: the #12 pill beside it says where (web/profile.js drawPlace)
   setText($('st-rank-cap'), known ? '' : signedIn === 'username' ? 'Pick a username to earn trophies' : signedIn ? '' : 'Sign in to earn trophies');      // signed in with a username: 'No trophies yet' says it all
-  const floor = THRESHOLDS[r.tier - 1] || 0, dFloor = floor + (r.div - 1) * DIV_W, p = top ? 1 : Math.max(0, Math.min(1, (n - dFloor) / DIV_W));      // the bar: across the current division (Pro: full)
+  const floor = THRESHOLDS[r.tier - 1] || 0, p = known ? rankProgress({ tier: r.tier, div: r.div, trophies: n }) : 0;      // the bar: across the current division (Pro: full)
   { const b = $('st-rank-bar'); if (b) { b.style.setProperty('--p', (known ? p : 0).toFixed(3)); b.setAttribute('aria-valuenow', String(Math.round((known ? p : 0) * 100))); } }
   const nextAt = r.div < 3 ? floor + r.div * DIV_W : THRESHOLDS[r.tier], nextName = top ? '' : r.div < 3 ? rankLabel(r.tier, r.div + 1) : rankLabel(r.tier + 1, 1);      // 'Gold III' is 50 on from Gold II; from Gold III the next step is Platinum I
   { const nx = $('st-next'); if (nx) { setText(nx, !known ? '' : top ? 'Top rank' : `${Math.max(1, nextAt - n)} to ${nextName}`); nx.hidden = !known; } }
@@ -166,6 +166,8 @@ export function rankCrest(L, signedIn = false) {
       road.append(li); }); }
   { const b = $('st-best'), above = known && (best > r.tier || best === r.tier && hasDivs(best) && bestDiv > r.div); if (b) { setText(b, above ? `Best: ${rankLabel(best, bestDiv)}` : ''); b.hidden = !above; } }      // Pro has no divisions: never 'Best: Pro' over Pro
 }
+// how far across the current division a ladder is, 0..1 (Pro: full): the hero's bar above and the header card's bar (web/profile.js drawChip) agree
+export function rankProgress(L) { const r = rankRef(L); if (!r) return 0; if (r.tier === RANKS.length) return 1; const dFloor = (THRESHOLDS[r.tier - 1] || 0) + (r.div - 1) * DIV_W; return Math.max(0, Math.min(1, (Math.max(0, L.trophies | 0) - dFloor) / DIV_W)); }
 const setDiv = (el, r) => { if (hasDivs(r.tier)) el.dataset.div = String(r.div); else delete el.dataset.div; };      // Pro has no divisions (NOTES 126): no numeral pill on its emblem
 // another player's emblem in a box of its own (the leaderboard profile, NOTES 140): the division's medal at .is-lg with its numeral, as on the crest; never
 // lastRank (that is mine, for the Ranks page). r null (no trophies yet) empties the box

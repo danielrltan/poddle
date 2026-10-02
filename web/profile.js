@@ -559,6 +559,7 @@ function drawChip() {
   const b = $('btn-head-acct'); if (!b) return; const a = on && me.enabled ? me.account : null, name = a && a.username, L = name ? meLadder : null;
   b.classList.toggle('is-card', !!name); show('head-acct-n', !!name); text('head-acct-tr', (L ? L.trophies : 0).toLocaleString('en-US'));
   { const em = $('head-acct-em'); if (em && em.dataset.r !== (L ? L.tier + '.' + L.div : '')) { em.dataset.r = L ? L.tier + '.' + L.div : ''; h.emblem(em, L ? { tier: L.tier, div: L.div } : null); } show('head-acct-em', !!L); b.classList.toggle('has-em', !!L); }
+  { const bar = $('head-acct-bar'); if (bar) { const p = L ? h.progress(L) : 0; bar.style.setProperty('--p', p.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(p * 100))); } show('head-acct-bar', !!name); }      // the trophy bar: the hero's, across the current division
   if (name) b.setAttribute('aria-label', `${name}, ${(L ? L.trophies : 0).toLocaleString('en-US')} trophies: your stats`);
 }
 function drawAcct() {
@@ -584,7 +585,7 @@ let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, tiles: noop, crest: noop, emblem: noop, rankBadge: noop, board: noop, cup: noop, acct: noop, friend: noop };      // acct, friend: web/social.js (the account changed; the profile card's friend row)
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, tiles: noop, crest: noop, progress: () => 0, emblem: noop, rankBadge: noop, board: noop, cup: noop, acct: noop, friend: noop };      // acct, friend: web/social.js (the account changed; the profile card's friend row)
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
