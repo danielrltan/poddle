@@ -247,7 +247,7 @@ export function resultPane() { const c = $('result'), W = innerWidth || 1, H = i
   const f = Math.max(0.25, 1 - c.offsetWidth / W); return { fw: f, fh: 1, px: f - 1, py: 0 }; }
 // At the cut the title does not leave: it shrinks into the court pane's top left corner and stays while the panel is up
 function cornerStamp(st, instant) { if (!st || slots.overlay !== 'match') return; const r = st.getBoundingClientRect(), fs = parseFloat(getComputedStyle(st).fontSize) || 1, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  st.classList.remove('go'); st.classList.add('is-corner'); void st.offsetWidth; st.style.transition = instant ? 'none' : ''; st.style.transform = `translate(${(rem * 1.5 - r.left).toFixed(1)}px, ${(rem * 1.25 - r.top).toFixed(1)}px) scale(${Math.min(1, 3.25 * rem / fs).toFixed(3)})`; }
+  st.classList.remove('go'); st.classList.add('is-corner'); void st.offsetWidth; st.style.transition = instant ? 'none' : ''; st.style.transform = `translate(${(rem * 1.5 - r.left).toFixed(1)}px, ${(rem * 1.25 - r.top).toFixed(1)}px) scale(${Math.min(1, Math.min(6.5 * rem, 0.07 * innerWidth) / fs).toFixed(3)})`; }      // 6.5rem tall (twice NOTES 167's 3.25), less in a narrow window, never bigger than it was
 addEventListener('resize', () => { const st = $('result-slam'); if (!st || !st.classList.contains('is-corner')) return; st.style.transition = 'none'; st.style.transform = 'none'; cornerStamp(st, true); });      // the corner is measured in pixels: a new window size, a new corner (no glide)
 let resNames = ['', ''];      // the result's left and right names, for a spectator's 'Ann wants a rematch'
 // -> the ms the panel stays out of sight behind the title (0: it is in at once)
