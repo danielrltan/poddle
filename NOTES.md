@@ -3716,3 +3716,31 @@ unchanged; once it shrinks into the corner (.result-slam.is-corner) it turns whi
 DEFEAT, the winner's colour for a spectator's '<name> wins!') and a shadow in the deep shade, with the colours gliding over the 640 ms of the move.
 ui.js cornerStamp scales it to 6.5rem tall instead of 3.25, capped at 7vw so a narrow window (600 px: 42 px) keeps it inside the court pane's corner,
 clear of the emote row. victory-e2e passes as it was (24 checks). Shipped in bd7cd0a; these notes and the changelog entry followed.
+
+## 174. Matt moves like a player
+
+The owner (2026-10-02): "bots are really robotic in how they move, i want you to make them more natural. for example, if u lob to them,
+they will automatically stand up really tall and it just looks goofy." The cause: NOTES 68's stance reads the whole body out of
+`pd.pos.y`, which for a person IS the head. For Matt it is only the paddle, which runBot drives straight to the contact point at 4 m/s,
+so a lob at 2.2 m read as a head 1.2 m up: on his toes and stretched 0.68 m taller. All of this is in scene.js updatePads and draws only;
+the server, Matt's speed, reach and timing are unchanged. Every `pd.bot` seat gets it: Matt at every level and both players of the
+menu's attract rally.
+
+- Body height: a bot's stance reads `stance.by`, a critically damped spring (k 110) toward a height taken off the paddle: below the
+  standing baseline the knees take 0.8 of the drop (a low ball still crouches), above it only up to 0.12 m onto the toes, eased in
+  (the paddle, a floating Mii hand, reaches the rest). While a ball is live he waits 5 cm lower, knees bent. The knee spring's speed and
+  the dip counter read the same number. Matt never taunts (three quick low balls used to set off the teabag).
+- Overhead: the canned swing blends (pd.over, set from the paddle height at the wind-up, raised while it still rises) into OVERHEAD,
+  the same timing but over the top: the face cocked back behind the head, then down through the ball toward the net.
+- Footsteps: his feet used to slide while the whole body hopped at a fixed 11 rad/s. Now the distance the body covers drives a stride
+  phase (one step per STRIDE = 0.62 m): the feet lift in turn (7.5 cm) and reach the way he is going, and the body rises mid-step.
+  Stopping puts both feet down. People keep their own (tracked) feet and the old hop: not asked for, and stance.mjs pins them.
+- Split step: as the other side hits (the hit event, and attractShot for the menu rally), a 0.38 s move: a 4.5 cm hop that lands in a 7 cm dip, ready to push off.
+- Reduced motion: no stride bob or lift and no split hop; the body-height fix and the overhead stay.
+- Same cause, not changed: a person playing with Auto (or auto height) also has their paddle height driven by runAuto, so their avatar
+  still stretches on a lob. The client cannot tell a remote Auto player apart without a new wire flag (a data-flow change): left for
+  the owner to decide.
+- No data, storage or UI change: legal pages untouched. Changelog: "Matt moves like a player".
+- Tests: test/bot-motion.mjs (new, port 8750) replays runBot's own motion on side 1 of scene-preview.html: lob contact head +11 cm
+  (was +67.6), a low ball still drops the head ~59 cm, three quick dips never taunt, and the feet hand over left/right while running;
+  close and far screenshots in test/ui-shots/bot-motion/. stance.mjs, breathe.mjs and scene-next.mjs pass unchanged.

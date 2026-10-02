@@ -400,6 +400,10 @@ function buildAvatar(side) {
 const IDLE = [14, -12, 12];
 const SWING = [[0, ...IDLE], [0.13, -64, 12, -30], [0.29, 72, 22, 38], [0.40, 62, 18, 30], [0.74, ...IDLE]];
 const SWING_CONTACT = 0.2;
+// Matt's overhead (NOTES 170): for a ball up past his head the same timing, but over the top: the face cocked back behind the head,
+// then down through the ball toward the net and on into the follow-through. pd.over (0..1) blends it in by the contact height.
+const OVERHEAD = [[0, ...IDLE], [0.13, -14, 78, -12], [0.29, 6, -28, 6], [0.40, 6, -46, 6], [0.74, ...IDLE]];
+const STRIDE = 0.62;                      // m of travel per footstep, Matt's run (NOTES 170)
 const FACE_C = 0.23 * PADDLE_SCALE, REACH_MAX = 0.4;      // grip -> face centre; how far a hit may tug the paddle toward the ball
 const BODY = [0.5, 0.68];                 // avatar centre, left of / behind the paddle base (player frame)
 const SERVE_STEP = 0.35;                  // m the body steps toward the hanging ball while it serves (looks only)
@@ -411,9 +415,9 @@ const SERVE_STEP = 0.35;                  // m the body steps toward the hanging
 // The ranges are deliberately lopsided: y is clamped to 0.3..2.3, so a duck has 0.7 m to give and a stretch has 1.3 m,
 // but nobody stretches far before it stops being a stretch and becomes a reach.
 const STANCE = { base: 1.0, duck: 0.45, rise: 0.28, up: 0.8, sink: 0.17, toes: 0.115, lean: 0.34, squash: 0.11 };
-function swingEuler(t, out) {
-  let i = 0; while (i < SWING.length - 2 && t > SWING[i + 1][0]) i++;
-  const a = SWING[i], b = SWING[i + 1], k = ease(clamp((t - a[0]) / (b[0] - a[0]), 0, 1));
+function swingEuler(t, out, keys = SWING) {
+  let i = 0; while (i < keys.length - 2 && t > keys[i + 1][0]) i++;
+  const a = keys[i], b = keys[i + 1], k = ease(clamp((t - a[0]) / (b[0] - a[0]), 0, 1));
   for (let j = 0; j < 3; j++) out[j] = lerp(a[j + 1], b[j + 1], k);
   return out;
 }
@@ -774,9 +778,9 @@ export function createScene(containerEl) {
     return { side, group, avatar, hand, forearm, tag, status: null, tagFor: null, ghost: 0, mats: [], handM: skinM, ghostM, sleeveM, has: false, init: false, bot: false, matt: false, look: null,      // look: a LOOKS key from setLooks (the seat's registered username)      // bot: canned swing, no q. matt: Matt's look. Only the attract rally's side 0 has the first without the second
       tgt: { x: 0, y: 1, z: sgn(side) * 6.5, q: new THREE.Quaternion(), off: null },
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
-      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
+      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, over: 0, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
       // stance: how far the head is off the baseline (duck / tip), the bob spring it is driving, and the dip counter behind the taunt
-      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0, br: side * 2.2, puff: 0 } };      // br: the breath's phase (the two seats out of step); puff: how winded, 0..1
+      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0, br: side * 2.2, puff: 0, by: STANCE.base, byV: 0, stride: 0, split: 0 } };      // br: the breath's phase (the two seats out of step); puff: how winded, 0..1. by/byV, stride, split: Matt's body height, footsteps and split step (NOTES 170)
   });
   // The winner's shot (NOTES 165; setVictory): the result is drawn on the court. The winner holds a trophy where the paddle was (its attitude is the
   // paddle's own, so a phone or AirPod turns it), solid even when it is me, and one camera stands in front of them. pane: where the picture is
@@ -841,7 +845,7 @@ export function createScene(containerEl) {
     for (const pd of pads) { const mine = pd.side === eye; pd.avatar.visible = pd.has && (!mine || selfBody); selfish(pd, mine); pd.forearm.visible = pd.has && mine && !selfBody; placeTag(pd); }      // a Mii has no arms: with the body shown, no forearm
     for (let i = 0; i < 2; i++) { const b = i !== hideBack, s = i !== hideSide; for (const o of backFence[i]) o.visible = b; for (const o of sideFence[i]) o.visible = s; }
   }
-  const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vF = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0];
+  const E = new THREE.Euler(0, 0, 0, 'YXZ'), qA = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vF = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), e3 = [0, 0, 0], e4 = [0, 0, 0];
   const D2R = Math.PI / 180;
 
   function updatePads(dt) {
@@ -857,7 +861,9 @@ export function createScene(containerEl) {
       if (pd.bot) {                                        // bots never send a q: idle sway + canned swing
         if (won) pd.swingT = -1;
         if (pd.swingT >= 0) { pd.swingT += dt; if (pd.swingT > SWING[SWING.length - 1][0]) pd.swingT = -1; }
-        if (pd.swingT >= 0) swingEuler(pd.swingT, e3); else { e3[0] = IDLE[0]; e3[1] = IDLE[1]; e3[2] = IDLE[2]; }
+        if (pd.swingT >= 0 && pd.swingT < SWING_CONTACT) pd.over = Math.max(pd.over, clamp((pd.pos.y - 1.55) / 0.45, 0, 1));      // the paddle may still be rising to a lob as the wind-up starts
+        if (pd.swingT >= 0) { swingEuler(pd.swingT, e3); if (pd.over > 0) { swingEuler(pd.swingT, e4, OVERHEAD); for (let j = 0; j < 3; j++) e3[j] = lerp(e3[j], e4[j], pd.over); } }
+        else { e3[0] = IDLE[0]; e3[1] = IDLE[1]; e3[2] = IDLE[2]; }
         const br = Math.sin(timeS * 2.1 + pd.side);
         if (won) E.set((-6 + Math.sin(timeS * 2.3) * 7) * D2R, Math.sin(timeS * 1.4) * 30 * D2R, Math.sin(timeS * 2.3 + 1) * 13 * D2R);      // Matt shows his cup off: it turns and tips, upright on average
         else E.set((e3[1] + br * 2.5) * D2R, e3[0] * pd.mirror * D2R, (e3[2] * pd.mirror + br * 3) * D2R);
@@ -909,9 +915,21 @@ export function createScene(containerEl) {
         // pd.pos.y IS the head: in Body mode it is bodytrack's T.y(), and Auto and the bots drive the same number. Take it
         // raw. It already carries a 20 Hz link and a 55 ms lerp, which is just slack enough to pass a three-a-second bob;
         // another filter here would iron the bob flat, and the bob is half the point.
-        const dy = pd.pos.y - STANCE.base, duck = clamp(-dy / STANCE.duck, 0, 1), tip = clamp(dy / STANCE.rise, 0, 1);
+        //
+        // Except Matt's (NOTES 170). His pos.y is only his PADDLE, driven straight to wherever the ball will be met, so read as a
+        // head a lob stood him up 0.7 m tall and every low ball folded him in half on the instant. His body takes its own height
+        // off the paddle: a low ball bends the knees most of the way down to it, a high one only brings him up onto his toes (the
+        // paddle, a Mii's floating hand, reaches the rest), and he gets there on a spring, sinking in and coming back up rather
+        // than riding the paddle 1:1. While a ball is in play the knees stay a little bent: the ready position.
+        const hdt = Math.min(dt, 0.033);
+        let hh = pd.pos.y;
+        if (pd.bot) {
+          const py = pd.pos.y - STANCE.base, want = STANCE.base - (ball.live && !won ? 0.05 : 0) + (py < 0 ? py * 0.8 : 0.12 * (1 - Math.exp(-py / 0.5)));
+          sd.byV += ((want - sd.by) * 110 - sd.byV * 21) * hdt; sd.by += sd.byV * hdt; hh = sd.by;      // critically damped (2 * sqrt 110)
+        }
+        const dy = hh - STANCE.base, duck = clamp(-dy / STANCE.duck, 0, 1), tip = clamp(dy / STANCE.rise, 0, 1);
         const reach = clamp((dy - STANCE.rise) / STANCE.up, 0, 1);      // past a tiptoe it stops being one: the heels are already up, so the rest of the height has to come out of the body stretching for an overhead
-        const hdt = Math.min(dt, 0.033), vy = (pd.pos.y - sd.y0) / Math.max(dt, 1e-3); sd.y0 = pd.pos.y;
+        const vy = (hh - sd.y0) / Math.max(dt, 1e-3); sd.y0 = hh;
         // A knee spring driven by how fast the head is travelling, not by where it ended up: drop fast and the body squashes
         // past its resting crouch, rise fast and it stretches past standing. That overshoot is what makes a quick bob read
         // as a bounce rather than a slider being dragged, and it needs nothing to recognise a bob first.
@@ -919,7 +937,7 @@ export function createScene(containerEl) {
         sd.spring = clamp(sd.spring + sd.springV * hdt, -0.2, 0.2);
         // Down, up, down again, three times inside a second each: the oldest joke in multiplayer, and the one thing here
         // worth naming. Everything above already animates it; the taunt only turns the volume up so it plainly landed.
-        if (!sd.low && duck > 0.5) { sd.low = true; sd.dips = timeS - sd.dipAt < 1 ? sd.dips + 1 : 1; sd.dipAt = timeS; if (sd.dips >= 3) sd.taunt = 1; }
+        if (!sd.low && duck > 0.5) { sd.low = true; sd.dips = timeS - sd.dipAt < 1 ? sd.dips + 1 : 1; sd.dipAt = timeS; if (sd.dips >= 3 && !pd.bot) sd.taunt = 1; }      // Matt never taunts: his dips are low balls
         else if (sd.low && duck < 0.2) sd.low = false;
         sd.taunt = Math.max(0, sd.taunt - dt / 1.2);
         sd.duck = duck; sd.tip = tip;
@@ -932,9 +950,21 @@ export function createScene(containerEl) {
         sd.puff = still ? 0 : clamp(sd.puff + (Math.max(run, pd.lunge * 1.6, pd.cheer > 0 ? 0.8 : 0) * 0.7 - 0.12) * dt, 0, 1);
         sd.br += dt * Math.PI * 2 * (0.3 + 0.42 * sd.puff);
         const inh = Math.pow(0.5 - 0.5 * Math.cos(sd.br + 0.3 * Math.sin(sd.br)), 1.3) * (1 + 1.3 * sd.puff);      // 0 = out; the warp makes the in-breath the quicker half, the power lingers at the bottom
+        // ---------- Matt's feet (NOTES 170) ----------
+        // A person tracks their own feet; Matt's used to slide while the whole body hopped at one fixed beat. Now the distance
+        // he covers turns a stride phase: one footstep per STRIDE metres, each foot lifting and reaching the way he is going
+        // in turn, and the body rising mid-step. The split step: as the other side hits, a little hop that lands in a dip,
+        // ready to push off. Reduced motion keeps the steps flat and skips the hop.
+        let gait = 0, bob = 0, splitUp = 0, splitDip = 0;
+        if (pd.bot) {
+          const sp = Math.hypot(pd.vx, pd.vz); gait = clamp((sp - 0.25) / 0.9, 0, 1) * (still ? 0 : 1);
+          sd.stride = gait > 0 ? sd.stride + sp * dt / STRIDE : Math.round(sd.stride);      // stopping, the feet come down where they are
+          bob = Math.abs(Math.sin(Math.PI * sd.stride)) * 0.035 * gait;
+          if (sd.split > 0) { const k = 1 - sd.split; splitUp = k < 0.45 ? Math.sin(Math.PI * k / 0.45) * 0.045 : 0; splitDip = k >= 0.45 ? Math.sin(Math.PI * (k - 0.45) / 0.55) * 0.07 : 0; sd.split = still ? 0 : Math.max(0, sd.split - dt / 0.38); }
+        }
         // ---------- wear it ----------
-        const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8), lift = tip * STANCE.toes + reach * 0.1;
-        a.position.set(pd.bodyX, hop + Math.abs(Math.sin(timeS * 11)) * 0.05 * run, pd.bodyZ);
+        const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8) + splitDip, lift = tip * STANCE.toes + reach * 0.1;
+        a.position.set(pd.bodyX, hop + splitUp + (pd.bot ? bob : Math.abs(Math.sin(timeS * 11)) * 0.05 * run), pd.bodyZ);
         a.rotation.set(0, (s > 0 ? 0 : Math.PI) - 0.4 * hold, 0);      // on the serve it turns a little toward the ball, out in front of the paddle
         a.rotateZ(clamp(-pd.vx * s * 0.05, -0.22, 0.22)); a.rotateX(-0.06 - run * 0.08 - (pd.swingT >= 0 ? 0.1 : 0));      // the body's old whole-of-it lean, unchanged: it carries the feet with it, so it has to stay small
         if (sd.taunt > 0) a.rotateY(Math.sin(timeS * 25) * sd.taunt * 0.1);
@@ -961,6 +991,7 @@ export function createScene(containerEl) {
           // also what makes a tiptoe pivot on the toes: without it the whole foot just floats, and it reads as a small jump.
           vF.set(f.position.x, f.position.y, f.position.z).applyQuaternion(a.quaternion);
           f.position.y += Math.max(0, Math.hypot(0.066 * Math.cos(f.rotation.x), 0.165 * Math.sin(f.rotation.x)) - vF.y);
+          if (gait > 0) { const up = Math.max(0, (i ? -1 : 1) * Math.sin(Math.PI * sd.stride)) * gait; f.position.y += up * 0.075; f.position.x += lat * up * 0.07; f.position.z -= fwd * up * 0.07; }      // Matt's stepping foot: up, and toward where he is going
         }
         if (won) {                                         // the winner looks into the lens
           const dx = (camera.position.x - pd.bodyX) * s, dz = Math.max(0.5, (pd.bodyZ - camera.position.z) * s);
@@ -987,6 +1018,7 @@ export function createScene(containerEl) {
   }
   function startSwing(pd, at = 0) {
     pd.swingT = at; pd.mirror = (ball.pos.x - pd.pos.x) * sgn(pd.side) < -0.25 ? -1 : 1;     // ball on their left -> backhand
+    pd.over = clamp((Math.max(pd.pos.y, pd.tgt.y) - 1.55) / 0.45, 0, 1);                    // a ball over his head: the overhead
   }
 
   function updateBallVis(now, dt) {
@@ -1324,6 +1356,7 @@ export function createScene(containerEl) {
       if (m.kind === 'smash') smashFx(p, m.side, m.spin, rs, sk);
       trail.glow = 0.8 + 0.2 * shown; ballTake(ball, m, stampOf);      // the ball record: spin, the blend onto the new path, this contact's arc, and the launch that rides on the hit
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
+      const rx = pads[1 - m.side]; if (rx && rx.bot) rx.stance.split = 1;      // Matt split-steps as the ball comes off the other paddle
       sfx.pock(n, p[0]); if (m.spin > 0.12 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.2 * Math.min(1, m.spin) ** 1.5, 0.11, 0.004);   // spin hisses off the face, as loud as there is spin: 0.5 -> 0.07, 0.8 -> 0.14, 1 -> 0.2
     } else if (m.type === 'swung') {
       const pd = pads[m.side]; if (!pd) return;
@@ -1399,7 +1432,7 @@ export function createScene(containerEl) {
     if (!at.swung && at.t >= at.hitAt - SWING_CONTACT) { at.swung = true; startSwing(rc); rc.mirror = run.bh ? -1 : 1; }  // the existing bot swing, wound up so contact lands mid-sweep
     if (at.t < at.hitAt) return;
     const gap = Math.hypot(rc.pos.x - run.to[0], rc.pos.z - run.to[2]); at.stats.gap = Math.max(at.stats.gap, gap); if (gap > 0.5 || rc.swingT < 0) at.stats.late++;   // test/scene-next.mjs holds this at 0
-    rc.lunge = 1; rc.reach = true; rc.hitP = at.hitP;
+    rc.lunge = 1; rc.reach = true; rc.hitP = at.hitP; pads[1 - rc.side].stance.split = 1;
     attractShot(rc.side, at.hitP, at.hitAt);
   }
   function startAttract() {
