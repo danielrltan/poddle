@@ -561,10 +561,10 @@ export function createScene(containerEl) {
 
   // ---------- ball, blob shadow, trail ----------
   const ballTex = canvasTex(512, 256, (c, w, h) => {
-    c.fillStyle = '#e3f23a'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#e8fb2a'; c.fillRect(0, 0, w, h);
     const hole = (u, lat) => { const x = u * w, y = (0.5 - lat / Math.PI) * h, r = 15, rx = Math.min(r / Math.max(Math.cos(lat), 0.12), w);
       for (const dx of [-w, 0, w]) { c.beginPath(); c.ellipse(x + dx, y, rx, r, 0, 0, 7); c.fill(); } };
-    c.fillStyle = '#6f7d12';
+    c.fillStyle = '#a88e00';
     [[0, 8, 0], [0.62, 6, 0.5], [-0.62, 6, 0.5], [1.15, 4, 0], [-1.15, 4, 0]].forEach(([lat, n, ph]) => { for (let i = 0; i < n; i++) hole((i + ph) / n, lat); });
     hole(0.5, 1.5); hole(0.5, -1.5);
   });

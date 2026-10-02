@@ -3514,3 +3514,14 @@ lime (the old shade went olive: #c5d124 edge, #5a6e00 bottom wash, #a9b912 holes
   og:image is now ?v=7. The in-game 3D ball (scene.js ballTex) is gameplay art and unchanged.
 - The Poddle Helper's Resources/icon-512.png got the new icon; the released zip still carries the old one until the next build.
 - Changelog: October 2, "A brighter Poddle ball". Nothing is sent, stored or shown differently: the legal pages are untouched.
+
+## 163. The in-game ball matches the logo; Poddle Helper 1.0.1 with the new icon
+Follow-up to 162 at the owner's yes.
+- scene.js ballTex: body #e3f23a -> #e8fb2a (`--ball`), holes olive #6f7d12 -> #a88e00, the same hue-shifted deep yellow
+  (hue 51) as the logo's holes but darker: the ball is emissive (emissiveIntensity 1.6) and the logo's #cfae00 washed out in a
+  render at play size. The trail keeps its speed ramp (gameplay information, not branding). og.jpg regenerated (the ball is in
+  the shot), og:image ?v=8.
+- Poddle Helper 1.0.1 (danielrltan/poddle-helper c49b557 icon, then the version bump; tag v1.0.1, GitHub release "Poddle Helper
+  1.0.1"): only the app icon changed since 1.0.0. web/download/Poddle-Helper.zip is the same file as the release asset (sha256
+  19670dba84d6...). releases/latest now points at 1.0.1.
+- Changelog: the October 2 entry names the game ball and the Mac Helper too. Nothing sent, stored or shown changes: legal pages untouched.
