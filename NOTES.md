@@ -3651,3 +3651,23 @@ key, deleted at load like poddle.friendsSeen. Never add these back (CLAUDE.md sa
   important changes is unchanged: it is about future changes, and the owner decides each time.
 - Tests: lb-profile-ui.mjs section 15 now checks that no notice shows for any old lbSeen value and that the key is deleted; section 17
   checks the switch's plain toasts.
+
+## 169. The players breathe
+
+The owner (2026-10-02): "can you add breathing animations to the characters? to make things feel more alive." Every avatar (both seats,
+Matt, the attract rally, the winner's shot, your own see-through body) now breathes, in scene.js updatePads beside the stance. It replaces
+the old 1.8% sine on the body's height, which nobody could see.
+
+- The breath: a phase per seat (`stance.br`, the seats start 2.2 rad apart so two players never breathe in step), warped so the in-breath
+  is the quicker half and raised to a 1.3 power so it lingers empty. On the in-breath the chest capsule swells (x 5.5%, y 5%, z 7%), the
+  head rides up on it (HEAD_Y + 0.025: the capsule's top rises 0.46 x its y swell, so the head stays seated), the free hand lifts with the
+  shoulder and the chin tips up 0.045 rad. Calm, the head rises ~3 cm: plain on your own body, a spectator's view, the winner's shot and
+  the menu, but only a pixel or two on the far opponent at play distance (looked at: test/ui-shots); winded is what reads from there.
+- Winded: `stance.puff` (0..1) rises with running (the body's sideways speed), a lunge at the ball and the winner's hops, and falls 0.12 a
+  second. Calm is 0.3 breaths a second; fully winded is 0.72 a second and 2.3x as deep. A 4 s sprint gets puff to ~0.4 and the breath
+  about twice as deep; about eight quiet seconds bring it back.
+- Reduced motion: puff stays 0, so the calm breath stays and the heaving never comes.
+- Looks only: nothing sent or stored, no new UI, so the legal pages are untouched. Changelog: "The players breathe".
+- Tests: test/breathe.mjs (new, port 8744) drives scene-preview.html with the rally held still: the calm breath's depth and rate, a sprint
+  winding it deeper and faster, and a rest bringing it back; screenshots of out / in / winded in test/ui-shots/breathe/. stance.mjs's
+  side-1 height check now takes the breath off both heads (`breathY`), since the seats breathe out of step.

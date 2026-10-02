@@ -322,6 +322,7 @@ export const lookFor = (name, reg) => (reg === true && typeof name === 'string' 
 const MAE_EAR = [0.2, 0.19, -0.04, 0, -0.2, 0.55];     // Mae's ear: tip x (mirrored), y, z; then rotation x, y (mirrored: + turns the lining to face out), z (mirrored: + swings the bottom out)
 
 // ---------- Mii-ish avatar, built facing -z (the net, in the player frame) ----------
+const HEAD_Y = 1.47;                                     // the head's rest height on `upper`; breathing lifts it off this every frame
 function buildAvatar(side) {
   const g = new THREE.Group();
   const skin = new THREE.MeshStandardMaterial({ color: COL.skin, roughness: 0.7 });
@@ -330,7 +331,7 @@ function buildAvatar(side) {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.42, 6, 20), shirt); body.position.y = 0.74;
   const kit = new THREE.MeshStandardMaterial({ color: COL.kit, roughness: 0.8 });      // shorts and shoes: their own material (not `dark`, the eyes'), so a named look can repaint them
   const shorts = new THREE.Mesh(new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), kit); shorts.position.y = 0.55;
-  const head = new THREE.Group(); head.position.y = 1.47;
+  const head = new THREE.Group(); head.position.y = HEAD_Y;
   const whiteM = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 }), whites = [], eyes = [], mattFace = [], feet = [];      // whites: kept (empty) for callers that loop over it
   const halfEye = new THREE.SphereGeometry(0.036, 16, 10, 0, Math.PI * 2, Math.PI * 0.44, Math.PI * 0.56);      // an eye with its top cut off flat
   head.add(new THREE.Mesh(new THREE.SphereGeometry(0.27, 28, 20), skin));
@@ -775,7 +776,7 @@ export function createScene(containerEl) {
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
       lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
       // stance: how far the head is off the baseline (duck / tip), the bob spring it is driving, and the dip counter behind the taunt
-      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0 } };
+      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0, br: side * 2.2, puff: 0 } };      // br: the breath's phase (the two seats out of step); puff: how winded, 0..1
   });
   // The winner's shot (NOTES 165; setVictory): the result is drawn on the court. The winner holds a trophy where the paddle was (its attitude is the
   // paddle's own, so a phone or AirPod turns it), solid even when it is me, and one camera stands in front of them. pane: where the picture is
@@ -923,6 +924,14 @@ export function createScene(containerEl) {
         sd.taunt = Math.max(0, sd.taunt - dt / 1.2);
         sd.duck = duck; sd.tip = tip;
         const lat = clamp(pd.vx * s / 2.6, -1, 1), fwd = clamp(-pd.vz * s / 1.8, -1, 1);      // player frame: + = to their own right, + = pressing toward the net
+        // ---------- breathing ----------
+        // Never quite still: the chest fills, the shoulders and head ride up on it, the chin lifts a touch, and it all lets
+        // go again, a little slower out than in. Effort winds it: running, lunging for a ball and the winner's hops push
+        // `puff` up, and a winded body breathes faster and deeper, then gets its wind back over about eight quiet seconds.
+        // Reduced motion keeps the calm breath and drops the heaving.
+        sd.puff = still ? 0 : clamp(sd.puff + (Math.max(run, pd.lunge * 1.6, pd.cheer > 0 ? 0.8 : 0) * 0.7 - 0.12) * dt, 0, 1);
+        sd.br += dt * Math.PI * 2 * (0.3 + 0.42 * sd.puff);
+        const inh = Math.pow(0.5 - 0.5 * Math.cos(sd.br + 0.3 * Math.sin(sd.br)), 1.3) * (1 + 1.3 * sd.puff);      // 0 = out; the warp makes the in-breath the quicker half, the power lingers at the bottom
         // ---------- wear it ----------
         const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8), lift = tip * STANCE.toes + reach * 0.1;
         a.position.set(pd.bodyX, hop + Math.abs(Math.sin(timeS * 11)) * 0.05 * run, pd.bodyZ);
@@ -934,8 +943,9 @@ export function createScene(containerEl) {
         u.upper.rotation.set(-duck * STANCE.lean + tip * 0.07 - fwd * 0.1, 0, clamp(-pd.vx * s * 0.05, -0.22, 0.22) * duck * 0.9);
         u.upper.position.y = lift - sink;
         u.upper.scale.y = clamp(1 - duck * STANCE.squash + tip * 0.06 + reach * 0.14 - sd.spring * 0.5, 0.8, 1.35);
-        u.body.scale.y = 1 + Math.sin(timeS * 2.4 + pd.side) * 0.018;
-        u.offHand.position.set(-0.42 - duck * 0.13, 0.85 + Math.sin(timeS * 2.4 + 1) * 0.02 + hop * 0.6 - duck * 0.1 + tip * 0.16 + reach * 0.2, -0.12 - duck * 0.12);      // the free arm drops out and forward to balance a crouch, and reaches up on the toes
+        u.body.scale.set(1 + inh * 0.055, 1 + inh * 0.05, 1 + inh * 0.07);      // the chest swells most front to back
+        u.head.position.y = HEAD_Y + inh * 0.025;                                // the capsule's top rises 0.46 * its y swell: the head stays sat on it
+        u.offHand.position.set(-0.42 - duck * 0.13 - inh * 0.014, 0.85 + inh * 0.03 + hop * 0.6 - duck * 0.1 + tip * 0.16 + reach * 0.2, -0.12 - duck * 0.12);      // the free arm drops out and forward to balance a crouch, and reaches up on the toes
         if (hold > 0.01) { a.updateMatrixWorld(true); vA.copy(ballMesh.position); vA.y -= BALL_R + 0.08; u.upper.worldToLocal(vA); u.offHand.position.lerp(vA, hold); }      // the hand under the ball, palm up (the Mii's hand floats, so it can reach)
         // Feet: the stance widens as the knees bend, and the foot in the direction of travel takes the step while the other
         // trails. That stagger is what separates a lunge from a squat — the sink cannot do it, because the shoes would be
@@ -965,7 +975,7 @@ export function createScene(containerEl) {
         // stares at their own shoes. Without this the deep crouch turned the face away from the camera entirely and the
         // player opposite was reading the top of a head. The gaze is smoothed on its own so the lean can be taken off it
         // every frame without the correction compounding into the lerp.
-        u.head.rotation.x = clamp(sd.gaze - u.upper.rotation.x * 0.8, -0.35, 0.75);
+        u.head.rotation.x = clamp(sd.gaze - u.upper.rotation.x * 0.8 - inh * 0.045, -0.35, 0.75);      // and the chin lifts a touch on the in-breath
         u.head.rotation.z = sd.taunt > 0 ? Math.sin(timeS * 25 + 1) * sd.taunt * 0.16 : lerp(u.head.rotation.z, 0, damp(dt, 0.15));
       }
       // bots: start the wind-up just before the ball arrives so contact lands mid-sweep

@@ -40,7 +40,8 @@ const drive = await page.evaluateHandle(() => (window.STANCE_BASE = 1.0, window.
   }
   const a = pd.avatar, u = a.userData, S = a.scale.x, w = o => { const v = new THREE.Vector3(); o.getWorldPosition(v); return v; };
   const head = w(u.head), body = w(u.body), f0 = w(u.feet[0]), f1 = w(u.feet[1]);
-  return { headY: +head.y.toFixed(4), rootY: +a.position.y.toFixed(4), upperY: +u.upper.position.y.toFixed(4), upperS: +u.upper.scale.y.toFixed(4),
+  return { headY: +head.y.toFixed(4), breathY: +((u.head.position.y - 1.47) * u.upper.scale.y * S).toFixed(4),      // breathY: how much of headY is this frame's breath (NOTES 169)
+    rootY: +a.position.y.toFixed(4), upperY: +u.upper.position.y.toFixed(4), upperS: +u.upper.scale.y.toFixed(4),
     // the torso capsule's underside and the shoes' undersides, in world metres above the court
     bodyBottom: +(body.y - 0.46 * u.upper.scale.y * S).toFixed(4),
     footBottom: +Math.min(...[f0, f1].map((p, i) => p.y - Math.hypot(0.066 * Math.cos(u.feet[i].rotation.x), 0.165 * Math.sin(u.feet[i].rotation.x)) * S)).toFixed(4),
@@ -122,7 +123,7 @@ ok(settle.taunt === 0 && Math.abs(settle.spring) < 0.01 && Math.abs(settle.upper
 console.log('side 1');
 const farStill = await run({ side: 1, ys: 0.65, vx: 0, frames: 90 });
 ok(farStill.duck > 0.5, `side 1 ducks on the same number (${farStill.duck})`);
-ok(Math.abs(farStill.headY - still.headY) < 0.01, `to exactly the same height as side 0 (${farStill.headY} vs ${still.headY})`);
+ok(Math.abs((farStill.headY - farStill.breathY) - (still.headY - still.breathY)) < 0.01, `to exactly the same height as side 0, breath aside: the seats breathe out of step (${farStill.headY} - ${farStill.breathY} vs ${still.headY} - ${still.breathY})`);
 const far = await run({ side: 1, ys: 0.65, vx: 2.6, frames: 60, x0: -1.3 }); await shoot('5-side1-lunge');
 // Side 1's avatar is turned through PI, so the SAME world velocity is a step to that player's own LEFT.
 ok(far.footX[0] < still.footX[0] - 0.07, `its lunge is mirrored into its own frame (${far.footX} vs still ${still.footX})`);
