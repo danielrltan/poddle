@@ -4,7 +4,7 @@
 // stubs ui.js with a fixed list of names, so main.js hands in the few ui calls this needs (init).
 // Every string from the server or the player goes in as textContent. Nothing here logs an id, a name or a token.
 const $ = id => document.getElementById(id);
-const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', LB_SEEN = 'poddle.lbSeen', OLD_FR_SEEN = 'poddle.friendsSeen', GSI = 'https://accounts.google.com/gsi/client';
+const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', OLD_LB_SEEN = 'poddle.lbSeen', OLD_FR_SEEN = 'poddle.friendsSeen', GSI = 'https://accounts.google.com/gsi/client';
 const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];
 const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^[0-9a-f]{32}$/;      // the server's own check (3.1): anything else is no device id
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
@@ -53,22 +53,11 @@ export async function loadMe() {                            // once after boot: 
   try { const r = await api('/api/me'), j = r.ok && r.j;
     if (j) { const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
       me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true }; meLadder = me.account ? ladderOf(j) : null;      // the account's ladder and places ride on /api/me (server/api.js)
-      const seen = ls.get(LB_SEEN), hidden = !!(j.places && j.places.hidden === true);      // '1': the leaderboard notice was shown; '2': the profile-card one too (NOTES 140); '3': that every player's card shows stats, on a board or not (NOTES 166)
-      if (me.account && me.account.username && me.db && seen !== '3' && !hidden) lbNotice(0, !seen); } } catch { /* no answer: a guest with sign-in off */ }
+    } } catch { /* no answer: a guest with sign-in off */ }
   meDone = true;
   drawAcct(); return me;
 }
-// the notice the privacy page promises (NOTES 126): once per browser, only to a name that can be on a board. It waits until the lobby is up and has sat
-// there a moment (opening the lobby clears any toast), and is marked seen only once it has been shown. first: this browser never showed the NOTES 126 one,
-// so both are said at once; else (it said '1' and the player is listed now) only the profile card's (NOTES 140). A hidden '1' is not told here: toggleShow's own toast tells it when Show me is turned on
-let lbT = 0;
-function lbNotice(n = 0, first = true) {
-  clearTimeout(lbT); if (n > 600 || ls.get(LB_SEEN) === '3') return;      // gives up after ten minutes on the title or in a court: the next load tries again
-  if (!h.view()) { lbT = setTimeout(() => lbNotice(n + 1, first), 1000); return; }
-  lbT = setTimeout(() => { if (!h.view()) return lbNotice(n + 1, first);
-    h.toast(first ? 'Your username can appear on the global leaderboard, and anyone can open your profile card to see your stats. You can turn this off on the Leaderboard page' : 'Anyone can now open your profile card to see your stats and win streak. You can turn this off on the Leaderboard page', 8000); ls.set(LB_SEEN, '3'); }, 1200);
-}
-// No "New: ..." feature announcements (NOTES 147, CLAUDE.md "No announcement notices"): the Friends one is gone, and its key with it (below)
+// No notices at all (NOTES 147 and 168, CLAUDE.md "No announcement notices"): the Friends one and the leaderboard / profile-card ones are gone, and their keys with them (below)
 export async function fetchProfile() {                      // -> the Profile of 8.2, null = nothing saved yet, undefined = the request failed
   if (!on) return undefined; await mePromise; const dev = deviceId(); if (!me.account && !dev) return null;      // who is signed in first (/api/me). Nothing to ask about: no request at all
   try { const r = await api('/api/stats', 'POST', devBody()); if (!r.ok || !r.j) return undefined;
@@ -270,7 +259,6 @@ async function toggleShow() {
   let r = null; try { r = await api('/api/leaderboard/hide', 'POST', { hidden: hide }); } catch { r = null; }
   if (r && r.ok && r.j) { places = placeOf(r.j);
     if (hide) h.toast('You’re hidden from the global leaderboard', 2000);
-    else if (ls.get(LB_SEEN) !== '3') { clearTimeout(lbT); h.toast('You’re on the global leaderboard. Anyone can open your profile card to see your stats', 5000); ls.set(LB_SEEN, '3'); }      // the profile-card notice the privacy page promises, said now, not on the next load (NOTES 140)
     else h.toast('You’re on the global leaderboard', 2000); }
   else { t.setAttribute('aria-checked', String(hide)); h.toast('Couldn’t change that. Try again.', 2400); }
   if (h.view() === 'leaderboard') drawBoard();
@@ -595,6 +583,7 @@ export function init(hooks) {
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
   ls.del(OLD_FR_SEEN);      // the one-time Friends notice was removed (NOTES 147): its seen flag is a dead key
+  ls.del(OLD_LB_SEEN);      // so were the leaderboard and profile-card notices (the owner, 2026-10-02, NOTES 168: "remove the anyone can see ur profile notification permanently")
   wire(); drawAcct(); if (on) mePromise = loadMe();
 }
 function wire() {

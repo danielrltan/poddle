@@ -20,8 +20,8 @@ Important changes also need a notice on the home page (the one exception to "No 
 Never add a notice that announces a feature or a change: no "New: ..." toasts, what's-new popups, one-time "did you
 know" hints, NEW badges / dots / pills on tiles or buttons, banners or modals about something added. Features speak for
 themselves; the changelog page (the footer's "What's new" link) is where changes are listed. The only exception is a
-notice the Terms / Privacy pages legally promise for an important change to how data is handled (the leaderboard ones in
-profile.js lbNotice are these), and even then ask the owner before adding one. Toasts that answer something the player
+notice the Terms / Privacy pages legally promise for an important change to how data is handled, and even then ask the
+owner before adding one (he had the leaderboard and profile-card ones removed for good on 2026-10-02, NOTES 168: do not bring them back; poddle.lbSeen is a dead key profile.js deletes at load). Toasts that answer something the player
 just did (a friend request arrived, a copy worked, an error) are fine: they are not announcements.
 
 ## One card per thing, and it opens whole (the owner's rule, 2026-09-29, NOTES 150)
@@ -97,7 +97,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   st only to a friend. The card's friend row (web/social.js): Add / Requested + Cancel / Accept + Decline / Friends + Remove (confirm), a friend's live status.
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.lbSeen ('1': the one-time global leaderboard notice was shown; '2': the profile-card notice too, NOTES 140; '3': that the card shows stats for every player, NOTES 166), poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink}, poddle.camPrimer (allow|skip), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`

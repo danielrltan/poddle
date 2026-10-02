@@ -3638,3 +3638,16 @@ The owner (2026-10-02): "the friends / add friend row could be combined and put 
 - Tests: test/victory-e2e.mjs now checks the three titles, the corner on all three screens (and after a resize), the clock starting at 18-20 after
   the cut, the spectator's Leave / emote / tick / line and leaving from the panel (23 checks). ui-next, fixes-e2e and spectate-e2e wait out the
   title where they pressed or measured the card at once; ui-next's 8 old reds are unchanged.
+
+## 168. No leaderboard or profile-card notices any more
+
+The owner (2026-10-02): "can u remove the anyone can see ur profile notification permanently". All of them are gone: profile.js lbNotice
+(the toast on load, NOTES 126 / 140 / 166) and the longer toast when Show me on the global leaderboard is turned on (the plain "You're on
+the global leaderboard" / "You're hidden" answers to the switch stay: they answer what the player just pressed). poddle.lbSeen is a dead
+key, deleted at load like poddle.friendsSeen. Never add these back (CLAUDE.md says so now).
+
+- Legal (same commit): privacy.html loses the poddle.lbSeen row of the storage table and the two "are told once in the game" sentences
+  in section 13, which gains a line saying the notices and the key were removed. Section 13's general promise of a home-page notice for
+  important changes is unchanged: it is about future changes, and the owner decides each time.
+- Tests: lb-profile-ui.mjs section 15 now checks that no notice shows for any old lbSeen value and that the key is deleted; section 17
+  checks the switch's plain toasts.

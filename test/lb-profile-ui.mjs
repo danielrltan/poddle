@@ -184,30 +184,20 @@ await pg.hover(rowSel('Kiko')); await sleep(300);
   ok(t.t === 'none' && t.a === 'none' && s.state === 'ok', `reduced motion: a hovered row does not lift, no entrance, the sheet still opens (${J(t)})`); }
 await pg.close();
 
-// ---------- 15: the one-time notice (poddle.lbSeen) ----------
+// ---------- 15: no notice about the leaderboard or the profile card, ever (NOTES 168): any old poddle.lbSeen value is deleted at load ----------
 const notice = async (seen, listed) => { API.mePlaces = { listed, hidden: !listed }; const p = await page('notice-' + seen + listed, { seen }); await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await sleep(1500); await p.click('#btn-start').catch(() => {}); await sleep(3200);
   const r = await ev(p, () => ({ toast: document.getElementById('toast')?.textContent || '', seen: localStorage.getItem('poddle.lbSeen') })); await p.close(); return r; };
-{ let r = await notice('1', true);
-  ok(r.toast === 'Anyone can now open your profile card to see your stats and win streak. You can turn this off on the Leaderboard page' && r.seen === '3', `lbSeen '1', not hidden: the profile-card notice, then '3' (${J(r)})`);
-  r = await notice(null, true);
-  ok(/^Your username can appear on the global leaderboard, and anyone can open your profile card to see your stats\./.test(r.toast) && r.seen === '3', `lbSeen unset: both at once, then '3' (${J(r)})`);
-  r = await notice('1', false);
-  ok(!/profile card/.test(r.toast) && r.seen === '1', `lbSeen '1' but hidden (not listed): not told, stays '1' (${J(r)})`);
-  r = await notice('2', true);
-  ok(/see your stats and win streak/.test(r.toast) && r.seen === '3', `lbSeen '2': told once that the card shows stats for every player (NOTES 166), then '3' (${J(r)})`);
-  r = await notice('3', true);
-  ok(!/leaderboard|profile card/.test(r.toast) && r.seen === '3', `lbSeen '3': nothing more (${J(r)})`); }
+{ const bad = []; for (const [seen, listed] of [[null, true], ['1', true], ['1', false], ['2', true], ['3', true]]) { const r = await notice(seen, listed); if (/leaderboard|profile card|your stats/i.test(r.toast) || r.seen !== null) bad.push(J([seen, listed, r])); }
+  ok(!bad.length, `lbSeen unset, '1', '2' or '3', listed or hidden: no notice on load, and the key is gone${bad.length ? ' (' + bad.join('; ') + ')' : ''}`); }
 API.mePlaces = { listed: true };
 
-// ---------- 17: turning Show me back on tells a '1' browser about the profile card at once, then '2' ----------
+// ---------- 17: the Show me switch answers with its plain toasts only ----------
 { API.mePlaces = { listed: false }; PLACES.hidden = true; PLACES.listed = false;
   const p = await page('unhide', { seen: '1' }); await toBoard(p);
   const tog = async () => { await p.click('#tog-lb-show'); await sleep(400); return ev(p, () => ({ toast: document.getElementById('toast')?.textContent || '', seen: localStorage.getItem('poddle.lbSeen'), on: document.getElementById('tog-lb-show').getAttribute('aria-checked') })); };
   const a = await ev(p, () => document.getElementById('tog-lb-show')?.getAttribute('aria-checked'));
-  let r = await tog();
-  ok(a === 'false' && r.on === 'true' && r.toast === 'You’re on the global leaderboard. Anyone can open your profile card to see your stats' && r.seen === '3', `lbSeen '1', hidden, Show me turned on: told about the profile card at once, then '3' (${J({ was: a, ...r })})`);
-  r = await tog(); const r2 = await tog();
-  ok(r.toast === 'You’re hidden from the global leaderboard' && r2.toast === 'You’re on the global leaderboard' && r2.seen === '3', `off again, then on again with '3': the plain toasts (${J([r.toast, r2.toast])})`);
+  let r = await tog(); const r1 = await tog();
+  ok(a === 'false' && r.on === 'true' && r.toast === 'You’re on the global leaderboard' && r1.toast === 'You’re hidden from the global leaderboard' && r.seen === null, `Show me turned on, then off: the plain toasts, nothing about the profile card, no lbSeen written (${J([a, r, r1.toast])})`);
   await p.close(); API.mePlaces = { listed: true }; PLACES.hidden = false; PLACES.listed = true; }
 
 const uniq = [...new Set(errs.map(e => e.split('\n')[0].slice(0, 220)))];
