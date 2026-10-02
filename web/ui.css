@@ -643,7 +643,7 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .tile-line{display:inline-flex;align-items:center;gap:.35em;max-width:100%;font-size:var(--t-sm);font-weight:700;letter-spacing:0;color:var(--ink-soft);white-space:nowrap} .tile-line > span:last-child{overflow:hidden;text-overflow:ellipsis}
 .tiles:not([data-n="5"]):not([data-n="6"]) .tile-text{align-items:center;text-align:center}
 .tile{--glow:0 0 0 .25rem color-mix(in srgb,var(--line) 28%,transparent), 0 0 1.5rem .25rem color-mix(in srgb,var(--line) 55%,transparent)}
-#btn-courts{--line:#2fc46a} #btn-bot{--line:var(--them)} #btn-friends{--line:#b18cff} #btn-leaderboard{--line:var(--gold-3)}
+#btn-courts{--line:#2fc46a} #btn-bot{--line:#ff5c8a} #btn-friends{--line:#b18cff} #btn-leaderboard{--line:var(--gold-3)}
 /* Quick play is the one filled block: the player's blue, white art */
 #btn-quick{background-image:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.45) 50%,transparent 60%),linear-gradient(180deg,#7cc6ff 0%,#4eaaff 47%,var(--me) 53%,#2f8ff2 100%);border-color:#fff;color:#fff;text-shadow:0 .125rem 0 rgba(14,63,140,.3);--line:#fff}
 #btn-quick::before{opacity:.35} #btn-quick .art-fill{fill:#fff;stroke:#fff} #btn-quick .art-accent-fill{fill:var(--me);stroke:var(--me)}

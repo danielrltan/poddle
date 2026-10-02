@@ -3473,7 +3473,7 @@ two equal white heroes did not "work very nice anymore"):
   Your stats, Leaderboard (two bars when Friends does not show). DOM order = reading order = arrow order: Quick play, Courts, Play a bot,
   Friends, Your stats, Leaderboard. Friends is no longer a hero (NOTES 150 had Friends | Quick play).
 - Quick play is the one filled block: the player's blue with white art. Every other block is white with its own accent (a local `--line`:
-  Courts green, Play a bot orange, Friends purple, Your stats the blue, Leaderboard gold) on the icon detail, the hover ring and the glow
+  Courts green, Play a bot pink (orange until 2026-10-02: too close to the Leaderboard gold), Friends purple, Your stats the blue, Leaderboard gold) on the icon detail, the hover ring and the glow
   (`.tile{--glow}` is built from `--line`).
 - Upright windows: Quick play the full width, then bars two by two, Friends the full width between them. Under 480px: one column, Quick
   play first. A phone (html[data-mobile], data-n 1..4) is untouched apart from the order: Watch a match, Friends, Your stats, Leaderboard.
