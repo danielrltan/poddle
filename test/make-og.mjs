@@ -20,7 +20,7 @@ const SHOT = { t: process.env.T || '11.95', look: process.env.LOOK || '2.6,1.8,1
 const JPEG_QUALITY = +process.env.Q || 86, BG = '#dfeef6';       // BG: html,body in web/ui.css
 
 // ---- the ball: web/ui.css .logo-ball, turned into circles. Its CSS gradients measure their radius to the farthest corner; these are about the same sizes as fractions of the width, evened out and a shade deeper so the holes survive at 16 px.
-const BALL = { holes: [[.30, .32, .085], [.62, .24, .085], [.50, .52, .08], [.22, .62, .08], [.78, .54, .08], [.48, .82, .08]] };
+const BALL = { holes: [[.50, .50, .08], [.50, .23, .08], [.734, .365, .08], [.734, .635, .08], [.50, .77, .08], [.266, .635, .08], [.266, .365, .08]] };      // seven, as the logo's .logo-ball: one in the middle, six in a ring (NOTES 172)
 function ballSvg() {
   const S = 64, R = 30.5, o = (S - 2 * R) / 2, f = v => +v.toFixed(2);
   const holes = BALL.holes.map(([x, y, r]) => `<circle cx="${f(o + x * 2 * R)}" cy="${f(o + y * 2 * R)}" r="${f(r * 2 * R)}"/>`).join('');

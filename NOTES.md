@@ -3698,3 +3698,12 @@ whatever screen was up. So from the SECOND court of a visit on (never the first,
 - DEFEAT is var(--bad) with a --bad-deep drop (it was slate). ov-victory slams in over the first 0.2 s and then holds at scale 1: the slow
   swell to 1.05 and back is gone. The title has the court for 2 s: ui.js STAMP_MS 2000, the animation 2000 ms, server/game.js STAMP_S 2 (the
   court closes REMATCH_S + 2 s after match point), main.js's clock sum to match. test/victory-e2e.mjs checks the 2 s, the red and the still scale.
+
+## 172. The favicon has the logo's seven holes
+- The owner: "fix the favicon to match the poddle ball logo? there should be a total of 7 holes in the pickleball." The icons (and the og
+  image and the share card's ball) still had NOTES 162's six holes in the old scatter; the logo (.logo-ball in ui.css / how-to-play.css) has had
+  seven since the hue pass: one in the middle, six in a ring at 27 % of the width.
+- test/make-og.mjs BALL.holes is that layout (r .08); test/og-card.html and server/share.js draw the same seven radial-gradient holes. Regenerated
+  with `node test/make-og.mjs`: favicon.svg, favicon-32.png, favicon.ico, apple-touch-icon.png, icon-192/512.png and og.jpg; og:image is ?v=9 on
+  every page. favicon-check.png: the holes still read at 16 px on light and dark. Poddle Helper's bundled icon is the old six-hole one until its
+  next build. Nothing sent, stored or shown differently: the legal pages are untouched.

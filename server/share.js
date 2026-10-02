@@ -112,8 +112,7 @@ main{width:100%;max-width:1000px;display:flex;flex-direction:column;align-items:
 .logo{display:flex;align-items:center;font-size:clamp(40px,7vw,56px);font-weight:900;line-height:1;letter-spacing:-.01em;color:var(--ink-strong);text-decoration:none;
   filter:drop-shadow(0 .05em 0 rgba(255,255,255,.9)) drop-shadow(0 .09em .12em rgba(30,70,100,.28))}
 .logo i{display:inline-block;width:.62em;height:.62em;margin:.16em .035em 0;border-radius:50%;
-  background:radial-gradient(circle at 30% 32%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 62% 24%,var(--ball-deep) 0 8%,transparent 9%),radial-gradient(circle at 50% 52%,var(--ball-deep) 0 8%,transparent 9%),
-    radial-gradient(circle at 22% 62%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 78% 54%,var(--ball-deep) 0 7%,transparent 8%),radial-gradient(circle at 48% 82%,var(--ball-deep) 0 7%,transparent 8%),
+  background:radial-gradient(circle at 50% 50%,var(--ball-deep) 0 7.6%,transparent 8.6%),radial-gradient(circle at 50% 23%,var(--ball-deep) 0 7.6%,transparent 8.6%),radial-gradient(circle at 73.4% 36.5%,var(--ball-deep) 0 7.6%,transparent 8.6%),radial-gradient(circle at 73.4% 63.5%,var(--ball-deep) 0 7.6%,transparent 8.6%),radial-gradient(circle at 50% 77%,var(--ball-deep) 0 7.6%,transparent 8.6%),radial-gradient(circle at 26.6% 63.5%,var(--ball-deep) 0 7.6%,transparent 8.6%),radial-gradient(circle at 26.6% 36.5%,var(--ball-deep) 0 7.6%,transparent 8.6%),
     radial-gradient(circle at 34% 28%,#fbffd6,var(--ball) 58%,#ffe01a 100%);box-shadow:inset 0 -.04em .08em rgba(220,180,0,.5)}
 .card{display:block;width:min(100%,960px,max(440px,calc((100vh - 390px) * 1.905)));aspect-ratio:1200/630;border-radius:clamp(14px,2.4vw,28px);overflow:hidden;background:#dcecf6;border:4px solid #fff;box-shadow:0 3px 0 rgba(90,150,185,.25),0 18px 40px rgba(20,60,100,.28)}
 .card img{display:block;width:100%;height:100%}
