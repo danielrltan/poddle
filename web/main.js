@@ -559,7 +559,9 @@ function onSample(sample, from) {
         // slower phone swing's slice a slice). Sign: which way the ball breaks off the bounce. (How level the paddle is held is NOT used.)
         // Measured (test/spin.mjs, 63 real strokes): 71 % leave with no spin (was 5 %), 29 % show the swirl (was 92 %), 17 % read as a
         // slice (was 27 %); the flicks-and-wide-swings set: 0 % over 0.3 (was 50 %). Same roll 0.52: 0.63 at 8 rad/s, 0.78 at 12.5, 1.0 at 27.
-        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.40) / 0.18)), over = Math.max(0, Math.min(1, ((e.chop || 0) - 0.5) / 0.3)), cut = Math.max(0, Math.min(1, (Math.abs(e.curl || 0) / Math.max(0.8, (e.rom || 0) * Math.PI / 180) - 0.35) / 0.25));
+        // Spin takes 20% more of either than it did (NOTES 175; the owner, 2026-10-02): both knees x1.2, roll 0.40-0.58 -> 0.48-0.70, curl
+        // 0.35-0.60 -> 0.42-0.72. The speed factor and the server's slice line are untouched.
+        const roll = Math.max(0, Math.min(1, (Math.abs(e.roll || 0) - 0.48) / 0.216)), over = Math.max(0, Math.min(1, ((e.chop || 0) - 0.5) / 0.3)), cut = Math.max(0, Math.min(1, (Math.abs(e.curl || 0) / Math.max(0.8, (e.rom || 0) * Math.PI / 180) - 0.42) / 0.30));
         const knee = t => t * t * (3 - 2 * t), rollI = knee(roll) * (1 - knee(over)), curve = knee(cut), speed = 0.85 + 0.55 * Math.max(0, Math.min(1, ((e.raw || 0) - 8) / 12));
         const bet = e.final === false ? Math.max(0, Math.min(1, ((e.rom || 0) - 60) / 40)) : 1;   // an early report (a bet, 20-80 deg swept) reads mostly wind-up pronation: ungated it gave 0.6-0.9 spin to 10 of 63 real strokes that settle at 0. A bet earns spin only once it has swept 60-100 deg; the settled report re-aims a real slice (sliced diff > 0.2)
         const amount = Math.min(1, Math.max(rollI, curve) * speed * bet), way = curve > rollI ? Math.sign(e.curl || 0) : Math.abs(e.roll || 0) > 0.1 ? -Math.sign(e.roll) : Math.sign(e.dir || 1);

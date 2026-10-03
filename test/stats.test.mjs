@@ -55,7 +55,7 @@ function hit(c) { let cool = 0; c.play = m => {
     cool = Date.now() + 400; c.send({ type: 'swing', power: 14 + Math.random() * 16, dir: (Math.random() - 0.5) * 1.6, lob: 0, final: true, pk: 22, src: 'airpod' }); }
 }; }
 function lose(c) { let cool = 0; c.play = m => { c.send({ type: 'paddle', auto: true, q: [0, 0, 0, 1] });
-  if (m.serving === c.side && m.reach && Date.now() > cool) { cool = Date.now() + 600; c.send({ type: 'swing', power: 30, dir: 0, lob: 0, final: true }); } }; }
+  if (m.serving === c.side && m.reach && Date.now() > cool) { cool = Date.now() + 600; c.send({ type: 'swing', power: 32, dir: 0, lob: 0, final: true }); } }; }
 const still = c => { c.play = () => c.send({ type: 'paddle', auto: true, q: [0, 0, 0, 1] }); };        // ready, never swings (a serve waits 9 s, then goes by itself)
 
 // HTTP: the API as a page on this server would call it
@@ -118,7 +118,7 @@ report(await Promise.all([
     t.ok(l.last('matchover').winner !== l.side && lp && lp.saved && lp.first === false && lp.streak === 0 && lp.kind === 'bot' && lp.level === 0, 'a loss to Rookie: saved, no first, streak 0');
     const LP = await profileOf(l.d, l.addr); t.ok(LP && LP.matt[0].losses === 1 && LP.matt[0].wins === 0 && LP.human.losses === 0, 'the loss is on the Rookie rung, not against people');
     const lz = LP && LP.play; t.ok(lz && lz.hits > 0 && lz.returns === 0 && lz.smashes > 0 && lz.chances > 0 && lz.pointsLost > 0 && lz.pointsWon >= lz.aces && lz.winners === 0,
-      'a player who only serves (power 30, flat: smashes) and never returns: hits and smashes but no return, only missed chances: ' + JSON.stringify(lz));
+      'a player who only serves (power 32, flat: smashes; 30 is a drive since NOTES 175) and never returns: hits and smashes but no return, only missed chances: ' + JSON.stringify(lz));
     bye(l);
   }),
   sc('2. Matt level changes: after the first strike the easiest level used, before it the new level', async t => {

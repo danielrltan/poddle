@@ -3744,3 +3744,27 @@ menu's attract rally.
 - Tests: test/bot-motion.mjs (new, port 8750) replays runBot's own motion on side 1 of scene-preview.html: lob contact head +11 cm
   (was +67.6), a low ball still drops the head ~59 cm, three quick dips never taunt, and the feet hand over left/right while running;
   close and far screenshots in test/ui-shots/bot-motion/. stance.mjs, breathe.mjs and scene-next.mjs pass unchanged.
+
+## 175. Smashes and spin take 20% more; Matt keeps his paddle down for a lob
+
+The owner (2026-10-02): "make smashes and spins like ~20% more intensive to pull off than how they are now", then "make it so that the
+bot doesn't hold up its racket when receiving a lob, it just looks stupid. it should just raise its hand right before the hit".
+
+- Smash (server/game.js `effort`, SMASH_IN 0.875): "20% more intensive" taken as 20% more swing speed. The smash line (n 0.76) sat at
+  23.4 rad/s on a wide AirPod stroke, 19.1 on a phone (web/motion.js: n = 0.62 + 0.38 ((peak x sqrt(gain) - 10) / 22)^2); it is now
+  28.0 / 22.9, i.e. n 0.875. A person's settled power passes through effort() at intake: under 0.76 unchanged, 0.76..0.875 held at 0.76
+  (the hardest drive; shotKind's `>` keeps it a drive), above that stretched back over 0.76..1, so a full swing is still full power and a
+  smash still gets the whole extra pace. SMASH itself is unchanged, so the trail colours (scene.js / pad.js SMASH_N), stats.js's forgery
+  check, the 0.76 bet cap and Matt (who picks his n and is not swung) all behave as before: Matt smashes as often as he did.
+- Spin (web/main.js): both intent knees x1.2: wrist roll 0.40-0.58 -> 0.48-0.696, curl per radian 0.35-0.60 -> 0.42-0.72. The speed
+  factor and the server's slice line (SLICE.at) are untouched. Clients pick it up on reload.
+- Measured on the 67 real recorded strokes (test/kinds.mjs, which now applies the server's effort()): smash 7% -> 4%, slice 19% -> 12%,
+  strokes with any spin 31% -> 25%.
+- Matt's lob paddle (scene.js updatePads, `pd.raise`, `py`): runBot sends his paddle straight to a lob's contact height as soon as he
+  reads it, so he stood holding it over his head while the lob hung for a second. Drawn, it now waits at his side (capped at 1.1 m) and
+  comes up only as the ball arrives: from 0.5 s out, all the way by 0.22 s (the canned swing starts at 0.2), held through the swing, then
+  down. His body height (NOTES 174) reads the drawn paddle, so he does not go up on his toes early either. Low balls are drawn as before.
+  The server's paddle, and so every hit, is unchanged. A simulated real lob: drawn 1.09 m until 0.5 s out, then up and over the top.
+- No data, storage or UI change: legal pages untouched. Changelog: "Smashes and spin take a harder swing".
+- Tests: kinds.mjs reads effort(); stats.test.mjs's serve-only player swings 32 (30 is a drive now); bot-motion.mjs checks the paddle
+  waits at his side (1.09 m while the server's is at 2.2) and is up at the ball by the hit.

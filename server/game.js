@@ -178,6 +178,13 @@ const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one addr
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
 const SMASH = 0.76;                                            // n above this is a smash (power 27.3; a wide stroke gets there from ~24 rad/s, NOTES 82)
+// A person's smash takes 20% more swing than it did (NOTES 175; the owner, 2026-10-02). The line above sat at 23.4 rad/s on a wide AirPod
+// stroke (19.1 on a phone); now it is 28.0 (22.9). Those swings reach n SMASH_IN in web/motion.js (0.62 + 0.38 ((1.2 x 23.35 - 10) / 22)^2),
+// so effort() keeps every settled power under SMASH as it was, holds SMASH..SMASH_IN at SMASH (the hardest drive, not a smash: shotKind
+// is strict), and stretches the band above back over SMASH..1, so the hardest swing still flies at full power. Only human swings pass
+// through it: Matt picks his n and is not swung, so he smashes as often as before, and so do the colours, stats and bets keyed on SMASH.
+const SMASH_IN = 0.875;
+const effort = n => n <= SMASH ? n : n <= SMASH_IN ? SMASH : SMASH + (n - SMASH_IN) * (1 - SMASH) / (1 - SMASH_IN);
 const SMASH_UP = [0.4, 0.55];                                  // lob (0..0.8) over which a hard swing stops being a smash: a smash comes DOWN or level through the ball. Recorded smashes send lob <= 0.27 (<= 0.45 with the reworked lob gate): called at 0.475, upward share 0.6
 const LOB_ARC = [0.25, 0.6];                                   // underhand() over which the flight turns from the drive's into the lob's: 0.8 of the way by 0.5, all of it by 0.6
 const ASK_S = +process.env.ASK_S || 10, ASK_COOL_S = +process.env.ASK_COOL_S || 10, ASK_GAP_S = process.env.ASK_GAP_S != null ? +process.env.ASK_GAP_S : 3;   // s on the wall clock (docs/SPECTATE.md Asking to play): a request lives 10 s; a requester waits 10 s after it ENDS; a court rests 3 s between requests
@@ -994,7 +1001,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
       if (match && !me.auto) stats.sample(match, me, me.x, me.y, ball.live);   // paddle plausibility: 2+ teleports in a row while the ball is live (docs/ACCOUNTS.md 4.8)
     } else if (m.type === 'swing') {
-      let pw = clamp((num(m.power, 6) - 6) / 28, 0, 1);
+      let pw = effort(clamp((num(m.power, 6) - 6) / 28, 0, 1));      // 20% more swing to smash (SMASH_IN)
       // No overhead bonus any more (NOTES 82): it lifted any downward stroke past n 0.55 by 0.2 to a smash, however slowly it came
       // down (4 of 12 recorded overheads, from 8.9 rad/s). An overhead is a smash the way every stroke is: by its speed (web/motion.js).
       // final: the settled report (web/motion.js sends one for every swing; a client from before that sends no such field and is taken at its word).

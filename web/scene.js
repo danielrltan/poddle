@@ -778,7 +778,7 @@ export function createScene(containerEl) {
     return { side, group, avatar, hand, forearm, tag, status: null, tagFor: null, ghost: 0, mats: [], handM: skinM, ghostM, sleeveM, has: false, init: false, bot: false, matt: false, look: null,      // look: a LOOKS key from setLooks (the seat's registered username)      // bot: canned swing, no q. matt: Matt's look. Only the attract rally's side 0 has the first without the second
       tgt: { x: 0, y: 1, z: sgn(side) * 6.5, q: new THREE.Quaternion(), off: null },
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
-      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, over: 0, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
+      lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, over: 0, raise: 0, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
       // stance: how far the head is off the baseline (duck / tip), the bob spring it is driving, and the dip counter behind the taunt
       stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0, br: side * 2.2, puff: 0, by: STANCE.base, byV: 0, stride: 0, split: 0 } };      // br: the breath's phase (the two seats out of step); puff: how winded, 0..1. by/byV, stride, split: Matt's body height, footsteps and split step (NOTES 170)
   });
@@ -858,6 +858,17 @@ export function createScene(containerEl) {
       // local paddle is 1:1 (only the server-stepped z gets a whisper of filtering); remote is 20Hz -> slerp/lerp
       const kp = local ? 1 : damp(dt, 0.055);
       pd.pos.x = lerp(pd.pos.x, t.x, kp); pd.pos.y = lerp(pd.pos.y, t.y, kp); pd.pos.z = lerp(pd.pos.z, t.z, damp(dt, local ? 0.03 : 0.06));
+      // Matt's paddle waits at his side (NOTES 175). runBot sends it straight up to a lob's contact height the moment he reads the ball, so
+      // on a slow lob he stood holding it over his head for a second. Drawn, it comes up only as the ball arrives (from 0.5 s out, all the
+      // way by 0.22 s, when the canned swing starts), stays up through the swing and goes back down after. Only up: a low ball's paddle is
+      // drawn where it is. `py` is the drawn height; the server's paddle, and so every hit, is untouched.
+      let py = pd.pos.y;
+      if (pd.bot) {
+        const ahead = -(ball.pos.z - pd.pos.z) * s, vz = ball.vel.z * s, k = clamp(((vz > 0.3 ? ahead / vz : 9) - 0.22) / 0.28, 0, 1);
+        const up = pd.swingT >= 0 || won ? 1 : ball.live && ball.lastBy !== pd.side && ahead > -0.3 ? 1 - k * k * (3 - 2 * k) : 0;
+        pd.raise = lerp(pd.raise, up, damp(dt, up > pd.raise ? 0.04 : 0.2));
+        const rest = Math.min(pd.pos.y, 1.1); py = rest + (pd.pos.y - rest) * pd.raise;
+      }
       if (pd.bot) {                                        // bots never send a q: idle sway + canned swing
         if (won) pd.swingT = -1;
         if (pd.swingT >= 0) { pd.swingT += dt; if (pd.swingT > SWING[SWING.length - 1][0]) pd.swingT = -1; }
@@ -880,7 +891,7 @@ export function createScene(containerEl) {
       }
       pd.lunge = Math.max(0, pd.lunge - dt / 0.32);
       const lg = Math.sin(Math.min(1, pd.lunge * 1.15) * Math.PI) * 0.2;       // out and back, gently
-      const w = pd.world.set(pd.pos.x + s * pd.off.x, Math.max(0.12, pd.pos.y + pd.off.y + lg * 0.12), pd.pos.z + s * (pd.off.z - lg));
+      const w = pd.world.set(pd.pos.x + s * pd.off.x, Math.max(0.12, py + pd.off.y + lg * 0.12), pd.pos.z + s * (pd.off.z - lg));
       pd.group.quaternion.set(s * pd.q.x, pd.q.y, s * pd.q.z, pd.q.w);         // T*P*T^-1 for side 1
       if (pd.reach) {                                      // just hit: the server's contact box is generous, so pull the FACE onto the ball for a beat
         vA.set(0, FACE_C, 0).applyQuaternion(pd.group.quaternion).add(w);
@@ -924,7 +935,7 @@ export function createScene(containerEl) {
         const hdt = Math.min(dt, 0.033);
         let hh = pd.pos.y;
         if (pd.bot) {
-          const py = pd.pos.y - STANCE.base, want = STANCE.base - (ball.live && !won ? 0.05 : 0) + (py < 0 ? py * 0.8 : 0.12 * (1 - Math.exp(-py / 0.5)));
+          const dpy = py - STANCE.base, want = STANCE.base - (ball.live && !won ? 0.05 : 0) + (dpy < 0 ? dpy * 0.8 : 0.12 * (1 - Math.exp(-dpy / 0.5)));      // off the DRAWN paddle: no tiptoe while it waits at his side
           sd.byV += ((want - sd.by) * 110 - sd.byV * 21) * hdt; sd.by += sd.byV * hdt; hh = sd.by;      // critically damped (2 * sqrt 110)
         }
         const dy = hh - STANCE.base, duck = clamp(-dy / STANCE.duck, 0, 1), tip = clamp(dy / STANCE.rise, 0, 1);

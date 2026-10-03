@@ -4,7 +4,7 @@ import { MotionModel, qaxis, qmul, qrot } from '../web/motion.js';
 import fs from 'fs';
 const src = fs.readFileSync(new URL('../server/game.js', import.meta.url), 'utf8');
 const grab = name => { const i = src.indexOf('const ' + name + ' = '); return src.slice(i, src.indexOf('\n', i)); };
-const { underhand, sliced, shotKind } = new Function('const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));' + ['SLICE', 'SMASH', 'SMASH_UP', 'LOB_ARC', 'underhand', 'sliced', 'smooth', 'lofted', 'flat', 'hard', 'shotKind'].map(grab).join('\n') + '\nreturn { underhand, sliced, shotKind };')();
+const { underhand, sliced, shotKind, effort } = new Function('const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));' + ['SLICE', 'SMASH', 'SMASH_IN', 'effort', 'SMASH_UP', 'LOB_ARC', 'underhand', 'sliced', 'smooth', 'lofted', 'flat', 'hard', 'shotKind'].map(grab).join('\n') + '\nreturn { underhand, sliced, shotKind, effort };')();
 const main = fs.readFileSync(new URL('../web/main.js', import.meta.url), 'utf8');
 const a0 = main.indexOf('const roll = Math.max('), a1 = main.indexOf("game.send({ type: 'swing'", a0); if (a0 < 0 || a1 < 0) throw new Error('web/main.js: the swing maths moved (anchors: "const roll = Math.max(" .. "game.send({ type: \'swing\'")');
 const clientOf = new Function('e', main.slice(a0, a1) + '; return { level: 0, roll, curve, amount, way, slice, lob };');   // the client's OWN spin maths and lob gate, as it sends them: nothing here is copied by hand
@@ -20,7 +20,8 @@ for (const f of ['data/live-swings.jsonl', 'data/live-play-1.jsonl', 'data/live-
   const last = new Map(); let id = 0;
   for (const r of rows) for (const e of m.feed(r, r.t * 1000)) { if (e.type === 'swing') id++; if (e.type === 'swing' || e.type === 'swingFix') last.set(id, { e, top: qrot(m.pose(r.t * 1000).Pd, [0, 1, 0]) }); }
   const kinds = {}, L = [], C = [], LV = [], RO = [], TU = [];
-  for (const { e } of last.values()) { const sp = clientOf(e), lob = sp.lob, n = Math.max(0, Math.min(1, (e.power - 6) / 28)), pw = e.chop > CHOP && n > CHOP_N ? Math.min(1, n + CHOP_ADD) : n;
+  for (const { e } of last.values()) { const sp = clientOf(e), lob = sp.lob, n = effort(Math.max(0, Math.min(1, (e.power - 6) / 28))),      // the server's intake (NOTES 175)
+      pw = e.chop > CHOP && n > CHOP_N ? Math.min(1, n + CHOP_ADD) : n;
     const spin = sliced(sp.slice, lob); if (e.power >= 9) SP.push(spin);
     const k = shotKind(pw, lob, sp.slice); kinds[k] = (kinds[k] || 0) + 1; total[k] = (total[k] || 0) + 1; if (e.power >= 9) real[k] = (real[k] || 0) + 1;
     L.push(lob / 0.8); C.push(e.chop); LV.push(sp.level); RO.push(Math.abs(e.roll)); TU.push(e.turn); }

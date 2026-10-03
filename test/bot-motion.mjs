@@ -33,7 +33,7 @@ const play = o => page.evaluate(({ cy = 1.0, dx = 0, foot = 3.3, ys = null, fram
   let ms = (window.__ms = (window.__ms || 1e6) + 1000), x = 0, y = 1.0;
   const step = () => { pl.z = -6.5; ms += 1000 / 60; f.push(ms); sc.render(ms); };
   for (let i = 0; i < 120; i++) { pl.x = 0; pl.y = 1.0; pl.swingT = -1; step(); }       // 2 s at the ready: everything settles
-  const head = [], feet = [[], []], taunt = []; let atContact = null;
+  const head = [], feet = [[], []], taunt = []; let atContact = null, waiting = null;
   for (let i = 0; i < frames; i++) {
     const t = i / 60;
     if (wave) y = wave(t);
@@ -43,10 +43,11 @@ const play = o => page.evaluate(({ cy = 1.0, dx = 0, foot = 3.3, ys = null, fram
     if (!wave && Math.abs(t - swingAt) < 1e-6 + 0.5 / 60) { pd.swingT = 0; pd.mirror = 1; }
     step(); u.head.getWorldPosition(v); head.push(v.y); taunt.push(pd.stance.taunt);
     for (let k = 0; k < 2; k++) { const w = u.feet[k].position.clone(); u.feet[k].getWorldPosition(w); feet[k].push(w.y); }
-    if (!wave && atContact === null && t >= swingAt + 0.2) atContact = { head: v.y, paddleY: pd.pos.y };
+    if (!wave && waiting === null && t >= swingAt - 0.1) waiting = { drawn: pd.group.position.y, paddleY: pd.pos.y };      // the paddle as drawn while he waits for the ball (NOTES 175)
+    if (!wave && atContact === null && t >= swingAt + 0.2) atContact = { head: v.y, paddleY: pd.pos.y, drawn: pd.group.position.y };
     if (stopAt !== null && t >= stopAt) break;
   }
-  return { head, feet, atContact, peakTaunt: Math.max(...taunt), posY: pd.pos.y };
+  return { head, feet, atContact, waiting, peakTaunt: Math.max(...taunt), posY: pd.pos.y };
 }, o);
 const shoot = async name => {
   for (const [k, c] of [['close', [4.6, 1.7, -3.2, 1.2, 1.35, -7.2]], ['far', [1.0, 2.3, 7.6, 0.8, 1.3, -7]]]) {
@@ -61,6 +62,8 @@ console.log(`standing head ${standHead.toFixed(3)}`);
 const lob = await play({ cy: 2.2, dx: 1.2, stopAt: 1.1 }); await shoot('1-lob-contact');
 console.log(`lob: paddle ${lob.atContact.paddleY.toFixed(2)} m, head ${lob.atContact.head.toFixed(3)}`);
 ok(lob.atContact.paddleY > 1.9, `the paddle really is up for the lob (${lob.atContact.paddleY.toFixed(2)} m)`);
+ok(lob.waiting.drawn < 1.4, `waiting for the lob, his paddle stays down at his side (drawn at ${lob.waiting.drawn.toFixed(2)} m while the server's is at ${lob.waiting.paddleY.toFixed(2)})`);
+ok(lob.atContact.drawn > lob.atContact.paddleY - 0.15, `and it is up where the ball is by the hit (drawn ${lob.atContact.drawn.toFixed(2)} m, server ${lob.atContact.paddleY.toFixed(2)})`);
 ok(lob.atContact.head - standHead < 0.12, `meeting a lob, Matt stays his own height: no stretching tall (head +${((lob.atContact.head - standHead) * 100).toFixed(1)} cm)`);
 // ---------- 2. a low ball still bends the knees ----------
 const low = await play({ cy: 0.45, dx: -1.0, stopAt: 1.1 }); await shoot('2-low-contact');
