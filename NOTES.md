@@ -3768,3 +3768,24 @@ bot doesn't hold up its racket when receiving a lob, it just looks stupid. it sh
 - No data, storage or UI change: legal pages untouched. Changelog: "Smashes and spin take a harder swing".
 - Tests: kinds.mjs reads effort(); stats.test.mjs's serve-only player swings 32 (30 is a drive now); bot-motion.mjs checks the paddle
   waits at his side (1.09 m while the server's is at 2.2) and is up at the ball by the hit.
+
+## 176. Matt swings from the waist and his paddle moves like a hand
+
+The owner (2026-10-03) said "continue" after NOTES 174-175, read as: keep going on the bot overhaul. Filmed from the player's view, the two
+tells left were a body that stayed square to the net through every swing, and a paddle that set off and stopped like a block on a rail.
+Both are draws only, in scene.js updatePads, `pd.bot` only (Matt and the menu rally); runBot and every hit are unchanged.
+
+- Torso: `upper` turns with the swing, 0.45 of the paddle's yaw off the idle pose (e3, so it follows the canned swing frame by frame):
+  coiled 0.6 rad away on the wind-up, square at contact, 0.45 past on the follow-through, mirrored for a backhand, square again after.
+  An overhead turns 0.4 as much and arches instead (0.12 of its pitch: back on the cock, forward through the ball). The head's look is
+  now kept as `stance.look` in the body's square frame and the twist (and the run turn) taken back off, so his eyes stay on the ball.
+- Run turn: the root turns 0.2 rad x the gait amount (NOTES 174) toward his lateral travel, square again as he plants.
+- Paddle: runBot steps x at full foot speed from a standstill and stops it dead; behind the 55 ms lerp the drawn paddle went 0 -> 3 m/s
+  in 0.12 s (peak ~52 m/s^2). Drawn x and z now follow on an exact critically damped spring (`pd.dr`), loose (w 11) while he runs and
+  tight (w 40) for the last 0.3 s before an incoming ball and through the swing: peak 11 m/s^2 setting off, on the server's paddle at
+  contact when he arrives in time, 12.8 cm off in the worst case (still running at full speed as he hits), which the hit's reach (up to
+  40 cm, NOTES 154) pulls onto the ball. More than 1.5 m apart (a new point, a re-seat) it snaps rather than glides.
+- No data, storage or UI change: legal pages untouched. Changelog: a new October 3 entry, "Matt swings from the waist" (dateModified and sitemap lastmod bumped).
+- Tests: bot-motion.mjs adds the coil both ways and square after, the paddle's take-off acceleration, and the contact gap early and late;
+  its harness now sets pd.over the way startSwing does. stance, breathe and bot-motion pass. scene-next's "setMenu(false) ... > 50 fps"
+  reads 30.0 on this machine today on unchanged main too (headless Chrome throttling): not this change; it passed clean on 15b3dc9 earlier.

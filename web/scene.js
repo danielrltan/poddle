@@ -780,7 +780,7 @@ export function createScene(containerEl) {
       pos: new THREE.Vector3(0, 1, sgn(side) * 6.5), q: new THREE.Quaternion(), off: new THREE.Vector3(),
       lunge: 0, reach: false, reachV: new THREE.Vector3(), hitP: [0, 1, 0], swingT: -1, swungAt: -9, mirror: 1, over: 0, raise: 0, bodyX: 0, bodyZ: sgn(side) * 6.8, vx: 0, vz: 0, cheer: 0, world: new THREE.Vector3(),
       // stance: how far the head is off the baseline (duck / tip), the bob spring it is driving, and the dip counter behind the taunt
-      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0, br: side * 2.2, puff: 0, by: STANCE.base, byV: 0, stride: 0, split: 0 } };      // br: the breath's phase (the two seats out of step); puff: how winded, 0..1. by/byV, stride, split: Matt's body height, footsteps and split step (NOTES 170)
+      stance: { duck: 0, tip: 0, y0: STANCE.base, spring: 0, springV: 0, low: false, dips: 0, dipAt: -9, taunt: 0, gaze: 0, br: side * 2.2, puff: 0, by: STANCE.base, byV: 0, stride: 0, split: 0, look: 0 } };      // br: the breath's phase (the two seats out of step); puff: how winded, 0..1. by/byV, stride, split: Matt's body height, footsteps and split step (NOTES 170)
   });
   // The winner's shot (NOTES 165; setVictory): the result is drawn on the court. The winner holds a trophy where the paddle was (its attitude is the
   // paddle's own, so a phone or AirPod turns it), solid even when it is me, and one camera stands in front of them. pane: where the picture is
@@ -854,7 +854,7 @@ export function createScene(containerEl) {
       const want = pd.status && vis && !at.on ? 1 : 0; if (pd.ghost !== want) { pd.ghost = clamp(pd.ghost + (want ? dt : -dt) / 0.25, 0, 1); ghostify(pd); }      // whited out while calibrating / paused / away
       if (!vis) continue;
       const s = sgn(pd.side), local = isMe(pd.side), t = pd.tgt;
-      if (!pd.init) { pd.pos.set(t.x, t.y, t.z); pd.q.copy(t.q); pd.bodyX = t.x - s * BODY[0]; pd.bodyZ = t.z + s * BODY[1]; pd.init = true; }
+      if (!pd.init) { pd.pos.set(t.x, t.y, t.z); pd.q.copy(t.q); pd.dr = null; pd.bodyX = t.x - s * BODY[0]; pd.bodyZ = t.z + s * BODY[1]; pd.init = true; }
       // local paddle is 1:1 (only the server-stepped z gets a whisper of filtering); remote is 20Hz -> slerp/lerp
       const kp = local ? 1 : damp(dt, 0.055);
       pd.pos.x = lerp(pd.pos.x, t.x, kp); pd.pos.y = lerp(pd.pos.y, t.y, kp); pd.pos.z = lerp(pd.pos.z, t.z, damp(dt, local ? 0.03 : 0.06));
@@ -869,6 +869,19 @@ export function createScene(containerEl) {
         pd.raise = lerp(pd.raise, up, damp(dt, up > pd.raise ? 0.04 : 0.2));
         const rest = Math.min(pd.pos.y, 1.1); py = rest + (pd.pos.y - rest) * pd.raise;
       }
+      // Matt's hand also gets going and pulls up like a hand (NOTES 176). runBot moves his paddle at full foot speed from a standstill and
+      // stops it dead, and the 55 ms lerp above left it 0 -> 3 m/s in 0.12 s: a block on a rail. Drawn, x and z follow it on a critically
+      // damped spring, loose (w 11) while he runs, tight (w 40) for the last 0.3 s before the ball and through the swing, so the face is on
+      // the server's paddle by contact. Exact for a held target, so any frame rate gives the same path.
+      let px = pd.pos.x, pz = pd.pos.z;
+      if (pd.bot) {
+        if (!pd.dr) pd.dr = { x: pd.pos.x, z: pd.pos.z, vx: 0, vz: 0 };
+        const ahead = -(ball.pos.z - pd.pos.z) * s, vz = ball.vel.z * s, near = pd.swingT >= 0 || (ball.live && ball.lastBy !== pd.side && vz > 0.3 && ahead / vz < 0.3);
+        const D = pd.dr, om = lerp(11, 40, D.k = lerp(D.k || 0, near ? 1 : 0, damp(dt, near ? 0.03 : 0.25))), e = Math.exp(-om * dt);
+        for (const [k, kv, T] of [['x', 'vx', pd.pos.x], ['z', 'vz', pd.pos.z]]) { const d = D[k] - T, c = D[kv] + om * d; D[k] = T + (d + c * dt) * e; D[kv] = (D[kv] - om * c * dt) * e; }
+        if (Math.abs(D.x - pd.pos.x) > 1.5 || Math.abs(D.z - pd.pos.z) > 1.5) { D.x = pd.pos.x; D.z = pd.pos.z; D.vx = D.vz = 0; }      // a new point or a seat change: no gliding across the court
+        px = D.x; pz = D.z;
+      } else pd.dr = null;
       if (pd.bot) {                                        // bots never send a q: idle sway + canned swing
         if (won) pd.swingT = -1;
         if (pd.swingT >= 0) { pd.swingT += dt; if (pd.swingT > SWING[SWING.length - 1][0]) pd.swingT = -1; }
@@ -891,7 +904,7 @@ export function createScene(containerEl) {
       }
       pd.lunge = Math.max(0, pd.lunge - dt / 0.32);
       const lg = Math.sin(Math.min(1, pd.lunge * 1.15) * Math.PI) * 0.2;       // out and back, gently
-      const w = pd.world.set(pd.pos.x + s * pd.off.x, Math.max(0.12, py + pd.off.y + lg * 0.12), pd.pos.z + s * (pd.off.z - lg));
+      const w = pd.world.set(px + s * pd.off.x, Math.max(0.12, py + pd.off.y + lg * 0.12), pz + s * (pd.off.z - lg));
       pd.group.quaternion.set(s * pd.q.x, pd.q.y, s * pd.q.z, pd.q.w);         // T*P*T^-1 for side 1
       if (pd.reach) {                                      // just hit: the server's contact box is generous, so pull the FACE onto the ball for a beat
         vA.set(0, FACE_C, 0).applyQuaternion(pd.group.quaternion).add(w);
@@ -976,12 +989,17 @@ export function createScene(containerEl) {
         // ---------- wear it ----------
         const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8) + splitDip, lift = tip * STANCE.toes + reach * 0.1;
         a.position.set(pd.bodyX, hop + splitUp + (pd.bot ? bob : Math.abs(Math.sin(timeS * 11)) * 0.05 * run), pd.bodyZ);
-        a.rotation.set(0, (s > 0 ? 0 : Math.PI) - 0.4 * hold, 0);      // on the serve it turns a little toward the ball, out in front of the paddle
+        a.rotation.set(0, (s > 0 ? 0 : Math.PI) - 0.4 * hold - lat * gait * 0.2, 0);      // and Matt turns a little into a run (NOTES 176), square again as he plants      // on the serve it turns a little toward the ball, out in front of the paddle
         a.rotateZ(clamp(-pd.vx * s * 0.05, -0.22, 0.22)); a.rotateX(-0.06 - run * 0.08 - (pd.swingT >= 0 ? 0.1 : 0));      // the body's old whole-of-it lean, unchanged: it carries the feet with it, so it has to stay small
         if (sd.taunt > 0) a.rotateY(Math.sin(timeS * 25) * sd.taunt * 0.1);
         // Everything the stance adds bends at the waist instead. A crouch's forward lean is three times the old one, and
         // swung about the root it would put the shoes through the paint; hinged here it leaves them flat where they stand.
-        u.upper.rotation.set(-duck * STANCE.lean + tip * 0.07 - fwd * 0.1, 0, clamp(-pd.vx * s * 0.05, -0.22, 0.22) * duck * 0.9);
+        // Matt swings from the waist (NOTES 176): his shoulders follow the paddle round, 0.45 of its turn off the idle pose: coiled away on
+        // the wind-up, square at contact, past on the follow-through, mirrored on a backhand (it rides on e3, the swing this frame). An
+        // overhead turns less and arches instead: back on the cock, forward through the ball. On `upper`, so the feet stay planted.
+        const swingOn = pd.bot && pd.swingT >= 0 && !won;
+        const twist = swingOn ? (e3[0] - IDLE[0]) * pd.mirror * D2R * 0.45 * (1 - 0.6 * pd.over) : 0, arch = swingOn ? (e3[1] - IDLE[1]) * D2R * 0.12 * pd.over : 0;
+        u.upper.rotation.set(-duck * STANCE.lean + tip * 0.07 - fwd * 0.1 + arch, twist, clamp(-pd.vx * s * 0.05, -0.22, 0.22) * duck * 0.9);
         u.upper.position.y = lift - sink;
         u.upper.scale.y = clamp(1 - duck * STANCE.squash + tip * 0.06 + reach * 0.14 - sd.spring * 0.5, 0.8, 1.35);
         u.body.scale.set(1 + inh * 0.055, 1 + inh * 0.05, 1 + inh * 0.07);      // the chest swells most front to back
@@ -1006,13 +1024,14 @@ export function createScene(containerEl) {
         }
         if (won) {                                         // the winner looks into the lens
           const dx = (camera.position.x - pd.bodyX) * s, dz = Math.max(0.5, (pd.bodyZ - camera.position.z) * s);
-          u.head.rotation.y = lerp(u.head.rotation.y, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12)); sd.gaze = lerp(sd.gaze, 0, damp(dt, 0.12));
+          sd.look = lerp(sd.look, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12)); sd.gaze = lerp(sd.gaze, 0, damp(dt, 0.12));
         } else if (ball.seen) {                            // head tracks the ball, from wherever the crouch has actually left it
           const hy = a.position.y + (u.upper.position.y + u.head.position.y * u.upper.scale.y) * 1.3;
           const dx = (ballMesh.position.x - pd.bodyX) * s, dz = Math.max(0.5, (pd.bodyZ - ballMesh.position.z) * s);
-          u.head.rotation.y = lerp(u.head.rotation.y, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12));
+          sd.look = lerp(sd.look, clamp(-Math.atan2(dx, dz), -0.8, 0.8), damp(dt, 0.12));
           sd.gaze = lerp(sd.gaze, clamp(Math.atan2(ballMesh.position.y - hy, dz + 2) * 0.8, -0.3, 0.5), damp(dt, 0.12));
         }
+        u.head.rotation.y = clamp(sd.look - twist + lat * gait * 0.2, -1.2, 1.2);      // the look is kept in the body's square frame: the swing's twist and the run's turn are taken back off, so the eyes stay on the ball
         // A crouch bends at the waist, and the neck gives most of it straight back: nobody drops into a ready position and
         // stares at their own shoes. Without this the deep crouch turned the face away from the camera entirely and the
         // player opposite was reading the top of a head. The gaze is smoothed on its own so the lean can be taken off it
