@@ -28,7 +28,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
 const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats', '/ranks', '/leaderboard', '/friends']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
-const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/changelog': '/changelog.html', '/changelog/': '/changelog.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats',
+const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats',
   '/ranked': '/ranks', '/ranked/': '/ranks' };            // clean URLs: a fixed map, no extension guessing. /ranked: the old Ranked view (removed, docs/TROPHIES.md 2): its links land on the Ranks page
 let PAGE_404 = null; try { PAGE_404 = fs.readFileSync(path.join(WEB, '404.html')); } catch { /* no page: plain words */ }
 function notFound(req, res) {                                                                           // a miss is a real 404 (never a soft 200) and never indexed

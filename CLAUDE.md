@@ -19,7 +19,7 @@ Important changes also need a notice on the home page (the one exception to "No 
 ## No announcement notices (the owner's rule, 2026-09-29, NOTES 147)
 Never add a notice that announces a feature or a change: no "New: ..." toasts, what's-new popups, one-time "did you
 know" hints, NEW badges / dots / pills on tiles or buttons, banners or modals about something added. Features speak for
-themselves; the changelog page (the footer's "What's new" link) is where changes are listed. The only exception is a
+themselves; there is no changelog page either (the owner removed it on 2026-10-04, NOTES 186: NOTES.md is the only record of changes). The only exception is a
 notice the Terms / Privacy pages legally promise for an important change to how data is handled, and even then ask the
 owner before adding one (he had the leaderboard and profile-card ones removed for good on 2026-10-02, NOTES 168: do not bring them back; poddle.lbSeen is a dead key profile.js deletes at load). Toasts that answer something the player
 just did (a friend request arrived, a copy worked, an error) are fine: they are not announcements.

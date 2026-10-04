@@ -5,7 +5,7 @@
 // the caller serves web/og.jpg. Nothing here throws out of png(), and nothing logs a name, a slug or an id.
 const crypto = require('node:crypto'), path = require('node:path');
 
-const CARD_V = 10;                                              // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
+const CARD_V = 11;                                              // the design's version: part of every hash, so a new look gets a new ?v= and unfurlers fetch it again
 const W = 1200, H = 630;
 const FONTS = ['500', '800', '900'].map(w => path.join(__dirname, 'fonts', `mplus-rounded-1c-${w}.ttf`));   // latin subsets of the site's font (web/vendor/fonts), as TTF: resvg reads no woff2
 const F = { 500: 'Rounded Mplus 1c Medium', 800: 'Rounded Mplus 1c ExtraBold', 900: 'Rounded Mplus 1c Black' };   // each weight is its own family in these files
@@ -208,9 +208,9 @@ ${E ? E.defs : ''}
     else out.push(`<circle cx="${cx}" cy="${cy}" r="${R + 4.5}" fill="none" stroke="${lv[1]}" stroke-width="3"/><circle cx="${cx}" cy="${cy}" r="${R}" fill="${lv[0]}" stroke="#ffffff" stroke-width="6"/>`);
     if (lv) out.push(`<circle cx="${cx}" cy="${cy}" r="${R - 3}" fill="url(#disc)"/>`);
     out.push(icon(cx - 25, cy - 25, 50, MATT, lv ? '#ffffff' : C.soft, 2.25, lv ? ' filter="url(#sh1)"' : ''));
-    const tx = cx + R + 24, s = d.matt ? `${d.matt} Matt` : 'None yet', fs = fit(s, 900, 42, xr - 20 - tx);
+    const tx = cx + R + 24, s = d.matt || 'None yet', fs = fit(s, 900, 42, xr - 20 - tx);      // the level alone under 'Highest Matt level passed', as Your stats and the public card (NOTES 185)
     const sc = d.mattScore || (d.mattFlawless ? '11-0' : null);   // the best score against that Matt (NOTES 183), under the level as #lbp-mscore: "Best 11–7"
-    out.push(caps(tx, y1 + (sc ? 42 : 50), 'Hardest level beaten'));
+    out.push(caps(tx, y1 + (sc ? 42 : 50), 'Highest Matt level passed'));
     out.push(text(tx, y1 + (sc ? 88 : 100), s, { size: fs, wt: 900, fill: lv ? lv[1] : C.soft }));
     if (sc) out.push(text(tx, y1 + 116, `Best ${sc.replace('-', '\u2013')}`, { size: 19.5, wt: 800, fill: d.mattFlawless ? C.warnDeep : C.soft }));
   }

@@ -16,7 +16,7 @@ try {
   console.log('status, type, cache');
   const NOCACHE = 'no-cache', WEEK = 'public, max-age=604800';
   for (const [p, type, cache, file] of [['/', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/index.html', 'text/html; charset=utf-8', NOCACHE, 'index.html'], ['/robots.txt', 'text/plain; charset=utf-8', NOCACHE, 'robots.txt'],
-    ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'], ['/changelog.html', 'text/html; charset=utf-8', NOCACHE, 'changelog.html'],
+    ['/sitemap.xml', 'application/xml; charset=utf-8', NOCACHE, 'sitemap.xml'], ['/site.webmanifest', 'application/manifest+json', NOCACHE, 'site.webmanifest'], ['/how-to-play.html', 'text/html; charset=utf-8', NOCACHE, 'how-to-play.html'],
     ['/privacy.html', 'text/html; charset=utf-8', NOCACHE, 'privacy.html'], ['/terms.html', 'text/html; charset=utf-8', NOCACHE, 'terms.html'], ['/vendor/mp/LICENSE.txt', 'text/plain; charset=utf-8', null, 'vendor/mp/LICENSE.txt'],
     ['/og.jpg', 'image/jpeg', WEEK, 'og.jpg'], ['/og.jpg?v=8', 'image/jpeg', WEEK, 'og.jpg'], ['/favicon.ico', 'image/x-icon', WEEK, 'favicon.ico'], ['/favicon.svg', 'image/svg+xml; charset=utf-8', WEEK, 'favicon.svg'], ['/favicon-32.png', 'image/png', WEEK, 'favicon-32.png'],
     ['/apple-touch-icon.png', 'image/png', WEEK, 'apple-touch-icon.png'], ['/icon-192.png', 'image/png', WEEK, 'icon-192.png'], ['/icon-512.png', 'image/png', WEEK, 'icon-512.png'],
@@ -93,7 +93,7 @@ try {
     const body = home.replace(/<noscript>[\s\S]*?<\/noscript>/g, ''), h1 = [...body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map(m => m[1].replace(/<[^>]+>/g, '').trim());
     const title = (body.match(/<section[^>]*id="screen-title"[\s\S]*?<\/section>/) || [''])[0], th1 = [...title.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map(m => m[1].replace(/<[^>]+>/g, ''));
     ok(th1.length === 1 && th1[0] === 'Poddle' && h1.length === 1, `one <h1> outside noscript, on the title screen, and its text is "${th1[0]}"${h1.length > 1 ? ' (others: ' + h1.slice(1).join(', ') + ')' : ''}`);
-    ok(/Phone pickleball/.test(title) && /nothing to install/i.test(title) && (title.match(/<a\b[^>]*href="\/how-to-play\.html"[^>]*>How to play<\/a>/g) || []).length === 1, 'the title screen says Phone pickleball, what you need, and links How to play');
+    ok(/Phone pickleball/.test(title) && (title.match(/<a\b[^>]*href="\/how-to-play\.html"[^>]*>How to play<\/a>/g) || []).length === 1 && !/changelog/.test(home), 'the title screen says Phone pickleball and links How to play (the footer tagline went with the Product Hunt badge, the changelog link with the page)');
     ok(!/First to 11/.test(title), 'the title screen does not say First to 11'); }
 
   console.log('legal pages (CLAUDE.md "Legal pages": they must stay linked and true)');
@@ -114,7 +114,7 @@ try {
     const xml = (await req('/sitemap.xml')).body.toString(), locs = [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map(m => m[1]), mods = [...xml.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)].map(m => m[1]);
     const opens = (xml.match(/<(?![?\/!])[^>]*[^\/]>/g) || []).length, closes = (xml.match(/<\/[^>]+>/g) || []).length;
     ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>') && /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/.test(xml) && xml.trim().endsWith('</urlset>') && opens === closes && !/&(?!amp;|lt;|gt;|quot;|apos;)/.test(xml), `sitemap.xml is well formed (${opens} tags open, ${closes} close)`);
-    ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/changelog.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
+    ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
     ok(mods.length === locs.length && mods.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d)) && Date.parse(d) <= Date.now() + 864e5), `lastmod is a W3C date, not in the future: ${mods}`);
     for (const l of locs) { const p = new URL(l).pathname, r = await req(p); ok(r.status === 200 && /text\/html/.test(r.h['content-type']), `${p} from the sitemap: ${r.status}`);
       if (r.status === 200) { const c = [...r.body.toString().matchAll(/<link rel="canonical" href="([^"]*)"/g)].map(m => m[1]); ok(c.length === 1 && c[0] === l, `its canonical is itself: ${c}`); } } }

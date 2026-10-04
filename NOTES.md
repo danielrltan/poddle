@@ -4084,3 +4084,15 @@ Two owner asks (2026-10-04):
   on Your stats and the public card reads Highest Matt level passed (the .caps style upper-cases it), and the level reads Pro, not Pro Matt
   (profile.js drawMatt / openPlayer). The chips, the first-win toast ("First win against Tour Matt") and the share PNG's "Beat the Pro bot" are
   as they were. Tests updated: profile-ui ('Club', 'Pro'), lb-profile-ui ('Pro').
+
+## 196. The share card follows the Matt wording; the changelog page is gone
+
+- The owner (2026-10-04): "update the sharecard too". server/card.js's Matt tile reads "Highest Matt level passed" over the level alone
+  ("Pro", not "Pro Matt"), as Your stats and the public card do since NOTES 185; the ring and "Best 11–3" were already there from the
+  card's redesign. CARD_V 11: every shared picture gets a new ?v=. share.test checks the heading, ">Pro<" and that "Pro Matt" is gone.
+- The owner: "can you get rid of the changelog? players dont really need it for a small game like this." web/changelog.html is deleted,
+  with the footer's What's new link (index.html), its sitemap entry, the /changelog redirects in server/game.js (MOVED) and its rows in
+  seo.test. /changelog.html now 404s like any unknown path. CLAUDE.md's No-announcements rule no longer points at it: NOTES.md is the
+  record of changes. Privacy / Terms never referred to the page, so they stand.
+- seo.test's title-screen check wanted the footer tagline ("nothing to install") that the Product Hunt badge replaced (2f66fc1); it now
+  checks the Phone pickleball line, the How to play link and that nothing links the changelog. The deploy gate is green again.
