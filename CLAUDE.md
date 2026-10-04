@@ -105,7 +105,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`
   (session, HttpOnly, 180 d), `__Host-poddle_n` (sign-in nonce, 10 min).
 - Third parties: Fly.io (host, logs ~7 days, the database volume + 5-day snapshots), Cloudflare (cdnjs three.js
-  fallback; email forwarding for hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click), YouTube (the menu music's artist channel, only on click of the credit; the track itself, web/audio/into-the-blue.mp3, is served by us),
+  fallback; email forwarding for hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click), YouTube (the menu music's artist channel, only on click of the credit; the track itself, web/audio/into-the-blue.m4a, is served by us),
   Google (Sign in with Google: its script loads only after the player opens the sign-in card; its ID
   token carries email/name/picture, which the server discards, keeping only `sub`; Google sets its own cookies / FedCM
   in its window). No analytics, no ads.

@@ -4156,3 +4156,13 @@ Known gap: a careful bot that forges a coherent q/r stream around each swing pas
 in every move mode); a swing made while a menu screen covers the court has no stream (needs 5 and 40% to matter); pauses stop both
 swings and stream; a seat's pending checks are judged at match end; old tabs already send r and q. Legal: privacy.html (paddle motion
 row, retention, legal-basis row, a dated line in 15), docs/ropa.md 4, CLAUDE.md data flows.
+
+## 198. The menu music is 2.2 MB, not 3.7
+- Every menu visitor fetches the whole track after their first click (menuaudio.js load(): a blob, since the static server has no
+  byte ranges). For the launch crowd on US cellular that was the biggest download on the site: a 112 kbps MP3 of 3.7 MB.
+- Now web/audio/into-the-blue.m4a: the same master (~/poddle-launch-video/music/into-the-blue.wav), the same loudnorm -18 LUFS
+  / TP -1.5, encoded by Apple's encoder (afconvert, AAC-LC, 64 kbps constrained VBR, quality 127): 2.2 MB, 41% smaller, and
+  AAC-LC in MP4 decodes in every browser (Chrome checked: canPlayType "probably", plays). HE-AAC would have been 1.6 MB but some
+  Firefox builds cannot decode it, and a silent menu on launch day is not worth 0.6 MB. The MP3 is gone.
+- server/game.js: `.m4a` is `audio/mp4`; audio joins the week-long cache (a new track is a new file name), it was no-cache with
+  a revalidation on every visit. CLAUDE.md's third-party line names the new file. Nothing new is sent or stored.

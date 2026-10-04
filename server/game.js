@@ -24,9 +24,9 @@ function phBadge() {
     return ph.body || fs.readFileSync(path.join(WEB, 'ph-badge.svg'), 'utf8'); })();
 }
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg',
+  '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
-const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);                              // the share card is busted by ?v=, icons rarely change: a week
+const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico', '.m4a', '.mp3']);                // the share card is busted by ?v=, icons rarely change, a new track is a new file name: a week
 const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats', '/ranks', '/leaderboard', '/friends']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
 const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats',
   '/ranked': '/ranks', '/ranked/': '/ranks' };            // clean URLs: a fixed map, no extension guessing. /ranked: the old Ranked view (removed, docs/TROPHIES.md 2): its links land on the Ranks page
