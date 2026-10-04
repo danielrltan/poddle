@@ -405,6 +405,7 @@ const S2 = (a, b, ra = true, rb = true) => [{ owner: a, record: ra, bests: ra },
   r = db.recordMatch(B()); ok(r.seats[0].first && r.seats[0].streak === 1 && r.seats[0].bests.length === 3, 'first Pro win: first=true, three bests');
   r = db.recordMatch(B({ now: T0 + 1, score: [11, 9] })); ok(!r.seats[0].first && r.seats[0].streak === 2, 'second win: not first, streak 2');
   let pro = P(g3).matt[3]; ok(pro.wins === 2 && pro.firstWinAt === T0 && pro.bestMargin === 7 && pro.bestStreak === 2 && P(g3).human.wins === 0, 'bot_record: wins, first_win_at, best margin; human W/L untouched');
+  ok(eq(pro.bestScore, [11, 4]), `bestScore: the best win's score, 11-4 over 11-9 (${JSON.stringify(pro.bestScore)})`);
   db.recordMatch(B({ now: T0 + 2, winner: 1, score: [3, 11] })); db.recordMatch(B({ now: T0 + 3, winner: null, ending: 'left', score: [2, 5] })); db.recordMatch(B({ now: T0 + 4, winner: null, ending: 'dropped', score: [1, 1] }));
   pro = P(g3).matt[3]; ok(pro.losses === 2 && pro.abandons === 1 && pro.streak === 0 && pro.bestStreak === 2, "loss and 'left' are losses, 'dropped' an abandon; each resets the streak");
   db.recordMatch(B({ now: T0 + 5, level: undefined, levelRank: 2 })); ok(P(g3).matt[2].level === 3 && P(g3).matt[2].name === 'Tour' && P(g3).matt[2].wins === 1 && P(g3).matt[3].wins === 2, 'levelRank 2 is Tour (wire 3), never Pro');
@@ -450,7 +451,7 @@ const S2 = (a, b, ra = true, rb = true) => [{ owner: a, record: ra, bests: ra },
   const M = P(ao);
   ok(M.played === A.played + G.played && M.human.wins === A.human.wins + G.human.wins && M.human.streak === A.human.streak, 'fold: played and W add, h_streak keeps the account\'s');
   ok(M.bests.rally.v === 30 && M.bests.hit.v === 81 && M.bests.speed.v === 22.5 && M.bests.hit.at === G.bests.hit.at, 'fold: bests take the max with their time');
-  ok(M.matt[3].wins === A.matt[3].wins + G.matt[3].wins && M.matt[3].streak === A.matt[3].streak && M.matt[3].firstWinAt === T0 && M.matt[3].bestMargin === 7 && M.matt[3].bestStreak === 2, 'fold per level: wins add, streak keeps the account\'s, first_win_at the earlier, best margin/streak max');
+  ok(M.matt[3].wins === A.matt[3].wins + G.matt[3].wins && M.matt[3].streak === A.matt[3].streak && M.matt[3].firstWinAt === T0 && M.matt[3].bestMargin === 7 && M.matt[3].bestStreak === 2 && eq(M.matt[3].bestScore, [11, 4]), 'fold per level: wins add, streak keeps the account\'s, first_win_at the earlier, best margin/streak max, the better best score');
   ok(P(g3) === null && db.guestOwner(dev(3)) === null && db.accountByDevice(dev(3)) === acct.id && db.ownerForDevice(dev(3), T0 + 101, { create: true }) === ao, 'after the merge: guest gone, the device follows the account');
   ok(eq(db.recentLosses(g2, 0), logG) && db.oneWay(ao, g2, 0).aOverB >= 1, 'match_log rows naming the guest now name the account');
   ok(db.mergeDevice(dev(3), acct.id, T0 + 102) === 'none', 'a device already merged into THIS account -> none');
@@ -509,10 +510,14 @@ console.log('ladder');
   const { DatabaseSync } = await import('node:sqlite'); const f1 = path.join(tmp, 'v1.db');
   { const D = new DatabaseSync(f1); D.exec(v1); D.exec('PRAGMA user_version=1');
     D.prepare('INSERT INTO owners (id, kind, created_at, touched_at) VALUES (7, ?, ?, ?)').run('device', T0, T0); D.prepare('INSERT INTO profile (owner_id, played, updated_at) VALUES (7, 2, ?)').run(T0);
-    D.prepare("INSERT INTO match_log (at, kind, bot_level, owner_a, owner_b, score_a, score_b, winner, ending, ranked, flags, secs) VALUES (?, 'bot', 1, 7, NULL, 11, 3, 0, 'won', 1, '', 60)").run(T0); D.close(); }
+    D.prepare("INSERT INTO match_log (at, kind, bot_level, owner_a, owner_b, score_a, score_b, winner, ending, ranked, flags, secs) VALUES (?, 'bot', 1, 7, NULL, 11, 3, 0, 'won', 1, '', 60)").run(T0);
+    D.prepare('INSERT INTO bot_record (owner_id, level, wins, streak, best_streak, first_win_at, best_margin) VALUES (7, 1, 1, 1, 1, ?, 8)').run(T0); D.close(); }      // a row from before best_for / best_against (NOTES 183)
   ok(quiet(() => db.open(f1)) && db.ok() && new DatabaseSync(f1).prepare('PRAGMA user_version').get().user_version === 2, 'a v1 file opens and migrates to version 2');
   ok(eq(Object.keys(db.counts()), ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs']) && db.counts().ladder === 0 && db.counts().match_log === 1, 'counts() includes ladder, share and the friends tables (docs/SOCIAL.md 2; empty); the old rows are kept');
   ok(eq(db.exportOf(7, T0 + 1).matches.map(m => [m.mode, m.trophyDelta]), [['casual', null]]) && db.ladderOf(7).tier === 1 && db.ladderOf(7).trophies === 0, 'an old row reads as mode casual with no trophy change; an owner without a ladder row is Bronze I, 0');
+  { const club = db.profileOf(7, T0 + 1).matt.find(r => r.level === 1); ok(club && club.bestMargin === 8 && eq(club.bestScore, [11, 3]), `an old bot_record row (margin only) reads its best score as 11 to 11 - margin: ${JSON.stringify(club && club.bestScore)}`);
+    db.recordMatch({ now: T0 + 2, kind: 'bot', level: 1, winner: 0, ending: 'won', score: [12, 10], secs: 60, ranked: true, flags: [], seats: [{ owner: 7, record: true, bests: false }, null] });
+    const c2 = db.profileOf(7, T0 + 3).matt.find(r => r.level === 1); ok(c2.bestMargin === 8 && eq(c2.bestScore, [11, 3]), `a narrower win after it (12-10) does not replace the derived 11-3 (${JSON.stringify(c2)})`); }
   db.close();
   ok(fresh({ MATT_DAY: '12' }) && db.ok(), 'open(:memory:) with MATT_DAY 12');
   ok(db.ladderApply({ owner: 1, delta: 5, won: true, vsBot: false, now: T0 }) === null && db.ladderApply({ owner: NaN, delta: 5, won: true, vsBot: false, now: T0 }) === null, 'ladderApply for an unknown or bad owner: null, nothing written');

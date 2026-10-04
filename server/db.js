@@ -94,6 +94,8 @@ CREATE TABLE bot_record (
   best_streak   INTEGER NOT NULL DEFAULT 0,
   first_win_at  INTEGER,
   best_margin   INTEGER NOT NULL DEFAULT 0,
+  best_for      INTEGER NOT NULL DEFAULT 0,
+  best_against  INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (owner_id, level)
 );
 CREATE TABLE match_log (
@@ -195,6 +197,8 @@ function extra() {
   try {
     for (const c of PLAY_COLS) if (!have.has(c)) D.exec(`ALTER TABLE profile ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // c is a constant from PLAY_COLS, never input
     if (!acct.has('lb_hidden')) D.exec('ALTER TABLE accounts ADD COLUMN lb_hidden INTEGER NOT NULL DEFAULT 0');   // NOTES 126: 1 = the owner turned off Show me on the global leaderboard
+    const bot = new Set(D.prepare('PRAGMA table_info(bot_record)').all().map(c => c.name));
+    for (const c of ['best_for', 'best_against']) if (!bot.has(c)) D.exec(`ALTER TABLE bot_record ADD COLUMN ${c} INTEGER NOT NULL DEFAULT 0`);   // NOTES 183: the score of the best win (0-0 = not recorded: an older row, read as 11 to 11 - best_margin)
     D.exec(EXTRA); recomputed = Number(D.prepare(RECOMPUTE).run().changes); D.exec('COMMIT');
   } catch (e) { if (D.isTransaction) D.exec('ROLLBACK'); throw e; }
 }
@@ -303,9 +307,9 @@ function prepare() {                                             // every statem
     playAdd: q(`UPDATE profile SET ${PLAY_COLS.map(c => c + ' = ' + c + ' + ?').join(', ')} WHERE owner_id = ?`),   // the play counters, PLAY_COLS order (constants, never input). Its own statement: profSet stays as the ladder work left it
     botGet: q('SELECT * FROM bot_record WHERE owner_id = ? AND level = ?'),
     botAll: q('SELECT * FROM bot_record WHERE owner_id = ? ORDER BY level'),
-    botPut: q(`INSERT INTO bot_record (owner_id, level, wins, losses, abandons, streak, best_streak, first_win_at, best_margin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    botPut: q(`INSERT INTO bot_record (owner_id, level, wins, losses, abandons, streak, best_streak, first_win_at, best_margin, best_for, best_against) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (owner_id, level) DO UPDATE SET wins = excluded.wins, losses = excluded.losses, abandons = excluded.abandons, streak = excluded.streak,
-      best_streak = excluded.best_streak, first_win_at = excluded.first_win_at, best_margin = excluded.best_margin`),
+      best_streak = excluded.best_streak, first_win_at = excluded.first_win_at, best_margin = excluded.best_margin, best_for = excluded.best_for, best_against = excluded.best_against`),
     acctIns: q('INSERT INTO accounts (owner_id, google_sub, created_at) VALUES (?, ?, ?)'),
     acctBySub: q('SELECT id, owner_id, username, renamed_at FROM accounts WHERE google_sub = ?'),
     acctById: q('SELECT id, owner_id, username, username_key, renamed_at, created_at, merges, google_sub FROM accounts WHERE id = ?'),
@@ -447,9 +451,10 @@ function fold(g, a, now) {
     S.playAdd.run(...PLAY_COLS.map(c => Math.round(num(G[c], 0, 1e9))), a);   // the play counters add (docs/SHARE.md 1)
   }
   for (const gb of S.botAll.all(g)) {
-    const ab = S.botGet.get(a, gb.level) || { wins: 0, losses: 0, abandons: 0, streak: 0, best_streak: 0, first_win_at: null, best_margin: 0 };
+    const ab = S.botGet.get(a, gb.level) || { wins: 0, losses: 0, abandons: 0, streak: 0, best_streak: 0, first_win_at: null, best_margin: 0, best_for: 0, best_against: 0 };
     const first = gb.first_win_at == null ? ab.first_win_at : ab.first_win_at == null ? gb.first_win_at : Math.min(gb.first_win_at, ab.first_win_at);
-    S.botPut.run(a, gb.level, ab.wins + gb.wins, ab.losses + gb.losses, ab.abandons + gb.abandons, ab.streak, Math.max(ab.best_streak, gb.best_streak), first, Math.max(ab.best_margin, gb.best_margin));
+    const gs = bestScore(gb) || [0, 0], as = bestScore(ab) || [0, 0], [bf, ba] = better(gs[0], gs[1], as[0], as[1]) ? gs : as;   // the better of the two best scores (a derived 11-x is written down at the merge)
+    S.botPut.run(a, gb.level, ab.wins + gb.wins, ab.losses + gb.losses, ab.abandons + gb.abandons, ab.streak, Math.max(ab.best_streak, gb.best_streak), first, Math.max(ab.best_margin, gb.best_margin), bf, ba);
   }
   S.logMoveA.run(a, g); S.logMoveB.run(a, g);                    // the pair caps keep working across the merge
   // the trophy ladder (docs/TROPHIES.md 1): a merge must never double a position: trophies / best_* / tier take the max, W/L and Matt games add, the streak is
@@ -556,13 +561,14 @@ const recordMatch = guard(null, m => {
         if (rec && (won || lost)) { p.h_points_won += sc[i]; p.h_points_lost += sc[1 - i]; }
         res.streak = p.h_streak;
       } else {
-        const b = S.botGet.get(o, level) || { wins: 0, losses: 0, abandons: 0, streak: 0, best_streak: 0, first_win_at: null, best_margin: 0 };
+        const b = S.botGet.get(o, level) || { wins: 0, losses: 0, abandons: 0, streak: 0, best_streak: 0, first_win_at: null, best_margin: 0, best_for: 0, best_against: 0 };
         if (rec) {
           if (won) { b.wins++; b.streak++; b.best_streak = Math.max(b.best_streak, b.streak); b.best_margin = Math.max(b.best_margin, sc[i] - sc[1 - i]);
+            { const cur = bestScore(b) || [0, 0]; if (better(sc[i], sc[1 - i], cur[0], cur[1])) { b.best_for = sc[i]; b.best_against = sc[1 - i]; } }   // the best win's score (NOTES 183); an older row's derived 11-x counts as the one to beat
             if (b.first_win_at == null) { b.first_win_at = now; res.first = true; } }
           else if (lost || ending === 'left') { b.losses++; b.streak = 0; }        // G1a: quitting after the first strike is a loss
           else if (ending === 'dropped') { b.abandons++; b.streak = 0; }           // G1b / C': no W/L, streak broken
-          S.botPut.run(o, level, b.wins, b.losses, b.abandons, b.streak, b.best_streak, b.first_win_at, b.best_margin);
+          S.botPut.run(o, level, b.wins, b.losses, b.abandons, b.streak, b.best_streak, b.first_win_at, b.best_margin, b.best_for, b.best_against);
         }
         res.streak = b.streak;
       }
@@ -653,8 +659,14 @@ const oneWay = guard({ aOverB: 0, bOverA: 0 }, (a, b, since, series = null) => {
 const established = guard(false, (o, now) => { if (!isId(o)) return false; const w = S.ownerGet.get(o), p = S.profGet.get(o); return !!w && (now - w.created_at >= DAY || (!!p && p.played >= 3)); });   // R11c
 
 // profileOf(ownerId) -> the Profile shape of section 8.2 | null.
+// better(for, against, bestFor, bestAgainst): is the score for-against a better win than the best so far? A wider margin wins; the same
+// margin with fewer points given up (11-9 over 12-10); nothing recorded yet (0-0) loses to anything.
+const better = (f, a, bf, ba) => bf <= 0 || f - a > bf - ba || f - a === bf - ba && a < ba;
+// bestScore(row) -> [for, against] of the best win, or null. An older row (before NOTES 183) has the margin only: read as 11 to 11 - margin (a
+// deuce game, 12-10, reads 11-9; the first win from now on records itself). WIN_BOT: the game's WIN_AT in production
+const WIN_BOT = 11, bestScore = b => !b || !(b.best_margin > 0) ? null : b.best_for > 0 ? [b.best_for, b.best_against] : [WIN_BOT, Math.max(0, WIN_BOT - b.best_margin)];
 function levelRow(o, lv) { const b = S.botGet.get(o, lv); return { level: lv, name: LEVEL_NAME[lv], wins: b ? b.wins : 0, losses: b ? b.losses : 0, abandons: b ? b.abandons : 0,
-  streak: b ? b.streak : 0, bestStreak: b ? b.best_streak : 0, firstWinAt: b ? b.first_win_at : null, bestMargin: b ? b.best_margin : 0 }; }
+  streak: b ? b.streak : 0, bestStreak: b ? b.best_streak : 0, firstWinAt: b ? b.first_win_at : null, bestMargin: b ? b.best_margin : 0, bestScore: bestScore(b) }; }
 function expiresOf(w, p) { return w.kind === 'device' ? w.touched_at + (p.played <= 1 ? cfg.guestOneDays : cfg.guestDays) * DAY : null; }
 const profileOf = guard(null, (o, now = Date.now()) => {
   if (!isId(o)) return null;

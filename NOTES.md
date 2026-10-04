@@ -4020,3 +4020,21 @@ not: the public card and the share card carried the toughest Matt's name only. N
   ball (-.5rem, -9deg, 106%), a small landing. Rookie ambles, Club hops, Tour winds up and smashes, Pro darts. The
   keyboard twin `lob-smash-k` keeps the focus-visible restart trick the other three have. The global reduced-motion block
   clamps it like the rest.
+
+## 192. The public card shows the best score against the toughest Matt beaten
+
+The owner (2026-10-04): "on pub profile for matt level beaten, can u make it show the best game score between the player and matt of that
+difficulty the player beat?" Only the margin was kept (bot_record.best_margin), and a margin of 2 is 11-9 or 12-10. So:
+- server/db.js: bot_record gains best_for / best_against (ALTER at open, in extra(), default 0-0 = not recorded). A win writes them when it is
+  better(): a wider margin, or the same margin with fewer points given up (11-9 over 12-10); a merge keeps the better of the two sides'.
+  levelRow adds `bestScore: [for, against] | null`: the recorded score, or for an older row 11 to 11 - best_margin (WIN_BOT = 11; a deuce
+  game from before today reads 11-9, and the derived score is the one a new win must beat, so a 12-10 after it does not replace an 11-3).
+- server/card.js dataOf adds `mattScore: '11-3' | null` for the toughest Matt beaten (validated: for > against, both 0..99), on the public
+  card's answer and in the share card's hash; the share PNG's pill reads "Beat the Pro bot 11-3" (the 11-0 of NOTES 182 is the same line).
+- The public card (#lbp-mscore, a small line under the level like Your stats' day): "Best 11–3", hidden when there is none. Your stats
+  itself is unchanged: its chips carry the W-L record per level and the day under the badge.
+- Legal (same commit): privacy.html's public-card and shared-card lines add "with your best score against it". docs/ACCOUNTS.md schema
+  and fold rule updated.
+- Tests: accounts-unit (the write rule 11-4 over 11-9, the fold, a v1 file's margin-only row reads 11-3 and a later 12-10 leaves it),
+  share.test (mattScore on the data and the SVG, a nonsense score dropped), lb-profile-ui (Dan "Best 11–0", Juno none; a screenshot
+  test/ui-shots/accounts/lbp-card-dan-1280x800.png; 39 checks).

@@ -178,6 +178,8 @@ CREATE TABLE bot_record (
   best_streak   INTEGER NOT NULL DEFAULT 0,
   first_win_at  INTEGER,                      -- the "you beat Pro Matt" moment
   best_margin   INTEGER NOT NULL DEFAULT 0,   -- biggest winning margin at this level
+  best_for      INTEGER NOT NULL DEFAULT 0,   -- the score of the best win (widest margin, then fewest points given up); 0-0 = a row from before NOTES 183, read as 11 to 11 - best_margin
+  best_against  INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (owner_id, level)
 );
 
@@ -264,7 +266,7 @@ Sign-in (`POST /api/signin`, section 8) carries the browser's device id in the J
 
 Fold rules (guest G into account A): `played, h_wins, h_losses, h_points_*, tour_titles` add. `h_best_streak,
 best_rally, best_hit, best_speed` take the max (and its `_at`). `h_streak` keeps A's value (a streak is not summed
-across devices). Per level: `wins, losses, abandons` add, `best_streak, best_margin` max, `streak` keeps A's,
+across devices). Per level: `wins, losses, abandons` add, `best_streak, best_margin` max, `best_for / best_against` the better score, `streak` keeps A's,
 `first_win_at` takes the earlier non-null. `match_log` rows naming G are rewritten to A (so pair caps keep working).
 
 After sign-OUT the client rotates the device id (section 3.1), so the next guest session on that browser is a fresh

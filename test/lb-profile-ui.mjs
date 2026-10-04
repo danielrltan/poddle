@@ -21,8 +21,8 @@ const NAMES = ['Dan', 'Kiko', 'Rallyqueen', 'Paddlebot', 'Mo', 'Ace_Vega', 'Lobs
 const ROWS = NAMES.map((name, i) => ({ rank: i + 1, name, v: 60 - i * 4, tier: i < 8 ? 8 - (i >> 1) : null, div: 1 + (i % 3) }));      // Pickle_Rick .. Juno: no trophies yet
 const card = (name, rank, trophies, matt, stats) => ({ name, streak: name === 'Dan' ? 5 : 0, rank, trophies, matt, stats });      // streak: the current win streak (NOTES 164)
 const PLAYERS = {
-  Dan: { delay: 300, body: { ...card('Dan', { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, 1180, 'Pro', eleven('81%', '42-7', '31h 12m', '12', '86%', '58%', '60', '1570', '318', '41', '97', '4')) , mattFlawless: true } },
-  Kiko: { body: card('Kiko', { tier: 7, div: 2, label: 'Champion II', pro: null }, 964, 'Tour', eleven('67%', '18-9', '9h 40m', '5', '73%', '54%', '56', '1340', '140', '12', '33', '1')) },
+  Dan: { delay: 300, body: { ...card('Dan', { tier: 8, div: 1, label: 'Pro #1', pro: 1 }, 1180, 'Pro', eleven('81%', '42-7', '31h 12m', '12', '86%', '58%', '60', '1570', '318', '41', '97', '4')) , mattFlawless: true, mattScore: '11-0' } },
+  Kiko: { body: { ...card('Kiko', { tier: 7, div: 2, label: 'Champion II', pro: null }, 964, 'Tour', eleven('67%', '18-9', '9h 40m', '5', '73%', '54%', '56', '1340', '140', '12', '33', '1')) , mattScore: '12-10' } },
   Juno: { body: card('Juno', null, 0, null, eleven('-', '0-0', '0m', '0', '-', '-', '0', '-', '0', '0', '0', '0')) },
   Pickle_Rick: { body: card('Pickle_Rick', null, 0, 'Rookie', eleven('78%', '4,321-1,234', '277h 46m', '1,234', '89%', '53%', '444', '2570', '88,888', '88,888', '88,888', '1,234')) },
   Lobster: { delay: 800, body: card('Lobster', { tier: 5, div: 1, label: 'Diamond I', pro: null }, 610, 'Club', eleven('50%', '7-7', '4h 2m', '3', '64%', '51%', '36', '1100', '60', '9', '14', '0')) },
@@ -74,7 +74,7 @@ const rowSel = n => `#lb-list button.lb-row[data-name="${n}"]`;      // test nam
 const sheet = pg => ev(pg, () => { const c = document.getElementById('lbp-card'), l = document.getElementById('acct-layer'), a = document.activeElement, g = id => document.getElementById(id);
   const vis = e => !!e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none';
   return { open: !!c && !c.hidden && !l.hidden, state: c?.dataset.state, name: g('lbp-name')?.textContent, badge: !!g('lbp-name')?.nextElementSibling?.classList.contains('reg-badge'), rank: g('lbp-rank')?.textContent,
-    mcls: g('lbp-matt')?.className, mtip: g('lbp-matt')?.dataset.tip || g('lbp-matt')?.title || '', em: !!g('lbp-em')?.querySelector('.rank-em'), emA11y: [g('lbp-em')?.getAttribute('role'), g('lbp-em')?.getAttribute('aria-label')].join('|'), tro: vis(g('lbp-tro')) ? g('lbp-trophies').textContent : null, mbest: g('lbp-mbest')?.textContent, statsShown: vis(g('lbp-stats')),
+    mscore: g('lbp-mscore') && !g('lbp-mscore').hidden ? g('lbp-mscore').textContent : null, mcls: g('lbp-matt')?.className, mtip: g('lbp-matt')?.dataset.tip || g('lbp-matt')?.title || '', em: !!g('lbp-em')?.querySelector('.rank-em'), emA11y: [g('lbp-em')?.getAttribute('role'), g('lbp-em')?.getAttribute('aria-label')].join('|'), tro: vis(g('lbp-tro')) ? g('lbp-trophies').textContent : null, mbest: g('lbp-mbest')?.textContent, statsShown: vis(g('lbp-stats')),
     stats: [...Array(11).keys()].map(i => ({ v: document.querySelector(`#lbp-stats [data-stat="${i}"]`)?.textContent, skel: g('lbp-stats').classList.contains('is-skel') })), rec: g('lbp-w').textContent + '-' + g('lbp-l').textContent, streak: vis(g('lbp-streak')) ? g('lbp-streak-n').textContent : null, friendFirst: g('lbp-friend').compareDocumentPosition(g('lbp-hero')) & 4 ? true : false,      // the eleven public figures by their [data-stat] index (server/card.js dataOf's order), in Your stats' layout (NOTES 164)
     msg: vis(g('lbp-msg')) ? g('lbp-msg').textContent : '', retry: vis(g('lbp-retry')), foot: vis(g('lbp-foot')) ? g('lbp-foot').textContent : '',
     inCard: !!c && c.contains(a), focusRow: a?.matches?.('button.lb-row') ? a.dataset.name : null, focusConnected: !!a?.isConnected, view: window.__ui.lobbyView(), path: location.pathname }; });
@@ -96,7 +96,8 @@ ok(s.open && s.name === 'Dan' && s.badge && s.state === 'ok' && !(await ev(pg, s
 { const a = await ev(pg, () => { const c = document.getElementById('lbp-card'); return { role: c.getAttribute('role'), modal: c.getAttribute('aria-modal'), by: document.getElementById(c.getAttribute('aria-labelledby'))?.textContent }; });
   ok(a.role === 'dialog' && a.modal === 'true' && a.by === 'Dan', `a modal dialog labelled by the name (${J(a)})`); }
 await sleep(500); s = await sheet(pg);
-ok(s.mcls === 'lbp-matt st-mbadge is-lv3 is-flawless' && s.mtip === 'Beaten 11-0', `Dan's Pro Matt was beaten 11-0: the badge wears the gold ring (${s.mcls}, "${s.mtip}")`);
+await pg.screenshot({ path: new URL('./ui-shots/accounts/lbp-card-dan-1280x800.png', import.meta.url).pathname });      // the public card as a whole, for a look
+ok(s.mcls === 'lbp-matt st-mbadge is-lv3 is-flawless' && s.mtip === 'Beaten 11-0' && s.mscore === 'Best 11\u201310'.replace('10', '0'), `Dan's Pro Matt was beaten 11-0: the badge wears the gold ring, the best score under the level (${s.mcls}, "${s.mtip}", "${s.mscore}")`);
 ok(s.state === 'ok' && s.rank === 'Pro #1' && s.em && s.tro === '1,180' && s.mbest === 'Pro Matt' && s.stats.map(x => x.v).join() === '81%,31h 12m,12,86%,58%,60,1570,318,41,97,4' && !s.foot && s.rec === '42-7' && s.streak === '5' && s.friendFirst,
   `loaded: Pro #1, 1,180 trophies, Pro Matt, the eleven in Your stats' layout with the 42-7 record, the flame at 5, the friend row over the hero, no own-row footer (${J({ rank: s.rank, tro: s.tro, mbest: s.mbest, foot: s.foot, rec: s.rec, streak: s.streak, stats: s.stats.map(x => x.v) })})`);
 ok(s.inCard, 'focus is inside the sheet');
@@ -143,7 +144,7 @@ ok(s.open && s.name === 'Nova' && s.state === 'ok' && s.stats[0].v === '50%', `L
 await pg.keyboard.press('Escape'); await sleep(200);
 await pg.click(rowSel('Juno'), { clickCount: 2 }); await sleep(600); s = await sheet(pg);
 ok(s.open && s.name === 'Juno' && s.state === 'ok', `a double click opens the sheet once and leaves it open (${J({ open: s.open, state: s.state })})`);
-ok(s.mcls === 'lbp-matt st-mbadge is-none' && s.mtip === '', `no Matt beaten: no ring, no tooltip (${s.mcls})`);
+ok(s.mcls === 'lbp-matt st-mbadge is-none' && s.mtip === '' && s.mscore === null, `no Matt beaten: no ring, no tooltip, no score line (${s.mcls}, ${s.mscore})`);
 ok(s.rank === 'No trophies yet' && !s.em && s.emA11y === '|' && s.tro === null && s.mbest === 'None yet' && s.stats.map(x => x.v).join() === '-,0m,0,-,-,0,-,0,0,0,0' && s.rec === '0-0' && s.streak === '0', `no trophies yet: no emblem, "No trophies yet", no trophies, the zeros and dashes as the card has them (${J({ rank: s.rank, v: s.stats.map(x => x.v) })})`);
 await pg.keyboard.press('Escape'); await sleep(250); s = await sheet(pg); ok(!s.open && s.focusRow === 'Juno', `Esc after the double click: focus on Juno's row (${s.focusRow})`);
 

@@ -318,6 +318,8 @@ function drawPlayer(p, state) {
   const tro = num(p.trophies); show('lbp-tro', !!rank && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
   const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) { mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi) + (mi >= 0 && p.mattFlawless === true ? ' is-flawless' : ''); if (mi >= 0 && p.mattFlawless === true) mb.title = `Beaten ${FLAWLESS}-0`; else { mb.removeAttribute('title'); delete mb.dataset.tip; } }      // ui.js adoptTitle moves a title to data-tip; an emptied title leaves the old tip, so it is cleared here      // mattFlawless: the server's card data (card.dataOf), the same gold ring as Your stats
   text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
+  const msc = mi >= 0 && typeof p.mattScore === 'string' && /^\d{1,2}-\d{1,2}$/.test(p.mattScore) ? p.mattScore : '';      // the best score against that Matt (card.dataOf mattScore, NOTES 183): under the level, where Your stats has the day
+  text('lbp-mscore', msc ? `Best ${msc.replace('-', '\u2013')}` : ''); show('lbp-mscore', !!msc);
   const pl = $('lbp-places');      // the place numbers /api/player gave (never the values): one short line
   if (pl) { pl.textContent = ''; const P = p.places && typeof p.places === 'object' ? p.places : null;
     for (const [k, l] of PLACE_BOARDS) { const x = P && P[k] && Number.isInteger(P[k].rank) && P[k].rank > 0 ? P[k].rank : 0; if (!x) continue;
