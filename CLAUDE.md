@@ -71,7 +71,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   cap; at most LOG_CAP_DAY=100 rows per owner a day; no row for leaving Matt), sessions at expiry, friend_reqs 30 d after created (declined or not; sweep step `friendreqs`), friendships until removed or
   either account is deleted / swept, name holds 30 d
   (rename) / 90 d (deleted account). Fly volume snapshots daily, kept 5 d; admin backups in /tmp, gone within 5 d.
-- Public: player names, scores, moves; spectator names to players on watch / ask-to-play, to all on emotes;
+- Public: player names, scores, moves; spectator names to players on watch / ask-to-play; the sender's name (player or spectator) to all on emotes;
   tournament host and player names, bracket; listed courts in the court list. Registered usernames
   (replace the display name) to opponents, spectators, court list, brackets; the developer's username (Dan) shows a hammer badge
   (tooltip "Developer") and always plays as its own fixed character; so does the username Mae (a white lop-eared bunny, and a small pink bow on the corner of her name wherever it shows, NOTES 148) (scene.js LOOKS,

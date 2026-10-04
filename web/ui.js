@@ -457,7 +457,7 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
 
 // ---------- small things ----------
 export function setMode(name) { setText($('mode'), name); for (const o of $('move-seg')?.children || []) o.setAttribute('aria-checked', String(o.dataset.move === String(name).toLowerCase())); }      // how you move lives in the settings panel now (docs/NEXT.md 14d)
-// Matt's level, or null when the other seat is not Matt: the 1 2 3 4 key hint and the settings Difficulty row show only against him
+// Matt's level, or null when the other seat is not Matt: the B key hint and the settings Difficulty row show only against him
 export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); show('bot-pick', on); if (!on) return; swapText($('bot-level'), String(level), 'ov-pop');
   for (const id of ['bot-seg', 'pick-seg']) for (const o of $(id)?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level)));
 }
@@ -697,23 +697,34 @@ export function setView(name, who = '', tier = null) {    // tier: that player's
   for (const c of document.querySelectorAll('#views .view-chip')) c.setAttribute('aria-pressed', String(c.dataset.view === name));
 }
 on2('views', 'click', e => { const c = e.target.closest('.view-chip'); if (c && onViewFn) onViewFn(c.dataset.view); });
-on2('views', 'keydown', e => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; const cs = [...$('views').children], i = cs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault(); cs[(i + d + 4) % 4].focus(); });
-// ---------- spectator emotes: a row of Apple emoji bottom-right (web/emoji/, from iamcal/emoji-data img-apple-160), happy to sad.
-// A pick goes to the server; it comes back to everyone in the court (the sender too) and pops in from the right edge. No cooldown: tap as fast as you like.
-export const EMOTES = [['1f923', '🤣', 'Rolling on the floor laughing'], ['1f975', '🥵', 'Hot'], ['1f92f', '🤯', 'Mind blown'],
-  ['1f621', '😡', 'Angry'], ['1f480', '💀', 'Skull'], ['1f940', '🥀', 'Wilted flower'], ['1f622', '😢', 'Crying']];     // the index is the wire value (server EMOTES)
-let onEmoteFn = null;
+on2('views', 'keydown', e => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; const cs = [...$('views').querySelectorAll('.view-chip')], i = cs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault(); cs[(i + d + 4) % 4].focus(); });
+// ---------- emotes, for players and spectators: a small bar of GG and nine Apple emoji bottom-right (web/emoji/, from iamcal/emoji-data
+// img-apple-160), each with its key, 1 to 0. A pick goes to the server; it comes back to everyone in the court (the sender too) and pops up
+// briefly in the corner. One a second (NOTES 205): the bar dims meanwhile, and a key or tap then does nothing.
+export const EMOTES = [['gg', 'GG', 'GG'], ['1fae1', '🫡', 'Salute'], ['1f49a', '💚', 'Green heart'], ['1f602', '😂', 'Tears of joy'], ['1f975', '🥵', 'Hot'],
+  ['1f621', '😡', 'Angry'], ['1f92f', '🤯', 'Mind blown'], ['1f480', '💀', 'Skull'], ['1f940', '🥀', 'Wilted flower'], ['1f622', '😢', 'Crying']];     // the index is the wire value (server EMOTES); key i + 1, the tenth on 0
+const EMOTE_COOL = 1000;
+let onEmoteFn = null, emoteCool = 0, emoteT = 0;
 export function onEmote(fn) { onEmoteFn = fn; }
-const emoteImg = i => { const img = document.createElement('img'); img.src = new URL(`emoji/${EMOTES[i][0]}.png`, import.meta.url).href; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
+const emoteImg = i => { if (EMOTES[i][0] === 'gg') { const g = document.createElement('b'); g.className = 'emote-gg'; g.textContent = 'GG'; return g; }
+  const img = document.createElement('img'); img.src = new URL(`emoji/${EMOTES[i][0]}.png`, import.meta.url).href; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
 { const box = $('emotes');
-  if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.title = em[2]; b.append(emoteImg(i)); box.append(b); });
-  on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (!b || !onEmoteFn) return; restart(b, 'ov-sent'); onEmoteFn(+b.dataset.e); }); }      // the face squashes and springs as it goes
-// one reaction arriving: floats up from the bottom-right corner like a live-stream reaction, swaying, and fades. Eight on screen at most
+  if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'), k = document.createElement('span'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.setAttribute('aria-keyshortcuts', String((i + 1) % 10)); b.title = em[2];
+    k.className = 'emote-key'; k.textContent = String((i + 1) % 10); k.setAttribute('aria-hidden', 'true'); b.append(emoteImg(i), k); box.append(b); });
+  on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (b) sendEmote(+b.dataset.e); }); }
+// a click or a key (main.js: 1-9, 0): the face squashes and springs as it goes, then the bar rests for a second. false = resting, nothing sent
+export function sendEmote(i) {
+  const box = $('emotes'), t = performance.now(); if (!box || !EMOTES[i] || !onEmoteFn || t < emoteCool) return false;
+  emoteCool = t + EMOTE_COOL; const b = box.children[i]; if (b) restart(b, 'ov-sent');
+  restart(box, 'is-cool'); clearTimeout(emoteT); emoteT = setTimeout(() => box.classList.remove('is-cool'), EMOTE_COOL);
+  onEmoteFn(i); return true;
+}
+// one reaction arriving: rises a little from just above the bar and fades within two seconds, over the corner, never the court's middle. Five on screen at most
 export function emote(i, name) {
   const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
-  while (layer.childElementCount >= 8) layer.firstElementChild.remove();
-  const el = document.createElement('div'), body = document.createElement('i'), dur = 3.2 + Math.random() * 1.2; el.className = 'emote-pop';
-  el.style.setProperty('--x', `${(Math.random() * 3).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.5 + Math.random() * 1)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
+  while (layer.childElementCount >= 5) layer.firstElementChild.remove();
+  const el = document.createElement('div'), body = document.createElement('i'), dur = 1.8 + Math.random() * .4; el.className = 'emote-pop';
+  el.style.setProperty('--x', `${(Math.random() * 6).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.25 + Math.random() * .5)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
   body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only
   el.append(body); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), dur * 1000 + 500); layer.append(el);
 }

@@ -125,17 +125,18 @@
   <!-- the count into a match: 3, 2, 1 over the court, so a serve never arrives before the paddle is up (ui.countdown) -->
   <div class="countdown" id="count" role="status" data-fit hidden><b id="count-n" data-text=""></b><span>Get ready</span></div>
 
-  <!-- bottom-right: the keys worth a hint. C always; 1 2 3 4 only while the other seat is Matt (ui.setBot). Every other key still works and says nothing. -->
+  <!-- bottom-right, above the emote bar: the keys worth a hint. C always; B only while the other seat is Matt (ui.setBot). Every other key still works and says nothing. -->
   <div class="keyhints" id="keys" data-fit>
-    <ul><li><span class="keycap">C</span>Calibrate</li><li id="key-bot" hidden><span class="keycap">1</span><span class="keycap">2</span><span class="keycap">3</span><span class="keycap">4</span>Difficulty: <span id="bot-level">Club</span></li></ul>
+    <ul><li><span class="keycap">C</span>Calibrate</li><li id="key-bot" hidden><span class="keycap">B</span>Difficulty: <span id="bot-level">Club</span></li></ul>
   </div>
 
-  <!-- spectators: view chips bottom-left (keys 1-4), the split-screen divider, emotes bottom-right (ui.js builds the buttons); for everyone the emote pops and the seat-hold card -->
-  <div class="views" id="views" role="group" aria-label="View" data-fit>
-    <button class="view-chip" data-view="broadcast" aria-pressed="true"><span class="keycap">1</span><span>Broadcast</span></button>
-    <button class="view-chip" data-view="split" aria-pressed="false"><span class="keycap">2</span><span>Split</span></button>
-    <button class="view-chip" data-view="pov" aria-pressed="false"><span class="keycap">3</span><span id="view-pov">Player</span></button>
-    <button class="view-chip" data-view="free" aria-pressed="false"><span class="keycap">4</span><span>Free</span></button>
+  <!-- spectators: view chips bottom-left (V steps through them), the split-screen divider. For everyone: the emote bar bottom-right (keys 1-0; ui.js builds the buttons), the emote pops and the seat-hold card -->
+  <div class="views" id="views" role="group" aria-label="View" aria-keyshortcuts="V" data-fit>
+    <span class="keycap views-key" aria-hidden="true">V</span>
+    <button class="view-chip" data-view="broadcast" aria-pressed="true"><span>Broadcast</span></button>
+    <button class="view-chip" data-view="split" aria-pressed="false"><span>Split</span></button>
+    <button class="view-chip" data-view="pov" aria-pressed="false"><span id="view-pov">Player</span></button>
+    <button class="view-chip" data-view="free" aria-pressed="false"><span>Free</span></button>
   </div>
   <div id="split-line" aria-hidden="true"></div>
   <div class="emotes" id="emotes" role="group" aria-label="React"></div>

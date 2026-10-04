@@ -1,13 +1,13 @@
-// The winner's shot (NOTES 165): real server/game.js, fake AirPods, real Chromes. Ann + Ben play to 3, Cat watches.
-// The winner: the title holds the court for 2 s with no panel, then the cut: the result panel down the right two fifths, the winner in the left
-// three fifths holding the trophy where the paddle was (it turns with the paddle), solid, looked at by one camera. The loser and the spectator get
-// the cut at once. A tall window lays the panel along the bottom. A rematch puts the paddle back and the play camera with it.
-// VICTORY_PORT=<base> moves the block (base .. base+2). Screenshots: test/ui-shots/victory-*.png. LOOK at them.
+// The emote bar (NOTES 205): real server/game.js, fake AirPods, real Chromes. Ann and Ben play, Cat watches.
+// Everyone on the court gets the small bar bottom-right: GG and nine emoji, keys 1 to 0 under them, the player's key strip above it, nothing
+// overlapping. A key sends one to the whole court (a short pop with the sender's name, gone in about two seconds); the bar then rests a
+// second (dimmed; a second key does nothing). The spectator emotes too, and V steps through the views (1-4 did, before they were emotes).
+// EMOTEBAR_PORT=<base> moves the block (base .. base+2). Screenshots: test/ui-shots/emotes-*.png. LOOK at them.
 import { spawn } from 'child_process'; import fs from 'fs';
 import { WebSocketServer } from 'ws';
 import puppeteer from 'puppeteer-core';
 import { makeSynth, CALIBRATE, SESSION_LOOP } from './fake-bridge.mjs';
-const root = new URL('..', import.meta.url).pathname, SHOTS = root + 'test/ui-shots/', sleep = ms => new Promise(r => setTimeout(r, ms)), P0 = +process.env.VICTORY_PORT || 8470;
+const root = new URL('..', import.meta.url).pathname, SHOTS = root + 'test/ui-shots/', sleep = ms => new Promise(r => setTimeout(r, ms)), P0 = +process.env.EMOTEBAR_PORT || 8490;
 if ([8080, 8787, 3000].some(p => p >= P0 && p <= P0 + 2)) { console.log("refusing: that port range holds the player's own game"); process.exit(2); }
 const out = [], errs = [];                                  // one tally across the three sessions
 function rig(env = {}) {
@@ -53,7 +53,7 @@ function rig(env = {}) {
     await pg.goto(url(tag, query)); await sleep(1500); return pg; }
   const shot = async (pg, n, sizes = [[1280, 720]]) => { const was = pg.viewport();
     for (const [w, h] of sizes) { if (pg.viewport().width !== w || pg.viewport().height !== h) { await pg.setViewport({ width: w, height: h }); await sleep(500); } await pg.mouse.move(w / 2, h / 2 + 3); await sleep(450);
-      await pg.screenshot({ path: `${SHOTS}victory-${n}-${w}x${h}.png` }); }
+      await pg.screenshot({ path: `${SHOTS}emotes-${n}-${w}x${h}.png` }); }
     if (pg.viewport().width !== was.width || pg.viewport().height !== was.height) { await pg.setViewport(was); await sleep(400); } };
   const BOTH = [[1280, 720], [600, 900]];
   const type = async (pg, text) => { for (const c of text) await pg.keyboard.type(c, { delay: 25 }); await sleep(150); };
@@ -68,65 +68,42 @@ function rig(env = {}) {
   return { G, B, DEAD, server, slog, pods, rest, go, swing, ok, note, done, close, st, until, open, shot, BOTH, type, play, toLobby, toCourt, reload, url, errs, out, boxes, overlaps };
 }
 
-
-setTimeout(() => { console.log('VICTORY E2E FAIL (timeout)'); process.exit(2); }, 12 * 60000);
+setTimeout(() => { console.log('EMOTEBAR E2E FAIL (timeout)'); process.exit(2); }, 6 * 60000);
 fs.mkdirSync(SHOTS, { recursive: true });
-const R = rig({ WIN_AT: '3', WIN_BY: '1' }), { ok, st, until, open, shot, BOTH, type, play, toLobby, toCourt } = R; let s;
+const R = rig({ WIN_AT: '11' }), { ok, done, until, open, shot, type, play, toLobby, toCourt, boxes, overlaps } = R; let s; const J = JSON.stringify;
 const a = await open('a', 'Ann'), b = await open('b', 'Ben');
 await toLobby(a); await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'share view'); const CODE = s.share;
 await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await type(b, CODE); await b.keyboard.press('Enter'); await a.click('#btn-share-go');
 await Promise.all([toCourt(a), toCourt(b)]);
-const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); await until(c, s => s.phase === 'watch', 6000, 'c watches'); await c.keyboard.press('KeyV');      // split: the shot must take the whole window back
-// what the result looks like right now: the stamp, the panel's box, the scene's shot, and where the winner's head and the trophy land on screen
-const look = pg => pg.evaluate(() => { const $ = id => document.getElementById(id), d = window.__scene._dbg, W = innerWidth, H = innerHeight, slam = $('result-slam'), card = $('result').getBoundingClientRect(), v = d.vic.side, pd = v >= 0 ? d.pads[v] : null;
-  const at = p => { const q = p.clone().project(d.camera); return [+((q.x + 1) / 2 * W).toFixed(0), +((1 - q.y) / 2 * H).toFixed(0)]; }, head = pd ? pd.avatar.position.clone().setY(1.9) : null;
-  return { W, H, overlay: document.body.dataset.overlay || null, beat: $('screen-match').dataset.beat, stamp: $('screen-match').classList.contains('is-stamp'), slam: slam.textContent, slamA: +(+getComputedStyle(slam).opacity).toFixed(2), slamBox: (r => [r.left, r.top, r.right, r.bottom].map(Math.round))(slam.getBoundingClientRect()), left: $('rematch-count').hidden ? null : $('rematch-left').textContent, ready: [$('tally-me'), $('tally-them')].map(e => e.classList.contains('is-ready')), rnote: $('rematch-note').textContent,
-    leave: !$('rematch-btns').hidden && !$('btn-leave').hidden && $('btn-rematch').hidden, emotes: (e => +getComputedStyle(e).opacity > 0.9 && getComputedStyle(e).display !== 'none' ? Math.round(e.getBoundingClientRect().right) : null)($('emotes')), pops: $('emote-layer').childElementCount,
-    card: [card.left, card.top, card.right, card.bottom].map(Math.round), vic: v, trophy: d.trophy.visible, paddle: pd ? pd.group.visible : null, solid: pd ? !pd.self && pd.avatar.visible : null,
-    same: pd ? d.trophy.quaternion.angleTo(pd.group.quaternion) < 1e-6 && d.trophy.position.distanceTo(pd.group.position) < 1e-6 : null, head: head ? at(head) : null, cup: pd ? at(d.trophy.position) : null,
-    focus: document.activeElement && document.activeElement.id, title: $('result-title').textContent, split: d.view().name, pods: d.pads.map(p => p.group.visible) }; });
-s = await until(a, s => s.overlay === 'match', 240000, 'the match ends'); const t0 = Date.now();
-const won = s.scMe > s.scThem, w = won ? a : b, l = won ? b : a, side = won ? 0 : 1; console.log('NOTE winner:', won ? 'Ann' : 'Ben');
-await sleep(Math.max(0, 600 - (Date.now() - t0)));
-let W1 = await look(w), L1 = await look(l), C1 = await look(c);
-ok(W1.slam === 'VICTORY!' && W1.slamA > 0.9 && W1.stamp && W1.card[0] >= W1.W - 2 && W1.vic === -1 && !W1.trophy, `winner at 0.6 s: VICTORY! alone over the court, the panel off screen, no cut yet (${JSON.stringify({ slam: W1.slam, a: W1.slamA, card: W1.card, vic: W1.vic })})`);
-ok(W1.focus !== 'btn-rematch', `nothing on the hidden panel has focus behind VICTORY! (${W1.focus})`); await w.keyboard.press('Enter');      // and Enter there votes for nothing
-ok(L1.slam === 'DEFEAT' && L1.slamA > 0.9 && L1.stamp && L1.card[0] >= L1.W - 2 && L1.vic === -1, `loser at 0.6 s: DEFEAT alone over the court, no panel, no cut yet (${JSON.stringify({ slam: L1.slam, a: L1.slamA, card: L1.card, vic: L1.vic })})`);
-ok(/^(Ann|Ben) wins!$/.test(C1.slam) && C1.slamA > 0.9 && C1.stamp && C1.vic === -1 && C1.slamBox[0] >= 0 && C1.slamBox[2] <= C1.W, `spectator at 0.6 s: "${C1.slam}" fits the window (${C1.slamBox}), no cut yet`);
-ok(W1.left === null && L1.left === null, `no rematch clock behind the title (${W1.left}, ${L1.left})`);
-s = await w.evaluate(() => { const scr = document.getElementById('screen-match'), t = performance.now(); new MutationObserver(() => { if (!scr.classList.contains('is-stamp') && !window.__drop) window.__drop = performance.now() - t; }).observe(scr, { attributes: true });
-  return document.getElementById('result-slam').getAnimations().map(x => x.effect.getTiming().duration)[0]; }); ok(s === 2000, `VICTORY! holds for 2 s (it was 0.95 s): ${s} ms`);
-s = await l.evaluate(() => { const e = document.getElementById('result-slam'), c = getComputedStyle(e); return c.color + ' ' + c.scale; }); ok(/^rgb\(255, 100, 100\) (none|1)$/.test(s), `DEFEAT is red and stands still at 0.6 s (${s})`);
-await w.screenshot({ path: `${SHOTS}victory-stamp-1280x720.png` });
-await sleep(Math.max(0, 4300 - (Date.now() - t0))); W1 = await look(w); L1 = await look(l); C1 = await look(c);
-const inPane = (o, x0, x1, y0, y1) => o.head && o.cup && [o.head, o.cup].every(p => p[0] > x0 && p[0] < x1 && p[1] > y0 && p[1] < y1);
-s = await w.evaluate(() => window.__drop); ok(s > 700 && s < 1800, `the panel waited behind VICTORY! until 2 s (the class dropped ${Math.round(s)} ms after the 0.6 s look)`);
-const cornered = o => o.slamA > 0.9 && o.slamBox[0] >= 0 && o.slamBox[1] >= 0 && o.slamBox[2] < o.W * 0.45 && o.slamBox[3] < o.H * 0.2;
-ok(cornered(W1) && cornered(L1) && cornered(C1), `at the cut the title shrinks into the top left corner and stays: ${W1.slam} ${W1.slamBox}, ${L1.slam} ${L1.slamBox}, ${C1.slam} ${C1.slamBox}`);
-ok(/^(20|19|18)$/.test(W1.left) && /^(20|19|18)$/.test(L1.left), `the rematch clock starts with the panel: ${W1.left} / ${L1.left} s at 1.7 s after the cut`);
-ok(L1.vic === side && L1.trophy && L1.paddle === false && L1.solid && L1.same && C1.vic === side && C1.trophy && C1.split === 'split', `loser and spectator (in split) get the same shot of seat ${side}`);
-ok(C1.leave && C1.emotes !== null && C1.emotes < C1.W * 0.6 && C1.rnote === 'Waiting for a rematch', `spectator's panel: Leave alone, the emotes over the court pane (right edge ${C1.emotes}), "${C1.rnote}"`);
-ok(!W1.stamp && W1.vic === side && W1.trophy && W1.paddle === false && W1.solid && W1.same, `winner at 4.3 s: the cut: my own seat ${W1.vic} holds the trophy, solid, no paddle (${JSON.stringify({ a: W1.slamA, paddle: W1.paddle, solid: W1.solid, same: W1.same })})`);
-ok(Math.abs(W1.card[0] - W1.W * 0.6) < 3 && W1.card[2] === W1.W && W1.card[1] === 0 && W1.card[3] === W1.H, `the panel is the right two fifths, full height (${W1.card})`);
-ok(inPane(W1, 0, W1.W * 0.6, 0, W1.H) && inPane(L1, 0, L1.W * 0.6, 0, L1.H), `the winner's head and the trophy are inside the left three fifths (winner's view ${JSON.stringify([W1.head, W1.cup])}, loser's ${JSON.stringify([L1.head, L1.cup])})`);
-ok(W1.focus === 'btn-rematch' && (await st(w)).result.btns, `Rematch has focus once the panel is in (${W1.focus}); the early Enter voted nothing`);
-s = await w.evaluate(() => { const c = document.getElementById('result'); return { fit: c.scrollHeight <= c.clientHeight + 1, rows: ['result-title', 'tally-sc-me', 'btn-rematch', 'btn-leave'].every(id => { const r = document.getElementById(id).getBoundingClientRect(), p = c.getBoundingClientRect(); return r.left >= p.left && r.right <= p.right + 1 && r.top >= 0 && r.bottom <= innerHeight; }) }; });
-ok(s.fit && s.rows, `the panel shows its title, score and both buttons without scrolling (${JSON.stringify(s)})`);
-await shot(w, 'winner'); await shot(l, 'loser'); await shot(c, 'watch', BOTH);
-await c.setViewport({ width: 600, height: 900 }); await sleep(900); C1 = await look(c);
-ok(C1.card[0] === 0 && C1.card[2] === 600 && C1.card[3] === 900 && C1.card[1] > 900 * 0.4 && inPane(C1, 0, 600, 0, C1.card[1]), `600x900: the panel lies along the bottom (${C1.card}), the winner and the trophy above it (${JSON.stringify([C1.head, C1.cup])})`); ok(cornered(C1), `600x900: the title keeps its corner after the window changes (${C1.slamBox})`);
-await c.setViewport({ width: 1280, height: 720 }); await sleep(400);
-// the trophy is the paddle's: turn the hand, it turns
-const q0 = await l.evaluate(() => window.__scene._dbg.trophy.quaternion.toArray()); R.swing(w.tag); await sleep(900); const q1 = await l.evaluate(() => window.__scene._dbg.trophy.quaternion.toArray());
-ok(Math.hypot(...q0.map((v, i) => v - q1[i])) > 0.02, `the winner's hand turns the trophy on the loser's screen too (${q0.map(v => v.toFixed(2))} -> ${q1.map(v => v.toFixed(2))})`);
-// a spectator reacts, and reads who wants another game; then leaves from the panel
-await c.click('#emotes .emote-btn'); await sleep(500); W1 = await look(w); ok(W1.pops > 0, `a spectator's emote pops on the winner's screen during the result (${W1.pops})`);
-await w.click('#btn-rematch'); await sleep(600); C1 = await look(c); L1 = await look(l); const li = won ? 0 : 1;
-ok(C1.ready[li] && !C1.ready[1 - li] && C1.rnote === `${won ? 'Ann' : 'Ben'} wants a rematch` && L1.ready[1] && !L1.ready[0], `the winner voted: the spectator reads "${C1.rnote}" and a tick on their chip (${C1.ready}); so does the loser (${L1.ready})`);
-await shot(c, 'watch-voted'); await c.click('#btn-leave'); s = await until(c, s => s.screen === 'lobby', 3000, 'the spectator leaves from the panel'); ok(s.screen === 'lobby', 'spectator: Leave on the panel goes back to the lobby');
-// rematch: the paddles and the game's own cameras come back
-await l.click('#btn-rematch'); await until(w, s => s.overlay === null, 5000, 'rematch on'); await sleep(400);
-W1 = await look(w); ok(W1.vic === -1 && !W1.trophy && W1.pods.every(Boolean) && W1.slam !== '' === false || W1.vic === -1 && !W1.trophy && W1.pods.every(Boolean), `rematch: no trophy, both paddles back (${JSON.stringify({ vic: W1.vic, trophy: W1.trophy, pods: W1.pods })})`);
-await R.close();
-const fails = out.filter(x => x.startsWith('FAIL')); if (errs.length) console.log('console/page errors:\n  ' + errs.join('\n  '));
-console.log(fails.length || errs.length ? `VICTORY E2E FAIL (${fails.length} failed, ${errs.length} page errors)` : `VICTORY E2E PASSED (${out.filter(x => x.startsWith('PASS')).length} checks)`); process.exit(fails.length || errs.length ? 1 : 0);
+const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); await until(c, s => s.phase === 'watch', 6000, 'c watches');
+const bar = pg => pg.evaluate(() => { const box = document.getElementById('emotes'), r = box.getBoundingClientRect(), cs = getComputedStyle(box);
+  return { shown: cs.display !== 'none' && +cs.opacity > 0.9 && r.width > 0, right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom), w: Math.round(r.width), h: Math.round(r.height), cool: box.classList.contains('is-cool'),
+    keys: [...box.querySelectorAll('.emote-key')].map(k => getComputedStyle(k).display === 'none' ? '' : k.textContent).join(''), first: box.firstElementChild?.textContent.replace(/\d/g, ''), n: box.childElementCount,
+    pops: [...document.querySelectorAll('#emote-layer .emote-pop')].map(p => (p.querySelector('img')?.alt || p.querySelector('.emote-gg')?.textContent) + ':' + (p.querySelector('span')?.textContent || '')) }; });
+const SIZES = [[1280, 720], [900, 700], [700, 900], [390, 844]];
+for (const [pg, who] of [[a, 'player'], [c, 'spectator']]) for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(600); await pg.mouse.move(w / 2, h / 2 + 3); await sleep(300); await pg.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);      // a toast (Your serve) hides the bar a moment
+  s = await bar(pg); const bx = await boxes(pg, ['emotes', 'keys', 'views', 'btn-ask', 'toast']), hit = overlaps(bx);
+  ok(s.shown && s.n === 10 && s.first === 'GG' && s.keys === '1234567890' && s.right >= 8 && s.bottom >= 8 && s.w <= 340, `${who} ${w}x${h}: the bar shows, GG first, keys 1-0, ${s.w}x${s.h} px, ${s.right}/${s.bottom} px off the corner`);
+  ok(!hit.length, `${who} ${w}x${h}: nothing overlaps the bar (${hit.join(', ') || 'clear'})`);
+  await pg.screenshot({ path: `${SHOTS}emotes-${who}-${w}x${h}.png` }); }
+for (const pg of [a, c]) { await pg.setViewport({ width: 1280, height: 720 }); } await sleep(600);
+await a.keyboard.press('Digit1'); await sleep(250);
+for (const [pg, who] of [[a, 'Ann'], [b, 'Ben'], [c, 'Cat']]) { s = await bar(pg); ok(s.pops.includes('GG:Ann'), `${who} sees Ann's GG with her name (${s.pops})`); }
+s = await bar(a); ok(s.cool, 'the bar rests after a pick');
+await a.keyboard.press('Digit2'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['GG:Ann']), `a second key inside the second does nothing (${s.pops})`);
+await a.screenshot({ path: `${SHOTS}emotes-pop-player-1280x720.png` }); await c.screenshot({ path: `${SHOTS}emotes-pop-spectator-1280x720.png` });
+await sleep(1000); s = await bar(a); ok(!s.cool, 'the bar is back after a second');
+await a.keyboard.press('Digit0'); await sleep(300); s = await bar(b); ok(s.pops.includes('😢:Ann'), `0 is the tenth, 😢 (${s.pops})`);
+await c.keyboard.press('Digit3'); await sleep(300); s = await bar(a); ok(s.pops.includes('💚:Cat'), `the spectator's 3 reaches the player: 💚 (${s.pops})`);
+await sleep(2600); s = await bar(b); ok(s.pops.length === 0, `the pops are gone within about two seconds (${s.pops})`);
+const v = pg => pg.evaluate(() => { const x = window.__scene._dbg.view(); return x.name + (x.name === 'pov' ? x.side : ''); });
+const seen = []; for (let i = 0; i < 5; i++) { await c.keyboard.press('KeyV'); await sleep(250); seen.push(await v(c)); }
+ok(seen.join(' ') === 'split pov0 pov1 free broadcast', `V steps through the views: ${seen.join(' ')}`);
+s = await bar(c); ok(s.pops.length === 0, 'V sends no emote');
+await c.keyboard.press('Digit2'); await sleep(250); ok((await v(c)) === 'broadcast', 'a number no longer changes the view');
+// against Matt: his difficulty row has the bottom-left corner (NOTES 204), the bar the bottom-right; they never meet, however narrow
+const d = await open('d', 'Dot'); await toLobby(d); await d.click('#btn-bot'); await sleep(300); await d.click('#btn-bot-1'); await toCourt(d); await until(d, s => s.them === 'Matt', 6000, 'Matt sits down');
+for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); await sleep(600); await d.mouse.move(w / 2, h / 2 + 3); await d.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);
+  const bx = await boxes(d, ['emotes', '#keys li', '#key-bot', 'bot-pick']), hit = overlaps(bx); ok(bx.emotes && bx['bot-pick'] && !hit.length, `against Matt ${w}x${h}: the bar and the difficulty row both show, apart (${hit.join(', ') || JSON.stringify(bx)})`);
+  await d.screenshot({ path: `${SHOTS}emotes-matt-${w}x${h}.png` }); }
+await done();

@@ -381,10 +381,10 @@ Socket URL: `?cid=..&lobby=1[&room=CODE][&watch=1][&name=..]`; `room` / `watch` 
 - `play()` with `?room=CODE`: if `ui.playerName()` is empty, open the code view prefilled and let the player type a
   name and press Join; else join (or `watch` when `&watch=1`) at once.
 - Keys. Esc: `ui.asking()` -> `ui.askWatch(null)`; phase play / watch -> `ui.settings(!ui.settings())`; else `back()`.
-  Spectator: `1 2 3 4` = views (3 again flips), `F`, `H`, `Q Q`, Esc; nothing else. One function serves keys and
+  Spectator: `V` = the next view (Player twice: one player, then the other), `1`-`9` `0` = emotes, `F`, `H`, `Q Q`, Esc; nothing else (NOTES 205; the views were 1 2 3 4). One function serves keys and
   chips (`ui.onView`): `scene.setView(...)`, then `ui.setView(v.name, v.name === 'pov' ? nameOf(v.side) : '')` with
   what the scene returned, then save `poddle.view`. A `names` change while in `pov` refreshes the chip. Player: every key of today still
-  works and says nothing new: C, M, R, F, [ ], V, H, B, 1 2 3 4, P, Q. V and H also call `ui.setSettings`. Y and N answer the
+  works and says nothing new: C, M, R, F, [ ], V, H, B, P, Q; `1`-`9` `0` send emotes (NOTES 205; 1 2 3 4 were Matt's levels, B still walks them). V and H also call `ui.setSettings`. Y and N answer the
   ask card, only while it shows; A is a spectator's Ask to play.
 - Settings callbacks: `sens(dir)` = today's `]` / `[` code path; level shown = `(90 - sideDeg) / 5 + 1` (1..14) or, in
   Body mode, `round((0.42 - body.reach) / 0.03) + 1`. `airpod(on)` / `stats(on)` -> `ui.show('podwrap' | 'dev', on)`.

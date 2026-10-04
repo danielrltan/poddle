@@ -52,8 +52,7 @@ let side = 0, role = 'player', names = [null, null], state = null, players = 0, 
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
 let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', wantWatch = LOBBY && qs.get('watch') === '1', pending = null, leaveAt = 0;   // room: the court I am seated in (the wire still says 'room'). wantRoom / wantWatch: from a shared link ?court=CODE (?room= is the old spelling and still works) or a reload. pending: the lobby request still waiting for its answer
-let botWant = null, botLevel = '', botVia = 'key', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
-const KEY_OF = { 0: '1', 1: '2', 3: '3', 2: '4' };      // wire level -> the key that picks it (display order Rookie, Club, Tour, Pro)
+let botWant = null, botLevel = '', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 // The two gates of docs/API-NEXT.md 4.2. seated: nothing from the game gets past the lobby messages while no room is joined
@@ -206,7 +205,7 @@ function showOver() {                              // the result card. A matchov
   if (spec()) ui.confetti(W ? ['#ff8a3d', '#ffd34a', '#ffffff'] : ['#3aa0ff', '#ffd34a', '#ffffff'], 60);      // a spectator: one smaller burst in the winner's colours
 }
 
-// ---------- spectator views: keys 1-4 and the chips are one function (docs/API-NEXT.md 2.3, 3.4) ----------
+// ---------- spectator views: key V and the chips are one function (docs/API-NEXT.md 2.3, 3.4) ----------
 const VIEWS = ['broadcast', 'split', 'pov', 'free'];
 const chipView = v => { const r = v.name === 'pov' ? ranks[v.side] : null; if (r) ui.setView(v.name, nameOf(v.side), r); else ui.setView(v.name, v.name === 'pov' ? nameOf(v.side) : ''); };      // the chip names the player and, when they have a rank, carries their emblem (the third argument only then: test/menu.mjs records the call)
 function showView() { const v = scene.getView(); if (v && spec()) chipView(v); }
@@ -215,6 +214,7 @@ function setView(name, flip) {                     // flip: asked for by the vie
   const was = scene.getView() || {}, v = scene.setView(name, name === 'pov' && was.name === 'pov' ? (flip ? 1 - was.side : was.side) : 0) || { name, side: 0 };
   chipView(v); if (VIEWS.includes(v.name)) ls.set('poddle.view', v.name);
 }
+function nextView() { const v = scene.getView() || { name: 'broadcast' }; setView(v.name === 'pov' && v.side === 0 ? 'pov' : VIEWS[(VIEWS.indexOf(v.name) + 1) % VIEWS.length], true); }      // V: Broadcast, Split, one player, the other, Free, round again
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
 let showPod = prefs.airpod !== false, showBody = prefs.body !== false, showStats = false;      // showBody: your own see-through player model (off = the original ghost forearm alone)      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
@@ -718,7 +718,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     const counted = m.active && !spec() && Number.isInteger(m.counted) && m.counted !== m.level && Array.isArray(m.levels) && typeof m.levels[m.counted] === 'string' ? m.levels[m.counted].slice(0, 12) : '';      // the level changed mid-match: the match counts at the easiest played (docs/ACCOUNTS.md 4.6), unless the level is picked again, which restarts it at 0-0 (NOTES 202)
     if (m.reason) { if (live() && m.reason !== 'tournament') say('Court is full', null, 1800); }
     else if (m.reset === true) { if (live() && !spec()) say(`0-0 · counts as ${botLevel}`, null, 2400); }
-    else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(counted ? `Matt · ${botLevel} · counts as ${counted} · ${botVia === 'panel' ? botLevel : KEY_OF[m.level] || botLevel} again restarts at 0-0` : `Matt · ${botLevel}`, null, counted ? 4600 : 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
+    else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(counted ? `Matt · ${botLevel} · counts as ${counted} · ${botLevel} again restarts at 0-0` : `Matt · ${botLevel}`, null, counted ? 4600 : 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
     return;
   }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
@@ -829,10 +829,10 @@ ui.onSettings({
     if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
     if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); if (m === 'auto' && camOn) stopCam(); },      // Auto turns the camera off (NOTES 190); Body turns it back on above. How you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
-  bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) { botVia = 'panel'; game.send({ type: 'bot', level }); } } });      // botVia: how the level was picked, so a mid-match hint names the same control (the button, or the key)
+  bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });      // the settings row and the row under Matt's tab
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
 ui.onView(name => setView(name, true));
-ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });
+ui.onEmote(e => { if (room) game.send({ type: 'emote', e }); });      // players and spectators alike (NOTES 205)
 ui.onRematch(yes => { if (!room) return; if (spec()) { if (!yes) leave(); return; }      // a spectator's panel has Leave alone: back to the lobby
   if (!yes && votedYes) { votedNo = true; return leave(); }      // Leave after Rematch: the server takes one answer each, and a player leaving the vote closes the court for everyone just the same
   votedYes = !!yes; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
@@ -855,18 +855,18 @@ addEventListener('keydown', e => {
   if (phase === 'title') { if (ui.settings()) { if (k === 'escape') ui.settings(false); return; } if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
   if (k === 't' && tour && !e.repeat) { tourKey(); return; }     // T: the tournament (its card in a warm-up; back to the bracket while watching; its screen from the lobby)
-  if (ui.currentOverlay() === 'tour-vs') return;      // the VS card: the seat is already drawn, so Q Q, C, B and 1-4 would only tear the card down and the seat would still pull me in (Esc is gated in esc())
-  if (phase === 'lobby' || phase === 'camera') return;           // the lobby's keys live in ui.js; game keys wait for a room. On the primer C, B and 1-4 would calibrate or call Matt behind it
+  if (ui.currentOverlay() === 'tour-vs') return;      // the VS card: the seat is already drawn, so Q Q, C, B and the emote keys would only tear the card down and the seat would still pull me in (Esc is gated in esc())
+  if (phase === 'lobby' || phase === 'camera') return;           // the lobby's keys live in ui.js; game keys wait for a room. On the primer C and B would calibrate or call Matt behind it
   if (k === 'q' && room) { const t = performance.now(); if (t < leaveAt) { game.send({ type: 'leave' }); toLobby(); } else { leaveAt = t + 2500; say(forfeits() ? 'Press Q again to forfeit' : 'Press Q again to leave', null, 2500); } return; }
   if (k === 'h') setStats(!showStats);
-  if (spec()) { if ('1234'.includes(k) && !e.repeat) setView(VIEWS[+k - 1], true); else if (k === 'a' && !e.repeat && ui.askCan()) askPlay(); return; }      // A: Ask to play      // watching: 1-4 pick the view (3 again = the other player), F, H, Q Q and Esc. Nothing else
+  if (k.length === 1 && k >= '0' && k <= '9') { const o = ui.currentOverlay(); if (!e.repeat && room && live() && !ui.currentScreen() && (!o || o === 'match')) ui.sendEmote((+k + 9) % 10); return; }      // 1-9, 0: the emote bar's ten (NOTES 205), on court and over the result panel
+  if (spec()) { if (k === 'v' && !e.repeat) nextView(); else if (k === 'a' && !e.repeat && ui.askCan()) askPlay(); return; }      // A: Ask to play      // watching: V steps through the views, 1-0 emote, F, H, Q Q and Esc. Nothing else
   if (k === 'c') startCal();
   if (k === 'r') recenter();
   if (k === 'p') resetPeaks();
   if (k === 'v') setPod(!showPod);
   if (k === '[' || k === ']') sens(k === ']' ? 1 : -1);          // [ = less sensitive, ] = more (the settings panel's - / +)
-  if (k === 'b') { botVia = 'key'; game.send({ type: 'bot' }); }                     // alone: join now. playing the bot: next difficulty
-  if ('1234'.includes(k)) { botVia = 'key'; game.send({ type: 'bot', level: [0, 1, 3, 2][+k - 1] }); }      // keys follow the display order: Rookie, Club, Tour, Pro (the wire keeps each level's index)
+  if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty (Rookie, Club, Tour, Pro, round again). 1-4 were the levels until they became emotes (NOTES 205)
 });
 addEventListener('resize', () => scene.resize());
 

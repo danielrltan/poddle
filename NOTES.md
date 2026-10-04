@@ -4265,3 +4265,32 @@ scoreboard tab, NOTES 201, over the far court).
   the toast reads under it. It gives way to the ask card (`body:has(.ask-card.is-on)`), which owns that corner while a spectator asks.
   Hidden as before under a result or menu screen and while the settings card (with its own row) is open.
 - CSS + ui.js only; no data or text change, legal pages untouched. test/spectate-e2e.mjs re-shot next-05-hud-matt-*.png.
+
+## 205. Emotes for everyone: GG and nine emoji on keys 1 to 0, with a one-second rest
+- "Add these emotes: GG🫡💚😂🥵😡🤯💀🥀😢 into an emote system. 10 total, in that order, quick emotes by pressing a number 1-0.
+  Show them with a small bar in the corner with the number keys labeled. They should appear briefly and be as non-invasive as
+  possible. Put a slight cooldown where you see fit."
+- The spectators' row of 7 (🤣🥵🤯😡💀🥀😢) is now one bar of 10 for players AND spectators, bottom-right: GG (a bold text badge,
+  not an image), 🫡 💚 😂 🥵 😡 🤯 💀 🥀 😢, each with its key under it (1-9, then 0). The new emoji are Apple's from
+  iamcal/emoji-data img-apple-160 like the others (web/emoji/1fae1, 1f49a, 1f602); 1f923 (🤣) is gone. Smaller than the old row
+  (2 rem per emote), and a phone (html[data-mobile]) gets no key numbers. A player's key strip (C, B) sits just above the bar.
+  Against Matt his difficulty row (NOTES 204) keeps the bottom-left; under 560 px wide it steps up above the bar's band so the two never meet.
+  It stays on over the result panel for everyone (a GG after the match), and a toast hides it a moment as before.
+- A pop: smaller (2.25 rem), rises 6 rem from just above the bar and fades in about two seconds (was 3.5 rem rising half the
+  screen over ~4 s), five on screen at most. The sender's name under it as before.
+- Cooldown: one emote a second per person. This reverses NOTES 46 (no cooldown), at the owner's new ask. The client (ui.sendEmote)
+  ignores a key or tap for 1 s and dims the bar meanwhile, a thin line along its foot running out; the server (EMOTE_GAP) drops
+  anything inside 900 ms per socket, so a tap on time is never lost to jitter.
+- Server: EMOTES 10; a seated player's `emote` goes through room.onMessage (ahead of the pause gate) and broadcasts under the
+  court name (a username for a signed-in seat). Bots never emote. A tab still on the old ui.js after the deploy sends the old
+  indexes for one reload (0 was 🤣, now GG); nothing else breaks.
+- The number keys were taken, so two things moved: Matt's level is B (it already walked Rookie, Club, Tour, Pro; the hint says
+  `B Difficulty: Club`; the settings row and NOTES 201's row under Matt's tab are unchanged). NOTES 202's mid-match toast now always
+  names the level (`Matt · Pro · counts as Rookie · Pro again restarts at 0-0`: the row under the tab is where to pick it); its key
+  form (`4 again`) and main.js's botVia / KEY_OF are gone, since B walks on and never picks the same level twice and a spectator's views are V (Broadcast, Split, one player, the other,
+  Free, round again; the chips lose their 1-4 keycaps, the row has one V key).
+- Legal: privacy.html (section 4: any player or spectator who sends an emote; 10 reactions, "GG" and 9 emoji), terms.html (your name
+  shows on any emote you send), CLAUDE.md data flows. Nothing new is stored; emotes were already in the data list.
+- Tests: test/emotebar-e2e.mjs (new: the bar at 1280, 900, 700 and 390 px wide for a player and a spectator, nothing overlapping,
+  keys 1 and 0, the rest, the pops gone in two seconds, V's order, and against Matt the bar and his row apart at every width); emote.test.mjs (players emote, the 0.9 s gap per socket, 0-9);
+  spectate-e2e, menu, fixes-e2e, victory-e2e and ui-next use V / B / the chips instead of 1-4.

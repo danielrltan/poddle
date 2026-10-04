@@ -56,10 +56,10 @@ reset (the server's `t` stood still while wall time ran).
 
 ## Spectator client
 No AirPod, no bridge, no calibration, no webcam. Title -> lobby -> Watch -> straight onto the court.
-Views, switchable at any time (on-screen chips and keys 1-4; the choice is remembered):
+Views, switchable at any time (on-screen chips and key V, which steps through them; 1-4 until NOTES 205, when the number keys became emotes; the choice is remembered):
  1. **Broadcast** (default): side-on from beyond a net post, elevated, both players in frame left and right.
  2. **Split screen**: both players' own points of view side by side (two viewports, one scene; per-view fence visibility).
- 3. **Player view**: behind one player exactly as they see it; pressing 3 again flips to the other player.
+ 3. **Player view**: behind one player exactly as they see it; V (or the chip) again flips to the other player.
  4. **Free cam**: drag to orbit, scroll to zoom, clamped above the ground and outside the fences' interior clutter.
 HUD: both names and the score, the room code, a "Watching" tag, the watcher count. Players see the watcher count too.
 Result screen: players get Rematch / Leave with the other player's choice and the countdown; spectators see the result

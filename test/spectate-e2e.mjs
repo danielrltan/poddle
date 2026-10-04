@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws';
 import puppeteer from 'puppeteer-core';
 import { makeSynth, CALIBRATE, SESSION_LOOP } from './fake-bridge.mjs';
 const P0 = +process.env.SPEC_E2E_PORT || 8440, G = P0, B = P0 + 1, DEAD = P0 + 2, root = new URL('..', import.meta.url).pathname, sleep = ms => new Promise(r => setTimeout(r, ms));
-const LINK = 'court=', WORD = 'court', HINTS = (keys, level) => keys === (level ? `CCalibrate | 1234Difficulty: ${level}` : 'CCalibrate');      // what the page says, in one place
+const LINK = 'court=', WORD = 'court', HINTS = (keys, level) => keys === (level ? `CCalibrate | BDifficulty: ${level}` : 'CCalibrate');      // what the page says, in one place
 const WIN = 5, HOLD = 15;                           // first to 5, no win-by-2, so a match is SURE to end inside a test (Ben stops swinging, but Ann swings blind: at deuce they could trade points for ever). The seat hold keeps its real 15 s
 const server = spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: G, WIN_AT: WIN, WIN_BY: 1, HOLD_S: HOLD }, stdio: ['ignore', 'pipe', 'inherit'] }), slog = []; server.stdout.on('data', d => slog.push(String(d)));
 
@@ -134,9 +134,9 @@ ok(s.cam === null && !s.camwrap && !s.podwrap && !s.keys && s.views && !s.watchT
 s = await until(c, s => s.me === 'Ann' && s.them === 'Ben', 4000, 'c sees both names'); ok(s.me === 'Ann' && s.them === 'Ben', `spectator scoreboard: "${s.me}" left, "${s.them}" right, never You`);
 [s, t] = await Promise.all([until(a, s => s.watchers === 1, 4000, 'a sees the watcher count'), until(c, s => s.watchers === 1, 4000, 'c sees the watcher count')]); ok(s.watchers === 1 && t.watchers === 1, `watchers: Ann sees ${s.watchers}, Cat sees ${t.watchers}`);
 await sleep(1500); await shot(c, '08-view-broadcast', BOTH);
-await c.keyboard.press('Digit2'); s = await until(c, s => s.scene.name === 'split' && s.dview === 'split', 2000, 'key 2 = split'); await sleep(900); await shot(c, '09-view-split', BOTH);
-await c.keyboard.press('Digit3'); s = await until(c, s => s.scene.name === 'pov', 2000, 'key 3 = player view'); ok(s.pov === 'Player: Ann' && s.scene.side === 0, `player view: "${s.pov}"`); await sleep(900); await shot(c, '10-view-pov-ann');
-await c.keyboard.press('Digit3'); s = await until(c, s => s.scene.name === 'pov' && s.scene.side === 1, 2000, '3 again = the other player'); ok(s.pov === 'Player: Ben', `player view flipped: "${s.pov}"`); await sleep(900); await shot(c, '10-view-pov-ben', BOTH);
+await c.keyboard.press('KeyV'); s = await until(c, s => s.scene.name === 'split' && s.dview === 'split', 2000, 'V = split'); await sleep(900); await shot(c, '09-view-split', BOTH);
+await c.keyboard.press('KeyV'); s = await until(c, s => s.scene.name === 'pov', 2000, 'V again = player view'); ok(s.pov === 'Player: Ann' && s.scene.side === 0, `player view: "${s.pov}"`); await sleep(900); await shot(c, '10-view-pov-ann');
+await c.keyboard.press('KeyV'); s = await until(c, s => s.scene.name === 'pov' && s.scene.side === 1, 2000, 'V again = the other player'); ok(s.pov === 'Player: Ben', `player view flipped: "${s.pov}"`); await sleep(900); await shot(c, '10-view-pov-ben', BOTH);
 await c.click('#views [data-view="free"]'); s = await until(c, s => s.scene.name === 'free' && s.dview === 'free', 2000, 'the Free chip'); const f0 = await c.evaluate(() => ({ ...window.__scene._dbg.free }));
 await c.mouse.move(640, 300); await c.mouse.down(); await c.mouse.move(760, 340, { steps: 6 }); await c.mouse.up(); const f1 = await c.evaluate(() => ({ ...window.__scene._dbg.free }));
 ok(Math.abs(f1.yaw - f0.yaw) > 0.2, `free cam: a drag on the court orbits (yaw ${f0.yaw.toFixed(2)} -> ${f1.yaw.toFixed(2)})`); await sleep(600); await shot(c, '11-view-free', BOTH);
@@ -159,7 +159,7 @@ await c.click('#btn-menu'); s = await until(c, s => s.settings, 2000, 'spectator
 // ---- Ben calibrates again mid-match: his character goes pale with a tag, his sub line says so, the next serve waits
 await b.keyboard.press('KeyC'); [s, u] = await Promise.all([until(a, s => s.tags[1] === 'calibrating' && s.ghost[1] > 0.95, 4000, 'a sees Ben calibrating'), until(c, s => s.tags[1] === 'calibrating' && s.ghost[1] > 0.95, 4000, 'c sees Ben calibrating')]);
 ok(s.themSub === 'Calibrating' && u.themSub === 'Calibrating' && s.tags[0] == null, `calibrating: Ann reads "${s.them} / ${s.themSub}", Cat reads "${u.themSub}", tags ${JSON.stringify(u.tags)}`);
-await shot(a, '19-tag-calibrating-opponent'); await shot(c, '19-tag-calibrating-broadcast'); await c.keyboard.press('Digit2'); await sleep(700); await shot(c, '19-tag-calibrating-split'); await c.keyboard.press('Digit1');
+await shot(a, '19-tag-calibrating-opponent'); await shot(c, '19-tag-calibrating-broadcast'); await c.click('#views [data-view="split"]'); await sleep(700); await shot(c, '19-tag-calibrating-split'); await c.click('#views [data-view="broadcast"]');
 go('b'); await until(b, s => s.calibrated && s.screen === 'hud', 30000, 'b calibrates again'); s = await until(a, s => s.tags[1] == null && s.ghost[1] === 0 && s.themSub === 'Far side', 4000, 'the tag goes when Ben is back'); ok(s.ghost[1] === 0, 'calibrated: the character is itself again');
 
 // =====================================================================================================================
@@ -223,7 +223,7 @@ await a.click('#btn-menu'); [s, u] = await Promise.all([until(a, s => s.paused &
 ok(u.meSub === 'Paused' && u.tags[1] == null && u.scene.frozen, `paused: Cat reads "${u.me} / ${u.meSub}", tag over Ann only ${JSON.stringify(u.tags)}, HUD tag ${u.pausedTag}`); await shot(c, '20-tag-paused-broadcast', BOTH); await shot(a, '21-settings-matt', BOTH);
 await a.click('#bot-seg [data-level="0"]'); s = await until(a, s => s.botRow === 'Rookie' && s.themSub === 'Rookie', 3000, 'Difficulty row -> Rookie'); await a.click('#move-seg [data-move="auto"]'); s = await until(a, s => s.moveSeg === 'Auto', 2000, 'Move row -> Auto');
 await a.keyboard.press('Escape'); s = await until(a, s => !s.paused && !s.settings, 3000, 'resume'); s = await wake(a); ok(HINTS(s.keys, 'Rookie') && s.moveSeg === 'Auto', `the hint follows the level: "${s.keys}"`);
-await a.keyboard.press('Digit3'); s = await until(a, s => s.themSub === 'Tour', 3000, 'key 3 = Tour'); await a.keyboard.press('Digit4'); s = await until(a, s => s.themSub === 'Pro', 3000, 'key 4 = Pro'); s = await wake(a); ok(HINTS(s.keys, 'Pro'), `1 2 3 4 still change the level (3 = Tour, 4 = Pro): "${s.keys}"`); await shot(a, '22-hud-difficulty', BOTH);
+await a.keyboard.press('KeyB'); s = await until(a, s => s.themSub === 'Club', 3000, 'B = Club'); await a.keyboard.press('KeyB'); s = await until(a, s => s.themSub === 'Tour', 3000, 'B = Tour'); await a.keyboard.press('KeyB'); s = await until(a, s => s.themSub === 'Pro', 3000, 'B = Pro'); s = await wake(a); ok(HINTS(s.keys, 'Pro'), `B walks the levels (Rookie, Club, Tour, Pro): "${s.keys}"`); await shot(a, '22-hud-difficulty', BOTH);
 
 
 // =====================================================================================================================
@@ -245,7 +245,7 @@ q = await askUntil(c, v => v.btn === 'Ask again', 15000, 'c: Ask again after the
 await c.keyboard.press('KeyQ'); await sleep(200); await c.keyboard.press('KeyQ'); await until(c, s => s.screen === 'lobby' && !s.room, 4000, 'c leaves the stands (Q Q)');      // the Y round comes in the way a stranger would: Courts, search, the row, Enter
 await a.keyboard.press('KeyQ'); await sleep(200); await a.keyboard.press('KeyQ'); await until(a, s => s.screen === 'lobby' && !s.room, 4000, 'a leaves Matt (Q Q)');      // a public court this time, so it is listed
 await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="1"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'a creates a public court'); const OPEN = s.share;
-await a.click('#btn-share-go'); s = await toCourt(a); s = await until(a, s => s.them === 'Matt', 8000, 'Matt walks in'); await a.keyboard.press('Digit1');      // Rookie: a match against him lasts past this round (first to 5)
+await a.click('#btn-share-go'); s = await toCourt(a); s = await until(a, s => s.them === 'Matt', 8000, 'Matt walks in'); for (let i = 0; i < 4 && (await st(a)).themSub !== 'Rookie'; i++) { await a.keyboard.press('KeyB'); await sleep(400); }      // Rookie: a match against him lasts past this round (first to 5)
 await c.click('#btn-courts'); await sleep(300); await c.click('#court-seg [data-filter="open"]'); await c.click('#court-search'); await type(c, OPEN.slice(0, 2).toLowerCase());      // Cat's last visit left the Full tab on (it is remembered)
 const askRow = code => c.evaluate(code => { const li = [...document.querySelectorAll('#room-list > li.court[data-kind="ask"]')].filter(l => l.firstElementChild.dataset.code === code); return { n: li.length, go: li[0]?.querySelector('.court-go')?.textContent, who: li[0]?.querySelector('.court-who')?.textContent }; }, code);
 for (let i = 0; i < 150 && !(q = await askRow(OPEN)).n; i++) await sleep(200);      // listed as Join until Ann's first strike, then as Ask to play (the list arrives every second)

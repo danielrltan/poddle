@@ -185,7 +185,7 @@ const ROOM_TTL = (process.env.ROOM_TTL != null ? +process.env.ROOM_TTL : 30) * 1
 const ROOM_CAP = +process.env.ROOM_CAP || 40;                  // rooms at once: one small machine hosts them all (tests lower it)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';          // no I, L, O, 0, 1: a code gets read out across a room
 const SPEC_CAP = 8;                                            // spectators per room (docs/SPECTATE.md)
-const EMOTES = 7, EMOTE_GAP = 60;                               // spectator emotes: an index into web/ui.js EMOTES. No cooldown a person can feel (NOTES 46); 60 ms per socket only stops a script flooding the court
+const EMOTES = 10, EMOTE_GAP = 900;                             // emotes, players' and spectators': an index into web/ui.js EMOTES. The client waits 1 s between two (NOTES 205; NOTES 46 had none); 900 ms here so a tap on time is never dropped
 const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one address may have made and still standing: 40 idle sockets from one machine took every court (busy beyond that)
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
@@ -882,10 +882,10 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (ws.cid && seen.has(ws.cid)) return; if (ws.cid) seen.add(ws.cid);
     const s = JSON.stringify({ type: 'watcher', name: safeName(ws.name, '') }); for (const pl of players) if (pl.ws) put(pl.ws, s);   // the players get a small 'Sam is watching' in the top-right corner
   }
-  function emote(ws, e) {                                         // a spectator's reaction: everyone in the room sees it pop in from the side, with the sender's name
-    if (!spectators.has(ws) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
+  function emote(ws, e, pl) {                                     // a reaction: everyone in the room (the sender too) sees it pop up in the corner, with the sender's name. pl: a seated player's own, under their court name
+    if (!(pl ? pl.ws === ws : spectators.has(ws)) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
     const ms = Date.now(); if (ms - (ws.emoteAt || 0) < EMOTE_GAP) return; ws.emoteAt = ms;
-    broadcast({ type: 'emote', e, name: safeName(ws.name, '') });
+    broadcast({ type: 'emote', e, name: safeName(pl ? pl.name : ws.name, '') });
   }
   // ---------- asking to play (docs/SPECTATE.md Asking to play): a spectator watching one human play Matt asks for Matt's seat. ONE request per court,
   // it lives ASK_S, the player answers Y/N, silence is a no; a requester waits ASK_COOL_S from the END of their request, the court rests ASK_GAP_S between two ----------
@@ -1004,6 +1004,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (m.type === 'name') { if (!me.reg) me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel. A registered seat keeps its username
     if (m.type === 'bot') return botRequest(me, m.level);
     if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. Booleans only
+    if (m.type === 'emote') return emote(me.ws, m.e, me);        // before the pause gate too: a GG over the result panel or a paused court
     if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
     if (paused || hold) return;                                  // room time stands still: no paddle, no swing
     if (m.type === 'paddle') {

@@ -83,18 +83,18 @@ const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); s = a
 await sleep(1500); let bx = await boxes(c, ['ping-pill', 'room-pill', 'watchers']); ok(bx['ping-pill'] === null && bx['room-pill'], `spectator: no ping pill (${JSON.stringify(bx)})`);
 bx = await boxes(a, ['ping-pill']); ok(bx['ping-pill'], 'player: ping pill shown');
 // split, wide and tall
-await c.keyboard.press('Digit2'); await sleep(1000); await shot(c, 'F-split', BOTH);
+await c.click('#views [data-view="split"]'); await sleep(1000); await shot(c, 'F-split', BOTH);
 await c.setViewport({ width: 600, height: 900 }); await sleep(700); s = await c.evaluate(() => { const l = document.getElementById('split-line').getBoundingClientRect(); return { stacked: window.__scene._dbg.view().stacked, line: [l.left, l.top, l.width, l.height].map(Math.round) }; });
 ok(s.stacked && s.line[2] === 600 && s.line[3] === 2 && s.line[1] === 449, `600x900: stacked, the line lies across the middle: ${JSON.stringify(s)}`); await c.setViewport({ width: 1280, height: 720 }); await sleep(500);
 // free cam
-await c.keyboard.press('Digit4'); await sleep(800);
+await c.click('#views [data-view="free"]'); await sleep(800);
 await c.mouse.move(640, 300); await c.mouse.down(); await c.mouse.move(640, 0, { steps: 12 }); await c.mouse.up(); for (let i = 0; i < 25; i++) { await c.mouse.wheel({ deltaY: 400 }); await sleep(30); } await sleep(600);
 let f = await c.evaluate(() => ({ ...window.__scene._dbg.free, cam: window.__scene._dbg.camera.position.toArray() })); ok(f.pitch === 6 && f.dist <= 16.01, `free cam lowest + farthest: pitch ${f.pitch}, dist ${f.dist.toFixed(1)}, camera ${f.cam.map(v => v.toFixed(1))}`); await shot(c, 'F-free-low-far');
 for (let i = 0; i < 25; i++) { await c.mouse.wheel({ deltaY: -400 }); await sleep(30); } await c.mouse.move(640, 300); await c.mouse.down(); await c.mouse.move(640, 340, { steps: 4 }); await c.mouse.up(); await sleep(400); await shot(c, 'F-free-near-centre');
 await c.mouse.move(640, 400); await c.mouse.down({ button: 'right' }); await c.mouse.move(1240, 400, { steps: 12 }); await c.mouse.up({ button: 'right' }); await sleep(500);
 f = await c.evaluate(() => ({ ...window.__scene._dbg.free })); ok(Math.abs(f.tz) > 3, `right-drag slides the target along the court: tz ${f.tz.toFixed(2)}`); await shot(c, 'F-free-near-slid');
 for (let i = 0; i < 40; i++) await c.keyboard.press('ArrowRight'); await sleep(300); const tz2 = (await c.evaluate(() => window.__scene._dbg.free.tz)); ok(Math.abs(tz2 - f.tz) > 3, `the arrow keys slide it too (Right looks right: back the other way): tz ${tz2.toFixed(2)}`); await shot(c, 'F-free-near-other-end');
-await c.keyboard.press('Digit1');
+await c.click('#views [data-view="broadcast"]');
 // forfeit wording
 await until(a, s => s.hits > 0, 30000, 'a ball is struck'); await a.keyboard.press('KeyQ'); s = await until(a, s => s.toast, 2000, 'a first Q'); ok(s.toast === 'Press Q again to forfeit', `mid-match against a person, first Q: "${s.toast}"`);
 await sleep(2700); await a.click('#btn-menu'); await sleep(600); s = await a.evaluate(() => document.getElementById('btn-leave-room').textContent); ok(s === 'Forfeit', `settings Leave button mid-match: "${s}"`); await shot(a, 'F-settings-forfeit'); await a.keyboard.press('Escape');
