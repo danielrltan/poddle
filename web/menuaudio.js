@@ -14,7 +14,7 @@ function silent() {                                                      // 0.1 
 }
 const UI_MAX = 1.5, MUSIC_MAX = 0.6;      // at the defaults (6, 5) a select peaks near -19 dBFS over music peaking near -16: high bells cut through
 const curve = v => Math.pow(Math.max(0, Math.min(10, v)) / 10, 1.7);      // equal steps sound equal: the top half is not all the same loud
-const PENTA = [0, 2, 4, 7, 9];                                           // the stepper climbs a major pentatonic: never a sour step
+const DOREMI = [0, 2, 4, 5, 7, 9, 11];                                  // the stepper sings up a major scale, do re mi fa so la ti (NOTES 186): 0 is do on C4, 7 is the next do
 
 export function menuAudio(getAc) {
   let ac = null, bus = null, mbus = null, hall = null, muted = false, uiVol = 6, musVol = 5;
@@ -76,7 +76,7 @@ export function menuAudio(getAc) {
   function play(kind, n) {
     if (muted || uiVol <= 0 || !init()) return;
     if (kind === 'hover') { const t = performance.now(); if (t - hoverAt < 45) return; hoverAt = t; }      // a sweep across a row of tiles is a patter, not a buzz
-    if (kind === 'step') { const i = Math.max(0, Math.min(10, n | 0)), f = 440 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12); bell(f, 0, 0.16, 0.18); return; }
+    if (kind === 'step') { const i = Math.max(0, Math.min(10, n | 0)), f = 261.63 * Math.pow(2, (DOREMI[i % 7] + 12 * Math.floor(i / 7)) / 12); bell(f, 0, 0.16, 0.18); return; }
     VOICES[kind]?.();
   }
 

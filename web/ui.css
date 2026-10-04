@@ -960,8 +960,8 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 @media (hover:hover){ .ph-badge:hover{transform:translateY(-.125rem) scale(1.03)} } .ph-badge:focus-visible{outline:.1875rem solid var(--line);outline-offset:.125rem}
 /* the title's footer (NOTES 184): the links centred in the bar; the Product Hunt badge sits in the screen's bottom right corner, just above the bar
    (anchored to the footer, bottom:100%, so it follows the bar's height when the links wrap) */
-.title-foot .ph-badge{position:absolute;right:var(--s-7);bottom:calc(100% + var(--s-4))} .title-foot .ph-badge img{height:2.5rem}
-@media (max-width:700px){ .title-foot .ph-badge{right:var(--s-4);bottom:calc(100% + var(--s-3))} .title-foot .foot-links{flex:1 1 100%;flex-wrap:wrap;justify-content:center;row-gap:var(--s-1)} .title-foot .ph-badge img{height:2.125rem} }
+.menu-glass .menu-foot .ph-badge{position:absolute;right:var(--s-7);bottom:calc(100% + var(--s-4));z-index:3} .menu-glass .menu-foot .ph-badge img{height:2.5rem}      /* the title and the lobby (NOTES 186) */
+@media (max-width:700px){ .menu-glass .menu-foot .ph-badge{right:var(--s-4);bottom:calc(100% + var(--s-3))} .title-foot .foot-links{flex:1 1 100%;flex-wrap:wrap;justify-content:center;row-gap:var(--s-1)} .menu-glass .menu-foot .ph-badge img{height:2.125rem} }
 .foot-agree{font-size:max(13px,var(--t-xs));color:var(--ink-soft);line-height:1.35} .foot-agree .foot-link{font-size:inherit;font-weight:800}
 .menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:var(--s-3);padding-bottom:var(--s-3)}      /* the line may wrap: the bar grows with it, never clips it */
 @media (max-width:520px){ .foot-agree ~ .keyhints-inline{display:none} .foot-agree{flex:1;text-align:center} }      /* a phone has no Esc or F key: the legal line gets the whole bar */
@@ -2205,3 +2205,8 @@ body[data-overlay="match"] .emote-layer{opacity:1;right:40vw;z-index:calc(var(--
 body[data-settings="menu"] .settings{left:auto;right:var(--edge);z-index:calc(var(--z-screen) + 3);transform-origin:calc(100% - 1.375rem) -.75rem;background:linear-gradient(180deg,#f6fafc,#e7f1f6)}      /* solid: over the tiles a see-through card is unreadable */
 .settings.is-menu .set-status,.settings.is-menu #btn-recenter,.settings.is-menu #set-bot,.settings.is-menu #grp-social,.settings.is-menu #set-foot{display:none}
 [data-mobile] .settings.is-menu #grp-paddle,[data-mobile] .settings.is-menu #grp-match,[data-mobile] .settings #set-music{display:none}      /* a phone's menu: it is the paddle, not the player's screen, and it plays no music */
+/* the Product Hunt badge's strip (NOTES 186): the menu pages' content stops above the badge, so a tall panel (Ranks, Courts on a phone) never runs under it */
+#screen-title .menu-body,#screen-lobby .menu-body{padding-bottom:calc(2.5rem + 2 * var(--s-4))}
+@media (max-width:700px){ #screen-title .menu-body{padding-bottom:calc(2.125rem + 2 * var(--s-3))}
+  #screen-lobby .menu-body{padding-bottom:var(--s-4)} #screen-lobby .menu-foot{flex-wrap:wrap;height:auto;justify-content:center;row-gap:var(--s-2);padding-block:var(--s-3)}
+  #screen-lobby .menu-foot .ph-badge{position:static;order:-1} #screen-lobby .menu-foot .foot-agree{flex:1 1 100%;text-align:center} }      /* a phone-wide lobby scrolls, so a corner badge would sit over the panels: there it rides in the footer, over the legal line */

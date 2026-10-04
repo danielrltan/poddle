@@ -25,7 +25,7 @@ try {
   await shot('1-title');
   const foot = await ev(() => { const f = document.querySelector('#screen-title .menu-foot'), b = f.querySelector('.ph-badge'), fr = f.getBoundingClientRect(), br = b?.getBoundingClientRect();
     return { tagline: /Any computer/.test(f.textContent), badge: !!b, inLobby: !!document.querySelector('#screen-lobby .ph-badge'), right: br ? Math.round(innerWidth - br.right) : -1, above: br ? Math.round(fr.top - br.bottom) : -1 }; });
-  ok(!foot.tagline && foot.badge && !foot.inLobby && foot.right < 80 && foot.above >= 4 && foot.above < 40, `title: no tagline in the footer, the Product Hunt badge in the bottom right corner just above it, not in the lobby (${JSON.stringify(foot)})`);
+  ok(!foot.tagline && foot.badge && foot.inLobby && foot.right < 80 && foot.above >= 4 && foot.above < 40, `title: no tagline in the footer, the Product Hunt badge in the bottom right corner just above it, and one in the lobby too (${JSON.stringify(foot)})`);
   ok(await ev(() => !!document.querySelector('#screen-title .foot-credit') && /Into the Blue by Gwamm Music/.test(document.querySelector('#screen-title .foot-credit').textContent)), 'the title credits the music');
 
   // the title's settings button: the card opens over the title, it does not start the game

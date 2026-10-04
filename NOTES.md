@@ -3932,3 +3932,15 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
   menu-sound bus, so Menu sounds and Sound off still govern it. start is now a deeper drop (130 -> 45 Hz, 0.55 s), a five-note run up two
   octaves (C4..E5, 40 ms apart), a wide C major chord from C3 to G5 held 1.3 s, and a four-note sparkle (C6 E6 G6 C7) over it, all into the hall.
   Peaks ~-9 dBFS at the default level, ~8 dB over select, ~-2 dBFS at Menu sounds 10 (no clipping). Same buttons as NOTES 183.
+
+## 186. The settings steppers sing do re mi; the Product Hunt badge on every menu page
+- The owner: "for the tick increase sound in settings, can you make it the do re me fa so scale increase" and "the product hunt button should also be
+  visible everywhere across all menu pages".
+- menuaudio.js `step`: a major scale from C4 (do re mi fa so la ti do), one degree per step: 0 = C4 .. 7 = C5 .. 10 = F5 (was a pentatonic from A4).
+  Sensitivity, Music and Menu sounds all use it.
+- The badge: a second copy in the lobby footer, so the title and every lobby view (home, Courts, Play a bot, Your stats, Leaderboard, Create,
+  Ranks) show it in the same bottom right corner just above the bar (.menu-glass .menu-foot .ph-badge). Both menu bodies reserve a strip above
+  the footer (badge + two gaps) so no panel runs under it; the Ranks panel, already a scroll panel, now scrolls at 1440x900 too (it only fit
+  with 28 px to spare before). At 700 px and under the lobby scrolls, so there the badge rides in the footer on its own centred row above
+  the legal line instead of floating over the panels; the title keeps its corner. The camera / connect / calibrate set-up screens do not
+  show it (decided without asking: they are steps into a match, not menu pages). No legal change (Privacy: "the badge in the menu").
