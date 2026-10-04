@@ -97,6 +97,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   st only to a friend. The card's friend row (web/social.js): Add / Requested + Cancel / Accept + Decline / Friends + Remove (confirm), a friend's live status.
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
+  The camera runs only while seated on a court with Move on Body; leaving the court, watching, Auto and a hidden tab turn it off (NOTES 190).
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, sink, music, menuSfx (0..10 volumes, NOTES 181)}, poddle.camPrimer (allow|skip), poddle.cal ({phone, airpod}: a finished calibration's frame quaternions and axes + `at`, NOTES 187; never sent), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,

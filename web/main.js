@@ -88,7 +88,7 @@ const camKind = t => { const n = t && t.errorName || 'NotAllowedError', m = t &&
   return 'other'; };
 let mode = MODES.includes(qs.get('move')) ? qs.get('move') : NO_CAM || ls.get(CAM_KEY) === 'skip' ? 'auto' : 'body', body = null, bodyX = 0;      // ?cam=0, or Play without camera: there will be no camera, so not Body
 let camOn = false, camGen = 0, camWant = false, camAsked = false, camView = '', camAgain = false;      // camGen: the request that counts (Try again and No start a new one; an older answer is let go). camWant: switch to Body once it is up. camAsked: the player pressed something for it (a failure is worth telling)
-function startCam() {                              // the webcam is asked for when a seat is taken, never on the way to watching (docs/SPECTATE.md: spectators get no camera prompt)
+function startCam(keep) {                          // the webcam is asked for when a seat is taken, never on the way to watching (docs/SPECTATE.md: spectators get no camera prompt). keep: the centre to resume with (NOTES 190)
   if (camOn || NO_CAM) return; camOn = true; const g = ++camGen;
   createBodyTracker($('camv'), $('camc'), () => { if (g !== camGen) return false; if (phase === 'camera') primerDone(); }).then(t => {      // Allowed: on with the set-up while the models load. false: turned down meanwhile, hand the stream back
     if (g !== camGen) { t.stop(); return; }
@@ -97,11 +97,20 @@ function startCam() {                              // the webcam is asked for wh
     if (!t.ready) { console.warn('camera tracking unavailable:', t.errorName, t.error); t.stop(); if (!t.granted) camOn = false;      // stop(): a stream that came but whose models did not load kept the camera light on for good. Not granted: the next seat (or Try again) may ask again
       camWant = false; if (mode === 'body') setMode('auto', !inPlay()); camTrouble(t); return; }
     if (camWant) { camWant = false; if (mode !== 'body') setMode('body', !inPlay()); }      // turned on after a No: that was to play with it
-    if (stats.calibrated) { const c = setInterval(() => { if (t.seen()) { clearInterval(c); t.center(); } }, 100); }      // calibration finished before the camera was up: centre on the first sight of the player instead
+    if (keep) { t.cx0 = keep.cx0; t.cy0 = keep.cy0; }      // back from a hidden tab: the same centre as before, no recentring
+    else if (stats.calibrated) { const c = setInterval(() => { if (t.seen()) { clearInterval(c); t.center(); } }, 100); }      // calibration finished before the camera was up: centre on the first sight of the player instead
   });
 }
 function stopCam() { camGen++; if (body) { prefs.reach = body.reach; body.stop(); } body = null; camOn = false; ui.setCamera(false); syncSettings(); }      // let go of it, and of any question still open: camOn no longer latches, so the next startCam really asks again
 function camRestart() { stopCam(); startCam(); }
+// The camera is on only while it is in use (NOTES 190, the owner: "it needs to turn off otherwise that's an invasion of privacy"): seated on a court
+// with Move on Body. Leaving the court, watching, picking Auto and a hidden tab all turn it off; a hidden tab's court gets it back, same centre, on return
+const camCourt = () => seated() && !spec() && ['camera', 'connect', 'calibrate', 'play'].includes(phase) && mode === 'body' && !NO_CAM && ls.get(CAM_KEY) !== 'skip';
+let camAway = null;      // the tab was hidden with the camera on: { cx0, cy0 } of its tracker
+addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (camOn) { camAway = body ? { cx0: body.cx0, cy0: body.cy0 } : null; stopCam(); camAway ||= { cx0: 0.5, cy0: 0.5, fresh: true }; } return; }
+  const k = camAway; camAway = null; if (k && camCourt()) startCam(k.fresh ? undefined : k);
+});
 function camTrouble(t) {                           // the camera said no. On a set-up screen that earns the help screen; over the court a toast, and only when they asked for it
   if (t.granted) return;                           // it was allowed and the tracking failed to load: nothing the player can fix, the game moves them
   const k = camKind(t);
@@ -344,14 +353,14 @@ function play() {                                  // leave the title for the lo
   if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
 function begin() {                                 // seated: the camera primer first (once ever), then straight to calibration if the paddle is already streaming, straight to the court if that is done too
-  phase = 'connect'; const ask = camAsk();
+  phase = 'connect'; const ask = mode === 'body' ? camAsk() : '';      // Auto: no camera, so no primer either
   if (ask === 'wait') { phase = 'camera'; camView = ''; permReady.then(() => { if (phase === 'camera' && !camView) begin(); }); return; }      // the browser's answer takes a few ms: a first seat must not start the camera before the primer
   if (ask) { primer(ask, 'blocked'); return; }      // 'help': blocked in this browser already, so the help instead of an Allow that cannot work
-  if (ls.get(CAM_KEY) !== 'skip') startCam();
+  if (ls.get(CAM_KEY) !== 'skip' && mode === 'body') startCam();      // Auto (picked in Settings) needs no camera
   goOn();
 }
 function goOn() { if (stats.calibrated && airpodLive()) { phase = 'play'; openCourt(); sayRecal(); } else if (airpodLive() && !cachedCal()) startCal(); else if (!airpodLive()) { screen('connect'); padPhase(); } }      // kept from the last court, or from the last visit (NOTES 187): straight onto the court, and a word about C
-function enterWatch() { phase = 'watch'; openCourt(); }      // a spectator: no AirPod, no bridge, no calibration, no camera. Lobby -> court.
+function enterWatch() { phase = 'watch'; camAway = null; stopCam(); openCourt(); }      // the camera too: a player who goes on to watch (a tournament) has no use for it      // a spectator: no AirPod, no bridge, no calibration, no camera. Lobby -> court.
 let pendT = 0;
 function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
 function request(m) {                               // one lobby request at a time, each carrying the player's name. Not connected right now: it goes out when the socket opens
@@ -448,6 +457,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
+  camAway = null; if (camOn) stopCam();      // off the court: the camera goes off (NOTES 190). The next seat turns it on again, without asking twice
   trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
@@ -813,7 +823,7 @@ ui.onSettings({
   sens: dir => { sens(dir < 0 ? -1 : 1, true); uiSfx('step', sensOf().sens - 1); }, music: dir => setLevel('music', dir < 0 ? -1 : 1), uisfx: dir => setLevel('ui', dir < 0 ? -1 : 1), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
   move: m => { if (!MODES.includes(m)) return;
     if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
-    if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); },      // how you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
+    if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); if (m === 'auto' && camOn) stopCam(); },      // Auto turns the camera off (NOTES 190); Body turns it back on above. How you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause

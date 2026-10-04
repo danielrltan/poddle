@@ -960,7 +960,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 @media (hover:hover){ .ph-badge:hover{transform:translateY(-.125rem) scale(1.03)} } .ph-badge:focus-visible{outline:.1875rem solid var(--line);outline-offset:.125rem}
 /* the title's footer (NOTES 184): the links centred in the bar; the Product Hunt badge sits in the screen's bottom right corner, just above the bar
    (anchored to the footer, bottom:100%, so it follows the bar's height when the links wrap) */
-.menu-glass .menu-foot .ph-badge{position:absolute;right:var(--edge);bottom:calc(100% + var(--s-4));z-index:3} .menu-glass .menu-foot .ph-badge img{height:2.5rem}      /* the title and the lobby (NOTES 186) */
+.menu-glass .menu-foot .ph-badge{position:absolute;right:var(--edge);bottom:calc(100% + var(--s-3));z-index:3} .menu-glass .menu-foot .ph-badge img{height:2.5rem}      /* the title and the lobby (NOTES 186) */
 @media (max-width:700px){ .menu-glass .menu-foot .ph-badge{right:var(--edge);bottom:calc(100% + var(--s-3))} .title-foot .foot-links{flex:1 1 100%;flex-wrap:wrap;justify-content:center;row-gap:var(--s-1)} .menu-glass .menu-foot .ph-badge img{height:2.125rem} }
 .foot-agree{font-size:max(13px,var(--t-xs));color:var(--ink-soft);line-height:1.35} .foot-agree .foot-link{font-size:inherit;font-weight:800}
 .menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:var(--s-3);padding-bottom:var(--s-3)}      /* the line may wrap: the bar grows with it, never clips it */
@@ -1669,10 +1669,9 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .st-mbadge{position:relative;width:4rem;height:4rem;flex:none}
 .st-mdisc{width:100%;height:100%;border-radius:50%;display:grid;place-items:center;border:.25rem solid #fff;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),transparent 55%),var(--lv);box-shadow:0 0 0 .125rem var(--lv-deep), 0 .25rem .625rem rgba(40,70,100,.25)}
 .st-mdisc svg{width:2.1rem;height:2.1rem;fill:none;stroke:#fff;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 .0625rem 0 rgba(0,0,0,.18))}
-.st-mstar{position:absolute;right:-.3rem;bottom:-.2rem;width:1.75rem;height:1.75rem;fill:var(--gold-2);stroke:var(--gold-4);stroke-width:3;stroke-linejoin:round;filter:drop-shadow(0 .0625rem .125rem rgba(120,80,0,.35));animation:num-pop 600ms var(--ease-bounce) 700ms both}
 /* the toughest Matt beaten 11-0: a gold ring round the disc, on Your stats and the public card alike (NOTES 182) */
 .st-mbadge.is-flawless .st-mdisc{border-color:var(--gold-1);box-shadow:0 0 0 .1875rem var(--gold-3), 0 0 0 .375rem var(--gold-1), 0 .25rem .625rem rgba(120,80,0,.3)}
-.st-mbadge.is-none .st-mdisc{background:linear-gradient(180deg,var(--sky-2),var(--sky-4));box-shadow:0 0 0 .125rem var(--sky-4)} .st-mbadge.is-none .st-mdisc svg{stroke:var(--ink-soft);filter:none} .st-mbadge.is-none .st-mstar{display:none}
+.st-mbadge.is-none .st-mdisc{background:linear-gradient(180deg,var(--sky-2),var(--sky-4));box-shadow:0 0 0 .125rem var(--sky-4)} .st-mbadge.is-none .st-mdisc svg{stroke:var(--ink-soft);filter:none}
 .st-mtext{min-width:0;display:flex;flex-direction:column;gap:.0625rem} .st-mtext .caps{margin:0}
 .st-mbest{margin:0;font-size:var(--t-xl);font-weight:900;line-height:1.1;color:var(--lv-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .st-mbadge.is-none + .st-mtext .st-mbest{color:var(--ink-soft)}
 .st-mtext small{font-size:var(--t-xs);font-weight:700;color:var(--ink-soft)} .st-mbadge.is-none + .st-mtext small{color:var(--me-ink)}      /* nothing beaten: the coaching line in the player's blue, as on the empty tiles */
@@ -1948,7 +1947,7 @@ button.lb-row.is-me:hover{box-shadow:var(--sh-1),0 0 0 .1875rem color-mix(in srg
 .lbp-card .st-rank-name{margin:0;font:900 2rem/1.05 var(--font);letter-spacing:.02em;color:var(--me-ink)} .lbp-card .st-mbest{margin:0;font:900 var(--t-xl)/1.1 var(--font);color:var(--lv-deep)} .lbp-card .st-wl,.lbp-card .st-num,.lbp-card .st-ret-n,.lbp-card .st-chips{margin:0}
 .lbp-card .st-wl b{font-size:2.25rem;font-weight:900;line-height:1} .lbp-card .st-num b,.lbp-card .st-ret-n b{font-size:2rem;font-weight:900;line-height:1;color:var(--me-ink)} .lbp-card .st-fig{padding:.375rem .125rem} .lbp-card .st-fig dd{font-size:1rem;letter-spacing:-.01em} .lbp-card .st-fig dt{white-space:nowrap;letter-spacing:0;font-size:max(10px,.6875rem)} .lbp-card .st-badge svg{animation:none} @media (min-width:761px){ .lbp-card .st-tile .st-badge{display:none} }
 .lbp-card .lbp-friend{min-height:0} .lbp-friend.is-none{justify-content:flex-end;padding:0;background:none;box-shadow:none}      /* a stranger: the Add friend button alone, no line beside it (NOTES 158) */ .lbp-card .st-rank-name:empty{height:1.1em;width:9rem;border-radius:var(--r-sm);background:var(--sky-2)}      /* loading a player with no emblem on the row */
-.lbp-card .lbp-mattsec{grid-template-columns:auto minmax(0,1fr)} .lbp-card .st-mbadge{width:3.5rem;height:3.5rem} .lbp-card .st-mstar{animation:none} .lbp-mattsec:has(.is-none) .st-mbest{color:var(--ink-soft)}
+.lbp-card .lbp-mattsec{grid-template-columns:auto minmax(0,1fr)} .lbp-card .st-mbadge{width:3.5rem;height:3.5rem} .lbp-mattsec:has(.is-none) .st-mbest{color:var(--ink-soft)}
 .lbp-stats{display:flex;flex-direction:column;gap:var(--s-2)} .lbp-card .st-people,.lbp-card .st-tile,.lbp-card .st-matt,.lbp-card .st-play{animation:none} .lbp-card .st-wl b,.lbp-card .st-num b,.lbp-card .st-ret-n b,.lbp-card .st-ribbon b{animation:none} .lbp-card .st-bar i{animation:none;transform:none}
 .lbp-card .st-bar-l b{color:inherit} .lbp-card .lbp-figs{grid-template-columns:repeat(5,minmax(0,1fr))} .lbp-card .st-chip .st-flame{fill:var(--them);stroke:var(--them-deep)}
 .lbp-card [data-stat].is-none{color:var(--ink-soft)} .lbp-stats.is-skel [data-stat],.lbp-stats.is-skel .st-wl b{color:var(--sky-4)}
@@ -2208,7 +2207,7 @@ body[data-settings="menu"] .settings{left:auto;right:var(--edge);z-index:calc(va
 .settings.is-menu .set-status,.settings.is-menu #btn-recenter,.settings.is-menu #set-bot,.settings.is-menu #grp-social,.settings.is-menu #set-foot{display:none}
 [data-mobile] .settings.is-menu #grp-paddle,[data-mobile] .settings.is-menu #grp-match,[data-mobile] .settings #set-music{display:none}      /* a phone's menu: it is the paddle, not the player's screen, and it plays no music */
 /* the Product Hunt badge's strip (NOTES 186): the menu pages' content stops above the badge, so a tall panel (Ranks, Courts on a phone) never runs under it */
-#screen-title .menu-body,#screen-lobby .menu-body{padding-bottom:calc(2.5rem + 2 * var(--s-4))}
+#screen-title .menu-body,#screen-lobby .menu-body{padding-bottom:calc(2.5rem + 2 * var(--s-3))}
 @media (max-width:700px){ #screen-title .menu-body{padding-bottom:calc(2.125rem + 2 * var(--s-3))}
   #screen-lobby .menu-body{padding-bottom:var(--s-4)} #screen-lobby .menu-foot{flex-wrap:wrap;height:auto;justify-content:center;row-gap:var(--s-2);padding-block:var(--s-3)}
   #screen-lobby .menu-foot .ph-badge{position:static;order:-1} #screen-lobby .menu-foot .foot-agree{flex:1 1 100%;text-align:center} }      /* a phone-wide lobby scrolls, so a corner badge would sit over the panels: there it rides in the footer, over the legal line */

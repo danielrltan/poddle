@@ -3991,3 +3991,25 @@ not: the public card and the share card carried the toughest Matt's name only. N
 ## 189. The Product Hunt badge sits right in the corner
 - The owner: "the prod hunt button isnt exactly in the corner; it has a bit extra space to its right side". It was s-7 (~3 rem) in from the right;
   now var(--edge), the HUD's own distance from the window edge, so it lines up with the title's settings button (17 px at 1440 wide). Looks only.
+
+## 190. The camera is on only while it is in use; the Matt badge's star is gone
+- The owner: "a big issue: camera access doesn't turn off once you exit a game or step away from the tab; it needs to turn off otherwise
+  that's an invasion of privacy". It was started at a seat and stopped only by Play without camera: it stayed on in the lobby, while
+  watching, on Auto, and in a hidden tab, until the tab closed (the Privacy page even said so).
+- main.js: the camera runs only while seated on a court (camera / connect / calibrate / play) with Move on Body.
+  - toLobby() stops it (every way off a court goes through it: Back, Q Q, the result card, a closed court, the tournament's courts).
+  - enterWatch() stops it (a player who goes on to watch).
+  - Settings > Move: Auto stops it; Body turns it on again (camTurnOn: no second browser question, the grant stands). begin() no longer
+    starts it, nor shows the primer, when Move is already Auto.
+  - visibilitychange: hidden stops it and keeps the tracker's centre (cx0, cy0); shown again while still on that court restarts it with
+    the same centre (startCam(keep)), so there is no recentring. Hidden in the lobby: nothing to restart.
+  The reach (Sensitivity) is kept across every stop, as before (stopCam saves it to prefs).
+- Privacy section 3: the "Selecting Auto does not turn the camera off ... remains on until you close the Poddle tab" sentence is replaced by
+  when it is on and every case that turns it off. Dates already read 2026-10-04. CLAUDE.md data flows updated.
+- test/camprimer.mjs: getUserMedia streams are kept and live video tracks counted. Section 6 now expects Auto to turn the camera off and Body
+  to bring it back (it used to check Auto -> Body kept the same stream). New section 8: seated -> on; another tab in front -> hidden and off;
+  back -> on; Back to the lobby -> off; hiding and showing in the lobby -> still off.
+- The Matt badge's gold star (.st-mstar, NOTES 111) is removed from Your stats and the public card: it showed whenever any level was beaten,
+  which the coloured disc and the level's name already say ("if it really has no meaning, remove it"). The 11-0 gold ring (NOTES 188) stays.
+- The badge strip of NOTES 186 is a little slimmer (gaps s-3, was s-4): it had made Your stats scroll by 6 px at 1280x800
+  (profile-ui "fits without a scroll" passes again). menu.mjs fails the same 23 lines as untouched main.

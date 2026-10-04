@@ -37,7 +37,7 @@ async function open(tag, cfg, { w = 1440, h = 900, query = '', ctx = null } = {}
     try { if (!localStorage.getItem('poddle.name')) localStorage.setItem('poddle.name', 'Dan'); } catch { /* */ }      // a returning visitor: the lobby asks a first one for a name
     window.__gum = 0;      // camera requests only: findSinks asks for audio, and that is not the camera
     const md = navigator.mediaDevices, real = md.getUserMedia.bind(md);
-    md.getUserMedia = c => { if (c && c.video) { window.__gum++; if (cfg.deny) return Promise.reject(new DOMException(cfg.deny === true ? 'Permission denied' : 'Could not start video source', cfg.deny === true ? 'NotAllowedError' : cfg.deny)); } return real(c); };
+    md.getUserMedia = c => { if (c && c.video) { window.__gum++; if (cfg.deny) return Promise.reject(new DOMException(cfg.deny === true ? 'Permission denied' : 'Could not start video source', cfg.deny === true ? 'NotAllowedError' : cfg.deny)); } return real(c).then(st => { (window.__streams ||= []).push(st); return st; }); };
     const pq = navigator.permissions.query.bind(navigator.permissions);
     navigator.permissions.query = d => d && d.name === 'camera' ? Promise.resolve(window.__perm = { state: cfg.perm, onchange: null }) : pq(d);
   }, cfg);
@@ -49,6 +49,7 @@ const st = pg => pg.evaluate(() => { const $ = id => document.getElementById(id)
     camRow: $('row-camera-state').textContent, camOn: seen('btn-cam-on'), focus: document.activeElement && document.activeElement.id,
     fits: (() => { const c = $('cam-card').getBoundingClientRect(); return c.left >= -0.5 && c.right <= innerWidth + 0.5; })(), hScroll: document.documentElement.scrollWidth > innerWidth + 0.5 }; });
 const seat = async pg => { await pg.click('#btn-start'); await sleep(700); if (await pg.evaluate(() => !!document.getElementById('btn-quick').getClientRects().length)) await pg.click('#btn-quick'); await sleep(1000); };      // Play, then Quick play: the seat. After a reload the address bar's ?court= rejoins by itself
+const liveCam = pg => pg.evaluate(() => (window.__streams || []).flatMap(s => s.getVideoTracks()).filter(t => t.readyState === 'live').length);      // camera tracks still running (NOTES 190)
 const shot = async (pg, name) => { await sleep(700); await pg.screenshot({ path: `${root}test/ui-shots/cam-${name}.png` }); };
 
 // ---------- 1. first seat: the primer, with a live paddle behind it; Allow asks, then calibration ----------
@@ -124,11 +125,13 @@ pg = await open('granted', { perm: 'granted' });
 await seat(pg); s = await st(pg);
 ok(s.screen === 'connect' && s.gum === 1 && s.key === 'allow', `permission already granted -> no primer, the camera starts (screen ${s.screen}, gum ${s.gum}, key ${s.key})`);
 const up = await pg.evaluate(() => new Promise(r => { const t0 = performance.now(), f = () => { if (__stats.cam && __stats.cam.ready || performance.now() - t0 > 12000) r(!!(__stats.cam && __stats.cam.ready)); else setTimeout(f, 200); }; f(); }));
-if (up) {      // Settings -> Move: Auto, then Body again. A camera already up is just used: no second request, no restart
-  await pg.evaluate(() => document.querySelector('[data-move=auto]').click()); await sleep(300);
-  await pg.evaluate(() => document.querySelector('[data-move=body]').click()); await sleep(300); s = await st(pg);
-  const cam = await pg.evaluate(() => !!(__stats.cam && __stats.cam.ready));
-  ok(s.gum === 1 && s.mode === 'Body' && cam, `Move Auto -> Body with the camera up: Body at once, not asked again (gum ${s.gum}, mode ${s.mode}, camera ${cam})`);
+if (up) {      // Settings -> Move: Auto turns the camera off (NOTES 190); Body turns it on again (the browser does not ask twice: already granted)
+  await pg.evaluate(() => document.querySelector('[data-move=auto]').click()); await sleep(400);
+  const off = await liveCam(pg); s = await st(pg);
+  ok(off === 0 && s.mode === 'Auto', `Move Auto: the camera goes off (live tracks ${off}, mode ${s.mode})`);
+  await pg.evaluate(() => document.querySelector('[data-move=body]').click());
+  const back = await pg.evaluate(() => new Promise(r => { const t0 = performance.now(), f = () => { if (__stats.cam && __stats.cam.ready || performance.now() - t0 > 12000) r(!!(__stats.cam && __stats.cam.ready)); else setTimeout(f, 200); }; f(); })); s = await st(pg);
+  ok(s.gum === 2 && s.mode === 'Body' && back && await liveCam(pg) === 1, `Move Body: the camera comes back and Body with it (gum ${s.gum}, mode ${s.mode}, camera ${back})`);
 } else ok(true, 'Move Auto -> Body: skipped, the models did not load in this browser');
 await pg.ctx.close();
 
@@ -143,6 +146,22 @@ pg = await open('watch', { perm: 'prompt' }, { query: '&court=WTCH&watch=1' });
 await pg.click('#btn-start'); await sleep(1500); s = await st(pg);
 ok(s.phase === 'watch' && s.screen !== 'camera' && s.gum === 0, `a watch link -> watching, no primer, no camera (phase ${s.phase}, screen ${s.screen}, gum ${s.gum})`);
 await pg.ctx.close();
+
+// ---------- 8. the camera is on only while it is in use (NOTES 190): a hidden tab turns it off and back on, leaving the court turns it off ----------
+podOn = true;
+pg = await open('privacy', { perm: 'granted', pod: true });
+await seat(pg); await sleep(1500);
+ok(await liveCam(pg) === 1, `seated: the camera is on (${await liveCam(pg)})`);
+{ const other = await pg.ctx.newPage(); await other.bringToFront(); await sleep(900);
+  const hid = await pg.evaluate(() => document.hidden), n = await liveCam(pg);
+  ok(hid && n === 0, `another tab in front: this tab is hidden and its camera is off (hidden ${hid}, live ${n})`);
+  await pg.bringToFront(); await other.close(); await sleep(2000);
+  ok(await liveCam(pg) === 1, `back to the tab, still seated: the camera is on again (${await liveCam(pg)})`); }
+await pg.keyboard.press('Escape'); await sleep(1200); s = await st(pg);
+ok(s.phase === 'lobby' && await liveCam(pg) === 0, `Back off the court: the lobby, and the camera is off (phase ${s.phase}, live ${await liveCam(pg)})`);
+{ const other = await pg.ctx.newPage(); await other.bringToFront(); await sleep(500); await pg.bringToFront(); await other.close(); await sleep(1500);
+  ok(await liveCam(pg) === 0, 'in the lobby, hiding and showing the tab does not turn it on'); }
+podOn = false; await pg.ctx.close();
 
 const uniq = [...new Set(errs.map(e => e.split('\n')[0].slice(0, 220)))];
 ok(!uniq.length, 'no page errors' + (uniq.length ? ':\n  ' + uniq.join('\n  ') : ''));
