@@ -4289,6 +4289,7 @@ scoreboard tab, NOTES 201, over the far court).
   names the level (`Matt · Pro · counts as Rookie · Pro again restarts at 0-0`: the row under the tab is where to pick it); its key
   form (`4 again`) and main.js's botVia / KEY_OF are gone, since B walks on and never picks the same level twice and a spectator's views are V (Broadcast, Split, one player, the other,
   Free, round again; the chips lose their 1-4 keycaps, the row has one V key).
+- how-to-play.html (follow-up commit): Watch says V for the views, and a line on the emote bar and its keys.
 - Legal: privacy.html (section 4: any player or spectator who sends an emote; 10 reactions, "GG" and 9 emoji), terms.html (your name
   shows on any emote you send), CLAUDE.md data flows. Nothing new is stored; emotes were already in the data list.
 - Tests: test/emotebar-e2e.mjs (new: the bar at 1280, 900, 700 and 390 px wide for a player and a spectator, nothing overlapping,
