@@ -4364,3 +4364,14 @@ The owner (2026-10-04): "can u add a smart profanity name filter for usernames" 
   Tests: accounts-unit (token, affix, respelling, false positives, profaneName, guestShown).
 - Settings > Screen > Show camera (#tog-cam): hides the camera inset (the little picture of you) while tracking carries on; Body stays its own
   switch. poddle.settings.cam (false when off; CLAUDE.md storage list, privacy.html's row names the camera preview). ui.setCamView.
+
+## 205. The home no longer loads as three squares
+
+The owner (2026-10-04): "sometimes the menu UI layout loads in squares and is aligned really weirdly". The home's two-row grid
+(NOTES 160) only applies at five or six tiles (.tiles[data-n]), and Friends, Your stats and Leaderboard were shown by profile.js only
+after GET /api/me had answered (db and sign-in known). Until then, or for good when that one request failed (the server restarting after
+a deploy, a flaky first fetch: it was asked once and never again), the home was the three-tile fallback: 17rem squares, flex-wrapped and
+centred, then (sometimes) a jump to the grid. Now drawAcct takes the hosted site to have its database and sign-in until /api/me says
+otherwise (meOk), so the six blocks lay out from the first frame; and loadMe asks again when the answer did not come, 1 s, 2, 4 ... 16 s,
+up to eight times, redrawing on a real answer (a server without a database would then hide the tiles). The three-square layout is still
+what a local copy without accounts gets. profile-ui and social-ui pass as before.

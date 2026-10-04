@@ -48,14 +48,21 @@ export async function api(path, method = 'GET', body) {
 }
 const devBody = () => { const dev = deviceId(); return dev ? { dev } : {}; };
 const acct = a => a && typeof a === 'object' ? { username: typeof a.username === 'string' && a.username ? a.username.slice(0, 12) : null, renameAt: Number.isFinite(a.renameAt) ? a.renameAt : null } : null;
+let meOk = false;      // /api/me has ANSWERED (not just been asked): until then the home lays out as if it had (NOTES 205)
+async function askMe() {                                    // -> true when /api/me answered with its JSON
+  const r = await api('/api/me'), j = r.ok && r.j; if (!j) return false;
+  const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
+  me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true }; meLadder = me.account ? ladderOf(j) : null;      // the account's ladder and places ride on /api/me (server/api.js)
+  return true;
+}
 export async function loadMe() {                            // once after boot: is sign-in on, and who is signed in
   if (!on) return me;
-  try { const r = await api('/api/me'), j = r.ok && r.j;
-    if (j) { const s = j.signin && typeof j.signin === 'object' ? j.signin : {}, id = typeof s.clientId === 'string' && /^[\w.-]{1,200}$/.test(s.clientId) ? s.clientId : null;
-      me = { enabled: s.enabled === true && !!id, clientId: id, account: s.enabled === true ? acct(j.account) : null, db: j.db === true }; meLadder = me.account ? ladderOf(j) : null;      // the account's ladder and places ride on /api/me (server/api.js)
-    } } catch { /* no answer: a guest with sign-in off */ }
-  meDone = true;
-  drawAcct(); return me;
+  try { meOk = await askMe(); } catch { /* no answer yet: see below */ }
+  meDone = true; drawAcct();
+  if (!meOk) (async () => {      // no answer (the server restarting after a deploy, a flaky first request): ask again, 1 s, 2, 4 ... 16, up to eight times. The home kept its
+    for (let i = 0, wait = 1000; i < 8 && !meOk; i++, wait = Math.min(16000, wait * 2)) { await new Promise(r => setTimeout(r, wait)); try { meOk = await askMe(); } catch { /* again */ } }      // full layout meanwhile; a real answer redraws
+    drawAcct(); })();
+  return me;
 }
 // No notices at all (NOTES 147 and 168, CLAUDE.md "No announcement notices"): the Friends one and the leaderboard / profile-card ones are gone, and their keys with them (below)
 export async function fetchProfile() {                      // -> the Profile of 8.2, null = nothing saved yet, undefined = the request failed
@@ -621,7 +628,8 @@ function drawAcct() {
     b.setAttribute('aria-label', !a ? 'Sign in' : name ? `${name}: your stats` : 'Pick a username'); b.dataset.tip = !a ? 'Sign in' : name ? 'Your stats' : 'Pick a username'; } }
   drawChip();
   h.lockName(name || null);                                  // a username is the name: both name fields show it, read-only, with Change
-  show('btn-profile', on); show('btn-leaderboard', on && me.db); show('btn-friends', on && me.db && me.enabled); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // the leaderboard reads the database too (NOTES 126); the tiles lay out for what shows
+  const db = meOk ? me.db : true, has = meOk ? me.enabled : true;      // before /api/me answers (or when it did not), the hosted site is taken to have its database and sign-in: the six-block home from the first frame, never three squares that jump (NOTES 205)
+  show('btn-profile', on); show('btn-leaderboard', on && db); show('btn-friends', on && db && has); h.tiles(); h.acct();      // Friends (docs/SOCIAL.md 1): accounts only, so only where one can be made. h.acct: web/social.js follows who is signed in      // the leaderboard reads the database too (NOTES 126); the tiles lay out for what shows
 }
 
 // ---------- the site's storage cleared in another tab: the device id went with it. Its socket keeps the old hello, so the next match is on a new one (3.1) ----------
