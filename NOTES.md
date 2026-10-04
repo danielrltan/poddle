@@ -3888,6 +3888,9 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
 - test/menu-audio.mjs (new, real server): card opens on title and lobby without leaving them, above the title, court rows hidden; music plays
   after the first gesture, carries into the lobby, stops for Sound off and for a court; levels step and are kept; hover once per control;
   narrow window fits. SHOTS=<dir> saves screenshots.
+- Follow-up (same day): on the menu a press outside the card only closes it; its click is swallowed (ui.js eatClick) so the Quick play tile
+  under it is not pressed too (it seated the test player). Every route back to the lobby goes through main.js screen(), so the music returns
+  after a court; test/menu-audio.mjs now checks both.
 - Existing suites, each run alone and against main (64119ed): menu.mjs and ui-next.mjs fail exactly main's assertions (ui-next's settings-row
   and Tab-order lists now also name Music and Menu sounds); camprimer.mjs and seo.test.mjs pass.
 

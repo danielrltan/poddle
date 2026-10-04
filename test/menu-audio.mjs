@@ -71,8 +71,10 @@ try {
   await pg.click('#btn-lobby-set'); await sleep(500); s = await st();
   ok(s.set === 'menu' && s.open, 'the lobby\'s settings button opens the card');
   await shot('3-lobby-settings');
-  { const t = await (await pg.$('#lobby-title')).boundingBox(); await pg.mouse.click(t.x + 4, t.y + 4); } await sleep(400);      // the header's title: nothing under it
-  ok(!(await st()).open, 'a click outside closes it');
+  { const t = await (await pg.$('#btn-quick')).boundingBox(); await pg.mouse.click(t.x + t.width / 2, t.y + t.height / 2); } await sleep(800);      // over Quick play
+  s = await st(); ok(!s.open && s.screen === 'lobby' && await ev(() => __stats.phase === 'lobby' && !__stats.room), `a click outside only closes the card: Quick play under it is not pressed (${JSON.stringify([s.open, s.screen])})`);
+  await pg.click('#btn-lobby-set'); await sleep(400); await pg.click('#btn-lobby-set'); await sleep(400);
+  ok(!(await st()).open, 'its button closes it again');
 
   // a narrow window: the card fits
   await pg.setViewport({ width: 390, height: 800 }); await sleep(400); await pg.click('#btn-lobby-set'); await sleep(500);
@@ -84,6 +86,9 @@ try {
   // Play a bot: on the way to the court the music fades out
   await pg.click('#btn-bot'); await sleep(1200); await ev(() => document.getElementById('btn-bot-0').click()); await sleep(2500); s = await st();
   ok(s.screen !== 'lobby' && s.screen !== 'title' && !s.mau.want && !s.mau.playing, `leaving the menu for a court: the music stops (${JSON.stringify([s.screen, s.mau])})`);
+  // Back from the set-up screen leaves the court: the music comes back in the lobby
+  await pg.keyboard.press('Escape'); await sleep(2200); s = await st();
+  ok(s.screen === 'lobby' && s.mau.want && s.mau.playing, `back in the lobby the music plays again (${JSON.stringify([s.screen, s.mau])})`);
   ok(!errs.length, `no page errors (${errs.slice(0, 3).join(' | ')})`);
 } catch (e) { ok(false, 'threw: ' + (e.stack || e)); }
 await browser.close();

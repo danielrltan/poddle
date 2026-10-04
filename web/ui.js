@@ -625,7 +625,11 @@ export function setPaused(on) {                            // the rest is CSS: b
 }
 {
   on2('btn-menu', 'click', () => settings(!setOpen));
-  addEventListener('pointerdown', e => { if (setOpen && !e.target.closest?.('#settings, #btn-menu, .menu-set')) settings(false); });
+  // On the menu a press outside the card only closes it: its click must not also press the tile under it (Quick play would seat you). Every click
+  // follows its own pointerdown, so the flag is set or cleared there and never outlives one press
+  let eatClick = false;
+  addEventListener('pointerdown', e => { eatClick = false; if (setOpen && !e.target.closest?.('#settings, #btn-menu, .menu-set')) { eatClick = !!slots.menu; settings(false); } });
+  addEventListener('click', e => { if (!eatClick) return; eatClick = false; e.preventDefault(); e.stopImmediatePropagation(); }, true);
   for (const b of document.querySelectorAll('.menu-set')) b.addEventListener('click', () => settings(!setOpen));
   const call = (k, ...a) => { if (setH[k]) setH[k](...a); };
   for (const k of ['music', 'uisfx']) { on2(`btn-${k}-less`, 'click', () => call(k, -1)); on2(`btn-${k}-more`, 'click', () => call(k, 1)); }
