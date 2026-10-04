@@ -958,10 +958,10 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 /* the Product Hunt badge in the lobby's footer (NOTES 182): 2.75rem tall, a lift on hover, out of the way of the keyhints */
 .ph-badge{flex:none;display:inline-flex;border-radius:.625rem;transition:transform var(--d-fast) var(--ease-bounce)} .ph-badge img{display:block;height:2.75rem;width:auto;border-radius:.625rem;box-shadow:var(--sh-1)}
 @media (hover:hover){ .ph-badge:hover{transform:translateY(-.125rem) scale(1.03)} } .ph-badge:focus-visible{outline:.1875rem solid var(--line);outline-offset:.125rem}
-/* the title's footer (NOTES 183): one row, the links on the left and the Product Hunt badge on the right, both on the bar's centre line.
-   A narrow window stacks them, centred: the links, then a smaller badge */
-.menu-glass .title-foot{justify-content:space-between;padding-left:var(--s-7);padding-right:var(--s-7)} .title-foot .ph-badge img{height:2.5rem}
-@media (max-width:700px){ .menu-glass .title-foot{justify-content:center;padding-left:var(--s-4);padding-right:var(--s-4)} .title-foot .foot-links{flex:1 1 100%;flex-wrap:wrap;justify-content:center;row-gap:var(--s-1)} .title-foot .ph-badge img{height:2.125rem} }
+/* the title's footer (NOTES 184): the links centred in the bar; the Product Hunt badge sits in the screen's bottom right corner, just above the bar
+   (anchored to the footer, bottom:100%, so it follows the bar's height when the links wrap) */
+.title-foot .ph-badge{position:absolute;right:var(--s-7);bottom:calc(100% + var(--s-4))} .title-foot .ph-badge img{height:2.5rem}
+@media (max-width:700px){ .title-foot .ph-badge{right:var(--s-4);bottom:calc(100% + var(--s-3))} .title-foot .foot-links{flex:1 1 100%;flex-wrap:wrap;justify-content:center;row-gap:var(--s-1)} .title-foot .ph-badge img{height:2.125rem} }
 .foot-agree{font-size:max(13px,var(--t-xs));color:var(--ink-soft);line-height:1.35} .foot-agree .foot-link{font-size:inherit;font-weight:800}
 .menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:var(--s-3);padding-bottom:var(--s-3)}      /* the line may wrap: the bar grows with it, never clips it */
 @media (max-width:520px){ .foot-agree ~ .keyhints-inline{display:none} .foot-agree{flex:1;text-align:center} }      /* a phone has no Esc or F key: the legal line gets the whole bar */

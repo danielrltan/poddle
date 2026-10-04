@@ -3919,3 +3919,9 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
   (moved from the lobby footer, where it floated between the legal line and the key hints; NOTES 182) on the right, on the bar's centre line.
   At 700 px and under the links wrap centred and the badge sits under them, smaller. The lobby footer is back to the legal line and the keys.
 - No data or legal change (Privacy says "the badge in the menu": still true). test/menu-audio.mjs checks the footer and the start sound.
+
+## 184. The Product Hunt badge in the title's bottom right corner, above the footer
+- The owner: "can u put the product hunt button on the bottom right corner before the footer?" NOTES 183 had it at the right end of the bar.
+- ui.css: the badge keeps its place in the title footer's markup but is absolutely placed (bottom: 100% + s-4, right: s-7; s-3 / s-4 at 700 px
+  and under), so it sits over the court in the screen's bottom right corner just above the bar and follows the bar's height when the links wrap.
+  The links are centred in the bar again. Looks only; test/menu-audio.mjs checks it sits 4..40 px above the bar at the right edge.
