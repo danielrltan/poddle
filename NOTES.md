@@ -4180,3 +4180,13 @@ see the menu appear better."
   unchanged). In a match nothing changes: the card is not .is-menu and the veil keys on data-settings="menu" only.
 - CSS only: no data, storage or text change; legal pages untouched. test/menu.mjs: the same 249 passed / 22 failed as main before the change.
 
+## 201. Matt's difficulty is a row under his tab on the court
+
+The owner (2026-10-04): "we also need to add a clearer indicator of how u can change bot difficulty." The ways in were the 1-4 key hint
+(bottom right, gone after six idle seconds) and the Difficulty row in the settings card, both easy to miss. Now, whenever the other seat is
+Matt (not a tournament match, not watching), a small pill row sits right under Matt's scoreboard tab: DIFFICULTY · Rookie Club Tour Pro,
+the current one picked, one click to change (#bot-pick / #pick-seg in index.html, the same {type:'bot', level} request as the settings
+row, through ui.js's 'bot' handler). It never fades. ui.js setBot shows it and checks its option along with the settings seg; placePick
+measures it under the right tab (under the whole board on a window up to 760 px wide, clear of the insets) and again on a resize. Gone
+with the scoreboard under a result overlay or a menu screen, and while the settings card is open (that card has its own row).
+The key hint and the settings row stay. Screens: test/ui-shots/next-05-hud-matt-*.png (spectate-e2e).

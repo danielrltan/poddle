@@ -603,6 +603,13 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .bot-levels{display:grid;grid-template-columns:repeat(4,1fr);justify-content:center;gap:var(--s-4);width:100%}      /* Rookie, Club, Tour, Pro: four across, two by two on a narrow window */
 @media (max-width:700px){ .bot-levels{grid-template-columns:repeat(2,1fr)} }
 #bot-seg .seg-opt{min-width:0;padding:0 .75rem}
+/* the difficulty under Matt's tab on the court (NOTES 187): a small pill row that never fades, placed by ui.js setBot under the scoreboard's right tab */
+.bot-pick{position:fixed;top:var(--pick-top,calc(var(--edge) + 4.625rem));left:var(--pick-left,75%);transform:translateX(-50%);z-index:calc(var(--z-hud) + 1);display:inline-flex;align-items:center;gap:.5rem;padding:.25rem .25rem .25rem .75rem;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.82);backdrop-filter:blur(.5rem);box-shadow:var(--sh-1);white-space:nowrap;transition:opacity var(--d-med) var(--ease-soft)}
+.bot-pick-cap{font:800 var(--t-xs)/1 var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+#pick-seg .seg-opt{min-width:0;height:2rem;padding:0 .625rem;font-size:var(--t-sm)}
+body[data-overlay] .bot-pick,body[data-screen]:not([data-screen="hud"]) .bot-pick,body[data-settings] .bot-pick{opacity:0;pointer-events:none}      /* with the scoreboard: gone under a result or a menu screen; the settings card has its own row */
+@media (max-width:760px){ .bot-pick{padding:.1875rem .1875rem .1875rem .625rem} #pick-seg .seg-opt{height:1.75rem;padding:0 .5rem} }
 .bot-levels .btn{min-width:0;height:auto;min-height:max(6rem,44px);padding:.75rem 1rem;flex-direction:column;justify-content:flex-start;gap:.25rem} .bot-levels .btn small{font-size:var(--t-sm);font-weight:600;letter-spacing:0;color:var(--ink-soft);white-space:nowrap}      /* one line each: four titles on one baseline */
 #lobby-bot{width:min(68rem,94vw)}      /* 68: the Club card's nowrap 'Medium pace, some mistakes' keeps the card's 1rem side padding */
 #bot-title{margin:0 0 var(--s-4);text-align:center}

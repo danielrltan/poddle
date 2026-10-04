@@ -456,7 +456,13 @@ export function calibration(e, { waiting = false, camLost = false } = {}) {
 // ---------- small things ----------
 export function setMode(name) { setText($('mode'), name); for (const o of $('move-seg')?.children || []) o.setAttribute('aria-checked', String(o.dataset.move === String(name).toLowerCase())); }      // how you move lives in the settings panel now (docs/NEXT.md 14d)
 // Matt's level, or null when the other seat is not Matt: the 1 2 3 4 key hint and the settings Difficulty row show only against him
-export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); if (!on) return; swapText($('bot-level'), String(level), 'ov-pop'); for (const o of $('bot-seg')?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level))); }
+export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); show('bot-pick', on); if (!on) return; swapText($('bot-level'), String(level), 'ov-pop');
+  for (const id of ['bot-seg', 'pick-seg']) for (const o of $(id)?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level)));
+  placePick(); }
+// the court's difficulty row sits under Matt's tab: measured from the scoreboard (its right tab), again on a resize
+function placePick() { const el = $('bot-pick'), tab = innerWidth > 760 ? document.querySelector('#board .score-tab.is-them') : $('board'); if (!el || el.hidden || !tab) return; const r = tab.getBoundingClientRect(); if (!r.width) return;      // a narrow window: under the whole board, clear of the insets
+  el.style.setProperty('--pick-top', `${Math.round(r.bottom + 6)}px`); el.style.setProperty('--pick-left', `${Math.round(r.left + r.width / 2)}px`); }
+addEventListener('resize', placePick);
 export function toggle(id) { const el = $(id); if (!el) return false; el.hidden = !el.hidden; return !el.hidden; }
 export function show(id, on) { const el = $(id); if (!el) return false; el.hidden = !on; return !el.hidden; }
 export function setCamera(ready) { show('camwrap', !!ready); }
@@ -641,6 +647,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
   on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });      // phone <-> AirPod at any time, not only on the set-up screen
   on2('bot-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });
+  on2('pick-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });      // the court's row: the same request as the settings row (main.js sends {type:'bot', level})
   on2('btn-recenter', 'click', e => { restart(e.currentTarget, 'ov-spin'); call('recenter'); }); on2('btn-leave-room', 'click', () => call('leave'));      // Recentre: the button spins its svg (restart() cannot replay an SVG itself: no offsetWidth)
   // name: saved on Enter / blur. Empty puts the old one back. Esc cancels the edit and hands focus back to the card (main.js owns what Esc does next)
   const commit = el => { if (lockedName) { el.value = lockedName; return; } const n = cleanName(el.value); if (!n) { el.value = savedName; return; } const changed = n !== savedName; el.value = n; keepName(el); if (changed) call('name', n); };
