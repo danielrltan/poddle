@@ -4166,3 +4166,17 @@ row, retention, legal-basis row, a dated line in 15), docs/ropa.md 4, CLAUDE.md 
   Firefox builds cannot decode it, and a silent menu on launch day is not worth 0.6 MB. The MP3 is gone.
 - server/game.js: `.m4a` is `audio/mp4`; audio joins the week-long cache (a new track is a new file name), it was no-cache with
   a revalidation on every visit. CLAUDE.md's third-party line names the new file. Nothing new is sent or stored.
+
+## 200. Settings over a menu sits on top and blurs everything behind it
+
+The owner (2026-10-04): "the settings menu in main menu goes under the buttons, this is bad. fix that, id like blur everything so u can
+see the menu appear better."
+- The cause: `.settings.is-menu` (NOTES 181) raised the card to z-screen + 3, but the older `body[data-settings] .settings{z-index:var(--z-screen)}`
+  (the in-match rule that keeps the card sharp over the pause blur) is more specific and won, so over a menu the card sat at 20, level with
+  the screens, and the tiles painted over it. The menu rule now also matches `body[data-settings] .settings.is-menu`: 23 on every menu
+  screen (title, home, courts, ranks; 1280x720 and 390x844 checked).
+- While Settings is open over a menu, `body::after` (z-screen + 2, under the card) blurs the whole page behind it (10 px, a light wash) and
+  fades with --d-med; none with reduced motion. pointer-events none, so a press outside still closes the card and eats that click (ui.js,
+  unchanged). In a match nothing changes: the card is not .is-menu and the veil keys on data-settings="menu" only.
+- CSS only: no data, storage or text change; legal pages untouched. test/menu.mjs: the same 249 passed / 22 failed as main before the change.
+
