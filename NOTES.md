@@ -4013,3 +4013,10 @@ not: the public card and the share card carried the toughest Matt's name only. N
   which the coloured disc and the level's name already say ("if it really has no meaning, remove it"). The 11-0 gold ring (NOTES 188) stays.
 - The badge strip of NOTES 186 is a little slimmer (gaps s-3, was s-4): it had made Your stats scroll by 6 px at 1280x800
   (profile-ui "fits without a scroll" passes again). menu.mjs fails the same 23 lines as untouched main.
+
+## 191. Tour gets its own hover move
+- Play a bot: each card's word moves like the level plays, but Tour was Club's hop played twice at 360 ms, not a move of
+  its own. Now it is `lob-smash` (560 ms, bounce ease): a crouch and coil back (down, 7deg, 94%), then up and through the
+  ball (-.5rem, -9deg, 106%), a small landing. Rookie ambles, Club hops, Tour winds up and smashes, Pro darts. The
+  keyboard twin `lob-smash-k` keeps the focus-visible restart trick the other three have. The global reduced-motion block
+  clamps it like the rest.
