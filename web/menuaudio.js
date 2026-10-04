@@ -5,7 +5,7 @@
 //
 // Levels are 0..10 (Settings > Sound > Music, Menu sounds). The Sound switch mutes both. The AudioContext is scene.js's
 // (getAc), so the output device chosen in Settings applies here too.
-const SRC = new URL('audio/into-the-blue.m4a', import.meta.url).href;      // beside this file, wherever web/ is served from. AAC-LC 64 kbps (NOTES 198): every browser decodes it, 2.2 MB instead of the 3.7 MB mp3
+const SRC = new URL('audio/into-the-blue.m4a', import.meta.url).href;      // beside this file, wherever web/ is served from. AAC-LC 64 kbps (NOTES 199): every browser decodes it, 2.2 MB instead of the 3.7 MB mp3
 function silent() {                                                      // 0.1 s of 8-bit silence, as a WAV: what the first gesture plays to bless the element
   const n = 800, b = new Uint8Array(44 + n).fill(128), v = new DataView(b.buffer), w = (o, t) => { for (let i = 0; i < 4; i++) b[o + i] = t.charCodeAt(i); };
   w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);

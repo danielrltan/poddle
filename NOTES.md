@@ -4157,7 +4157,7 @@ in every move mode); a swing made while a menu screen covers the court has no st
 swings and stream; a seat's pending checks are judged at match end; old tabs already send r and q. Legal: privacy.html (paddle motion
 row, retention, legal-basis row, a dated line in 15), docs/ropa.md 4, CLAUDE.md data flows.
 
-## 198. The menu music is 2.2 MB, not 3.7
+## 199. The menu music is 2.2 MB, not 3.7
 - Every menu visitor fetches the whole track after their first click (menuaudio.js load(): a blob, since the static server has no
   byte ranges). For the launch crowd on US cellular that was the biggest download on the site: a 112 kbps MP3 of 3.7 MB.
 - Now web/audio/into-the-blue.m4a: the same master (~/poddle-launch-video/music/into-the-blue.wav), the same loudnorm -18 LUFS
