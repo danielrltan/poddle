@@ -608,10 +608,9 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 /* Matt's difficulty on the court (NOTES 201, moved to the bottom-left corner in 204): a small pill row that never fades. A player's bottom-left is free
    (the view chips there are a spectator's, the key hint is bottom-right); it steps up over a toast like the ask card does, and gives way to that card */
 .bot-pick{position:fixed;left:var(--edge);bottom:var(--edge);z-index:calc(var(--z-hud) + 1);display:inline-flex;align-items:center;gap:.5rem;padding:.25rem .25rem .25rem .75rem;border-radius:var(--r-pill);
-  background:rgba(255,255,255,.82);backdrop-filter:blur(.5rem);box-shadow:var(--sh-1);white-space:nowrap;transition:opacity var(--d-med) var(--ease-soft), bottom 200ms var(--ease-out)}
+  background:rgba(255,255,255,.82);backdrop-filter:blur(.5rem);box-shadow:var(--sh-1);white-space:nowrap;transition:opacity var(--d-med) var(--ease-soft)}
 .bot-pick-cap{font:800 var(--t-xs)/1 var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
 #pick-seg .seg-opt{min-width:0;height:2rem;padding:0 .625rem;font-size:var(--t-sm)}
-body.has-toast .bot-pick{bottom:calc(var(--edge) + 3.75rem)}      /* the toast takes the bottom band: the row steps up so "Pro again restarts at 0-0" can be pressed while it reads */
 body[data-overlay] .bot-pick,body[data-screen]:not([data-screen="hud"]) .bot-pick,body[data-settings] .bot-pick,body:has(.ask-card.is-on) .bot-pick{opacity:0;pointer-events:none}      /* with the scoreboard: gone under a result or a menu screen; the settings card has its own row; the ask card takes the corner */
 @media (max-width:760px){ .bot-pick{padding:.1875rem .1875rem .1875rem .625rem} #pick-seg .seg-opt{height:1.75rem;padding:0 .5rem} }
 .bot-levels .btn{min-width:0;height:auto;min-height:max(6rem,44px);padding:.75rem 1rem;flex-direction:column;justify-content:flex-start;gap:.25rem} .bot-levels .btn small{font-size:var(--t-sm);font-weight:600;letter-spacing:0;color:var(--ink-soft);white-space:nowrap}      /* one line each: four titles on one baseline */
@@ -912,7 +911,8 @@ body[data-role="spectator"] #ping-pill{display:none}                           /
 @keyframes emote-cool{from{transform:scaleX(1)} to{transform:scaleX(0)}}
 html[data-mobile] .emote-key{display:none} html[data-mobile] .emote-btn{height:2.125rem}      /* a phone has no number keys */
 body:not([data-role="spectator"]) .keyhints{bottom:calc(var(--edge) + 3.375rem)}      /* a player's key strip sits just above the bar */
-@media (max-width:560px){ body:not(.has-toast) .bot-pick{bottom:calc(var(--edge) + 3.375rem)} }      /* narrow: Matt's difficulty row (bottom-left, NOTES 204) and the bar would meet, so the row steps up above the bar's band, left of the key strip */
+@media (min-width:561px){ body:has(#bot-pick:not([hidden])) .toast{bottom:calc(var(--edge) + 3.375rem)} }      /* against Matt the toast sits just above his row's band: a long one (a mid-match level change) would cover the row, which never moves (NOTES 206) */
+@media (max-width:560px){ .bot-pick{bottom:calc(var(--edge) + 3.375rem)} body:has(#bot-pick:not([hidden])) .toast{bottom:calc(var(--edge) + 6rem)} }      /* narrow: Matt's difficulty row (bottom-left, NOTES 204) and the bar would meet, so the row sits above the bar's band, left of the key strip. A toast never moves it: here the toast goes above the row (NOTES 206) */
 body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none;transition-duration:140ms}
 .emote-layer{position:fixed;inset:0;z-index:var(--z-hud);pointer-events:none;overflow:hidden}
 .emote-pop{position:absolute;right:calc(var(--edge) + var(--x, 0rem));bottom:calc(var(--edge) + 3.25rem);display:flex;flex-direction:column;align-items:center;gap:.125rem;

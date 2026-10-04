@@ -106,4 +106,10 @@ const d = await open('d', 'Dot'); await toLobby(d); await d.click('#btn-bot'); a
 for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); await sleep(600); await d.mouse.move(w / 2, h / 2 + 3); await d.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);
   const bx = await boxes(d, ['emotes', '#keys li', '#key-bot', 'bot-pick']), hit = overlaps(bx); ok(bx.emotes && bx['bot-pick'] && !hit.length, `against Matt ${w}x${h}: the bar and the difficulty row both show, apart (${hit.join(', ') || JSON.stringify(bx)})`);
   await d.screenshot({ path: `${SHOTS}emotes-matt-${w}x${h}.png` }); }
+// a toast (the longest: a mid-match level change) never moves Matt's row, and never lands on it (NOTES 206)
+for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); await sleep(500); const at = async () => (await boxes(d, ['bot-pick']))['bot-pick'];
+  const was = await at(); await d.evaluate(() => window.__ui.toast('Matt · Rookie · counts as Pro · Rookie again restarts at 0-0', 4000)); await sleep(700);
+  const now = await at(), bx = await boxes(d, ['bot-pick', 'toast']), hit = overlaps(bx);
+  ok(JSON.stringify(was) === JSON.stringify(now) && !hit.length, `toast up ${w}x${h}: the difficulty row stays put (${was} -> ${now}) and clear of the toast (${hit.join(', ') || JSON.stringify(bx.toast)})`);
+  await d.screenshot({ path: `${SHOTS}emotes-matt-toast-${w}x${h}.png` }); await d.evaluate(() => window.__ui.toastOff()); await sleep(300); }
 await done();

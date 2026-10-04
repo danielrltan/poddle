@@ -4295,3 +4295,15 @@ scoreboard tab, NOTES 201, over the far court).
 - Tests: test/emotebar-e2e.mjs (new: the bar at 1280, 900, 700 and 390 px wide for a player and a spectator, nothing overlapping,
   keys 1 and 0, the rest, the pops gone in two seconds, V's order, and against Matt the bar and his row apart at every width); emote.test.mjs (players emote, the 0.9 s gap per socket, 0-9);
   spectate-e2e, menu, fixes-e2e, victory-e2e and ui-next use V / B / the chips instead of 1-4.
+
+## 206. A toast no longer pushes Matt's difficulty row up
+- "The bot difficulty selection bar gets pushed up when a notification at the bottom center of the screen appears. Fix that so
+  that it doesn't get pushed up."
+- NOTES 204 stepped #bot-pick up 3.75 rem while a toast showed (body.has-toast), so it jumped on every "Your serve". That rule
+  is gone, with its `bottom` transition: the row never moves for a toast.
+- So a long toast cannot cover it instead (the mid-match "Matt · Rookie · counts as Pro · Rookie again restarts at 0-0" spans
+  the row at 900 and 700 px), the toast moves while the row shows: wider than 560 px it sits just above the bottom band
+  (edge + 3.375 rem); at 560 px and under, where the row already sits above the emote bar (NOTES 205), it goes above the row
+  (edge + 6 rem). Other toasts, and every toast when not playing Matt, stay where they were.
+- test/emotebar-e2e.mjs: with the longest toast up, the row's box is unchanged and clear of the toast at 1280, 900, 700 and 390.
+  CSS only; nothing sent or stored.
