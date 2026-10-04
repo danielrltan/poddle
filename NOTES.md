@@ -4052,3 +4052,22 @@ difficulty the player beat?" Only the margin was kept (bot_record.best_margin), 
 - card.dataOf gains `wl` and `ret` (the W-L numbers and the ring's fraction); api.js publicCard picks its fields by name and
   sends neither. share.test checks the rank as the page writes it ("Silver II", not capitals) and "Rookie Matt" + "11-0".
   docs/SHARE.md 2 describes the new look. test/ui-shots/share/ re-rendered. Nothing new is stored or sent (privacy page unchanged).
+
+## 194. Losses cost more as you climb
+
+The owner: "can u make it so that trophy reductions become stronger over time kinda like brawlstars progression so there's actually some
+challenge to climbing? but not too too hard as it'd still take a whiel in general". A loss to a person used to cost 20 at every rank
+(`-(20 - round(gap / 25))`, -32..-8), so holding any rank against equal opponents took 40% wins. Now each rank has a `loss` in
+server/ladder.js TIERS: Bronze 6, Silver 10, Gold 14, Platinum 18, Diamond 22, Master 26, Champion 30, Pro 34, and a loss costs
+`round(loss * (1 - gap / 600))` with gap = clamp(them - me, -300, 300): half to someone 300 above, one and a half times to someone 300
+below (Bronze -3..-9, Pro -17..-51). Wins are unchanged (30 + round(gap / 25)). Against equal opponents a rank holds at
+loss / (30 + loss) wins: 17% Bronze, 25% Silver, 32% Gold, 37.5% Platinum, 42% Diamond, 46% Master, 50% Champion, 53% Pro. So the
+low ranks climb faster than before and Champion/Pro need a winning record, but never a crushing one.
+
+Decisions made without the owner (numbers are one column in TIERS, easy to tune): the step of 4 per rank; the rank is the LOSER's at
+the game's start (the same frozen counts as before); the gap scales the loss proportionally instead of adding a fixed step, so a loss
+is never 0 or a gain; Pro is flat 34 however far above 1050; wins and Matt bounties untouched. Edge cases: the leaver after the first
+strike pays the same scaled loss (forfeit path calls humanDelta too); a rowless or not-eligible opponent still counts as gap 0; sticky
+floors (Bronze..Platinum) and the 450 floor above still apply after the loss; tournaments use the same function. Copy: the Ranks page
+lead, How to play (3 places) and the changelog. No data or legal change. Tests: ladder.test.mjs (per-rank table, Pro bounds, sweep
+bounds -51..-3), trophies.test.mjs (Bronze losses -6, Silver -10, the forfeit run 30/29/27), menu.mjs Ranks copy.

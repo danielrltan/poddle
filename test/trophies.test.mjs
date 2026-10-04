@@ -1,11 +1,11 @@
 // Trophies, server side (docs/TROPHIES.md 3 and 6): one real server on a database seeded with accounts (usernames, sessions, a few ladder rows),
-// scripted ws clients signed in by cookie. Two accounts play a game: profile.trophies +30 / -20, the ladder rows, delta_a / delta_b (the export's
+// scripted ws clients signed in by cookie. Two accounts play a game: profile.trophies +30 / -6 (a Bronze loss, NOTES 194), the ladder rows, delta_a / delta_b (the export's
 // trophyDelta), mode ladder; a guest gets none: signin, a username-less account none: username; Matt pays mattDelta, then the day cap (MATT_DAY)
 // and the ceiling; an easy Matt pays 0 with limit easy; a leaver after the first strike pays the loss and the stayer wins; a leave before the
 // first strike is silent; the emblem rides welcome.rank / names.rank / matchover.rank on a plain court; old-client rk messages are ignored;
 // /ranked is a 301 to /ranks. Then (the verify round): four forfeits by one pair hit pair_cap on the fourth (a paid forfeit win counts like a
 // counted one, db.js PAID); an eligible opponent without a row is gap 0 (3.3); one person on both seats or an anonymous seat: +0 left_early, and
-// the same_account leaver pays nothing; an account deleted mid-game saves nothing; a tournament of four pays +30 / -20 as kind tour and carries
+// the same_account leaver pays nothing; an account deleted mid-game saves nothing; a tournament of four pays +30 / -6 as kind tour and carries
 // the emblem on tmove (vs, you) and the bracket snapshot. Every game is one point (WIN_AT 1); scenarios run side by side on their own courts. Under 90 s.
 //   node test/trophies.test.mjs        TROPHIES_PORT=<port> moves the server (default 9460). Last line: TROPHIES TESTS PASSED or n FAILURES.
 import { spawn } from 'child_process';
@@ -31,7 +31,7 @@ const RAW = {}, OWNER = {};
   db.open(FILE); const now = Date.now();
   const mk = (sub, name, trophies = 0) => { const a = db.createAccount(sub, now); if (name) db.claimUsername(a.id, name, U.skeleton(name), now); RAW[sub] = db.session.create(a.id, now); OWNER[sub] = a.owner_id;
     if (trophies) db.ladderApply({ owner: a.owner_id, delta: trophies, won: true, vsBot: false, now }); };   // a seeded row: paid once (one win on its record)
-  mk('ann', 'Ann', 140); mk('ben', 'Ben', 140);                  // Bronze III both: the gap is 0, so +30 / -20 exactly; Ann's win is a rank-up to Silver I
+  mk('ann', 'Ann', 140); mk('ben', 'Ben', 140);                  // Bronze III both: the gap is 0, so +30 / -6 exactly (Bronze's loss); Ann's win is a rank-up to Silver I
   mk('cal', 'Cal'); mk('dee', 'Dee'); mk('bare', null);          // Cal plays a guest, Dee a username-less account
   mk('fay', 'Fay'); mk('hal', 'Hal', 160);                       // Fay: Matt at Rookie (Bronze pays there); Hal: Silver needs Club, Rookie is easy
   mk('ivy', 'Ivy', 100); mk('jon', 'Jon', 100);                  // the leaver rule
@@ -125,20 +125,20 @@ console.log('server: ' + PORT + ' (MATT_DAY ' + MATT_DAY + ')');
 await up(PORT, ENV);
 
 report(await Promise.all([
-  sc('1. two accounts with usernames: +30 / -20, the ladder rows, delta_a / delta_b, mode ladder, the emblem on a plain court', async t => {
+  sc('1. two accounts with usernames: +30 / -6, the ladder rows, delta_a / delta_b, mode ladder, the emblem on a plain court', async t => {
     const [a, b] = await pair({ who: 'ann' }, { who: 'ben' });
     t.ok(J(a.last('welcome').rank) === J([{ tier: 1, div: 3 }, null]) && J(b.last('welcome').rank) === J([{ tier: 1, div: 3 }, { tier: 1, div: 3 }]) && J(a.got('names').at(-1).rank) === J([{ tier: 1, div: 3 }, { tier: 1, div: 3 }]), `welcome.rank / names.rank carry the emblems (Bronze III both) on a plain court: ${J(a.got('names').at(-1).rank)}`);
     hit(a); still(b); await over(a); await over(b); const pa = await prof(a), pb = await prof(b);
     const ta = pa && pa.trophies, tb = pb && pb.trophies;
     t.ok(pa && pa.saved && pa.ranked && pa.kind === 'human' && ta && ta.delta === 30 && ta.trophies === 170 && ta.tierWas === 1 && ta.divWas === 3 && ta.tier === 2 && ta.div === 1 && ta.counted === true && ta.saved === true && ta.matt === false && ta.floorHeld === false && J(ta.why) === '[]' && ta.limit === undefined,
       `Ann's profile message: trophies +30, 140 -> 170, Bronze III -> Silver I: ${J(ta)}`);
-    t.ok(tb && tb.delta === -20 && tb.trophies === 120 && tb.tier === 1 && tb.div === 3 && tb.counted === true && tb.saved === true && tb.floorHeld === false, `Ben's: -20, 140 -> 120, still Bronze III: ${J(tb)}`);
+    t.ok(tb && tb.delta === -6 && tb.trophies === 134 && tb.tier === 1 && tb.div === 3 && tb.counted === true && tb.saved === true && tb.floorHeld === false, `Ben's: -6, 140 -> 134, still Bronze III: ${J(tb)}`);
     t.ok(J(a.last('matchover').rank) === J([{ tier: 2, div: 1 }, { tier: 1, div: 3 }]) && J(a.got('names').at(-1).rank[0]) === J({ tier: 2, div: 1 }), `matchover.rank and names.rank show the new rank: ${J(a.last('matchover').rank)}`);
     const la = await ladderOf('ann'), lb = await ladderOf('ben');
-    t.ok(la && la.trophies === 170 && la.tier === 2 && la.div === 1 && la.wins === 2 && la.losses === 0 && la.streak === 2 && la.bestTier === 2 && lb && lb.trophies === 120 && lb.losses === 1 && lb.streak === 0, `/api/stats ladder rows: Ann ${J(la && [la.trophies, la.wins, la.losses])}, Ben ${J(lb && [lb.trophies, lb.wins, lb.losses])}`);
+    t.ok(la && la.trophies === 170 && la.tier === 2 && la.div === 1 && la.wins === 2 && la.losses === 0 && la.streak === 2 && la.bestTier === 2 && lb && lb.trophies === 134 && lb.losses === 1 && lb.streak === 0, `/api/stats ladder rows: Ann ${J(la && [la.trophies, la.wins, la.losses])}, Ben ${J(lb && [lb.trophies, lb.wins, lb.losses])}`);
     const xa = lastMatch(await exportOf('ann')), xb = lastMatch(await exportOf('ben'));
-    t.ok(xa && xa.mode === 'ladder' && xa.kind === 'human' && xa.trophyDelta === 30 && xa.result === 'win' && xb && xb.mode === 'ladder' && xb.trophyDelta === -20 && xb.result === 'loss', `the export: mode ladder, trophyDelta 30 (delta_a) and -20 (delta_b): ${J([xa && xa.trophyDelta, xb && xb.trophyDelta])}`);
-    t.ok(/match recorded: human ranked \(\+30\/-20\)/.test(out), 'the log line: match recorded: human ranked (+30/-20)');
+    t.ok(xa && xa.mode === 'ladder' && xa.kind === 'human' && xa.trophyDelta === 30 && xa.result === 'win' && xb && xb.mode === 'ladder' && xb.trophyDelta === -6 && xb.result === 'loss', `the export: mode ladder, trophyDelta 30 (delta_a) and -6 (delta_b): ${J([xa && xa.trophyDelta, xb && xb.trophyDelta])}`);
+    t.ok(/match recorded: human ranked \(\+30\/-6\)/.test(out), 'the log line: match recorded: human ranked (+30/-6)');
     bye(a, b);
   }),
   sc('2. a guest against an account: only the account moves (gap 0), the guest hears none: signin', async t => {
@@ -183,8 +183,8 @@ report(await Promise.all([
     const [a, b] = await pair({ who: 'ivy' }, { who: 'jon' }); hit(a); still(b); await struck(a); b.send({ type: 'leave' }); await over(a); const pa = await prof(a);
     t.ok(a.last('matchover').forfeit && pa && !pa.ranked && pa.trophies && pa.trophies.delta === 30 && pa.trophies.counted === true && pa.trophies.trophies === 130 && J(pa.trophies.why) === '[]', `the stayer: not counted as a match (early forfeit) but +30 trophies: ${J(pa && pa.trophies)}`);
     await wait(300); const lb = await ladderOf('jon'), la = await ladderOf('ivy');
-    t.ok(lb && lb.trophies === 80 && lb.losses === 1 && lb.streak === 0 && la && la.trophies === 130 && la.wins === 2, `Jon paid -20 (100 -> ${lb && lb.trophies}), Ivy took +30 (100 -> ${la && la.trophies})`);
-    t.ok(lastMatch(await exportOf('jon'))?.trophyDelta === -20 && lastMatch(await exportOf('jon'))?.reasons.includes('early_forfeit') && /match recorded: human unranked \(\+30\/-20\)/.test(out), 'the export: trophyDelta -20 on an early_forfeit row; the log line (+30/-20)');
+    t.ok(lb && lb.trophies === 94 && lb.losses === 1 && lb.streak === 0 && la && la.trophies === 130 && la.wins === 2, `Jon paid -6 (100 -> ${lb && lb.trophies}), Ivy took +30 (100 -> ${la && la.trophies})`);
+    t.ok(lastMatch(await exportOf('jon'))?.trophyDelta === -6 && lastMatch(await exportOf('jon'))?.reasons.includes('early_forfeit') && /match recorded: human unranked \(\+30\/-6\)/.test(out), 'the export: trophyDelta -6 on an early_forfeit row; the log line (+30/-6)');
     bye(a, b);
   }),
   sc('7. a leave before the first strike is silent', async t => {
@@ -218,16 +218,16 @@ report(await Promise.all([
   sc('10. four forfeits by one pair in a day: the fourth pays the stayer 0 (pair_cap counts paid forfeit wins), the leaver still pays', async t => {
     const got = [];
     for (let k = 1; k <= 4; k++) { const [a, b] = await pair({ who: 'pam' }, { who: 'quin' }); hit(a); still(b); await struck(a); b.send({ type: 'leave' }); await over(a); const pa = await prof(a); got.push(pa && pa.trophies); bye(a, b); await wait(200); }
-    t.ok(J(got.slice(0, 3).map(x => x && x.delta)) === J([30, 28, 26]) && got.slice(0, 3).every(x => x.counted === true), `the first three forfeit wins pay, the gap growing each time: ${J(got.slice(0, 3).map(x => x && x.delta))} (30, 28, 26)`);
-    t.ok(got[3] && got[3].delta === 0 && got[3].counted === false && J(got[3].why) === J(['left_early']) && got[3].trophies === 184, `the fourth: +0, why left_early (pair_cap, R10 sees the three paid rows): ${J(got[3])}`);
+    t.ok(J(got.slice(0, 3).map(x => x && x.delta)) === J([30, 29, 27]) && got.slice(0, 3).every(x => x.counted === true), `the first three forfeit wins pay, the gap growing each time: ${J(got.slice(0, 3).map(x => x && x.delta))} (30, 29, 27)`);
+    t.ok(got[3] && got[3].delta === 0 && got[3].counted === false && J(got[3].why) === J(['left_early']) && got[3].trophies === 186, `the fourth: +0, why left_early (pair_cap, R10 sees the three paid rows): ${J(got[3])}`);
     const lp = await ladderOf('pam'), lq = await ladderOf('quin');
-    t.ok(lp && lp.trophies === 184 && lp.wins === 4 && lq && lq.trophies === 32 && lq.losses === 4, `Pam 100 -> 184 (three paid), Quin 100 -> 32 (four losses: 20, 18, 16, 14): ${J([lp && lp.trophies, lq && lq.trophies])}`);
-    t.ok((lastMatch(await exportOf('pam')) || {}).reasons?.includes('pair_cap') && lastMatch(await exportOf('quin'))?.trophyDelta === -14, 'the fourth row carries pair_cap and the leaver\'s -14');
+    t.ok(lp && lp.trophies === 186 && lp.wins === 4 && lq && lq.trophies === 78 && lq.losses === 4, `Pam 100 -> 186 (three paid), Quin 100 -> 78 (four Bronze losses: 6, 6, 5, 5): ${J([lp && lp.trophies, lq && lq.trophies])}`);
+    t.ok((lastMatch(await exportOf('pam')) || {}).reasons?.includes('pair_cap') && lastMatch(await exportOf('quin'))?.trophyDelta === -5, 'the fourth row carries pair_cap and the leaver\'s -5');
   }),
   sc('11. an eligible opponent without a ladder row counts as gap 0 for the one with a row; the newcomer reads the real gap', async t => {
     const [n, m] = await pair({ who: 'ned' }, { who: 'max' }); hit(n); still(m); await over(n); await over(m); const pn = await prof(n), pm = await prof(m);
     t.ok(pn && pn.trophies && pn.trophies.delta === 37 && pn.trophies.trophies === 37 && pn.trophies.counted, `Ned (no row) beats Silver Max (180): +37, the gap of 180: ${J(pn && pn.trophies)}`);
-    t.ok(pm && pm.trophies && pm.trophies.delta === -20 && pm.trophies.trophies === 160 && pm.trophies.floorHeld === false, `Max loses to a rowless opponent: -20 (gap 0, not -27 from Ned's 0): ${J(pm && pm.trophies)}`);
+    t.ok(pm && pm.trophies && pm.trophies.delta === -10 && pm.trophies.trophies === 170 && pm.trophies.floorHeld === false, `Max loses to a rowless opponent: Silver's -10 (gap 0, not -15 from Ned's 0): ${J(pm && pm.trophies)}`);
     bye(n, m);
   }),
   sc('12. one person on both seats (same_account): a leave charges nobody; a stayer facing an anonymous seat gets +0 left_early', async t => {
@@ -251,7 +251,7 @@ report(await Promise.all([
     t.ok((await api('POST', '/api/stats', {}, { who: 'xan' })).json?.profile?.ladder == null, 'Xan\'s session no longer reads a ladder row');
     bye(w, x);
   }),
-  sc('15. a tournament: kind tour pays +30 / -20 per match; the rank emblem rides tmove (vs and you) and the bracket snapshot', async t => {
+  sc('15. a tournament: kind tour pays +30 / -6 per match; the rank emblem rides tmove (vs and you) and the bracket snapshot', async t => {
     const h = tab({ who: 'tia' }); await h.open(); await until(() => h.n('lobby')); h.send({ type: 'tcreate', name: 'Tia' }); await until(() => h.tour);
     const ps = [h]; for (const who of ['uli', 'vera', 'wil']) { const c = tab({ who }); await c.open(); await until(() => c.n('lobby')); c.send({ type: 'join', code: h.tour.code, name: who }); await until(() => c.tour); ps.push(c); }   // nobody is ready yet: the warm-ups never serve
     await until(() => h.tour.n === 4); h.send({ type: 'tstart' }); await until(() => ps.every(p => p.n('tmove')), 5000); ps.forEach(still);   // ready from the VS card on: the serve goes by itself and the receiver whiffs, one point ends a match
@@ -261,12 +261,12 @@ report(await Promise.all([
     t.ok(h.tour.players.length === 4 && h.tour.players.every(p => p.tier === 1 && p.div === 3) && h.tour.rounds[0].matches.every(x => x.a.tier === 1 && x.a.div === 3 && x.b.tier === 1 && x.b.div === 3) && h.tour.rounds[1].matches[0].a.tier === null, `the bracket snapshot: tier / div on every player and both sides of a drawn match, null on To be decided: ${J(h.tour.rounds[0].matches[0].a)}`);
     t.ok(await until(() => ps.every(p => p.n('matchover') >= 1), 20000), 'both semifinals end');
     const sem = await Promise.all(ps.map(p => prof(p, 1)));
-    t.ok(sem.every(p => p && p.kind === 'tour' && p.ranked && p.saved && p.trophies && p.trophies.counted) && sem.filter(p => p.trophies.delta === 30 && p.trophies.trophies === 130).length === 2 && sem.filter(p => p.trophies.delta === -20 && p.trophies.trophies === 80).length === 2, `the semifinals: kind tour, two +30 and two -20: ${J(sem.map(p => p && p.trophies && p.trophies.delta))}`);
+    t.ok(sem.every(p => p && p.kind === 'tour' && p.ranked && p.saved && p.trophies && p.trophies.counted) && sem.filter(p => p.trophies.delta === 30 && p.trophies.trophies === 130).length === 2 && sem.filter(p => p.trophies.delta === -6 && p.trophies.trophies === 94).length === 2, `the semifinals: kind tour, two +30 and two -6: ${J(sem.map(p => p && p.trophies && p.trophies.delta))}`);
     t.ok(await until(() => h.tour && h.tour.phase === 'done', 25000), 'the final ends, a champion');
     const fin = ps.filter(p => p.n('matchover') >= 2), pf = await Promise.all(fin.map(p => prof(p, 2)));
-    t.ok(fin.length === 2 && pf.some(p => p && p.trophies && p.trophies.delta === 30 && p.trophies.trophies === 160) && pf.some(p => p && p.trophies && p.trophies.delta === -20 && p.trophies.trophies === 110), `the final: +30 to 160, -20 to 110: ${J(pf.map(p => p && p.trophies && [p.trophies.delta, p.trophies.trophies]))}`);
-    const x = lastMatch(await exportOf('tia')); t.ok(x && x.kind === 'tour' && x.mode === 'ladder' && [30, -20].includes(x.trophyDelta), `Tia's export: kind tour, mode ladder, trophyDelta ${x && x.trophyDelta}`);
-    t.ok(/match recorded: tour ranked \((\+30\/-20|-20\/\+30)\)/.test(out), 'the log line: tour ranked (+30/-20)');
+    t.ok(fin.length === 2 && pf.some(p => p && p.trophies && p.trophies.delta === 30 && p.trophies.trophies === 160) && pf.some(p => p && p.trophies && p.trophies.delta === -6 && p.trophies.trophies === 124), `the final: +30 to 160, -6 to 124: ${J(pf.map(p => p && p.trophies && [p.trophies.delta, p.trophies.trophies]))}`);
+    const x = lastMatch(await exportOf('tia')); t.ok(x && x.kind === 'tour' && x.mode === 'ladder' && [30, -6].includes(x.trophyDelta), `Tia's export: kind tour, mode ladder, trophyDelta ${x && x.trophyDelta}`);
+    t.ok(/match recorded: tour ranked \((\+30\/-6|-6\/\+30)\)/.test(out), 'the log line: tour ranked (+30/-6)');
     bye(...ps);
   }),
 ]));

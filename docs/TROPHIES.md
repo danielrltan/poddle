@@ -63,7 +63,8 @@ match (guard on the room, like `X.done`). Rules, in order:
 2. **Counted?** `r.ranked` from `stats.onEnd` (abuse.judge). Not counted: `+0`, `trophies: { counted: false, why }` with the
    existing `WHY` words. Exception (the leaver rule, 4).
 3. **Deltas.**
-   - vs a person (`human`, `tour`): `humanDelta(me, them, won, false)` from both seats' trophies read at match START (freeze
+   - vs a person (`human`, `tour`): `humanDelta(me, them, won, false)` (since NOTES 194 a loss costs the LOSER's rank `loss`, 6 Bronze, 10, 14, 18, 22, 26, 30, 34 Pro,
+     times `1 - gap / 600`: x0.5 to someone 300 above, x1.5 to someone 300 below; the examples below that say -20 predate it) from both seats' trophies read at match START (freeze
      them on the room in `startMatch`, like `Q` did: a Matt bounty landing elsewhere mid-game never changes it). An opponent with no
      ladder row or not eligible counts as `them = me` (gap 0: +30 / -20). `new_opponent` on the game: the winner's delta is
      `halveWin` (the loser's is the plain loss).
@@ -117,7 +118,7 @@ deploy.
   keep. Diamond and above can drop.`, and `Best: Platinum I` when the best is above the current. Before any trophies: crest dimmed,
   `No trophies yet`, `Win a game for your first trophies` (signed in) / `Sign in to earn trophies` (guest). (Since NOTES 158 the signed-in line is gone, the keep line under the bar is gone and the streak is the flame and its number alone: how ranks work is the Ranks page, opened by the crest or the (i) beside the rank.) Record lines stay as
   they are. Keep `rankCrest` and `drawRoad` names if convenient.
-- **Ranks page**: copy becomes: `Win games to earn trophies. A win against a person is worth about 30, a loss costs about 20;
+- **Ranks page**: copy becomes: `Win games to earn trophies. A win against a person is worth about 30; a loss costs 6 in Bronze and more at each rank, up to 34 in Pro;
   a win against Matt at your rank's level or harder pays a few. Bronze to Platinum are never lost once reached.` `ranksFrom`
   defaults to `profile`; `lastRank` is set by `rankCrest` (with the place from `/api/stats`).
 - **Profile card**: `Not ranked yet` becomes `No trophies yet`. Leaderboard: `Ranked Trophies` becomes `Trophies`, its empty

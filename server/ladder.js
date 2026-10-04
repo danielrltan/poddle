@@ -5,15 +5,17 @@
 
 // tier, name, floor (trophies where the rank starts), sticky (a floor you never fall below once reached), matt (the LOWEST Matt level, on the wire, a win pays at
 // for this rank: Rookie 0, Club 1, Pro 2, Tour 3; difficulty order 0 < 1 < 3 < 2, an easier Matt is practice), mattWin (trophies for a played-out counted win against him; 0 from Champion up, and MATT_CEILING stops him under Champion)
+// loss (what a loss to a person of equal trophies costs, NOTES 194: the owner wanted losses to bite harder as you climb, 'like brawlstars'). Against an equal opponent a
+// rank holds at loss / (30 + loss) wins: 17% in Bronze, 37.5% in Platinum, 50% in Champion, 53% in Pro; it was 40% everywhere at a flat 20
 const TIERS = Object.freeze([
-  Object.freeze({ tier: 1, name: 'Bronze',   floor: 0,   sticky: true,  matt: 0, mattWin: 10 }),
-  Object.freeze({ tier: 2, name: 'Silver',   floor: 150, sticky: true,  matt: 1, mattWin: 8 }),
-  Object.freeze({ tier: 3, name: 'Gold',     floor: 300, sticky: true,  matt: 1, mattWin: 7 }),
-  Object.freeze({ tier: 4, name: 'Platinum', floor: 450, sticky: true,  matt: 3, mattWin: 6 }),
-  Object.freeze({ tier: 5, name: 'Diamond',  floor: 600, sticky: false, matt: 3, mattWin: 5 }),
-  Object.freeze({ tier: 6, name: 'Master',   floor: 750, sticky: false, matt: 2, mattWin: 4 }),   // NOTES 124: the eighth rank (its name lives here and in web/emblems.js RANKS only)
-  Object.freeze({ tier: 7, name: 'Champion', floor: 900, sticky: false, matt: 2, mattWin: 0 }),
-  Object.freeze({ tier: 8, name: 'Pro',      floor: 1050, sticky: false, matt: 2, mattWin: 0 }),
+  Object.freeze({ tier: 1, name: 'Bronze',   floor: 0,   sticky: true,  matt: 0, mattWin: 10, loss: 6 }),
+  Object.freeze({ tier: 2, name: 'Silver',   floor: 150, sticky: true,  matt: 1, mattWin: 8, loss: 10 }),
+  Object.freeze({ tier: 3, name: 'Gold',     floor: 300, sticky: true,  matt: 1, mattWin: 7, loss: 14 }),
+  Object.freeze({ tier: 4, name: 'Platinum', floor: 450, sticky: true,  matt: 3, mattWin: 6, loss: 18 }),
+  Object.freeze({ tier: 5, name: 'Diamond',  floor: 600, sticky: false, matt: 3, mattWin: 5, loss: 22 }),
+  Object.freeze({ tier: 6, name: 'Master',   floor: 750, sticky: false, matt: 2, mattWin: 4, loss: 26 }),   // NOTES 124: the eighth rank (its name lives here and in web/emblems.js RANKS only)
+  Object.freeze({ tier: 7, name: 'Champion', floor: 900, sticky: false, matt: 2, mattWin: 0, loss: 30 }),
+  Object.freeze({ tier: 8, name: 'Pro',      floor: 1050, sticky: false, matt: 2, mattWin: 0, loss: 34 }),
 ]);
 const TOP = TIERS.length;                                        // 8: Pro, the top rank (no divisions, NOTES 126)
 const RANK_W = 150, DIV_W = 50, DIVS = 3;                        // a rank is 150 trophies wide, a division 50: Bronze I 0, II 50, III 100, Silver I 150 ... Champion III 1000. Pro (1050 and up, no cap) has NO divisions: its players are told apart by their global leaderboard place (NOTES 126, the owner: 'like Valorant')
@@ -49,11 +51,14 @@ function nextDivFloorOf(tier, div) { const t = clamp(int(tier), 1, TOP), d = cla
 function applyFloor(bestTier, trophies) { return Math.max(int(trophies), floorOf(clamp(int(bestTier), 1, STICKY_TOP))); }
 
 // humanDelta(me, them, won, sweep) -> trophies for one side of a game against a person, from BOTH sides' counts at the game's start (TROPHIES.md 3.3; sweep is history, always false now):
-//   gap = clamp(them - me, -300, 300); win = 30 + round(gap / 25) (+3 for a sweep) = 18..45; loss = -(20 - round(gap / 25)) = -32..-8
+//   gap = clamp(them - me, -300, 300); win = 30 + round(gap / 25) (+3 for a sweep) = 18..45; loss = -round(loss of MY rank * (1 - gap / 600)): half of it to someone
+//   300 above, one and a half times it to someone 300 below. Bronze -3..-9, Platinum -9..-27, Pro -17..-51 (NOTES 194; it was -(20 - round(gap / 25)) = -32..-8 for every rank)
 function humanDelta(me, them, won, sweep) {
-  const gap = clamp(int(them) - int(me), -300, 300), k = Math.round(gap / 25);
-  return won ? 30 + k + (sweep ? 3 : 0) : -(20 - k);
+  const gap = clamp(int(them) - int(me), -300, 300);
+  return won ? 30 + Math.round(gap / 25) + (sweep ? 3 : 0) : -Math.round(lossOf(tierOf(me)) * (1 - gap / 600));
 }
+// lossOf(tier) -> the rank's loss to an equal opponent (6 in Bronze .. 34 in Pro)
+function lossOf(tier) { return TIERS[clamp(int(tier), 1, TOP) - 1].loss; }
 // halveWin(delta) -> the winner's delta over a not-yet-established opponent (R11c new_opponent): half, never under 8
 function halveWin(delta) { return Math.max(8, Math.round(int(delta) / 2)); }
 // mattDelta(tier) -> a played-out counted win against Matt, by the rank at the START of that game
@@ -66,4 +71,4 @@ function mattAward(delta, dayUsed, dayCap, trophies) { return Math.max(0, Math.m
 const EXPORT_NAMES = NAMES;                                      // the export file names ranks by these words (never by tier number alone)
 
 module.exports = { TIERS, NAMES, FLOORS, ROMAN, TOP, DIVS, RANK_W, DIV_W, STICKY_TOP, CHAMPION, MATT_CEILING, EXPORT_NAMES,
-  tierOf, divOf, hasDivs, romanOf, rankName, floorOf, divFloorOf, nextFloorOf, nextDivFloorOf, applyFloor, humanDelta, halveWin, mattDelta, mattLevel, mattAward };
+  tierOf, divOf, hasDivs, romanOf, rankName, floorOf, divFloorOf, nextFloorOf, nextDivFloorOf, applyFloor, humanDelta, lossOf, halveWin, mattDelta, mattLevel, mattAward };
