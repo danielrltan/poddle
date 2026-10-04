@@ -3844,3 +3844,10 @@ count from the day the column was added (2026-09-25), and a dev server with a sh
 - No data, storage, permission or third-party change: the legal pages are untouched. Changelog entry added.
 - Tests: test/profile-ui.mjs: a flawless Rookie (bestMargin 11) is the one gold chip, Club at 10 and a beaten Pro at 4 are not, the colour
   is rgb(138, 82, 0), the tooltip; screenshot test/ui-shots/stats-flawless.png (94 checks).
+
+## 180. A tournament ends again: NOTES 178 had commented out `t.phase = 'done'`
+
+NOTES 178's one server line added `reg` to t.champ with a trailing `//` comment, and the comment swallowed the rest of the line:
+`t.phase = 'done'; t.doneAt = Date.now(); t.next = null;`. A final's result never made a tournament 'done': no champion screen, the bracket
+stuck in 'play', and trophies.test.mjs failed ("the final ends, a champion"), which the deploy gate caught on the next ship. The three
+statements are back before the comment. trophies.test and tourney.test pass; live from this deploy (the broken server was deployed with 178).
