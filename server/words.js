@@ -45,7 +45,7 @@ const PROFANITY_EXACT = [                                                       
   'bmlnZ2E=', 'bmlnZ2Fz', 'bmlnZ2F6', 'a2lrZQ==', 'a3lrZQ==', 'Y2hpbms=', 'Y2hpbmtz', 'c3BpY2s=', 'c3BpY3M=',
   'ZGljaw==', 'ZGlja3M=', 'd2hvcmVz', 'c2x1dHM=', 'Yml0Y2hlcw==', 'cHVzc2llcw==', 'aG9l', 'aG9lcw==', 'dGhvdA==', 'dGhvdHM=', 'c2ltcA==', 'Y3Vjaw==', 'aml6emVk', 'c2hpdGU=', 'ZnVr', 'd3Rm', 'c3RmdQ==', 'Z3Rmbw==', 'bnNmdw==', 'cGVkb3M=', 'bmF6aQ==',      // NOTES 204: the smart filter's additions, mild words (whole word or glued to an affix: bigdick, mrcock, sexygirl)
   'c3BpYw==', 'Y29vbmFzcw==', 'ZGFya2ll', 'Z29vaw==', 'ZmFn', 'ZmFncw==', 'ZHlrZQ==', 'aG9tbw==', 'bGVzYm8=',
-  'cGFraQ==', 'd29n', 'bmF6aQ==', 'bmF6aXM=', 'a2tr', 'eHh4', 'cG9ybg==', 'cG9ybm8=', 'cmFwaXN0', 'cGFlZG8=',
+  'cGFraQ==', 'd29n', 'bmF6aQ==', 'bmF6aXM=', 'a2tr', 'cG9ybg==', 'cG9ybm8=', 'cmFwaXN0', 'cGFlZG8=',
   'dHdhdA==', 'dHdhdHM=', 'bWlsZg==', 'b3JneQ==', 'cmFwZQ==', 'cmFwaW5n', 'cGVkbw==', 'YW5hbA==', 'YW51cw==', 'Y3Vt',
   'Ym9uZXI=', 'aG9va2Vy', 'dGl0dHk=', 'dGl0dGllcw==', 'dGl0cw==', 'Ym9vYmllcw==', 'bmlwcGxl', 'bmlwcGxlcw==',
   'aG9ybnk=', 'ZXJlY3Rpb24=', 'c2VtZW4=', 'dGVzdGljbGU=', 'c2Nyb3R1bQ==', 'd2Fuaw==', 'ZmFw', 'bWV0aA==', 'Y3JhY2s=',

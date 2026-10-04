@@ -4357,8 +4357,8 @@ The owner (2026-10-04): "can u add a smart profanity name filter for usernames" 
   girl, man, men, guy, gal, lover, king, queen, lord, master, god, bro, dude, kid, baby, daddy, mommy, mama, papa, big, lil, little, mr,
   mrs, your, real, xx; peeled from either end while one is left, never from a stem under three letters); Scunthorpe-style names keep
   working (Cockburn, Dickens, Dickson, Analyst, Therapist, Assassin, Cassandra, Kingsley, Godfrey, Massage, Nice_Guy, Realmadrid).
-  words.js gains 21 mild words (dick, hoe, thot, simp, cuck, wtf, stfu, nsfw, nazi ...; boob/boobs were tried and dropped: the run
-  collapse makes them Bob). Guest names: profaneName(name) runs imp() (any script, look-alikes, separators out) and the token check;
+  words.js gains 21 mild words (dick, hoe, thot, simp, cuck, wtf, stfu, nsfw, nazi ...; boob/boobs were tried and dropped, and the old xxx entry went: the run
+  collapse makes them Bob and any run of x). Guest names: profaneName(name) runs imp() (any script, look-alikes, separators out) and the token check;
   guestShown now answers Player 1 / 2 for a profane guest name as it does for one passing as Matt, so the opponent, the spectators, the
   court list and the brackets never show it (the typed name stays in the player's own box). No data change: the privacy page is unchanged.
   Tests: accounts-unit (token, affix, respelling, false positives, profaneName, guestShown).
