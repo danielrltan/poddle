@@ -3925,3 +3925,10 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
 - ui.css: the badge keeps its place in the title footer's markup but is absolutely placed (bottom: 100% + s-4, right: s-7; s-3 / s-4 at 700 px
   and under), so it sits over the court in the screen's bottom right corner just above the bar and follows the bar's height when the links wrap.
   The links are centred in the bar again. Looks only; test/menu-audio.mjs checks it sits 4..40 px above the bar at the right edge.
+
+## 185. Quick play's start sound is bigger and rings out in a hall
+- The owner: "quick play button needs to sound more dramatic / have a touch of reverb at the end".
+- menuaudio.js: a second reverb, the hall (2.6 s generated tail, wet .55), that only the start sound is sent into; its wet returns into the
+  menu-sound bus, so Menu sounds and Sound off still govern it. start is now a deeper drop (130 -> 45 Hz, 0.55 s), a five-note run up two
+  octaves (C4..E5, 40 ms apart), a wide C major chord from C3 to G5 held 1.3 s, and a four-note sparkle (C6 E6 G6 C7) over it, all into the hall.
+  Peaks ~-9 dBFS at the default level, ~8 dB over select, ~-2 dBFS at Menu sounds 10 (no clipping). Same buttons as NOTES 183.

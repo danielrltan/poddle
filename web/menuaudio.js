@@ -17,7 +17,7 @@ const curve = v => Math.pow(Math.max(0, Math.min(10, v)) / 10, 1.7);      // equ
 const PENTA = [0, 2, 4, 7, 9];                                           // the stepper climbs a major pentatonic: never a sour step
 
 export function menuAudio(getAc) {
-  let ac = null, bus = null, mbus = null, muted = false, uiVol = 6, musVol = 5;
+  let ac = null, bus = null, mbus = null, hall = null, muted = false, uiVol = 6, musVol = 5;
   let el = null, loading = false, ready = false, want = false, playing = false, stopT = 0, hoverAt = 0;
   function init() {
     if (bus) return true;
@@ -29,25 +29,29 @@ export function menuAudio(getAc) {
       verb.buffer = ir; wet.gain.value = 0.28;
       bus.connect(ac.destination); bus.connect(verb); verb.connect(wet); wet.connect(ac.destination);
       mbus = ac.createGain(); mbus.gain.value = 0; mbus.connect(ac.destination);
+      // the hall: a 2.6 s tail only the start sound is sent into (NOTES 185). Its wet comes back into bus, so Menu sounds and Sound off apply to it
+      const hv = ac.createConvolver(), hw = ac.createGain(), hl = Math.round(ac.sampleRate * 2.6), hir = ac.createBuffer(2, hl, ac.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = hir.getChannelData(c); let r = 991 + c * 313; for (let i = 0; i < hl; i++) { r = (r * 16807) % 2147483647; d[i] = ((r / 2147483647) * 2 - 1) * Math.pow(1 - i / hl, 2.2); } }
+      hv.buffer = hir; hw.gain.value = 0.55; hall = ac.createGain(); hall.connect(bus); hall.connect(hv); hv.connect(hw); hw.connect(bus);
     } catch { bus = null; return false; }
     return true;
   }
   // a bell: the note, a soft octave over it, and a short partial that gives the attack its tap. Pitched low and warm (NOTES 183: the owner
   // found the first set, an octave higher with a glassy 3rd partial, far too high): the tap is a quiet 2nd partial now, never a 3rd
-  function bell(f, at, dur, g, glide = 1, type = 'sine') {
+  function bell(f, at, dur, g, glide = 1, type = 'sine', out = bus) {
     const t = ac.currentTime + at;
     for (const [mul, gg, d, ty] of [[1, g, dur, type], [2, g * 0.16, dur * 0.5, 'sine'], [2, g * 0.08, 0.03, 'triangle']]) {
       const o = ac.createOscillator(), v = ac.createGain();
       o.type = ty; o.frequency.setValueAtTime(f * mul * glide, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.025);
       v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(gg, t + 0.005); v.gain.exponentialRampToValueAtTime(0.0001, t + d);
-      o.connect(v); v.connect(bus); o.start(t); o.stop(t + d + 0.03);
+      o.connect(v); v.connect(out); o.start(t); o.stop(t + d + 0.03);
     }
   }
-  function thump(f0, f1, at, dur, g) {                                     // a soft low drop under the start sound
+  function thump(f0, f1, at, dur, g, out = bus) {                                     // a soft low drop under the start sound
     const t = ac.currentTime + at, o = ac.createOscillator(), v = ac.createGain();
     o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
     v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(g, t + 0.008); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(v); v.connect(bus); o.start(t); o.stop(t + dur + 0.03);
+    o.connect(v); v.connect(out); o.start(t); o.stop(t + dur + 0.03);
   }
   const C4 = 261.63, E4 = 329.63, G4 = 392, A4 = 440, C5 = 523.25, E5 = 659.25, G5 = 783.99;
   const VOICES = {
@@ -60,12 +64,13 @@ export function menuAudio(getAc) {
     open: () => { bell(E4, 0, 0.14, 0.12); bell(A4, 0.05, 0.24, 0.12); },
     close: () => { bell(A4, 0, 0.12, 0.1); bell(E4, 0.05, 0.2, 0.1); },
     nope: () => { bell(185, 0, 0.09, 0.2); bell(185, 0.1, 0.12, 0.17); },
-    // Quick play (and a difficulty in Play a bot): the "here we go" of starting a match. A low drop, a fast C major run up, and a ringing chord on top
+    // Quick play (and a difficulty in Play a bot): the "here we go" of starting a match (NOTES 185: made bigger). A deep drop, a fast run up two
+    // octaves, then a wide C major chord with a sparkle over it, all into the hall so it rings out for two seconds after
     start: () => {
-      thump(150, 62, 0, 0.32, 0.26);
-      [C4, E4, G4, C5].forEach((f, i) => bell(f, i * 0.045, 0.16, 0.16, 0.97, 'triangle'));
-      for (const f of [C5, E5, G5]) bell(f, 0.19, 0.75, 0.1, 1, 'triangle');
-      bell(1046.5, 0.19, 0.5, 0.06);
+      thump(130, 45, 0, 0.55, 0.26, hall);
+      [C4, E4, G4, C5, E5].forEach((f, i) => bell(f, i * 0.04, 0.16, 0.14, 0.97, 'triangle', hall));
+      for (const f of [130.81, C4, G4, C5, E5, G5]) bell(f, 0.22, 1.3, f < 200 ? 0.12 : 0.075, 1, 'triangle', hall);
+      [1046.5, 1318.5, 1567.98, 2093].forEach((f, i) => bell(f, 0.24 + i * 0.05, 0.6, 0.035, 1, 'sine', hall));
     },
   };
   function play(kind, n) {
