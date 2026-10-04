@@ -4307,3 +4307,21 @@ scoreboard tab, NOTES 201, over the far court).
   (edge + 6 rem). Other toasts, and every toast when not playing Matt, stay where they were.
 - test/emotebar-e2e.mjs: with the longest toast up, the row's box is unchanged and clear of the toast at 1280, 900, 700 and 390.
   CSS only; nothing sent or stored.
+
+## 207. Hold B for three seconds to restart a match against Matt
+The owner (2026-10-04): "i dont understand this matt difficulty selection reset thing, its too confusing. just make it so that you can
+restart the game by holding down b for 3 seconds. that way it resets score and a new difficulty will be tracked. the curent copy writing
+is super confusing." NOTES 202's "the level again restarts at 0-0" is gone.
+- B pressed and let go: the next difficulty, as always (now on the key UP; the key down only starts the hold timer, and its auto-repeats
+  are ignored, where before every repeat of a held B walked the levels). B held 3 s (B_HOLD_MS, main.js): `{type:'bot', restart:true}`;
+  the key up after a fired hold does nothing, and the tab losing focus cancels the hold. Spectators, inputs and an open sign-in card never
+  reach it (the key down's own gates), and the timer only sends on a live court.
+- Server (botRequest): `restart` restarts a match under way against Matt (`started || resumed`) at the level on: startMatch (0-0, a fresh
+  stats match at that level, the 3-2-1), `reset: true` on the botinfo. Before the first strike it does nothing (nothing to restart). The
+  match under way is dropped unrecorded, as leaving Matt is. A level request for the level already on is just that again.
+- Copy: on a level change mid-match `Matt · Pro · counts as Rookie · hold B to restart` (4 s); when the easiest level is the one on, just
+  `Matt · Rookie`. After the hold: `Restarted · counts as Pro` (2.4 s). The key hint stays `B Difficulty: Pro` (the toast names the hold
+  at the one moment it matters; no extra words on the strip).
+- test/bot.test.mjs: the restart message before the first strike does nothing; after a change it restarts at 0-0 and clears `counted`;
+  the level picked again is only the level. docs/ACCOUNTS.md 4.6 updated. No new data (the restart is game information already listed);
+  legal pages untouched.

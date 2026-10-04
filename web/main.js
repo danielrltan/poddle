@@ -52,7 +52,8 @@ let side = 0, role = 'player', names = [null, null], state = null, players = 0, 
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
 let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', wantWatch = LOBBY && qs.get('watch') === '1', pending = null, leaveAt = 0;   // room: the court I am seated in (the wire still says 'room'). wantRoom / wantWatch: from a shared link ?court=CODE (?room= is the old spelling and still works) or a reload. pending: the lobby request still waiting for its answer
-let botWant = null, botLevel = '', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
+let botWant = null, botLevel = '', bHold = null, bHeld = false, holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
+const B_HOLD_MS = 3000;      // B held this long restarts the match against Matt (NOTES 207); bHold: the timer, bHeld: it fired, so the key up is not a press
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 // The two gates of docs/API-NEXT.md 4.2. seated: nothing from the game gets past the lobby messages while no room is joined
@@ -715,10 +716,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'botinfo') {
     const said = botLevel; if (m.active && typeof m.name === 'string') botLevel = m.name.slice(0, 12); drawNames();
-    const counted = m.active && !spec() && Number.isInteger(m.counted) && m.counted !== m.level && Array.isArray(m.levels) && typeof m.levels[m.counted] === 'string' ? m.levels[m.counted].slice(0, 12) : '';      // the level changed mid-match: the match counts at the easiest played (docs/ACCOUNTS.md 4.6), unless the level is picked again, which restarts it at 0-0 (NOTES 202)
+    const counted = m.active && !spec() && Number.isInteger(m.counted) && m.counted !== m.level && Array.isArray(m.levels) && typeof m.levels[m.counted] === 'string' ? m.levels[m.counted].slice(0, 12) : '';      // the level changed mid-match: the match counts at the easiest played (docs/ACCOUNTS.md 4.6); holding B restarts it at the level now on (NOTES 207)
     if (m.reason) { if (live() && m.reason !== 'tournament') say('Court is full', null, 1800); }
-    else if (m.reset === true) { if (live() && !spec()) say(`0-0 · counts as ${botLevel}`, null, 2400); }
-    else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(counted ? `Matt · ${botLevel} · counts as ${counted} · ${botLevel} again restarts at 0-0` : `Matt · ${botLevel}`, null, counted ? 4600 : 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
+    else if (m.reset === true) { if (live() && !spec()) say(`Restarted · counts as ${botLevel}`, null, 2400); }
+    else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(counted ? `Matt · ${botLevel} · counts as ${counted} · hold B to restart` : `Matt · ${botLevel}`, null, counted ? 4000 : 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
     return;
   }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
@@ -866,8 +867,10 @@ addEventListener('keydown', e => {
   if (k === 'p') resetPeaks();
   if (k === 'v') setPod(!showPod);
   if (k === '[' || k === ']') sens(k === ']' ? 1 : -1);          // [ = less sensitive, ] = more (the settings panel's - / +)
-  if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty (Rookie, Club, Tour, Pro, round again). 1-4 were the levels until they became emotes (NOTES 205)
+  if (k === 'b' && !e.repeat) { clearTimeout(bHold); bHeld = false; bHold = setTimeout(() => { bHeld = true; if (room && live() && !spec()) game.send({ type: 'bot', restart: true }); }, B_HOLD_MS); }      // B pressed: the hold timer starts. Held 3 s: the match restarts at 0-0 at the level on (NOTES 207). Let go before that: the next difficulty (keyup below). Alone: Matt joins now
 });
+addEventListener('keyup', e => { if (e.key.toLowerCase() !== 'b' || !bHold) return; clearTimeout(bHold); bHold = null; if (bHeld) { bHeld = false; return; } if (e.target.tagName === 'INPUT' || profile.cardOpen() || spec()) return; game.send({ type: 'bot' }); });      // a short B: next difficulty (Rookie, Club, Tour, Pro, round again), or Matt now when alone. After a hold's restart the key up does nothing. 1-4 were the levels until they became emotes (NOTES 205)
+addEventListener('blur', () => { clearTimeout(bHold); bHold = null; bHeld = false; });      // the tab lost the key up: no restart from a key held into another window
 addEventListener('resize', () => scene.resize());
 
 // ---------- render loop: local paddle straight from the model every frame ----------

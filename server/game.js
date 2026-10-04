@@ -775,7 +775,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // What the others see on that character (docs/SPECTATE.md Seat status): away = the seat is held for a reconnect, paused = this seat stopped the room, calibrating. Matt never has one.
   const statusOf = p => p.bot ? null : hold && hold.side === p.side ? 'away' : paused && paused.by === p.side ? 'paused' : !ready(p) ? 'calibrating' : null;
   const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name), order: BOT_ORDER, counted: levelMoved() ? BOT_ORDER[match.rank] : undefined });   // levels in index order (the wire value), order = how pickers list them. counted: the (easiest) level this match is recorded at, once the level moved after the first strike (docs/ACCOUNTS.md 4.6)
-  const levelMoved = () => !!(theBot() && match && !match.done && match.t0 && match.levelChanged && Number.isInteger(match.rank));   // the level changed mid-match: the current level again restarts the match at 0-0, counted at that level (NOTES 202)
+  const levelMoved = () => !!(theBot() && match && !match.done && match.t0 && match.levelChanged && Number.isInteger(match.rank));   // the level changed mid-match (the court then says what the match counts as, and that holding B restarts it: NOTES 202, 206)
 
   function addBot() {
     if (theBot() || humans().length !== 1) return;
@@ -789,16 +789,17 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (i >= 0) { players.splice(i, 1); ball.live = false; serveAt = Infinity; counting = null; broadcast(botInfo()); }
   }
   // B key: alone -> join now; already playing the bot -> next difficulty; two humans -> say why not.
-  function botRequest(from, level) {
+  function botRequest(from, level, restart) {
     if (over) return;                                            // a match is being voted on: nothing starts behind the result screen
     if (MATCH) return send(from, { ...botInfo(), reason: 'tournament' });   // a tournament match: Matt stays at Tour, and nobody calls him in
     if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
-    if (Number.isInteger(level) && clamp(level, 0, BOTS.length - 1) === botLevel && levelMoved()) {   // the level already on, picked again after a change mid-match: the match restarts at 0-0 and counts at this level (the one under way is dropped, like leaving it: no record against Matt)
+    if (restart) {                                               // B held 3 s (NOTES 207): the match against Matt restarts at 0-0 and counts at the level on. The one under way is dropped, like leaving it (no record against Matt). Nothing to restart before the first strike
+      if (!theBot() || !(started || resumed)) return;
       console.log(`[${code}] Matt match restarted at ${BOTS[botLevel].name}`);
       startMatch(humans()[0].side); broadcast({ ...botInfo(), reset: true }); return; }
     if (Number.isInteger(level)) botLevel = clamp(level, 0, BOTS.length - 1);
     else if (theBot()) botLevel = BOT_ORDER[(BOT_ORDER.indexOf(botLevel) + 1) % BOT_ORDER.length];   // B walks the display order: Club -> Tour -> Pro -> Rookie
-    if (!theBot()) addBot(); else { stats.level(match, BOT_ORDER.indexOf(botLevel)); broadcast(botInfo()); }   // after the first strike a match is recorded at the easiest level used (docs/ACCOUNTS.md 4.6); botinfo then carries `counted`, and the level again restarts at 0-0 (above)
+    if (!theBot()) addBot(); else { stats.level(match, BOT_ORDER.indexOf(botLevel)); broadcast(botInfo()); }   // after the first strike a match is recorded at the easiest level used (docs/ACCOUNTS.md 4.6); botinfo then carries `counted` (a held B restarts: above)
   }
 
   // Auto-footwork for humans: run to where the ball will be, drift home between shots. Foot speed is finite,
@@ -1002,7 +1003,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (m.type === 'pause') return pause(me, m.on);
     if (m.type === 'rematch') return vote(me, m.yes);
     if (m.type === 'name') { if (!me.reg) me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel. A registered seat keeps its username
-    if (m.type === 'bot') return botRequest(me, m.level);
+    if (m.type === 'bot') return botRequest(me, m.level, m.restart === true);
     if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. Booleans only
     if (m.type === 'emote') return emote(me.ws, m.e, me);        // before the pause gate too: a GG over the result panel or a paused court
     if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
