@@ -463,7 +463,9 @@ export function setBot(level) { const on = !!level; show('key-bot', on); show('s
 }
 export function toggle(id) { const el = $(id); if (!el) return false; el.hidden = !el.hidden; return !el.hidden; }
 export function show(id, on) { const el = $(id); if (!el) return false; el.hidden = !on; return !el.hidden; }
-export function setCamera(ready) { show('camwrap', !!ready); }
+let camReady = false, camShown = true;      // the camera inset: shown while tracking runs AND the Show camera switch is on (NOTES 204)
+export function setCamera(ready) { camReady = !!ready; show('camwrap', camReady && camShown); }
+export function setCamView(on) { camShown = !!on; show('camwrap', camReady && camShown); }
 
 // ---------- the camera primer (NOTES 94) ----------
 // One screen before the first camera request: why, what stays private, and what the browser is about to ask. When the camera
@@ -596,7 +598,7 @@ addEventListener('resize', placeSettings);
 export function setSettings(o = {}) {
   if (typeof o.sens === 'number') { const v = $('set-sens-val'), t = String(Math.round(o.sens)), was = +v?.textContent; if (v && v.textContent !== t) { v.textContent = t; if (setOpen) { v.classList.remove('ov-up', 'ov-down'); restart(v, +t > was ? 'ov-up' : 'ov-down'); } } }      // the new number rolls in from the side it came from
   for (const [key, id] of [['sensMin', 'btn-sens-less'], ['sensMax', 'btn-sens-more']]) if (key in o && $(id)) { if (o[key] && document.activeElement === $(id)) $('settings')?.focus({ preventScroll: true }); $(id).disabled = !!o[key]; }   // a disabled button drops focus to <body>: keep it in the card
-  for (const [key, id] of [['airpod', 'tog-airpod'], ['sound', 'tog-sound'], ['body', 'tog-body']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
+  for (const [key, id] of [['airpod', 'tog-airpod'], ['sound', 'tog-sound'], ['body', 'tog-body'], ['cam', 'tog-cam']]) if (key in o) $(id)?.setAttribute('aria-checked', String(!!o[key]));
   // Output: the row shows only when the sound can actually be moved AND the browser is willing to name the devices.
   // Otherwise the hint says which of the two is missing, rather than leaving a dead control on screen.
   if ('sinkWhy' in o) { show('set-sink', !o.sinkWhy); show('sink-hint', !!o.sinkWhy); if (o.sinkWhy) setText($('sink-hint'), SINK_HINT[o.sinkWhy] || SINK_HINT.browser);
@@ -641,7 +643,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   const call = (k, ...a) => { if (setH[k]) setH[k](...a); };
   for (const k of ['music', 'uisfx']) { on2(`btn-${k}-less`, 'click', () => call(k, -1)); on2(`btn-${k}-more`, 'click', () => call(k, 1)); }
   on2('btn-sens-less', 'click', () => call('sens', -1)); on2('btn-sens-more', 'click', () => call('sens', 1));
-  for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-sound', 'sound'], ['tog-body', 'body']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
+  for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-sound', 'sound'], ['tog-body', 'body'], ['tog-cam', 'cam']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
   on2('set-sink-sel', 'change', e => call('sink', e.currentTarget.value));      // main.js answers with setSettings: if the device refuses, the row goes back by itself
   on2('btn-find-sinks', 'click', () => call('findSinks'));
   on2('tog-full', 'click', () => fullscreen());

@@ -4346,3 +4346,21 @@ is super confusing." NOTES 202's "the level again restarts at 0-0" is gone.
 - test/emotebar-e2e.mjs: Ann's GG is a bubble out of her tab, left for her and for Cat watching, right for Ben; at 1280, 900, 700 and
   390 px the bubble sits 4-14 px off its tab and clear of the board, the corner and the insets. emote.test.mjs: a player's carries
   `side`, a spectator's does not.
+
+## 204. A smarter profanity filter for names, and a Show camera switch
+
+The owner (2026-10-04): "can u add a smart profanity name filter for usernames" and "can u also add a setting to turn off camera view".
+- There was a filter (usernames.js profane: severe stems anywhere in the skeleton key, mild words as the whole key, docs/ACCOUNTS.md 7.3),
+  which Sexy_Cat, pissOff, Damn99, hornyboy and bigdick walked past, and guest display names never met it at all. Now: a second fold on
+  top of the skeleton (ph -> f, ck -> k, q -> k, x -> ks, runs collapsed), applied to the lists and the name alike; a mild word is blocked as
+  any one token of the name ('_', digits, spaces, punctuation and a lower->Upper change are the edges) and glued to a common affix (boy,
+  girl, man, men, guy, gal, lover, king, queen, lord, master, god, bro, dude, kid, baby, daddy, mommy, mama, papa, big, lil, little, mr,
+  mrs, your, real, xx; peeled from either end while one is left, never from a stem under three letters); Scunthorpe-style names keep
+  working (Cockburn, Dickens, Dickson, Analyst, Therapist, Assassin, Cassandra, Kingsley, Godfrey, Massage, Nice_Guy, Realmadrid).
+  words.js gains 21 mild words (dick, hoe, thot, simp, cuck, wtf, stfu, nsfw, nazi ...; boob/boobs were tried and dropped: the run
+  collapse makes them Bob). Guest names: profaneName(name) runs imp() (any script, look-alikes, separators out) and the token check;
+  guestShown now answers Player 1 / 2 for a profane guest name as it does for one passing as Matt, so the opponent, the spectators, the
+  court list and the brackets never show it (the typed name stays in the player's own box). No data change: the privacy page is unchanged.
+  Tests: accounts-unit (token, affix, respelling, false positives, profaneName, guestShown).
+- Settings > Screen > Show camera (#tog-cam): hides the camera inset (the little picture of you) while tracking carries on; Body stays its own
+  switch. poddle.settings.cam (false when off; CLAUDE.md storage list, privacy.html's row names the camera preview). ui.setCamView.

@@ -37,6 +37,11 @@ console.log('usernames');
   const sev = d(W.PROFANITY_SUB[W.PROFANITY_SUB.indexOf('ZnVjaw==')]), mild = d(W.PROFANITY_EXACT[W.PROFANITY_EXACT.indexOf('Y29jaw==')]);
   r('xx' + sev + 'yy', 'profanity'); r(sev.toUpperCase().replace('U', 'U'), 'profanity');
   r(mild[0].toUpperCase() + mild.slice(1), 'profanity'); r('Cockburn'); r('Dickens'); r('Pomona'); r('Therapist'); r('Classic');
+  // the smart filter (NOTES 204): a mild word as one token of the name ('_', a digit or a case change at its edges), glued to a common affix, or respelt
+  r(mild[0].toUpperCase() + mild.slice(1) + '_Cat', 'profanity'); r('big' + mild, 'profanity'); r('Mr' + mild[0].toUpperCase() + mild.slice(1), 'profanity'); r(mild + '99', 'profanity'); r('xx' + sev.replace('ck', 'k') + 'yy', 'profanity'); r('Ph' + sev.slice(1), 'profanity');
+  r('Dickson'); r('Analyst'); r('Assassin'); r('Cassandra'); r('Kingsley'); r('Godfrey'); r('Massage'); r('Nice_Guy'); r('Realmadrid');
+  ok(U.profaneName(mild + ' lover') && U.profaneName('f.u.c.k') && U.profaneName(sev.toUpperCase()) && !U.profaneName('Bob') && !U.profaneName('Ünal') && !U.profaneName(''), 'profaneName: a guest name in any spelling, separators and all; plain names pass');
+  ok(U.guestShown(mild + ' man', 0) === 'Player 1' && U.guestShown('xx' + sev, 1) === 'Player 2' && U.guestShown('Bob', 0) === 'Bob', 'guestShown: a profane guest name shows as Player 1 / 2, like one that passes as Matt');
   ok(U.renameWait(null, T0) === 0 && U.renameWait(T0 - 31 * DAY, T0, 30) === 0 && U.renameWait(T0 - DAY, T0, 30) === T0 + 29 * DAY, 'renameWait: first claim free, 30-day cooldown, the until time');
   // guest names (7.3)
   for (const n of ['Мatt', 'Mаtt', 'ΜΑΤΤ', 'MAΤT', 'Matt.', 'Matt!', 'M a t t', 'Matt™', 'Mat̲t', 'ProMatt', 'Matt_bot', 'MattPro', 'TourMatt', 'PoddleHQ', 'Admin'])

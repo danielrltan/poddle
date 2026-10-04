@@ -25,7 +25,17 @@ const IMP_PREFIX = keys(W.IMPERSONATE_PREFIX);
 const IMP_EXACT = new Set(keys([...W.IMPERSONATE_EXACT, ...W.LEVELS.flatMap(l => ['matt' + l, l + 'matt'])]));   // matt joined before or after a level word: mattpro, promatt, mattclub ...
 
 const reserved = key => RES_EXACT.has(key) || RES_PREFIX.some(p => key.startsWith(p));      // -> true when the key is one nobody may register
-const profane = key => BAD_EXACT.has(key) || BAD_SUB.some(p => key.includes(p));            // -> true for a severe stem anywhere in the key, or a mild word as the whole key (Scunthorpe stays playable). Exported for a later guest filter
+// Profanity (NOTES 204, 'a smart filter'): on top of the skeleton's look-alike folding, a second fold for the spellings people reach for (ph -> f, ck -> k,
+// q -> k, x -> ks), applied to the lists and the name alike. Severe stems are blocked anywhere; mild words as the whole key OR as a whole token of the
+// name, with '_', digits and a case change as the token edges: Sexy_Cat, pissOff, Damn99, cockLover are out, Cockburn, Dickens, Analyst, Classic stay.
+const fold = k => k.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/q/g, 'k').replace(/x/g, 'ks').replace(/(.)\1+/g, '$1');
+const BAD_SUB_F = [...new Set(BAD_SUB.map(fold))], BAD_EXACT_F = new Set([...BAD_EXACT].map(fold));
+const profane = key => { const f = fold(key); return BAD_EXACT_F.has(f) || BAD_SUB_F.some(p => f.includes(p)); };      // -> true for a severe stem anywhere in the key, or a mild word as the whole key (Scunthorpe stays playable)
+const tokens = v => String(v).slice(0, MAX_IN).replace(/([a-z])([A-Z])/g, '$1 $2').split(/[^\p{L}]+/u).filter(Boolean);   // the words of a name: split at '_', digits, spaces, punctuation and a lower->Upper case change
+const AFFIX = ['boy', 'girl', 'man', 'men', 'guy', 'gal', 'lover', 'king', 'queen', 'lord', 'master', 'god', 'bro', 'dude', 'kid', 'baby', 'daddy', 'mommy', 'mama', 'papa', 'big', 'lil', 'little', 'mr', 'mrs', 'your', 'real', 'xx'].map(a => fold(skeleton(a)));   // the words a mild word gets glued to: hornyboy, sexygirl, bigdick, mrcock, realslut. Nothing as short and common as 'the' or 'is': Therapist must stay
+const bare = t => { let k = fold(skeleton(t)); for (let again = true; again;) { again = false; for (const a of AFFIX) { if (k.length > a.length + 2 && k.startsWith(a)) { k = k.slice(a.length); again = true; } if (k.length > a.length + 2 && k.endsWith(a)) { k = k.slice(0, -a.length); again = true; } } } return k; };   // -> the token with glued affixes peeled off, both ends, until none is left
+const profaneTokens = v => tokens(v).some(t => { const k = fold(skeleton(t)); return BAD_EXACT_F.has(k) || BAD_EXACT_F.has(bare(t)); });   // -> true when any one word of the name is a mild word, on its own or glued to an affix
+const profaneName = v => { const k = imp(v); return !!k && (profane(k) || profaneTokens(stripBadges(String(v).slice(0, MAX_IN)).normalize('NFKC').normalize('NFKD').replace(/\p{M}/gu, '').replace(LOOK_RE, c => LOOK[c]))); };   // -> a guest name (any script) that is profane: it shows as Player 1 / 2 (guestShown)
 
 // validate(name) -> { ok: true, name, key } | { ok: false, reason }. reason: length | chars | letter | underscore | reserved | profanity (7.1).
 function validate(v) {
@@ -39,7 +49,7 @@ function validate(v) {
   if (name[0] === '_' || name[name.length - 1] === '_' || name.includes('__')) return { ok: false, reason: 'underscore' };
   const key = skeleton(name);
   if (reserved(key) || impersonates(name)) return { ok: false, reason: 'reserved' };   // impersonates: ProMatt, TourMatt, Matt_Tour... would pass as the bot WITH the registered badge
-  if (profane(key)) return { ok: false, reason: 'profanity' };
+  if (profane(key) || profaneTokens(name)) return { ok: false, reason: 'profanity' };
   return { ok: true, name, key };
 }
 
@@ -63,6 +73,6 @@ function imp(v) {
   return skeleton(s);
 }
 const impersonates = name => { const k = imp(name); return !!k && (IMP_EXACT.has(k) || IMP_PREFIX.some(p => k.startsWith(p))); };   // -> true for a guest name that passes as Matt or as the site's staff. Matthew, Mateo, Me, Pro, Club stay false
-const guestShown = (name, seat) => impersonates(name) ? 'Player ' + (seat === 1 ? 2 : 1) : name;   // -> what a guest seat shows: its (already cleaned) name, or 'Player 1'/'Player 2' by seat index 0/1
+const guestShown = (name, seat) => impersonates(name) || profaneName(name) ? 'Player ' + (seat === 1 ? 2 : 1) : name;   // -> what a guest seat shows: its (already cleaned) name, or 'Player 1'/'Player 2' by seat index 0/1 (passing as Matt or staff, or profane: NOTES 204)
 
-module.exports = { validate, skeleton, reserved, profane, renameWait, RENAME_DAYS, stripBadges, BADGES: W.BADGES, imp, impersonates, guestShown };
+module.exports = { validate, skeleton, reserved, profane, profaneName, renameWait, RENAME_DAYS, stripBadges, BADGES: W.BADGES, imp, impersonates, guestShown };

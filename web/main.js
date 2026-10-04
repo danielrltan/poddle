@@ -218,16 +218,16 @@ function setView(name, flip) {                     // flip: asked for by the vie
 function nextView() { const v = scene.getView() || { name: 'broadcast' }; setView(v.name === 'pov' && v.side === 0 ? 'pov' : VIEWS[(VIEWS.indexOf(v.name) + 1) % VIEWS.length], true); }      // V: Broadcast, Split, one player, the other, Free, round again
 
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
-let showPod = prefs.airpod !== false, showBody = prefs.body !== false, showStats = false;      // showBody: your own see-through player model (off = the original ghost forearm alone)      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
+let showPod = prefs.airpod !== false, showBody = prefs.body !== false, showCam = prefs.cam !== false, showStats = false;      // showCam: the camera inset (Settings > Show camera, NOTES 204); tracking runs either way      // showBody: your own see-through player model (off = the original ghost forearm alone)      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
 // Sound (NOTES 60). sinkId is a deviceId the browser gave us for THIS origin; sinks is what it is willing to name right now.
 const lvl = (v, d) => Number.isInteger(v) && v >= 0 && v <= 10 ? v : d;      // Music and Menu sounds, 0..10 (NOTES 181)
 let musicVol = lvl(prefs.music, 5), uiVol = lvl(prefs.menuSfx, 6);
 let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? prefs.sink : '', sinks = [], sinkDenied = false;
 // sound / sink are left out while they are the default, so a player who never opens the Sound rows keeps the same saved object as before
-const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined, music: musicVol === 5 ? undefined : musicVol, menuSfx: uiVol === 6 ? undefined : uiVol }));
+const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, cam: showCam ? undefined : false, sink: sinkId || undefined, music: musicVol === 5 ? undefined : musicVol, menuSfx: uiVol === 6 ? undefined : uiVol }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
-function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !NO_CAM, bodyNote: NO_CAM || (body ? body.ready : camOn) ? '' : 'Body turns the camera on', tourMatch: tourKind === 'match',      // bodyOk: Body can be picked wherever a camera can be asked for
+function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, cam: showCam, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !NO_CAM, bodyNote: NO_CAM || (body ? body.ready : camOn) ? '' : 'Body turns the camera on', tourMatch: tourKind === 'match',      // bodyOk: Body can be picked wherever a camera can be asked for
   sound: soundOn, music: musicVol, uisfx: uiVol, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
   sinkWhy: !scene.audio.canSwitch() ? 'browser' : sinks.length ? '' : sinkDenied ? 'denied' : 'devices' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
@@ -269,6 +269,7 @@ function pickSink(id) {
   });
 }
 function setPod(on) { showPod = !!on; show('podwrap', showPod); savePrefs(); syncSettings(); }
+function setCamView(on) { showCam = !!on; ui.setCamView?.(showCam); savePrefs(); syncSettings(); }      // the inset only: Body (tracking) is its own switch
 function setBody(on) { showBody = !!on; scene.setSelfBody(showBody); savePrefs(); syncSettings(); }
 function setStats(on) { showStats = !!on; show('dev', showStats); savePrefs(); syncSettings(); }
 function recenter() { model.recenter(); if (body) body.center(); say('Camera recentered'); }
@@ -487,7 +488,7 @@ function refreshStatus() {
   const n = myName(); if (n !== polledName) { polledName = n; if (room) rename(n); }      // the name was changed in the settings panel while in a room
 }
 
-scene.setSelfBody(showBody); show('podwrap', showPod); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
+scene.setSelfBody(showBody); show('podwrap', showPod); ui.setCamView?.(showCam); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
 if (LOBBY && qs.get('room')) setUrl(wantRoom.length === 4 ? wantRoom : null, wantWatch);      // an old ?room= link: same court, the address bar now says ?court=
 if (!LOBBY) { phase = 'connect'; screen('connect'); setTimeout(begin); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
 refreshStatus(); setInterval(refreshStatus, 250);
@@ -825,7 +826,7 @@ profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game
 ui.onSettings({
   open: () => { pause(true); setDim(); loadSinks(); uiSfx('open'); },
   close: over => { if (!over) { pause(false); uiSfx('close'); } setDim(); },      // over: the friends card opens in its place and keeps the pause
-  sens: dir => { sens(dir < 0 ? -1 : 1, true); uiSfx('step', sensOf().sens - 1); }, music: dir => setLevel('music', dir < 0 ? -1 : 1), uisfx: dir => setLevel('ui', dir < 0 ? -1 : 1), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
+  sens: dir => { sens(dir < 0 ? -1 : 1, true); uiSfx('step', sensOf().sens - 1); }, music: dir => setLevel('music', dir < 0 ? -1 : 1), uisfx: dir => setLevel('ui', dir < 0 ? -1 : 1), airpod: setPod, body: setBody, cam: setCamView, stats: setStats, recenter, leave, name: rename,
   move: m => { if (!MODES.includes(m)) return;
     if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
     if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); if (m === 'auto' && camOn) stopCam(); },      // Auto turns the camera off (NOTES 190); Body turns it back on above. How you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice

@@ -934,8 +934,11 @@ Because usernames are ASCII-only, the confusable problem shrinks to look-alike A
     names (section 14 Q9).
 - Profanity: a short curated list (about 150 skeleton-form stems) compared as a SUBSTRING of the key for severe slurs
   and as an exact match for mild words (to avoid the "Scunthorpe" problem). The file holds the words base64-encoded
-  so the source stays readable in reviews; the list is maintained by the operator. The same check is exported for a
-  possible later guest-name filter (not in scope).
+  so the source stays readable in reviews; the list is maintained by the operator. Since NOTES 204 the check is smarter: a second fold
+  (ph -> f, ck -> k, q -> k, x -> ks) on the lists and the name; a mild word is also blocked as one TOKEN of the name ('_', digits and a
+  lower->Upper case change are the edges: Sexy_Cat, pissOff, Damn99) and glued to a common affix (boy, girl, man, lover, king, mr, big,
+  real ...: hornyboy, bigdick, MrCock); Cockburn, Dickens, Analyst, Therapist, Cassandra stay. Guest display names run the same check
+  through `profaneName` (any script, separators removed): a profane one shows as Player 1 / 2, exactly like a name that passes as Matt.
 - Guest names: `cleanName` (server/game.js:164-169) keeps its rules, plus two additions.
   1. Badge look-alikes are removed from every guest name (added to `NAME_OUT`): U+221A √, U+2122 ™, U+2610-2612
      ☐☑☒, U+2705 ✅, U+2713 ✓, U+2714 ✔, U+1F5F8 🗸, U+1F5F9 🗹, U+1F197 🆗. (The badge itself is not text anyway,
