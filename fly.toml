@@ -1,14 +1,20 @@
-# fly.io: one small machine in Toronto. The match lives in this one process's memory, so there must be exactly
+# fly.io: one machine in Toronto. The match lives in this one process's memory, so there must be exactly
 # ONE machine: two would put the two players in different games. (`fly scale count 1` if that ever drifts.)
+# Toronto serves the US fine (NYC ~15 ms, Chicago ~20 ms, LA ~75 ms); a second region would not help the west coast.
 app = "poddle"
 primary_region = "yyz"
+
+# Launch posture (NOTES 197): always on and on a dedicated core. The 60 Hz loop stepping every court must never wait for a
+# neighbour's time slice, and the first visitor must never wait for a cold boot. Measured (test/load.mjs): 200 courts = 400
+# players sending at 60 Hz cost 40% of one core and 99 MB; the limit is ROOM_CAP below, not the machine.
+# Quiet months: size = "shared-cpu-1x", memory = "256mb", auto_stop_machines = "stop", min_machines_running = 0, ROOM_CAP 40.
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"        # sleeps when nobody is connected; an open WebSocket keeps it awake
-  auto_start_machines = true         # the next visitor wakes it (about a second)
-  min_machines_running = 0
+  auto_stop_machines = "off"         # never sleeps: no cold start for the first visitor in a burst
+  auto_start_machines = true
+  min_machines_running = 1
 
   [[http_service.checks]]
     method = "GET"
@@ -18,8 +24,11 @@ primary_region = "yyz"
     grace_period = "5s"
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  size = "performance-1x"            # one dedicated core (node is single-threaded; the card renderer is its one worker)
+  memory = "2048mb"
+
+[[restart]]
+  policy = "always"                  # a crash is restarted every time, not ten times and then left stopped
 
 # Player stats (docs/ACCOUNTS.md 11.1): a SQLite file on a volume made once by the operator with
 #   fly volumes create poddle_data --app poddle --region yyz --size 1 --snapshot-retention 5 --yes
@@ -31,3 +40,5 @@ primary_region = "yyz"
 [env]
   PODDLE_DB = "/data/poddle.db"      # server/db.js; never under web/ (db.open refuses that)
   GOOGLE_CLIENT_ID = "722523597650-q0fitrq9nast0c2gh4gbdtt5keva6q0d.apps.googleusercontent.com"   # public (it is in every sign-in request); sign-in is off without it
+  ROOM_CAP = "120"                   # courts at once, Matt games included (server/game.js; 40 without this): 240 players before "Courts are full"
+  ADDR_ROOMS = "8"                   # courts one address may hold (4 without this): an office or campus behind one NAT is many players

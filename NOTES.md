@@ -4096,3 +4096,17 @@ Two owner asks (2026-10-04):
   record of changes. Privacy / Terms never referred to the page, so they stand.
 - seo.test's title-screen check wanted the footer tagline ("nothing to install") that the Product Hunt badge replaced (2f66fc1); it now
   checks the Phone pickleball line, the How to play link and that nothing links the changelog. The deploy gate is green again.
+
+## 197. Ready for a crowd: always on, a dedicated core, 120 courts
+- The owner, before a Product Hunt launch with US traffic: "scared of performance being bad". Measured first (test/load.mjs: N courts
+  of two fake players, each sending paddle positions at 60 Hz, one local server): 40 courts 22% of one M-series core, 120 courts
+  35%, 200 courts (400 players) 40% and 99 MB, the 60 Hz tick's p99 under 30 ms throughout. The server is not the limit.
+- The limits were elsewhere: `ROOM_CAP` 40 (the 41st court, Matt games included, is "Courts are full"), a machine that sleeps
+  (`auto_stop_machines = "stop"`: the first visitor after a quiet minute waits for a cold boot), a shared time-sliced vCPU with
+  256 MB (a burst of card renders once took it past that), `ADDR_ROOMS` 4 (an office NAT is many players), and a restart policy
+  that gives up after ten crashes.
+- fly.toml now: `auto_stop_machines = "off"`, `min_machines_running = 1`, `performance-1x` with 2 GB (~$31/mo, hourly; the
+  quiet-months settings are in the file's comment), `[[restart]] policy = "always"`, `ROOM_CAP = "120"` (240 players),
+  `ADDR_ROOMS = "8"`. The region stays yyz: Toronto reaches NYC in ~15 ms and LA in ~75 ms, and a second machine is impossible
+  (every court lives in one process). Fly's proxy already brotli-compresses, static files have validators, and the proxy's
+  concurrency has no hard limit (the docs: none is enforced when unset), so no connection is ever refused by the edge.
