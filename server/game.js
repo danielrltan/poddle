@@ -1439,7 +1439,7 @@ function tourCheck(t) {                                        // the round is o
 function tourChamp(t, e) {
   const path = []; for (const r of t.rounds) { const x = r.matches.find(o => o.a === e && o.w === 'a' || o.b === e && o.w === 'b'); if (!x) continue;
     const mine = x.a === e, vs = mine ? x.b : x.a; path.push({ round: r.name, vs: eName(t, vs), bot: isMatt(vs), score: mine ? [...x.score] : [x.score[1], x.score[0]], forfeit: x.forfeit }); }
-  t.champ = { id: isMatt(e) ? null : e, name: eName(t, e), bot: isMatt(e), path }; t.phase = 'done'; t.doneAt = Date.now(); t.next = null;
+  t.champ = { id: isMatt(e) ? null : e, name: eName(t, e), reg: eReg(t, e), bot: isMatt(e), path };      // reg: the client gives a registered username's own character to the podium (NOTES 178) t.phase = 'done'; t.doneAt = Date.now(); t.next = null;
   if (!isMatt(e)) try { stats.title(t.members.values(), t.members.get(e), Date.now()); } catch { /* a title is never worth a crash */ }   // only with 3+ distinct people and a ranked win (R16)
   console.log(`[${t.code}] champion: ${t.champ.bot ? 'Matt' : 'a player'}`); tourFlush(t);
 }

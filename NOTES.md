@@ -3802,3 +3802,25 @@ smeared, two neighbours on adjacent rings ran into one blob, the edges were jagg
 - The ball mesh is 48x32 segments (was 28x20): a smooth outline at the trailer's close range. Material, emissive and size are unchanged.
 - Looks only: no gameplay, data or UI change, legal pages untouched. Changelog: October 3, "A smoother ball".
 
+
+## 178. The champion screen: the champion alone on the court with the trophy, CHAMPION! then the gold card as the panel
+- The owner: "can you also revamp the champion victory screen for tournaments?" It was the centred gold card over the lobby's attract rally.
+- Now, for everyone the tournament shows it to (NOTES 165's shot, 167's title): a title over the court for 2 s (CHAMPION! in gold for the
+  champion, "<NAME> IS THE CHAMPION!" for the rest, sized to the name), then the cut: the champion alone on the court at their baseline, holding
+  the trophy, and the gold card (trophy medal, "You're the champion", the road of matches, Back to courts / See bracket) as the panel on the right
+  two fifths (along the bottom in a tall window). The title shrinks into the corner as before. Esc / Back to courts / See bracket take it down
+  and the attract rally comes back.
+- The podium (scene.js podium(o)): the attract rally stops; seat 0 stands at the baseline, painted as a person (Matt if Matt won) with the
+  username's own character (the champion snapshot now carries `reg`, server/game.js; LOOKS as on any court). The champion's own screen drives
+  that seat from their paddle and body every frame (main.js render loop, champLive): the phone turns the cup, Body still moves them; nothing is
+  sent, there is no seat on the wire. On everyone else's screen the seat is a canned 'bot' that waves the cup (the Matt branch of updatePads,
+  painted as whoever it is). podium(null) restarts the rally; main.js calls it the frame the champion card is gone.
+- ui.js: one title() for matchResult and champion (the stamp block of 167, shared); champion() returns the wait like matchResult, and Back to
+  courts takes focus after it. ui.css: the panel rules apply to every beat now (the `:not([data-beat="champ"])` guard is gone; the panel's
+  slide rule carries [data-beat] so it outweighs the older panel-in rule); the champion's medal at .95 in the panel; the title in gold.
+- Edge cases: the champion busy on an ordinary court still gets the toast (unchanged); a tournament ending under you (tourend) is unchanged;
+  a phone watching the final gets the stacked panel; reduced motion has no title and no wait. The final's own result card still keeps its
+  trophy row and rank-up before this (champHold), unchanged.
+- No data, storage, permission or third-party change (`reg` on the champion is the username flag the bracket already shows): legal untouched.
+- test/tourney-e2e.mjs checks the podium (the trophy, seat 0 alone, no rally), CHAMPION! in the corner, the panel, everyone else's title, and the
+  rally back after Back to courts; its loser-card shot waits out the DEFEAT title. Shots: test/ui-shots/tour-e2e-07-champion-*.png.

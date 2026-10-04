@@ -100,7 +100,7 @@ if (!s.result) ok(/Semifinal · vs /.test(s.pill) && s.leaveBtn === 'Forfeit' &&
 const res = await Promise.all([h, b, c, d].map(pg => until(pg, s => !!s.result || s.lview === 'bracket' && s.screen === 'lobby', 90000, 'a result or the bracket')));
 const cards = res.filter(s => s.result && !s.result.champ);
 ok(cards.length && cards.every(s => !s.result.vote && s.result.see && /On to the Final|Out in the Semifinal|Through: /.test(s.result.note)), `results, no vote, See bracket: ${res.map(s => s.result ? s.result.note : s.lview).join(', ')}`);
-const shotRes = [h, b, c, d].find((pg, i) => res[i].result && /Out in/.test(res[i].result.note)); if (shotRes && (await st(shotRes)).result) await shot(shotRes, '05-out');
+const shotRes = [h, b, c, d].find((pg, i) => res[i].result && /Out in/.test(res[i].result.note)); if (shotRes && (await st(shotRes)).result) { await sleep(2800); /* past the DEFEAT title (NOTES 167): the panel is in */ await shot(shotRes, '05-out'); }
 const br = await Promise.all([h, b, c, d].map(pg => until(pg, s => s.tour && s.tour.phase !== 'reg' && (s.lview === 'bracket' && s.screen === 'lobby' || !!s.vs || s.tour.kind === 'match'), 30000, 'the bracket after the round')));
 const outs = [h, b, c, d].filter((pg, i) => br[i].tour && br[i].tour.out), ins = [h, b, c, d].filter(pg => !outs.includes(pg));
 ok(outs.length === 2 && ins.length === 2, `two out (${outs.map(p => p.tag)}), two through (${ins.map(p => p.tag)})`);
@@ -120,8 +120,12 @@ const champ = ch.find(s => s.result.title === 'You’re the champion'), others =
 ok(!!champ && others.every(s => / is the champion$/.test(s.result.title)), `champion: ${ch.map(s => s.result.title).join(' ; ')}`);
 ok(ch.every(s => s.result.back && /Semifinal/.test(s.result.road) && /Final/.test(s.result.road)), `the tournament matches: ${ch[0].result.road}`);
 ok(ch.some(s => s.confetti > 0), `confetti falls (${ch.map(s => s.confetti)})`);
-const champPg = [h, b, c, d][ch.indexOf(champ)]; await sleep(1200); await shot(champPg, '07-champion', SIZES);
-await champPg.click('#btn-champ-back'); s = await until(champPg, s => s.screen === 'lobby' && s.lview === 'courts' && !s.tour, 5000, 'Back to courts'); ok(!s.tour, 'Back to courts: out of the tournament');
+const champPg = [h, b, c, d][ch.indexOf(champ)]; await sleep(3400); await shot(champPg, '07-champion', SIZES);      // past the CHAMPION! title (2 s, NOTES 178): the panel is in
+s = await champPg.evaluate(() => { const d = window.__scene._dbg, sl = document.getElementById('result-slam'), r = sl.getBoundingClientRect(), c = document.getElementById('result').getBoundingClientRect(); return { vic: d.vic.side, trophy: d.trophy.visible, attract: d.view().attract, has: d.pads.map(p => p.has), slam: sl.textContent, corner: r.left >= 0 && r.top >= 0 && r.right < innerWidth * 0.45 && r.bottom < innerHeight * 0.2, panel: Math.abs(c.left - innerWidth * 0.6) < 3 && c.right === innerWidth }; });
+ok(s.vic === 0 && s.trophy && !s.attract && s.has[0] && !s.has[1] && s.slam === 'CHAMPION!' && s.corner && s.panel, `the champion stands alone on the court with the trophy, CHAMPION! in the corner, the gold card as the right panel (${JSON.stringify(s)})`);
+const other = [h, b, c, d].find(pg => pg !== champPg); s = await other.evaluate(() => ({ slam: document.getElementById('result-slam').textContent, vic: window.__scene._dbg.vic.side, trophy: window.__scene._dbg.trophy.visible }));
+ok(/ is the champion!$/.test(s.slam) && s.vic === 0 && s.trophy, `everyone else: "${s.slam}" and the same podium (${JSON.stringify(s)})`);
+await champPg.click('#btn-champ-back'); s = await until(champPg, s => s.screen === 'lobby' && s.lview === 'courts' && !s.tour, 5000, 'Back to courts'); await sleep(300); s = await champPg.evaluate(() => ({ attract: window.__scene._dbg.view().attract, vic: window.__scene._dbg.vic.side })); ok(s.attract && s.vic === -1, `Back to courts: the rally is back, the podium gone (${JSON.stringify(s)})`); ok(!s.tour, 'Back to courts: out of the tournament');
 
 ok(!errs.length, `no console errors${errs.length ? ': ' + errs.slice(0, 6).join(' | ') : ''}`);
 const log = slog.join(''); ok(/tournament started: 4 players/.test(log) && /champion: /.test(log), 'the server logged the start and the champion');

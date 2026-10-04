@@ -1481,6 +1481,17 @@ export function createScene(containerEl) {
     rc.lunge = 1; rc.reach = true; rc.hitP = at.hitP; pads[1 - rc.side].stance.split = 1;
     attractShot(rc.side, at.hitP, at.hitAt);
   }
+  // The podium (NOTES 178; main.js showChamp): the champion alone on the court, at their baseline, for the champion screen's shot (setVictory puts the
+  // trophy in their hand). o = { side, matt, look, live }: live = the champion is me, and main.js feeds my paddle every frame; otherwise the seat is a
+  // canned 'bot' (the wave) painted as a person (or Matt) with the username's own look. null: the attract rally again.
+  let podiumOn = false;
+  function podium(o) {
+    if (!o) { if (podiumOn) { podiumOn = false; startAttract(); } return; }
+    if (at.on) stopAttract(); podiumOn = true; const sd = o.side === 1 ? 1 : 0;
+    for (const pd of pads) { const mine = pd.side === sd, s = sgn(pd.side), t = pd.tgt; pd.has = mine; pd.init = false; pd.bot = mine && !o.live; pd.status = null; pd.swingT = -1; pd.lunge = 0; pd.cheer = 0; pd.swooshUntil = 0;
+      pd.look = mine && LOOKS[o.look] ? o.look : null; paint(pd, mine && !!o.matt); t.x = 0; t.y = 1; t.z = s * 6.5; t.off = null; t.q.identity(); }
+    hideBall();
+  }
   function startAttract() {
     if (at.on) return; at.on = true; at.t = 0; at.rnd = rng(20260920); Object.assign(at.stats, { shots: 0, late: 0, out: 0, net: 9, gap: 0 }); stopFx();
     for (const pd of pads) { const s = sgn(pd.side), t = pd.tgt; pd.has = true; pd.init = false; pd.bot = true; pd.status = null; paint(pd, pd.side === 1); pd.swingT = -1; pd.lunge = 0; pd.cheer = 0; pd.swooshUntil = 0;
@@ -1575,7 +1586,7 @@ export function createScene(containerEl) {
   resize();
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
-    setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen, setVictory,
+    setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen, setVictory, podium,
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },

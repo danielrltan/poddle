@@ -170,7 +170,7 @@ function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDi
 // ---------- match end, rematch (docs/SPECTATE.md) ----------
 // The winner's shot (NOTES 165): once the result panel is in (after VICTORY!'s own beat, vicAt), the court behind it shows the winner holding the trophy.
 // The render loop hands scene.setVictory the seat while that panel is what is up, and null the moment it is not: no other code path has to remember to end it.
-let vicSide = null, vicAt = 0, revealT = 0;
+let vicSide = null, vicAt = 0, revealT = 0, champLive = false;      // champLive: the champion screen is up and the champion is me (the podium seat is driven by my paddle)
 function showOver() {                              // the result card. A matchover that came while a set-up screen was up waits in `over` for the court to open
   const m = over; over = null; if (!m) return;
   const T = m.tour && typeof m.tour === 'object' ? { round: String(m.tour.round || '').slice(0, 24), next: m.tour.next ? String(m.tour.next).slice(0, 24) : null, final: !!m.tour.final, gap: Math.max(0, Math.round((+m.tour.gap || 0) - (performance.now() - overAt) / 1000)) } : null;      // a tournament match: no vote, back to the bracket after gap s
@@ -398,7 +398,9 @@ function showChamp() {                              // for everyone: the champio
   champShown = tour.code; const c = tour.champ, me = tour.you && tour.you.id != null ? tour.you.id : null;
   if (room && !tourKind) { say(me != null && c.id === me ? 'You won the tournament' : `${c.bot ? 'Matt' : cleanName(c.name) || 'Someone'} won the tournament`, null, 3200); tour = null; champShown = ''; ui.setTour(null); game.send({ type: 'tleave' }); return; }      // busy in an ordinary court: a toast, and the tournament lets go; nobody is pulled off their court
   if (room) { game.send({ type: 'leave' }); toLobby(); }      // off the final's court first: its 'closed round' must not take the card down
-  tourMoving = false; ui.tourVs(null); screen(null); ui.champion(c, me); scene.jingle('champ');      // cuts the final's win/lose jingle, which is still ringing: this card follows it at once
+  tourMoving = false; ui.tourVs(null); screen(null); const wait = +ui.champion(c, me) || 0; scene.jingle('champ');      // cuts the final's win/lose jingle, which is still ringing: this card follows it at once
+  champLive = me != null && c.id === me; vicSide = 0; vicAt = performance.now() + wait;      // the podium (NOTES 178): the champion alone on the court with the trophy, seat 0; mine is my own paddle and body, anyone else's waves on its own
+  scene.podium?.({ side: 0, matt: !!c.bot, look: lookFor(cleanName(c.name), c.reg === true), live: champLive });
   const gold = ['#ffd34a', '#f2a81d', '#3aa0ff', '#ffffff']; ui.confetti(gold, 140); clearTimeout(burstT); burstT = setTimeout(() => { if (ui.championShowing()) ui.confetti(gold, 100); }, 900);
 }
 function endTour(why) {                             // tourend: restart | gone | empty | expired | left
@@ -854,7 +856,11 @@ let lastPos = null;
     lastPos = pos;
   }
   if (phase !== 'title' && phase !== 'lobby' && phase !== 'watch' && ui.isVisible('podwrap')) pod.update(p.Pd);      // (the menu camera drifts by itself now: scene.setMenu)
-  { const v = vicSide != null && seated() && !ui.currentScreen() && ui.currentOverlay() === 'match' && !ui.championShowing?.() && performance.now() >= vicAt;      // the winner's shot, exactly while the result panel is up over the court
+  { const champ = !!ui.championShowing?.(), up = !ui.currentScreen() && ui.currentOverlay() === 'match', v = vicSide != null && up && (champ || seated()) && performance.now() >= vicAt;      // the winner's shot, exactly while the result panel is up over the court; the champion's podium likewise
+    if (champ && champLive && p.calibrated) { const dt = Math.min(0.05, (now - lastFrame) / 1000); lastFrame = now;      // the champion is me: my paddle and body drive the podium seat (no seat on the wire: nothing is sent)
+      if (usingBody() && body.seen()) { [bodyX, vX] = damp(bodyX, Math.max(-3.5, Math.min(3.5, body.x())), vX, 0.085, dt); [bodyY, vY] = damp(bodyY, Math.max(0.3, Math.min(2.3, body.y())), vY, 0.085, dt); }
+      scene.updatePaddle(0, { x: usingBody() ? bodyX : 0, y: usingBody() ? bodyY : 1, z: 6.5, q: p.Pd, offset: p.offset, bot: false }); }
+    if (!champ && champLive) { champLive = false; scene.podium?.(null); }      // the champion screen is down (Back to courts, See bracket, Esc): the rally again
     scene.setVictory?.(v ? vicSide : null, v ? ui.resultPane?.() : null); }
   scene.render(now);
 })(performance.now());

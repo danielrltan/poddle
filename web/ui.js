@@ -245,6 +245,14 @@ const stacked = matchMedia('(max-aspect-ratio: 1/1), (max-width: 760px)');      
 export function resultPane() { const c = $('result'), W = innerWidth || 1, H = innerHeight || 1; if (!c) return null;
   if (stacked.matches) { const f = Math.max(0.25, 1 - c.offsetHeight / H); return { fw: 1, fh: f, px: 0, py: 1 - f }; }
   const f = Math.max(0.25, 1 - c.offsetWidth / W); return { fw: f, fh: 1, px: f - 1, py: 0 }; }
+// The title over the court (NOTES 167): word = '' for none. cls: its colour. fit: size it to its length (a name is as long as it is: the line always fits the window).
+// It holds for STAMP_MS with the card out of sight (#screen-match.is-stamp), then shrinks into the corner as the panel comes in
+function title(word, cls, fit) {
+  const st = $('result-slam'), scr = $('screen-match');
+  if (st) { st.textContent = word; st.className = 'result-slam' + (word ? ' is-victory' + (cls ? ' ' + cls : '') : ''); st.style.cssText = ''; if (word && fit) st.style.fontSize = `min(9rem, ${(125 / word.length).toFixed(1)}vw)`; if (word) restart(st, 'go'); }
+  clearTimeout(stampT); const v = !!(st && word) && !reduced(); scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => { scr?.classList.remove('is-stamp'); cornerStamp(st); }, STAMP_MS);
+  return v ? STAMP_MS : 0;
+}
 // At the cut the title does not leave: it shrinks into the court pane's top left corner and stays while the panel is up
 function cornerStamp(st, instant) { if (!st || slots.overlay !== 'match') return; const r = st.getBoundingClientRect(), fs = parseFloat(getComputedStyle(st).fontSize) || 1, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   st.classList.remove('go'); st.classList.add('is-corner'); void st.offsetWidth; st.style.transition = instant ? 'none' : ''; st.style.transform = `translate(${(rem * 1.5 - r.left).toFixed(1)}px, ${(rem * 1.25 - r.top).toFixed(1)}px) scale(${Math.min(1, Math.min(6.5 * rem, 0.07 * innerWidth) / fs).toFixed(3)})`; }      // 6.5rem tall (twice NOTES 167's 3.25), less in a narrow window, never bigger than it was
@@ -276,10 +284,7 @@ export function matchResult(o, me, them, name) {
   if (T) { setText($('result-note'), watching ? '' : won ? (o.forfeit ? `Through: ${nameThem} left` : T.next ? `On to the ${String(T.next).slice(0, 24)}` : 'You won the final') : `Out in the ${String(T.round || 'tournament').slice(0, 24)}`); noCount = false; }      // the bar counts down to the bracket
   const card = $('result'); card.classList.toggle('is-forfeit', !!o.forfeit); card.classList.toggle('is-watch', watching); card.classList.toggle('is-them-won', watching && !won);      // a forfeit: nobody left to clap. is-them-won: a spectator's title takes the winner's colour
   $('screen-match').dataset.beat = watching ? (o.forfeit ? 'forfeit' : 'watch') : o.forfeit && won ? 'forfeit' : won ? 'win' : 'lose';      // one attribute drives every beat in ui.css; set before showOverlay so the CSS starts on activation
-  { const st = $('result-slam'), scr = $('screen-match'), word = o.forfeit ? '' : watching ? `${winner} wins!` : won ? 'VICTORY!' : 'DEFEAT';      // the title (NOTES 167): everyone gets one, a forfeit excepted (nothing was won on the court)
-    if (st) { st.textContent = word; st.className = 'result-slam' + (!word ? '' : ' is-victory' + (watching ? ' is-watch' + (won ? '' : ' is-them') : won ? '' : ' is-defeat')); st.style.cssText = '';
-      if (word && watching) st.style.fontSize = `min(9rem, ${(125 / word.length).toFixed(1)}vw)`; if (word) restart(st, 'go'); }      // a name is as long as it is: the line always fits the window
-    clearTimeout(stampT); const v = !!(st && word) && !reduced(); scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => { scr?.classList.remove('is-stamp'); cornerStamp(st); }, STAMP_MS); }      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
+  title(o.forfeit ? '' : watching ? `${winner} wins!` : won ? 'VICTORY!' : 'DEFEAT', watching ? 'is-watch' + (won ? '' : ' is-them') : won ? '' : 'is-defeat', watching);      // the title (NOTES 167): everyone gets one, a forfeit excepted (nothing was won on the court)      // the stamp on a win of your own only (NOTES 122), paced (NOTES 130): VICTORY! alone first, then the card's whole entrances
   $('tally-sc-me').style.setProperty('--to', L | 0); $('tally-sc-them').style.setProperty('--to', R | 0);      // the count-up is a CSS counter over the real number: textContent is final from the first frame (no stamp: NOTES 104)
   resultStats(!legacy && !o.forfeit && o.stats && typeof o.stats === 'object' ? o.stats : null, card);
   showOverlay('match');
@@ -1239,14 +1244,15 @@ function brPick(k) { brTab = k; drawBracket(); $('br-tabs').querySelector('[aria
 export function champion(c, you = null) {
   if (!c || typeof c !== 'object') return; const me = you != null && c.id === you, name = c.bot ? 'Matt' : tnm(c.name) || 'Player';
   const card = $('result'); card.classList.remove('is-lose'); card.classList.add('is-champion'); $('medal').className = 'medal is-gold is-champion';
-  { const st = $('result-slam'); if (st) { st.textContent = ''; st.className = 'result-slam'; st.style.cssText = ''; } clearTimeout(stampT); $('screen-match')?.classList.remove('is-stamp'); }      // the champion's card has no stamp: the final's VICTORY! goes with its card
+  const wait = title(me ? 'CHAMPION!' : `${name} is the champion!`, 'is-champ', !me);      // the champion's own title (NOTES 178), over the final's VICTORY! wherever that still stands
   $('screen-match').dataset.beat = 'champ'; card.classList.remove('is-forfeit', 'is-watch', 'is-them-won'); resultStats(null, card); trophyReset();      // the final's own card is replaced at once: its stats, beat and any trophy row go with it
   setText($('result-title'), me ? 'You’re the champion' : `${name} is the champion`); setText($('result-note'), me ? 'Your tournament matches' : `${name}’s tournament matches`);
   const road = $('result-road'); road.textContent = '';
   for (const st of Array.isArray(c.path) ? c.path : []) { const li = mk('li', 'road-step'), sc = Array.isArray(st.score) ? st.score : [0, 0], vs = st.bot ? 'Matt' : tnm(st.vs) || 'Player';
     li.append(mk('small', '', tnm(st.round))); li.append(mk('span', '', st.forfeit ? `${vs} left` : `Beat ${vs}`)); if (!st.forfeit || sc[0] | sc[1]) li.append(mk('b', '', `${sc[0] | 0}-${sc[1] | 0}`)); road.append(li); }
   show('result-road', road.childElementCount > 0); show('rematch-btns', false); show('rematch-count', false); show('tour-res', false); show('champ-acts', true); setText($('rematch-note'), ''); stopCount();
-  showOverlay('match'); setTimeout(() => { if (slots.overlay === 'match') $('btn-champ-back')?.focus({ preventScroll: true, focusVisible: true }); }, 60);
+  showOverlay('match'); setTimeout(() => { if (slots.overlay === 'match') $('btn-champ-back')?.focus({ preventScroll: true, focusVisible: true }); }, 60 + wait);
+  return wait;
 }
 export const championShowing = () => slots.overlay === 'match' && $('result').classList.contains('is-champion');
 // ---- the tournament ended under you: a notice on the lobby (why = restart | empty | expired | gone), a toast for your own leave
