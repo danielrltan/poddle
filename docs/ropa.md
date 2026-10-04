@@ -132,11 +132,12 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
   side's decline, removal or re-send: Art. 15(4), the rights of others); the export's notes and privacy 9 say so.
 
 ## 4. Fair-play checks (the automated counted / did-not-count decision)
-- Data: at match end, the two players' IPs compared in memory; in memory for up to 24 h, keyed hashes of the network
+- Data: during a match (R19, NOTES 198), each swing report checked against the paddle stream (turn rate and orientation, 20 Hz) the
+  client already sends, the last 1.5 s held in memory per seat, only the flag written (in `match_log` reasons: `swing_motion` when enforced, `swing_motion_seen` while STATS_MOTION_ENFORCE is off); at match end, the two players' IPs compared in memory; in memory for up to 24 h, keyed hashes of the network
   address linked to device-id hashes, cids, accounts and recent results (link map); in the database, `match_log`:
   time, kind, Matt level, the two owner ids (never names), score, winner, ending, counted flag (`ranked`), rule reasons, length.
   Trophies (docs/TROPHIES.md 3, 2026-09-30; the Ranked series are history): for a signed-in account with a username, every counted game
-  against a person moves trophies (about +30 / -20 at a gap of 0, from both seats' counts at the start; the winner's gain is halved on
+  against a person moves trophies (about +30 at a gap of 0; since NOTES 194 a loss costs 6 in Bronze up to 34 in Pro, from both seats' counts at the start; the winner's gain is halved on
   `new_opponent`); a game that does not count awards none. Leaving a game against a person after the first ball is struck (Leave, or a seat
   held past its time) always costs the leaver the full loss, whatever the verdict; the stayer takes the win only when the game carries
   nothing beyond the forfeit's own flags (`early_forfeit`, `leaver_ahead`, `afk`, `too_fast`); before the first strike nothing is written.

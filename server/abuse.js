@@ -8,7 +8,7 @@ const BOT_ORDER = [0, 1, 3, 2];                                // wire level -> 
 const DAY = 24 * 3600 * 1000, HOUR = 3600 * 1000;
 const HUMAN = new Set(['human', 'tour']), BOTK = new Set(['bot', 'tourbot']);
 // Flags that unrank the whole match on their own. The per-seat ones (ident_changed, too_fast, afk, new_opponent,
-// paddle_teleport) act only through each seat's `record`; level_changed and swing_implausible are informational.
+// paddle_teleport, swing_motion) act only through each seat's `record`; level_changed and swing_implausible are informational.
 // same_computer (R5: both seats on one network address) is RETIRED (NOTES 153): the owner wants two people on one network to count, only one BROWSER
 // (R6 same_device / same_account / same_cid) is one person. Old match_log rows may still carry the id.
 const MATCH_WIDE = new Set(['legacy', 'revived', 'anon_opponent', 'same_device', 'same_account', 'same_cid',
@@ -64,6 +64,8 @@ function config(env = process.env) {
     forfeitMin: prod ? forfeitDef : n('STATS_FORFEIT_MIN', forfeitDef, 0, 1000),   // R7
     pairDay: n('STATS_PAIR_DAY', 3, 0, 1e4),                                       // R10
     afkMin: prod && afk === 0 ? 2 : afk,                                           // R9 floor; 0 disables R9 (tests only)
+    motion: prod || env.STATS_MOTION === '1',                                      // R19 (stats.js motion / swingSeen): always judged in production; elsewhere only with STATS_MOTION=1, as scripted test clients send swings with no hand behind them
+    motionEnforce: env.STATS_MOTION_ENFORCE === '1',                                // R19 acts (unranks) only with this; without it a flagged seat is only logged, as swing_motion_seen (NOTES 198: on once real phone play shows no flags)
     teleportMs: prod && tele === 0 ? 12 : tele,                                    // R18 (stats.js samples with it); 0 disables. 12 m/s: the recordings under data/ hold motion only, no paddle positions (Q16)
     established: env.STATS_ESTABLISHED === '1',                                    // R11c: OFF everywhere unless STATS_ESTABLISHED=1 (NOTES 129: the owner dropped it; with few players every opponent was 'new' and no win ever counted)
     establishedMs: DAY, establishedMatches: 3,                                     // R11c: an owner is established at 24 h old OR 3 recorded matches (db computes it)
@@ -107,7 +109,7 @@ function judge(facts, history, cfg) {
 
   const score = Array.isArray(f.score) ? f.score : [0, 0], pts = num0(score[0]) + num0(score[1]);
   const W = w === null ? null : seats[w], L = seats[l];
-  // Match-wide or per seat, every kind: R2, R6b, R8, R9, R18.
+  // Match-wide or per seat, every kind: R2, R6b, R8, R9, R18, R19.
   if (f.revived) flag('revived');                                                 // R2
   const changed = seats.map(s => isHuman(s) && !!(s.identChanged || s.pendingAnon));
   if (changed.some(Boolean)) flag('ident_changed');                               // R6b
@@ -117,6 +119,9 @@ function judge(facts, history, cfg) {
   if (idle.some(Boolean)) flag('afk');                                            // R9
   const tele = seats.map(s => isHuman(s) && c.teleportMs > 0 && !!s.teleport);
   if (tele.some(Boolean)) flag('paddle_teleport');                                // R18
+  const unbacked = seats.map(s => isHuman(s) && !!c.motion && !!s.motionBad), still = unbacked.map(x => x && !!c.motionEnforce);
+  if (still.some(Boolean)) flag('swing_motion');                                  // R19: swings the paddle stream never showed (NOTES 198)
+  else if (unbacked.some(Boolean)) flag('swing_motion_seen');                     // R19 judged but not enforced: informational, the match_log row says it
   if (bot && f.levelChanged) flag('level_changed');                               // R13, informational
   seats.forEach(s => { if (isHuman(s) && s.swingBad) flag('swing_implausible'); });   // R15, informational
 
@@ -150,14 +155,14 @@ function judge(facts, history, cfg) {
   }
 
   const wide = flags.some(x => MATCH_WIDE.has(x));
-  // Winner: credit withheld by R8, R11c, own R6b / R18, or R9 on EITHER seat.
+  // Winner: credit withheld by R8, R11c, own R6b / R18 / R19, or R9 on EITHER seat.
   if (w !== null && live[w])
-    out[w].record = !wide && !tooFast && !newOpp && !changed[w] && !tele[w] && !idle[0] && !idle[1];
-  // Loser: withheld when the WINNER was idle and by every match-wide rule; kept for its own R9, R6b, R18 and for R8 / R11c.
+    out[w].record = !wide && !tooFast && !newOpp && !changed[w] && !tele[w] && !still[w] && !idle[0] && !idle[1];
+  // Loser: withheld when the WINNER was idle and by every match-wide rule; kept for its own R9, R6b, R18, R19 and for R8 / R11c.
   if (live[l]) out[l].record = !wide && !(w !== null && idle[w]);
-  // Bests: only with a record, never after R2 / R8 / R9 (whole match), nor own R6b / R18. R15 withholds hit/speed only.
+  // Bests: only with a record, never after R2 / R8 / R9 (whole match), nor own R6b / R18 / R19. R15 withholds hit/speed only.
   for (const i of [0, 1]) {
-    out[i].bests = out[i].record && !f.revived && !tooFast && !idle[0] && !idle[1] && !changed[i] && !tele[i];
+    out[i].bests = out[i].record && !f.revived && !tooFast && !idle[0] && !idle[1] && !changed[i] && !tele[i] && !still[i];
     out[i].swing = out[i].bests && !(seats[i] && seats[i].swingBad);
     out[i].idle = idle[i];
   }

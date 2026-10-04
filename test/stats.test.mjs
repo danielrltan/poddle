@@ -328,6 +328,26 @@ console.log('20. database growth: only completed matches create profiles, and ne
 
 // 21. trophies (docs/TROPHIES.md 3, 6): the ladder block, mode ladder, trophyDelta and the profile message's trophies field live in test/trophies.test.mjs
 
+// R19 (NOTES 198): on a server with STATS_MOTION=1, the scripted hitter above (Auto, a swing whenever the ball is close, a paddle that never turns)
+// is exactly the cheapest cheat. Its win over Matt does not count; a client whose paddle stream turns with every swing does.
+{
+  const P4 = PORT + 3, M = await up(P4, { PODDLE_DB: path.join(tmp, 'motion.db'), ...BASE, STATS_MOTION: '1', STATS_MOTION_ENFORCE: '1' });
+  function hand(c) { hit(c); const swing = c.play; let ang = 0, at = 0, hot = 0;   // hit's swings, with a hand behind them: the paddle turns at 20 rad/s around each
+    const send = c.send; c.send = o => { if (o.type === 'swing') hot = Date.now(); if (o.type !== 'paddle') return send(o); };
+    c.play = m => { swing(m); const t = Date.now(); if (t - at < 50) return; at = t; const r = Math.abs(t - hot) < 250 ? 20 : 0; ang += r * 0.05;
+      send({ type: 'paddle', auto: true, r, q: [0, Math.sin(ang / 2), 0, Math.cos(ang / 2)] }); }; }
+  async function winOnce(how) { const c = await vsMatt({ port: P4, level: 0, how }); let k = 0, won = false;
+    while (!won && k < 4) { k++; await over(c, k); await prof(c, k); won = c.got('matchover')[k - 1]?.winner === c.side; if (!won) c.send({ type: 'rematch', yes: true }); }
+    const p = c.got('profile')[k - 1]; bye(c); return { won, p }; }
+  report(await Promise.all([
+    sc('R19. swings with no hand behind them', async t => {
+      const s = await winOnce(hit); t.ok(s.won && s.p && s.p.saved && s.p.ranked === false, `the scripted hitter beats Rookie: saved, not counted (${JSON.stringify(s.p && { ranked: s.p.ranked, why: s.p.why })})`);
+      const h = await winOnce(hand); t.ok(h.won && h.p && h.p.saved && h.p.ranked === true, `the same swings with a turning paddle stream: counted (${JSON.stringify(h.p && { ranked: h.p.ranked, why: h.p.why })})`);
+    }),
+  ]));
+  await stop(M);
+}
+
 console.log('16. logs');
 {
   const all = logs.map(l => l.out).join('\n'), hashes = DEVS.map(d => crypto.createHash('sha256').update(d).digest('hex'));

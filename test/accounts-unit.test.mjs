@@ -293,6 +293,14 @@ const has = (v, ...ids) => ids.every(i => v.flags.includes(i));
   v = J(human({}, {}, { teleport: true })); ok(v.ranked && rec(v) === 'RB R-', 'R18 teleporting LOSER: its loss counts, the winner ranked');
   v = J(vsBot({}, { teleport: true })); ok(!v.ranked && rec(v) === '-- --', 'R18 teleporting win over Matt: unranked');
   v = J(human({}, { teleport: true }), {}, abuse.config({ STATS_TELEPORT_MS: '0' })); ok(v.ranked, 'STATS_TELEPORT_MS=0 disables R18 (tests)');
+  { const M = abuse.config({ WIN_AT: '11', STATS_MOTION: '1', STATS_MOTION_ENFORCE: '1' }), LOG = abuse.config({ WIN_AT: '11', STATS_MOTION: '1' });   // R19 (NOTES 198): off unless STATS_MOTION=1, always on in production
+    ok(!CFG.motion && M.motion && abuse.config({ NODE_ENV: 'production' }).motion && abuse.config({ NODE_ENV: 'production', STATS_MOTION: '0' }).motion, 'R19 config: off by default, on with STATS_MOTION=1, forced on in production');
+    ok(M.motionEnforce && !LOG.motionEnforce && !abuse.config({ NODE_ENV: 'production' }).motionEnforce, 'R19 enforcement: only with STATS_MOTION_ENFORCE=1 (production too)');
+    v = J(human({}, { motionBad: true }), {}, LOG); ok(v.ranked && has(v, 'swing_motion_seen') && !has(v, 'swing_motion') && rec(v) === 'RB RB', 'R19 judged but not enforced: ranked, logged as swing_motion_seen');
+    v = J(human({}, { motionBad: true }), {}, M); ok(!v.ranked && has(v, 'swing_motion') && rec(v) === '-- RB', 'R19 swings with no hand behind them, the WINNER: win unranked, no bests; the loss counts');
+    v = J(human({}, {}, { motionBad: true }), {}, M); ok(v.ranked && has(v, 'swing_motion') && rec(v) === 'RB R-', 'R19 LOSER: its loss counts (no bests), the winner ranked');
+    v = J(vsBot({}, { motionBad: true }), {}, M); ok(!v.ranked && rec(v) === '-- --', 'R19 win over Matt: unranked');
+    v = J(human({}, { motionBad: true })); ok(v.ranked && !has(v, 'swing_motion'), 'R19 off (no STATS_MOTION): the seat flag is ignored'); }
   v = J(human({ revived: true, secs: 10 }, {}, { cids: new Set(['cid1']) }), { pairRanked24h: 5, winnerWins24h: 40 });
   ok(has(v, 'revived', 'too_fast', 'same_cid', 'pair_cap', 'daily_cap') && !v.ranked, 'several flags at once: every failing id is collected');
   // why (8.3): a human match never names the opponent's network

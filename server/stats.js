@@ -1,5 +1,5 @@
 // Player stats recording (docs/ACCOUNTS.md 3.2, 4): the per-match accumulator, seat identity (freeze, then compare), rally and swing
-// bests, the paddle teleport sampler, and the one call at match end (onEnd) that asks abuse.judge and writes one db transaction.
+// bests, the paddle teleport sampler, the swing motion check (R19), and the one call at match end (onEnd) that asks abuse.judge and writes one db transaction.
 // Nothing runs on require: init() wires the database, the knobs and the in-memory link map once at boot. Nothing here logs an
 // identity, an address, a device id, an account or a token: game.js logs one line per recorded match with the court code only.
 // NO function here may throw into the game loop: endMatch runs inside sim() on the 60 Hz interval (game.js wraps every hook too).
@@ -64,6 +64,7 @@ function seatAcc(pl) {
   return { pl, bot: false, contacts: 0, held: 0, rallyReal: 0, rallyHeld: 0, bestRally: 0, bestHit: 0, bestSpeed: 0, swingBad: false,
     ident: id && !id.anon ? id : null, computers: new Set(id ? [id.computer] : []), cids: new Set(pl.cid ? [pl.cid] : []),
     identChanged: false, pendingAnon: false, gone: false, mv: { x: 0, y: 0, at: 0, fast: 0 }, teleport: false,
+    mo: { ring: [], pend: [], n: 0, bad: 0, why: {} }, motionBad: false,
     hits: 0, returns: 0, chances: 0, winners: 0, aces: 0, smashes: 0, ptsWon: 0, ptsLost: 0, shot: null };   // play counters (docs/SHARE.md 1); shot: the last contact's pl.hit, its kind read once it can no longer change
 }
 // newMatch({ revived, rank, seats: [pl|null, pl|null] }) -> the match object a room keeps in `match` (4.1)
@@ -179,6 +180,49 @@ function sample(m, pl, x, y, ballLive) {
   mv.x = x; mv.y = y; mv.at = t;
 }
 
+// ---- swing motion (R19, NOTES 198) ----
+// Every swing a client reports must show in the paddle stream it sends anyway (20 Hz: q, the drawn paddle's orientation, and r, the hand's
+// turn rate, web/main.js). A script that sends swings, the cheapest cheat there is, sends no hand behind them. Measured on every capture in
+// data/ replayed through web/motion.js and sampled at 20 Hz like main.js (715 swings x 5 sampling phases): within 400 ms before a swing and
+// 300 ms after its settled report the stream always held a turn rate >= 4.9 rad/s, >= 0.39 x the settled peak (1% under 0.48), and q turned
+// 0.39 .. 1.42 x what r says it should have. The cuts sit well outside that, and outside what the same replay gives with the phone's bursty
+// relay (samples in 100-150 ms clumps) and 20% of the 20 Hz ticks dropped (test/motion-check.test.mjs): a top rate under MO.rMin, under MO.share
+// x the claimed peak, a turn under MO.ratio x what r says. A seat with MO.bad such swings that are also MO.badShare of its swings is flagged
+// (a script fails ~all of its swings; real play under that stress up to ~1 in 10); nothing is kept beyond the last 1.5 s.
+const MO = { before: 400, after: 300, keep: 1500, ringMax: 48, minSamples: 3, rMin: 3, share: 0.15, pkMin: 10, turnMin: 0.5, ratio: 0.1, bad: 5, badShare: 0.4 };
+const qturn = (a, b) => { const d = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]); return 2 * Math.acos(Math.min(1, d)); };
+// motion(m, pl, r, q, t?): one paddle message's rate and orientation (any move mode: Auto still sends the hand)
+function motion(m, pl, r, q, t) { try { motion_(m, pl, r, q, Number.isFinite(t) ? t : Date.now()); } catch { /* never into the game loop */ } }
+function motion_(m, pl, r, q, t) {
+  const s = accOf(m, pl); if (!s || s.bot || !cfg.motion) return;
+  const mo = s.mo, last = mo.ring[mo.ring.length - 1];
+  motionDue(s, t, false);                                          // first, on the ring as it stands: after a gap in the stream, a swing's own samples are still there
+  mo.ring.push({ t, r: Number.isFinite(r) && r > 0 ? Math.min(r, 60) : 0, q: Array.isArray(q) && q.length === 4 && q.every(Number.isFinite) ? q : last ? last.q : null });
+  while (mo.ring.length > MO.ringMax || (mo.ring.length && mo.ring[0].t < t - MO.keep)) mo.ring.shift();
+}
+// swingSeen(m, pl, fix, pk, final, t?): a swing report (t: tests only, the arrival time in ms). A new swing opens a check; its settled report (fix or final) moves the check's end and gives the peak
+function swingSeen(m, pl, fix, pk, final, t) { try { swingSeen_(m, pl, fix, pk, final, Number.isFinite(t) ? t : Date.now()); } catch { /* never into the game loop */ } }
+function swingSeen_(m, pl, fix, pk, final, t) {
+  const s = accOf(m, pl); if (!s || s.bot || !cfg.motion) return;
+  const mo = s.mo, cur = mo.pend[mo.pend.length - 1];
+  if (fix) { if (cur) { cur.end = t; if (final && Number.isFinite(pk)) cur.pk = pk; } return; }
+  if (mo.pend.length >= 8) motionCheck(s, mo.pend.shift());       // a burst of swings: the oldest is judged now, not dropped
+  mo.pend.push({ t0: t, end: t, pk: final && Number.isFinite(pk) ? pk : null });
+}
+function motionDue(s, t, all) { const mo = s.mo; while (mo.pend.length && (all || mo.pend[0].end + MO.after <= t)) motionCheck(s, mo.pend.shift()); }
+function motionCheck(s, sw) {
+  const mo = s.mo, w = mo.ring.filter(p => p.t >= sw.t0 - MO.before && p.t <= sw.end + MO.after);
+  let bad = w.length < MO.minSamples ? 'none' : '';                // no paddle stream around a swing: nothing backs it
+  if (!bad) {
+    const rMax = Math.max(...w.map(p => p.r));
+    let turn = 0, said = 0; for (let i = 1; i < w.length; i++) { said += w[i].r * 0.05; if (w[i].q && w[i - 1].q) turn += qturn(w[i - 1].q, w[i].q); }
+    bad = rMax < MO.rMin ? 'still' : sw.pk != null && sw.pk >= MO.pkMin && rMax < MO.share * sw.pk ? 'peak'
+      : said >= MO.turnMin && turn / said < MO.ratio ? 'noturn' : '';   // no upper bound: a dropped 20 Hz tick (a long frame at contact) doubles the turn between two samples
+  }
+  mo.n++; if (bad) { mo.bad++; mo.why[bad] = (mo.why[bad] || 0) + 1; }
+  if (mo.bad >= MO.bad && mo.bad >= MO.badShare * mo.n) s.motionBad = true;
+}
+
 // ---- match end (4.7) ----
 // owner(s, now, completed) -> { owner, created } for a human seat. A device gets a NEW owner only from a completed match and inside the
 // new-guest caps (5.5); a gone seat (deleted mid-match, 3.3) is recorded with no owner, and its frozen identity still judges the opponent.
@@ -199,7 +243,7 @@ function ownerOf(s, now, completed) {
 function onEnd(m, e) {
   if (!m || m.done) return null;
   m.done = true; live.delete(m);
-  for (const s of m.seats) if (s && !s.bot) shotDone(s);          // a forfeit mid-rally: the last contact is as settled as it will get
+  for (const s of m.seats) if (s && !s.bot) { shotDone(s); if (s.mo) { const t = Date.now(); motionDue(s, t, false); s.mo.pend.length = 0; } }   // a forfeit mid-rally: the last contact is as settled as it will get. Swings still waiting on their stream are not judged
   const now = e.now || Date.now(), kind = e.kind, human = HUMAN.has(kind), score = [e.score[0] | 0, e.score[1] | 0], pts = score[0] + score[1];
   const winner = e.winner === 0 || e.winner === 1 ? e.winner : null;
   const completed = e.ending === 'won' || (e.ending === 'forfeit' && pts >= cfg.forfeitMin);
@@ -215,7 +259,7 @@ function onEnd(m, e) {
   const facts = { now, kind, winner, ending: e.ending, score, secs, revived: m.revived, levelChanged: m.levelChanged,
     seats: m.seats.map((s, i) => !s ? null : s.bot ? { bot: true } : { bot: false, owner: info[i].owner, ident: s.ident, groups: info[i].groups,
       computers: s.computers, cids: s.cids, gone: s.gone, contacts: s.contacts, held: s.held, swingBad: s.swingBad, identChanged: s.identChanged,
-      pendingAnon: s.pendingAnon, teleport: s.teleport, established: info[i].established }) };
+      pendingAnon: s.pendingAnon, teleport: s.teleport, motionBad: s.motionBad, established: info[i].established }) };
   const history = {};
   if (human && winner != null && info[0] && info[1]) {
     const W = info[winner], Lo = info[1 - winner];
@@ -271,4 +315,4 @@ function forget({ tokenHash = null, accountId = null, devHash = null, deleted = 
 }
 
 module.exports = { init, config, linkMap, identOf, sameIdent, seen, seatAcc, newMatch, drop, accOf, seatFill, identify, member, optOut, launched, rallyReset, contact, pointEnd, records,
-  swingBest, fixRecords, level, sample, onEnd, title, forget, SPEED_CAP, SPEED_BAD, _live: live };
+  swingBest, fixRecords, level, sample, motion, swingSeen, onEnd, title, forget, SPEED_CAP, SPEED_BAD, _live: live };

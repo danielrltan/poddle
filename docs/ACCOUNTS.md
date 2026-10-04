@@ -701,6 +701,7 @@ no streak change, no firsts, no bests), **ignored** (nothing recorded at all). S
 | R16 `title` | Tournament title needs 3 distinct human computer GROUPS (5.4) AND identities, and one ranked human win by the champion | `titleCounts` | tour | counted / ignored |
 | R17 `origin_bad` | Socket opened from a page not on the allowlist | `ws.originBad` | that socket | treated as R3 (anonymous) |
 | R18 `paddle_teleport` | The seat's paddle moved faster than `TELEPORT_MS` on 2+ consecutive samples while the ball was live (4.8) | `acc.teleport` | seat | a WIN by that seat (bot or human) is unranked with no bests; its LOSS still counts |
+| R19 `swing_motion` (NOTES 198) | The seat's swings were not backed by its paddle stream: 5+ swings, and 40%+ of its swings, where the 20 Hz paddle messages from 400 ms before to 300 ms after the settled report show a top turn rate under 3 rad/s, under 0.15 x the settled peak claimed, or an orientation that turned under 0.1 x what the rate says, or fewer than 3 messages. Judged when `STATS_MOTION=1` (always in production); acts only with `STATS_MOTION_ENFORCE=1`, else logged as `swing_motion_seen` | `acc.motionBad` (server/stats.js motion / swingSeen) | seat | enforced: as R18, a WIN by that seat is unranked with no bests, its LOSS still counts; not enforced: informational |
 | RK1 `left_early` (trophies; since 2026-09-30 every person game, docs/TROPHIES.md 3.4) | A forfeit of a person game (`leave`, Q Q, a drop past the hold, `forfeitHeld`) after the first strike: the leaver takes the full loss delta whatever the verdict; the stayer takes the win delta only when the game's flags hold nothing beyond the forfeit's own (`early_forfeit`, `leaver_ahead`, `afk`, `too_fast`), else +0 and the card says `left_early`. Applied in the trophies hook in `record()`, never inside `judge` | the game's flags | ladder | trophies only; W/L and the log rows follow `judge` as always |
 | RK2 no-show (trophies) | A person game forfeited BEFORE the first strike (a never-ready seat, a leave before play): no deltas and no trophies message (docs/TROPHIES.md 3.4). Leaving a Matt game: 0 | `info.struck` | ladder | void |
 | RK3 `new_opponent` and trophies | R11c on a game HALVES the winner's trophy delta (`halveWin`, min +8) instead of withholding it; the loser pays the plain loss: the loser being new is not the winner's doing, and withholding would zero most early wins. Bounded by R11 `feeder` (6 losses to at most 2 winner groups) and `NEW_GUEST_DAY`, not by R12: a `new_opponent` game is unranked and never accrues in `winsOf` (docs/TROPHIES.md 3.3) | `flags` per game | ladder | the record follows R11c as before (the winner's W withheld); trophies halved |
@@ -708,7 +709,7 @@ no streak change, no firsts, no bests), **ignored** (nothing recorded at all). S
 | R10 by series | `match_log.series` is always null since 2026-09-30 (docs/TROPHIES.md 1): `pairs` counts every row as its own result (`'i' || id`); the series number space (`'s' || series`) only matters for rows written before that date. `oneWay`, `recentLosses`, `recentWins` stay per game | `match_log.series` | human, tour | as R10 |
 | RK5 frozen identity (trophies) | Trophies settle on the identity the seat had at hello / sign-in (the frozen identity, 3.2), resolved to an owner at match end (an account's owner, following a merge): a sign-out, a sign-in after the first strike or a deletion mid-match never move the delta, and a deleted identity resolves to nothing (`saved: false`, never a reused owner id). Eligible = that owner is an account WITH a username (docs/TROPHIES.md 3.1); a guest or a username-less account gets `trophies: { none: 'signin' | 'username' }` | frozen identity | ladder | trophies only |
 
-Evaluation order: R0, R1, R3 first (decide which seats exist); then R2, R6b, R8, R9, R18 (match-wide or per seat);
+Evaluation order: R0, R1, R3 first (decide which seats exist); then R2, R6b, R8, R9, R18, R19 (match-wide or per seat);
 then for human kinds R4, R5, R6, R7, R7b, R10, R11, R11b, R11c, R12. `judge` returns `seats[i].record` per seat:
 - the winner's credit is withheld (no W, first, streak or bests) when R8, R11c, or R6b/R18 on the WINNER fires, or
   when R9 fires for EITHER seat;
@@ -754,8 +755,9 @@ Known gaps (documented, not solved):
   VPN): unlinked, it is the previous case.
 - Staying anonymous for the whole match denies the opponent a ranked win (R4). It gives the anonymous player nothing.
 - Wins against Matt are scriptable by a forged client (swing timing and power are client-asserted); R18 stops the
-  cheapest version (teleporting), not a careful bot. Bot progress is therefore personal-only and never shown to
-  anyone else (Q14).
+  cheapest version (teleporting) and R19 (NOTES 198) a script that swings with no hand behind it, not a careful bot that
+  also forges a consistent paddle stream. Bot progress is therefore personal-only and never shown to
+  anyone else (Q14), but Matt games do feed the longest-rally board (NOTES 131).
 
 ### 5.3 Knobs (env, read once by `abuse.config`)
 | Env | Default | Tests | Production |

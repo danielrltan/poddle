@@ -4110,3 +4110,49 @@ Two owner asks (2026-10-04):
   `ADDR_ROOMS = "8"`. The region stays yyz: Toronto reaches NYC in ~15 ms and LA in ~75 ms, and a second machine is impossible
   (every court lives in one process). Fly's proxy already brotli-compresses, static files have validators, and the proxy's
   concurrency has no hard limit (the docs: none is enforced when unset), so no connection is ever refused by the edge.
+
+## 198. Anti-cheat: every swing must show in the paddle stream (R19 `swing_motion`)
+
+The owner asked whether Poddle can be hacked and how to stop it, then approved the plan. What a cheater can and cannot do: the server
+owns the ball, the score and the rules, so editing the page never moves the ball or the score. It does trust the inputs: the paddle
+position (only clamped), Auto (the server runs you to the ball), and every swing's power, aim and timing. So the cheapest cheat is a
+script, in the console or a Node client with its own Origin header, that turns Auto on and sends a full swing whenever the ball is
+close. Injected JavaScript cannot be blocked in the player's own browser (obfuscation, devtools detection and a CSP do not stop it, and a
+script needs no browser), so the answer is on the server: make the cheap version fail and leave cheated results uncounted, silently.
+
+R19 (server/stats.js `motion` / `swingSeen`, abuse.js, docs/ACCOUNTS.md 5.2): the client already sends its paddle's turn rate `r` and
+orientation `q` at 20 Hz (web/main.js; the phone and the AirPod feed the one MotionModel, so both send the real rate). Every swing report
+opens a check; once 300 ms have passed after its settled report, the paddle messages from 400 ms before it are read. A swing is unbacked
+when fewer than 3 paddle messages came, the turn rate never reached 3 rad/s, it stayed under 0.15 x the settled peak the swing claims
+(`pk`), or q turned under 0.1 x what r says (a forged rate with a still paddle). A seat with 5+ unbacked swings that are also 40%+ of its
+swings is flagged. Enforced, like R18: its WIN does not count (no W, firsts, bests) and its LOSS still does on its record; the match is
+then not ranked, so NO trophies move for either side (an honest player who loses to a flagged script keeps their trophies); it is in
+BAD_FLAGS, so a forfeit win pays +0 when either seat was flagged. Nothing is shown to anyone (the card says the generic "doesn't count").
+Memory: the last 1.5 s per seat; nothing stored but the flag id.
+
+Calibrated on every capture in data/ (6 files, 143 swings, 3 tracked) replayed through web/motion.js, sampled at 20 Hz like main.js:
+the stream always showed >= 4.9 rad/s, >= 0.39 x the settled peak, a q/r turn ratio of 0.39-1.42, >= 16 deg of turn. Those are AirPod
+captures with smooth delivery. The phone's relay is bursty and a long frame at contact drops a 20 Hz tick, so the test also replays with
+motion in 100-150 ms clumps and 12-20% of ticks dropped (in runs): first cut (0.25 x peak, a 0.2-3 turn ratio, 25%) flagged up to 8 of 35
+real swings (23%), mostly 'overturn' (a dropped tick doubles the turn between two samples) and a missed peak tick. Hence no upper turn
+bound, 0.15 x peak, 0.1 turn, 40%: real play under the worst stress now leaves at most ~6% unbacked; every script pattern still fails
+all of its swings.
+
+Shipped RECORD-ONLY (abuse.config: `motion` judged always in production, `motionEnforce` only with STATS_MOTION_ENFORCE=1): no phone
+capture exists, the phone is the default paddle, and a misfire would silently void every phone player's wins. Until enforced, a flagged
+seat is logged as `swing_motion_seen` on its match_log row and nothing else changes. To enforce: play a few phone and AirPod matches on
+production, check match_log for `swing_motion_seen` (expect none from real play), then set STATS_MOTION_ENFORCE = "1" in fly.toml [env].
+
+Tests: test/motion-check.test.mjs (new, in deploy.sh's gate: every capture at six delivery conditions judged clean, at most 10% unbacked;
+a still paddle, a forged rate, forged spikes, a big peak over a small turn, no stream, a swing every tick all flagged; a consistent stream
+not; 4 unbacked swings not yet), accounts-unit (R19 judge cases, config, record-only), stats.test (R19: on a STATS_MOTION=1 +
+ENFORCE server, stats.test's own scripted hitter beats Rookie and the win is not counted; the same swings with a turning paddle stream count).
+
+Not done, on purpose: capping the client's `net` lag claim at a server-measured round trip. The cheater controls when their side answers
+a ping, so a measured round trip can only be inflated, never shortened: it limits nothing a script cannot sidestep, and if Fly's proxy
+answers ping frames itself it would cut lag compensation for honest players. A per-match "robotic play" flag (timing too regular,
+reactions too fast) needs real match timing data, which nothing records today; collecting it is a privacy change of its own.
+Known gap: a careful bot that forges a coherent q/r stream around each swing passes R19. Edge cases: Auto still sends the stream (checked
+in every move mode); a swing made while a menu screen covers the court has no stream (needs 5 and 40% to matter); pauses stop both
+swings and stream; a seat's pending checks are judged at match end; old tabs already send r and q. Legal: privacy.html (paddle motion
+row, retention, legal-basis row, a dated line in 15), docs/ropa.md 4, CLAUDE.md data flows.

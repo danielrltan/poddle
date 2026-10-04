@@ -204,9 +204,9 @@ const STAMP_S = process.env.STAMP_S != null ? +process.env.STAMP_S : 2;   // s t
 const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
 const PROMO_S = +process.env.PROMO_S || CAL_S;                 // s a spectator who was let into Matt's seat has to get their paddle ready before Matt is back
 // Trophies (docs/TROPHIES.md 3.4): what a forfeit itself puts on the game it cut short (nobody struck, too few points, the leaver ahead): never held against the
-// stayer. Everything else in BAD_FLAGS (match-wide rules, an anonymous or forged seat, a changed identity, a teleporting paddle) leaves the stayer at +0
+// stayer. Everything else in BAD_FLAGS (match-wide rules, an anonymous or forged seat, a changed identity, a teleporting paddle, swings with no hand behind them) leaves the stayer at +0
 const FORFEIT_FLAGS = new Set(['early_forfeit', 'leaver_ahead', 'afk', 'too_fast']);
-const BAD_FLAGS = new Set([...abuse.MATCH_WIDE, 'anon', 'pad', 'origin_bad', 'too_fast', 'afk', 'paddle_teleport', 'ident_changed']);
+const BAD_FLAGS = new Set([...abuse.MATCH_WIDE, 'anon', 'pad', 'origin_bad', 'too_fast', 'afk', 'paddle_teleport', 'swing_motion', 'ident_changed']);
 let clock = 0;                            // sim clock of the process. A room starts its own time from it and stops that while paused or holding a seat, so rooms agree until one of them pauses
 // A name is untrusted text that lands on other people's screens: strings only, no control, invisible or bidi characters, no angle brackets, 12 characters. '' = none given.
 // Nor characters that draw as nothing (Hangul fillers, the braille blank, soft hyphen, tags: a name of those was a blank on every scoreboard), nor more than 2 stacked marks on a letter. What is left must have something to see in it.
@@ -1011,8 +1011,10 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (!me.auto) me.x = clamp(num(m.x, me.x), -X_LIMIT, X_LIMIT);
       if (!me.auto && !me.autoY) me.y = clamp(num(m.y, me.y), Y_MIN, Y_MAX);
       if (Array.isArray(m.q) && m.q.length === 4 && m.q.every(Number.isFinite)) me.q = m.q;
+      if (match) stats.motion(match, me, me.rate, m.q);           // the hand behind every swing (R19, NOTES 198): in every move mode, Auto too
       if (match && !me.auto) stats.sample(match, me, me.x, me.y, ball.live);   // paddle plausibility: 2+ teleports in a row while the ball is live (docs/ACCOUNTS.md 4.8)
     } else if (m.type === 'swing') {
+      if (match) stats.swingSeen(match, me, !!m.fix, Number.isFinite(m.pk) ? m.pk : null, m.final === true);   // R19: checked against the paddle stream once its window has passed
       let pw = effort(clamp((num(m.power, 6) - 6) / 28, 0, 1));      // 20% more swing to smash (SMASH_IN)
       // No overhead bonus any more (NOTES 82): it lifted any downward stroke past n 0.55 by 0.2 to a smash, however slowly it came
       // down (4 of 12 recorded overheads, from 8.9 rad/s). An overhead is a smash the way every stroke is: by its speed (web/motion.js).
