@@ -584,13 +584,29 @@ export function createScene(containerEl) {
   buildCourt();
 
   // ---------- ball, blob shadow, trail ----------
-  const ballTex = canvasTex(512, 256, (c, w, h) => {
-    c.fillStyle = '#e8fb2a'; c.fillRect(0, 0, w, h);
-    const hole = (u, lat) => { const x = u * w, y = (0.5 - lat / Math.PI) * h, r = 15, rx = Math.min(r / Math.max(Math.cos(lat), 0.12), w);
-      for (const dx of [-w, 0, w]) { c.beginPath(); c.ellipse(x + dx, y, rx, r, 0, 0, 7); c.fill(); } };
-    c.fillStyle = '#a88e00';
-    [[0, 8, 0], [0.62, 6, 0.5], [-0.62, 6, 0.5], [1.15, 4, 0], [-1.15, 4, 0]].forEach(([lat, n, ph]) => { for (let i = 0; i < n; i++) hole((i + ph) / n, lat); });
-    hole(0.5, 1.5); hole(0.5, -1.5);
+  // The ball's skin (NOTES 177): 40 holes (an outdoor ball's count) spread evenly over the sphere (a Fibonacci lattice), each drawn as a true
+  // circle ON the sphere, so none stretches near the poles the way ellipses on the flat map did. Per pixel, only inside each hole's box:
+  // antialiased edge, a rim a shade deeper, the floor deepest at the centre. Every shade is the logo's hue-shifted deep yellow (NOTES 162/163).
+  const ballTex = canvasTex(1024, 512, (c, w, h) => {
+    const img = c.createImageData(w, h), d = img.data, BODY = [0xe8, 0xfb, 0x2a], RIM = [0xdc, 0xbc, 0x00], DEEP = [0xa8, 0x8e, 0x00];
+    for (let i = 0; i < d.length; i += 4) { d[i] = BODY[0]; d[i + 1] = BODY[1]; d[i + 2] = BODY[2]; d[i + 3] = 255; }
+    const N = 40, R = 0.175, EDGE = 0.006, GOLD = Math.PI * (3 - Math.sqrt(5));
+    for (let k = 0; k < N; k++) {
+      const y = 1 - (2 * k + 1) / N, lat = Math.asin(y), lon = k * GOLD, cx = Math.cos(lat) * Math.cos(lon), cz = Math.cos(lat) * Math.sin(lon);
+      const r = R + EDGE, y0 = Math.max(0, Math.floor((0.5 - (lat + r) / Math.PI) * h)), y1 = Math.min(h - 1, Math.ceil((0.5 - (lat - r) / Math.PI) * h));
+      for (let py = y0; py <= y1; py++) {
+        const plat = (0.5 - (py + 0.5) / h) * Math.PI, cl = Math.cos(plat), sl = Math.sin(plat);
+        const span = Math.abs(plat) + r >= Math.PI / 2 - 1e-6 ? Math.PI : Math.min(Math.PI, Math.asin(Math.min(1, Math.sin(r) / Math.max(cl, 1e-6))) + 0.02);
+        const u0 = Math.floor(((lon - span) / (2 * Math.PI)) * w), u1 = Math.ceil(((lon + span) / (2 * Math.PI)) * w);
+        for (let pu = u0; pu <= u1; pu++) {
+          const px = ((pu % w) + w) % w, plon = ((pu + 0.5) / w) * 2 * Math.PI;
+          const dot = cl * Math.cos(plon) * cx + sl * y + cl * Math.sin(plon) * cz, a = Math.acos(Math.max(-1, Math.min(1, dot)));
+          if (a > R + EDGE) continue;
+          const cov = Math.min(1, (R + EDGE - a) / (2 * EDGE)), t = Math.min(1, a / R), floor = 1 - (1 - t) * (1 - t);   // 0 at the centre, 1 at the rim
+          const o = (py * w + px) * 4;
+          for (let ch = 0; ch < 3; ch++) { const hole = DEEP[ch] + (RIM[ch] - DEEP[ch]) * Math.pow(floor, 8); d[o + ch] = Math.round(d[o + ch] + (hole - d[o + ch]) * cov); }
+        } } }
+    c.putImageData(img, 0, 0);
   });
   // spin swirl: wind whipping round a sliced ball, turning the way its FIRST BOUNCE will go. The bounce (coast / bounceV in server/game.js) is a
   // plain one plus, from the spin: forward speed cut by (FLOOR.along - SPUN.along) * spin, and the sideways kick. That extra change D in the ball's
@@ -653,7 +669,7 @@ export function createScene(containerEl) {
       arc.matrixWorld.compose(serveFx.position, qFx, sFx.setScalar(fxScale(cam, serveFx.position) * serveFx.scale.x)); };
     serveFx.add(arc); }
   serveFx.visible = false; scene.add(serveFx);
-  const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
+  const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 48, 32), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45, emissive: 0xffffff, emissiveMap: ballTex, emissiveIntensity: 1.6 }));
   // The ball lights itself: from side 1 you see its shaded face (it measured 1.16 : 1 against the kitchen, 1.25 : 1 against the court), from side 0 the lit face
   // was 1.31 : 1 on the low sky. Through its own texture, so the holes still read and the spin still shows. Now 1.5 : 1 at worst (the milky south sky), 2.2+ elsewhere.
   ballMesh.visible = false; scene.add(ballMesh);       // no real shadow: the blob below is the depth cue

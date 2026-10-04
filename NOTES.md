@@ -3789,3 +3789,16 @@ Both are draws only, in scene.js updatePads, `pd.bot` only (Matt and the menu ra
 - Tests: bot-motion.mjs adds the coil both ways and square after, the paddle's take-off acceleration, and the contact gap early and late;
   its harness now sets pd.over the way startSwing does. stance, breathe and bot-motion pass. scene-next's "setMenu(false) ... > 50 fps"
   reads 30.0 on this machine today on unchanged main too (headless Chrome throttling): not this change; it passed clean on 15b3dc9 earlier.
+
+## 177. A smoother ball: 40 round holes spread evenly over it
+
+The owner (2026-10-03, while the launch trailer was being filmed): "the pickleball texture looks really rough. i want you to fix it in-game".
+The old ballTex (512x256) drew the holes as flat ellipses on the equirectangular map in five latitude rings plus two poles: the poles' holes were
+smeared, two neighbours on adjacent rings ran into one blob, the edges were jagged canvas fills, and the 28x20 sphere showed its facets up close.
+
+- scene.js ballTex, now 1024x512: 40 holes (an outdoor ball's count), centres on a Fibonacci lattice so they are evenly spread with none
+  touching. Each is a true circle on the sphere (angular radius 0.175 rad), drawn per pixel only inside its own box: a 0.006 rad antialiased
+  edge, the floor #a88e00 (NOTES 163's hole colour) easing to the rim colour #dcbc00 (NOTES 162) in a thin band at the lip. Body #e8fb2a as before.
+- The ball mesh is 48x32 segments (was 28x20): a smooth outline at the trailer's close range. Material, emissive and size are unchanged.
+- Looks only: no gameplay, data or UI change, legal pages untouched. Changelog: October 3, "A smoother ball".
+
