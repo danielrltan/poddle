@@ -3970,3 +3970,21 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
 - Tests: test/calkeep-e2e.mjs (new, CALKEEP_PORT, 6 checks: the key, a reload straight onto the court with the toast, the paddle drawn, C
   replaces the kept one, the next court's toast). calstart-e2e (7) and the rest pass; revive-e2e's one red was its own regex (`/Updating/`
   against 'Poddle is updating', since NOTES 157): now `/updating/i`.
+
+## 188. The Matt badge wears a gold ring when the toughest level was beaten 11-0, on the public card too
+
+The owner (2026-10-04): "on public stat page, does it indicate with a gold badge or something alike if the matt victory was flawless?" It did
+not: the public card and the share card carried the toughest Matt's name only. Now:
+- server/card.js dataOf gains `mattFlawless` (boolean): the toughest Matt beaten has bestMargin >= 11, i.e. was beaten 11-0 at least once
+  (the same rule as NOTES 179's gold chip; a lower level's 11-0 does not count, the badge is about the toughest). It rides on
+  GET /api/leaderboard/player (the public card) and on the share card's data, so it is in the card hash: every shared PNG gets a new ?v=
+  once, and its Matt pill reads "Beat the Pro bot 11-0" when so.
+- The badge (.st-mbadge.is-flawless): a gold double ring round the disc (gold-3 and gold-1) with a warm shadow, tooltip "Beaten 11-0"; the
+  same class on Your stats' badge (profile.js drawMatt, from the rungs' flawless[top]) and on the public card's #lbp-matt (from
+  p.mattFlawless, true only). The level name under it is unchanged. A title emptied later leaves ui.js's data-tip behind, so the tip is
+  deleted when the ring goes.
+- Legal (same commit): privacy.html's public-card line (section 2's table) and the shared-cards bullet now say "and whether you have
+  beaten that level 11-0". Last updated / dateModified / sitemap already read 2026-10-04.
+- Tests: share.test (dataOf: mattFlawless by the toughest level's margin, the SVG's 11-0), lb-profile-ui (Dan's Pro ring + tooltip, Juno
+  none and no stale tip; 39 checks), profile-ui (badge gold only when the toughest level is the flawless one). share.test's five PNG checks
+  and profile-ui's layout checks fail the same on untouched main here (no resvg in the shared node_modules; a peer's header change).

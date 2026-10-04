@@ -118,7 +118,7 @@ function drawRoad(p) {
 // wire number: Tour is 3 on the wire but easier than Pro), and a chip a level with its record. No order to climb, no locks, no Next
 function drawMatt(p) {
   const { rows, won, flawless, top } = rungs(p), badge = $('st-mbadge'), ul = $('pf-rungs');
-  if (badge) badge.className = 'st-mbadge ' + (top < 0 ? 'is-none' : 'is-lv' + top);
+  if (badge) { badge.className = 'st-mbadge ' + (top < 0 ? 'is-none' : 'is-lv' + top) + (flawless[top] ? ' is-flawless' : ''); if (flawless[top]) badge.title = `Beaten ${FLAWLESS}-0`; else { badge.removeAttribute('title'); delete badge.dataset.tip; } }      // is-flawless: the gold ring (NOTES 182)
   text('st-mbest', top < 0 ? 'None yet' : `${LEVEL[ORDER[top]]} Matt`);
   const r = top < 0 ? null : rows[top];
   text('st-mcap', r ? dayS(r.firstWinAt) : '');      // the day it was first beaten; nothing beaten: no coaching line
@@ -316,7 +316,7 @@ function drawPlayer(p, state) {
   h.emblem($('lbp-em'), rank);
   text('lbp-rank', rank ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rank.tier, rank.div)) : state === 'loading' ? '' : 'No trophies yet');      // 'Pro #3' only from the board's answer
   const tro = num(p.trophies); show('lbp-tro', !!rank && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
-  const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi);
+  const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) { mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi) + (mi >= 0 && p.mattFlawless === true ? ' is-flawless' : ''); if (mi >= 0 && p.mattFlawless === true) mb.title = `Beaten ${FLAWLESS}-0`; else { mb.removeAttribute('title'); delete mb.dataset.tip; } }      // ui.js adoptTitle moves a title to data-tip; an emptied title leaves the old tip, so it is cleared here      // mattFlawless: the server's card data (card.dataOf), the same gold ring as Your stats
   text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
   const pl = $('lbp-places');      // the place numbers /api/player gave (never the values): one short line
   if (pl) { pl.textContent = ''; const P = p.places && typeof p.places === 'object' ? p.places : null;

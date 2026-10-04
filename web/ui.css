@@ -1670,6 +1670,8 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .st-mdisc{width:100%;height:100%;border-radius:50%;display:grid;place-items:center;border:.25rem solid #fff;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),transparent 55%),var(--lv);box-shadow:0 0 0 .125rem var(--lv-deep), 0 .25rem .625rem rgba(40,70,100,.25)}
 .st-mdisc svg{width:2.1rem;height:2.1rem;fill:none;stroke:#fff;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 .0625rem 0 rgba(0,0,0,.18))}
 .st-mstar{position:absolute;right:-.3rem;bottom:-.2rem;width:1.75rem;height:1.75rem;fill:var(--gold-2);stroke:var(--gold-4);stroke-width:3;stroke-linejoin:round;filter:drop-shadow(0 .0625rem .125rem rgba(120,80,0,.35));animation:num-pop 600ms var(--ease-bounce) 700ms both}
+/* the toughest Matt beaten 11-0: a gold ring round the disc, on Your stats and the public card alike (NOTES 182) */
+.st-mbadge.is-flawless .st-mdisc{border-color:var(--gold-1);box-shadow:0 0 0 .1875rem var(--gold-3), 0 0 0 .375rem var(--gold-1), 0 .25rem .625rem rgba(120,80,0,.3)}
 .st-mbadge.is-none .st-mdisc{background:linear-gradient(180deg,var(--sky-2),var(--sky-4));box-shadow:0 0 0 .125rem var(--sky-4)} .st-mbadge.is-none .st-mdisc svg{stroke:var(--ink-soft);filter:none} .st-mbadge.is-none .st-mstar{display:none}
 .st-mtext{min-width:0;display:flex;flex-direction:column;gap:.0625rem} .st-mtext .caps{margin:0}
 .st-mbest{margin:0;font-size:var(--t-xl);font-weight:900;line-height:1.1;color:var(--lv-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .st-mbadge.is-none + .st-mtext .st-mbest{color:var(--ink-soft)}

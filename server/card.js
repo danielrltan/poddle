@@ -44,6 +44,7 @@ function rankOf(p) {
   return { name: tier === TOP ? `${RANK_NAME[TOP - 1]}${pro ? ' #' + pro : ''}` : E ? E.label(tier, div) : `${RANK_NAME[tier - 1]} ${ROMAN[div]}`, tier, div: tier === TOP ? 1 : div, pro, trophies: num(L.trophies) };
 }
 const mattOf = p => rows(p).map(beaten).lastIndexOf(true);      // the toughest Matt beaten, in difficulty order (0 Rookie .. 3 Pro), -1 for none
+const FLAWLESS = 11, flawlessOf = (p, top) => top >= 0 && num(rows(p)[top].bestMargin) >= FLAWLESS;      // the toughest Matt beaten 11-0 at least once: bestMargin reaches WIN_AT only that way (web/profile.js FLAWLESS, NOTES 182)
 
 // dataOf(profile, username, play?) -> exactly what the card draws (the hash is taken over this object). play: defaults to profile.play
 // (db.profileOf; the tests pass their own). Every card draws the same eleven figures, in the same places, zeros included.
@@ -77,7 +78,7 @@ function dataOf(p, username, play) {
   const top = mattOf(p);
   const E = emblems();
   return { v: CARD_V, em: E ? E.v : null, name: username || 'Poddle player', guest: !username, rank: rank.name, tier: rank.tier, div: rank.div, pro: rank.pro, trophies: rank.trophies,
-    matt: top < 0 ? null : LEVEL[ORDER[top]], mattI: top, big: all };
+    matt: top < 0 ? null : LEVEL[ORDER[top]], mattI: top, mattFlawless: flawlessOf(p, top), big: all };
 }
 const hashOf = d => crypto.createHash('sha256').update(JSON.stringify(d)).digest('hex').slice(0, 12);   // ?v= and the ETag: a stat change is a new picture URL
 
@@ -170,7 +171,7 @@ ${E ? E.defs : ''}
     out.push(`<g transform="translate(${r2(x0 + nw + 8)} ${ly + 6}) scale(${IC / 24})"><path d="M7 5.5H4.5a1 1 0 0 0-1 1V8a4 4 0 0 0 4 4M17 5.5h2.5a1 1 0 0 1 1 1V8a4 4 0 0 1-4 4" fill="none" stroke="#c97f08" stroke-width="2" stroke-linecap="round"/><path d="M6.5 3h11v6.5a5.5 5.5 0 0 1-11 0Z" fill="#fff1a6" stroke="#c97f08" stroke-width="1.2" stroke-linejoin="round"/><path d="M10.5 14.5h3v3h-3Z" fill="#c97f08"/><rect x="7" y="17" width="10" height="4" rx="1.2" fill="#7a4a00"/></g>`); ly += 70;
   }
   {
-    const lv = d.matt ? LV[d.mattI] || LV[0] : ['#c3dbe8', '#65717b'], s = d.matt ? `Beat the ${d.matt} bot` : 'No bot beaten yet', fs = fit(s, 900, 30, 262), sw = measure(s, 900, fs) + 98, x0 = cx - sw / 2;   // "bot", not "Matt": a stranger does not know Matt is the AI. At most 360 px wide: clear of the edge and the panel
+    const lv = d.matt ? LV[d.mattI] || LV[0] : ['#c3dbe8', '#65717b'], s = d.matt ? `Beat the ${d.matt} bot${d.mattFlawless ? ' 11-0' : ''}` : 'No bot beaten yet', fs = fit(s, 900, 30, 262), sw = measure(s, 900, fs) + 98, x0 = cx - sw / 2;   // "bot", not "Matt": a stranger does not know Matt is the AI. At most 360 px wide: clear of the edge and the panel
     out.push(`<rect x="${r2(x0)}" y="${ly}" width="${r2(sw)}" height="64" rx="32" fill="#ffffff" filter="url(#sh)"/>`);
     out.push(`<circle cx="${r2(x0 + 34)}" cy="${ly + 32}" r="24" fill="${lv[0]}" stroke="${lv[1]}" stroke-width="3"/><g transform="translate(${r2(x0 + 34 - 15)} ${ly + 16}) scale(1.25)" fill="#ffffff">${MATT}</g>`);
     out.push(text(x0 + 70, ly + 32 + fs * 0.36, s, { size: fs, wt: 900, fill: lv[1] }));

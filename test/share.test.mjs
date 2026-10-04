@@ -67,6 +67,9 @@ const lose = card.dataOf({ human: { wins: 1, losses: 14, bestStreak: 1 }, played
 const vals = d => J(d.big.map(b => b.value));
 ok([weak, fresh, lose].every(d => d.big.map(b => b.label).join() === ELEVEN) && vals(weak) === J(['-', '0m', '0', '5%', '-', '3', '290', '0', '0', '0', '0']) && vals(lose) === J(['7%', '1h 12m', '1', '30%', '27%', '0', '290', '2', '0', '1', '0']),
   `the same eleven figures on every card, weak and losing values included (${vals(weak)} | ${vals(lose)})`);
+{ const fl = card.dataOf({ matt: [{ level: 0, wins: 2, firstWinAt: 5, bestMargin: 11 }, { level: 1, wins: 1, firstWinAt: 6, bestMargin: 10 }] }, 'x'), fr = card.dataOf({ matt: [{ level: 0, wins: 2, firstWinAt: 5, bestMargin: 11 }] }, 'x');
+  ok(fl.matt === 'Club' && fl.mattFlawless === false && fr.matt === 'Rookie' && fr.mattFlawless === true && lose.mattFlawless === false && fresh.mattFlawless === false && /Beat the Rookie bot 11-0/.test(card.svgOf(fr)) && !/11-0/.test(card.svgOf(fl)),
+    `mattFlawless: the toughest Matt beaten by 11 (an 11-0), not a lower level's 11-0, and the card says so (${fl.matt} ${fl.mattFlawless}, ${fr.matt} ${fr.mattFlawless})`); }
 ok(J(fresh.big.map(b => b.value)) === J(['-', '0m', '0', '-', '-', '0', '-', '0', '0', '0', '0']), `no data at all reads '-' (no match against a person, no ball to return, no point, no measured swing), a real zero reads 0 (${vals(fresh)})`);
 ok(J(lose.big.slice(0, 3).map(b => [b.tag, b.sub, !!b.hero])) === J([['Win rate', '1-14 vs people', true], ['On court', 'all modes', true], ['Best streak', 'win vs people', true]]) && lose.big.slice(3).every(b => !b.hero && !b.sub) && !lose.big.some(b => 'bar' in b),
   `the three headline figures, each with its note (the record under the win rate); no bar (${J(lose.big.slice(0, 3))})`);
