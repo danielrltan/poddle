@@ -4254,3 +4254,14 @@ u watch it increase in real time ... exponentially in speed".
   lands everything at once. Nothing the first time the card shows, without a username, or with reduced motion.
 - Hooks: profile.init takes sfx and cupSvg (ui.cupSvg: the gold cup markup). Tests: ladder.test; ui-next's match-trophies and
   profile-ui's chip checks read the real digits and the final count, so they pass as before.
+
+## 204. Matt's difficulty row sits in the bottom-left corner
+The owner (2026-10-04): "the difficulty bar is in a terrible place, put it in like a bottom corner or something" (it hung under Matt's
+scoreboard tab, NOTES 201, over the far court).
+- `.bot-pick` is now fixed at the bottom-left corner (left and bottom = --edge), the players' free corner: the view chips there belong to a
+  spectator (never with this row), the key hint is bottom-right. The measuring JS is gone (ui.js placePick and its resize listener, the
+  --pick-top / --pick-left vars): setBot only shows it and checks the level.
+- Over a toast (body.has-toast) it steps up 3.75rem, as the ask card does, so "Pro again restarts at 0-0" (NOTES 202) can be pressed while
+  the toast reads under it. It gives way to the ask card (`body:has(.ask-card.is-on)`), which owns that corner while a spectator asks.
+  Hidden as before under a result or menu screen and while the settings card (with its own row) is open.
+- CSS + ui.js only; no data or text change, legal pages untouched. test/spectate-e2e.mjs re-shot next-05-hud-matt-*.png.

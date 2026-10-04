@@ -460,11 +460,7 @@ export function setMode(name) { setText($('mode'), name); for (const o of $('mov
 // Matt's level, or null when the other seat is not Matt: the 1 2 3 4 key hint and the settings Difficulty row show only against him
 export function setBot(level) { const on = !!level; show('key-bot', on); show('set-bot', on); show('bot-pick', on); if (!on) return; swapText($('bot-level'), String(level), 'ov-pop');
   for (const id of ['bot-seg', 'pick-seg']) for (const o of $(id)?.children || []) o.setAttribute('aria-checked', String((o.dataset.name || o.textContent) === String(level)));
-  placePick(); }
-// the court's difficulty row sits under Matt's tab: measured from the scoreboard (its right tab), again on a resize
-function placePick() { const el = $('bot-pick'), tab = innerWidth > 760 ? document.querySelector('#board .score-tab.is-them') : $('board'); if (!el || el.hidden || !tab) return; const r = tab.getBoundingClientRect(); if (!r.width) return;      // a narrow window: under the whole board, clear of the insets
-  el.style.setProperty('--pick-top', `${Math.round(r.bottom + 6)}px`); el.style.setProperty('--pick-left', `${Math.round(r.left + r.width / 2)}px`); }
-addEventListener('resize', placePick);
+}
 export function toggle(id) { const el = $(id); if (!el) return false; el.hidden = !el.hidden; return !el.hidden; }
 export function show(id, on) { const el = $(id); if (!el) return false; el.hidden = !on; return !el.hidden; }
 export function setCamera(ready) { show('camwrap', !!ready); }
