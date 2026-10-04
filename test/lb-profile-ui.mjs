@@ -98,7 +98,7 @@ ok(s.open && s.name === 'Dan' && s.badge && s.state === 'ok' && !(await ev(pg, s
 await sleep(500); s = await sheet(pg);
 await pg.screenshot({ path: new URL('./ui-shots/accounts/lbp-card-dan-1280x800.png', import.meta.url).pathname });      // the public card as a whole, for a look
 ok(s.mcls === 'lbp-matt st-mbadge is-lv3 is-flawless' && s.mtip === 'Beaten 11-0' && s.mscore === 'Best 11\u201310'.replace('10', '0'), `Dan's Pro Matt was beaten 11-0: the badge wears the gold ring, the best score under the level (${s.mcls}, "${s.mtip}", "${s.mscore}")`);
-ok(s.state === 'ok' && s.rank === 'Pro #1' && s.em && s.tro === '1,180' && s.mbest === 'Pro Matt' && s.stats.map(x => x.v).join() === '81%,31h 12m,12,86%,58%,60,1570,318,41,97,4' && !s.foot && s.rec === '42-7' && s.streak === '5' && s.friendFirst,
+ok(s.state === 'ok' && s.rank === 'Pro #1' && s.em && s.tro === '1,180' && s.mbest === 'Pro' && s.stats.map(x => x.v).join() === '81%,31h 12m,12,86%,58%,60,1570,318,41,97,4' && !s.foot && s.rec === '42-7' && s.streak === '5' && s.friendFirst,
   `loaded: Pro #1, 1,180 trophies, Pro Matt, the eleven in Your stats' layout with the 42-7 record, the flame at 5, the friend row over the hero, no own-row footer (${J({ rank: s.rank, tro: s.tro, mbest: s.mbest, foot: s.foot, rec: s.rec, streak: s.streak, stats: s.stats.map(x => x.v) })})`);
 ok(s.inCard, 'focus is inside the sheet');
 { let inside = true; for (let i = 0; i < 4; i++) { await pg.keyboard.press('Tab'); await sleep(60); if (!(await sheet(pg)).inCard) inside = false; }

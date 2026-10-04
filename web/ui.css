@@ -2204,7 +2204,7 @@ body[data-overlay="match"] .emote-layer{opacity:1;right:40vw;z-index:calc(var(--
 /* ---------- Settings from the menu (NOTES 181): the hamburger's card, opened by the title's and the lobby's own button, top right ----------
    Rows that need a court (the status lights, Recenter, Difficulty, Friends: the lobby has its own tile, Leave) are hidden here, not removed */
 .title-set{position:absolute;top:var(--edge);right:var(--edge);z-index:2}
-body[data-settings="menu"] .settings{left:auto;right:var(--edge);z-index:calc(var(--z-screen) + 3);transform-origin:calc(100% - 1.375rem) -.75rem;background:linear-gradient(180deg,#f6fafc,#e7f1f6)}      /* solid: over the tiles a see-through card is unreadable */
+.settings.is-menu{z-index:calc(var(--z-screen) + 3);left:auto;right:var(--edge);transform-origin:calc(100% - 1.375rem) -.75rem;background:linear-gradient(180deg,#f6fafc,#e7f1f6)}      /* solid: over the tiles a see-through card is unreadable. On the card's own class, not the body attribute: that goes at close while the card still fades for 180 ms, and the fading card jumped to the court's left-hand spot (the owner, 2026-10-04, NOTES 185) */
 .settings.is-menu .set-status,.settings.is-menu #btn-recenter,.settings.is-menu #set-bot,.settings.is-menu #grp-social,.settings.is-menu #set-foot{display:none}
 [data-mobile] .settings.is-menu #grp-paddle,[data-mobile] .settings.is-menu #grp-match,[data-mobile] .settings #set-music{display:none}      /* a phone's menu: it is the paddle, not the player's screen, and it plays no music */
 /* the Product Hunt badge's strip (NOTES 186): the menu pages' content stops above the badge, so a tall panel (Ranks, Courts on a phone) never runs under it */

@@ -119,7 +119,7 @@ function drawRoad(p) {
 function drawMatt(p) {
   const { rows, won, flawless, top } = rungs(p), badge = $('st-mbadge'), ul = $('pf-rungs');
   if (badge) { badge.className = 'st-mbadge ' + (top < 0 ? 'is-none' : 'is-lv' + top) + (flawless[top] ? ' is-flawless' : ''); if (flawless[top]) badge.title = `Beaten ${FLAWLESS}-0`; else { badge.removeAttribute('title'); delete badge.dataset.tip; } }      // is-flawless: the gold ring (NOTES 182)
-  text('st-mbest', top < 0 ? 'None yet' : `${LEVEL[ORDER[top]]} Matt`);
+  text('st-mbest', top < 0 ? 'None yet' : LEVEL[ORDER[top]]);      // the level alone: the heading says Matt (the owner, 2026-10-04)
   const r = top < 0 ? null : rows[top];
   text('st-mcap', r ? dayS(r.firstWinAt) : '');      // the day it was first beaten; nothing beaten: no coaching line
   if (!ul) return; ul.textContent = '';
@@ -317,7 +317,7 @@ function drawPlayer(p, state) {
   text('lbp-rank', rank ? (state === 'ok' && typeof p.rank.label === 'string' ? p.rank.label.slice(0, 24) : rankName(rank.tier, rank.div)) : state === 'loading' ? '' : 'No trophies yet');      // 'Pro #3' only from the board's answer
   const tro = num(p.trophies); show('lbp-tro', !!rank && state === 'ok'); text('lbp-trophies', tro.toLocaleString('en-US')); text('lbp-tro-cap', tro === 1 ? 'trophy' : 'trophies');
   const mi = MATT.indexOf(p.matt), mb = $('lbp-matt'); if (mb) { mb.className = 'lbp-matt st-mbadge ' + (mi < 0 ? 'is-none' : 'is-lv' + mi) + (mi >= 0 && p.mattFlawless === true ? ' is-flawless' : ''); if (mi >= 0 && p.mattFlawless === true) mb.title = `Beaten ${FLAWLESS}-0`; else { mb.removeAttribute('title'); delete mb.dataset.tip; } }      // ui.js adoptTitle moves a title to data-tip; an emptied title leaves the old tip, so it is cleared here      // mattFlawless: the server's card data (card.dataOf), the same gold ring as Your stats
-  text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : `${MATT[mi]} Matt`);
+  text('lbp-mbest', state === 'loading' ? '–' : mi < 0 ? 'None yet' : MATT[mi]);
   const msc = mi >= 0 && typeof p.mattScore === 'string' && /^\d{1,2}-\d{1,2}$/.test(p.mattScore) ? p.mattScore : '';      // the best score against that Matt (card.dataOf mattScore, NOTES 183): under the level, where Your stats has the day
   text('lbp-mscore', msc ? `Best ${msc.replace('-', '\u2013')}` : ''); show('lbp-mscore', !!msc);
   const pl = $('lbp-places');      // the place numbers /api/player gave (never the values): one short line

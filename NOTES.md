@@ -4071,3 +4071,16 @@ strike pays the same scaled loss (forfeit path calls humanDelta too); a rowless 
 floors (Bronze..Platinum) and the 450 floor above still apply after the loss; tournaments use the same function. Copy: the Ranks page
 lead, How to play (3 places) and the changelog. No data or legal change. Tests: ladder.test.mjs (per-rank table, Pro bounds, sweep
 bounds -51..-3), trophies.test.mjs (Bronze losses -6, Silver -10, the forfeit run 30/29/27), menu.mjs Ranks copy.
+
+## 195. The menu's settings card no longer jumps left as it closes; "Highest Matt level passed", the level alone
+
+Two owner asks (2026-10-04):
+- "if i click and reopen setting panel in main menu quickly, i see it appear in the in-game left side spot." The menu placement
+  (right-aligned, solid, over the tiles) hung on `body[data-settings="menu"]`, and settings(false) deletes that attribute at once while
+  the card still fades out for 180 ms (`.settings[hidden]` + allow-discrete): for those 180 ms the card wore the court's layout, top left,
+  and a quick reopen caught it there. The placement, stacking and background now hang on the card's own `.settings.is-menu` (set at open,
+  kept through the close), so the fading card stays where it was. Measured: open left 954, mid-fade 955, quick reopen 962 (was ~14).
+- "change the text for the matt thing to say 'Highest Matt Level Passed' and remove the 'matt' postfix in the difficulty name": the heading
+  on Your stats and the public card reads Highest Matt level passed (the .caps style upper-cases it), and the level reads Pro, not Pro Matt
+  (profile.js drawMatt / openPlayer). The chips, the first-win toast ("First win against Tour Matt") and the share PNG's "Beat the Pro bot" are
+  as they were. Tests updated: profile-ui ('Club', 'Pro'), lb-profile-ui ('Pro').
