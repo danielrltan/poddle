@@ -104,6 +104,17 @@ export class MotionModel {
     this.startCalibration();
   }
 
+  // A kept calibration (NOTES 187): what a finished calibration is, as plain arrays, for storage; and the same put back. The world axes (B) and
+  // the hold frame (calib, holdQ, K) are in the sensor's own frame, whose 'up' is gravity and so lasts, but whose heading starts anywhere on each
+  // new phone page / helper session: after restore() the first sample re-aims it (recenter) as if the paddle were pointed at the screen then.
+  save() { return this.calibrated && this.B ? { calib: [...this.calib], holdQ: [...(this.holdQ || this.calib)], K: [...this.K], B: { R: [...this.B.R], U: [...this.B.U], F: [...this.B.F] } } : null; }
+  restore(d) {
+    const q4 = v => Array.isArray(v) && v.length === 4 && v.every(Number.isFinite), v3 = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+    if (!d || !q4(d.calib) || !q4(d.holdQ) || !q4(d.K) || !d.B || !v3(d.B.R) || !v3(d.B.U) || !v3(d.B.F)) return false;
+    this.calib = qnorm(d.calib); this.holdQ = qnorm(d.holdQ); this.K = qnorm(d.K); this.B = { R: [...d.B.R], U: [...d.B.U], F: [...d.B.F] }; this.yawFix = IDENT;
+    this.cal = { stage: 'done' }; this.calibrated = true; this.last = null; this.reaim = true;      // the next sample starts the filters and re-aims the heading
+    return true;
+  }
   setSidelineDeg(deg) { this.c.X_SIN = 3.0 / Math.sin(clamp(deg, 25, 90) * DEG); }
 
   startCalibration() {
@@ -139,6 +150,7 @@ export class MotionModel {
     s.arr = s.t + (o - this.off);                                     // arrival, on the sample clock
 
     if (!this.calibrated) { this._calibrate(s, ev); return ev; }
+    if (!this.last) { this._start(s); if (this.reaim) { this.reaim = false; this.recenter(); this._start(s); } ev.push({ type: 'restored' }); return ev; }      // a restored calibration (restore()): from this sample on, pointed at the screen
     let dt = s.t - this.last.t;
     if (dt <= 0) return ev;                                           // duplicate / out of order
     if (dt > 0.25) { this._start(s); return ev; }                     // stream gap: start clean

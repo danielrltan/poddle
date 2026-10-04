@@ -318,6 +318,18 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
 function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); mau.music(!MOBILE && (name === 'title' || name === 'lobby')); }      // the music is the title's and the lobby's: it fades out on the way to a court      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
 function openCourt() { screen(null); if (over) showOver(); padPhase(); }
+// A calibration is kept (NOTES 187): localStorage poddle.cal = { phone: {...}, airpod: {...} } (web/motion.js save / restore), one per kind of paddle, written when a
+// calibration finishes. From then on a seat opens straight onto the court, the paddle re-aimed at the screen from its first sample; a toast says C recalibrates. C,
+// a swap of paddle and the set-up screens are as before. Nothing is sent: it stays in this browser (privacy section 5).
+const CAL_KEY = 'poddle.cal', calStore = () => { try { const o = JSON.parse(ls.get(CAL_KEY)); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
+const padWord = () => (src === 'phone' ? 'phone' : 'AirPod');
+const sayRecal = () => setTimeout(() => { if (inPlay()) say(`C to recalibrate ${padWord()}`, null, 3200); }, 1400);      // after the court's first words (Matt's level, 'Your serve' comes later still)
+function keepCal() { if (!src) return; const d = model.save(); if (!d) return; const o = calStore(); o[src] = { ...d, at: Date.now() }; ls.set(CAL_KEY, JSON.stringify(o)); }
+function cachedCal() {                             // -> true: the kept calibration for this paddle is in the model, the seat is on the court
+  if (!src || !model.restore(calStore()[src])) return false;
+  if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); openCourt(); tellCal();
+  sayRecal(); return true;
+}
 function startCal() { if (undo) undo.kept = false; calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(); padPhase(); }
 // The server is told whether this seat is ON THE COURT, from what the player is looking at, never from the calibration flags: a calibration is kept
 // between courts, so 'calibrated' was true behind the share screen, the camera primer, the connect screen (the phone asleep) and the 'All set' card,
@@ -338,7 +350,7 @@ function begin() {                                 // seated: the camera primer 
   if (ls.get(CAM_KEY) !== 'skip') startCam();
   goOn();
 }
-function goOn() { if (stats.calibrated && airpodLive()) { phase = 'play'; openCourt(); } else if (airpodLive()) startCal(); else { screen('connect'); padPhase(); } }
+function goOn() { if (stats.calibrated && airpodLive()) { phase = 'play'; openCourt(); sayRecal(); } else if (airpodLive() && !cachedCal()) startCal(); else if (!airpodLive()) { screen('connect'); padPhase(); } }      // kept from the last court, or from the last visit (NOTES 187): straight onto the court, and a word about C
 function enterWatch() { phase = 'watch'; openCourt(); }      // a spectator: no AirPod, no bridge, no calibration, no camera. Lobby -> court.
 let pendT = 0;
 function settle() { pending = null; clearTimeout(pendT); ui.lobbyBusy(false); }
@@ -549,18 +561,18 @@ function onSample(sample, from) {
   // A phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: its replay may wait
   // longer when (only when) that happens (NOTES 35). The AirPod keeps its own limit.
   if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; model.c.RATE_GAIN = from === 'phone' ? PHONE_GAIN : 1; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
-    if (stats.calibrated) { stats.calibrated = false; if (phase === 'play') startCal(); } else if (phase === 'calibrate') startCal(); }
-  if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if (phase === 'play' || phase === 'calibrate') startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero
+    if (stats.calibrated) { stats.calibrated = false; if (phase === 'play' && !cachedCal()) startCal(); } else if (phase === 'calibrate' && !cachedCal()) startCal(); }      // the other paddle's kept calibration, if it has one
+  if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if ((phase === 'play' || phase === 'calibrate') && !cachedCal()) startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero (a kept calibration re-aims itself)
   lastT = sample.t;
   const power = Math.hypot(sample.r[0], sample.r[1], sample.r[2]);
   lastSample = performance.now();
   ui.setStat('pw', power.toFixed(1));
   if (phase === 'title') { if (power > 12) play(); return; }         // a swing presses Play. The model is not fed until calibration
   if (phase === 'lobby' || phase === 'watch' || phase === 'camera') return;      //  A spectator's AirPod is nobody's paddle. Behind the primer it only counts as live (airpodLive): its answer goes on to calibration
-  if (phase === 'connect') startCal();                              //  begins, so a bud lying on the desk cannot calibrate itself.
+  if (phase === 'connect' && !cachedCal()) startCal();              //  begins, so a bud lying on the desk cannot calibrate itself. Kept from before: the court (cachedCal)
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
-    else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal();
+    else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(); keepCal();
       // 'All set' arrives in this same batch: hold the green card long enough to be read, then open the court
       setTimeout(() => { if (phase !== 'play') return; openCourt();
         setTimeout(() => { if (inPlay() && state && state.serving === side) say('Your serve', null, 2600); }, 380); }, 900); }     // after the fade

@@ -3944,3 +3944,29 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
   with 28 px to spare before). At 700 px and under the lobby scrolls, so there the badge rides in the footer on its own centred row above
   the legal line instead of floating over the panels; the title keeps its corner. The camera / connect / calibrate set-up screens do not
   show it (decided without asking: they are steps into a match, not menu pages). No legal change (Privacy: "the badge in the menu").
+
+## 187. A calibration is kept: no recalibrating at the start of every game, and 'C to recalibrate phone / AirPod'
+- The owner: "make calibration easier. make it so it's cached in each game session that you play. and at the start of each game session, there will be
+  a quick notification that says 'C to recalibrate phone / airpod' whichever is being used ... that means u shouldn't have to recalibrate at the
+  start of each game."
+- Before: a calibration lasted a page visit (kept between courts, NOTES 170); a reload, a new visit, a phone page reloaded (its clock jumping
+  back) or a swap of paddle meant the three calibration steps again.
+- Now a finished calibration is kept in localStorage `poddle.cal` = { phone: {...}, airpod: {...}, each with `at` } (web/motion.js save():
+  calib, holdQ, K and the world axes B; restore() puts them back and checks every number). main.js keepCal() writes it on 'calibrated';
+  cachedCal() restores it wherever a calibration used to start: the seat taken with the paddle already streaming (goOn), the first sample on
+  the connect screen, a paddle swapped mid-game, a paddle whose clock went back. The seat then opens straight onto the court.
+- The heading problem: a phone page's deviceorientation (and the helper's AirPod frame) starts its yaw anywhere each session, while gravity
+  ('up') is the same. So a restored calibration re-aims itself from its first sample (motion.js: _start, recenter, _start again, event
+  'restored'), as if the paddle were pointed at the screen then. Pitch and roll are the kept ones. If the first sample caught the phone
+  pointed elsewhere, R recentres and C recalibrates, as ever.
+- The toast: 'C to recalibrate phone' or 'C to recalibrate AirPod' (sayRecal, by `src`), 1.4 s after the court opens so Matt's level toast
+  does not wipe it, on every court opened with a kept calibration (this visit's or a stored one). A fresh calibration's court says nothing
+  (the player just did it). C, the phone's C key and the swap flow are unchanged; a new calibration replaces the kept one for that paddle.
+- Edge cases: a kept calibration is per browser (localStorage), never sent; sign-in / guests alike; a spectator never calibrates; the primer
+  and connect screens still come first when the paddle is not streaming; Body mode's camera centre is taken as before (body.center()).
+  NOTES 170's rule holds: the server hears 'ready' only from a seat on the court.
+- Privacy section 5 lists `poddle.cal` (Last updated already today); CLAUDE.md's inventory too. Not an announcement: the toast answers the
+  court opening without the steps the player expected.
+- Tests: test/calkeep-e2e.mjs (new, CALKEEP_PORT, 6 checks: the key, a reload straight onto the court with the toast, the paddle drawn, C
+  replaces the kept one, the next court's toast). calstart-e2e (7) and the rest pass; revive-e2e's one red was its own regex (`/Updating/`
+  against 'Poddle is updating', since NOTES 157): now `/updating/i`.

@@ -34,6 +34,6 @@ ok(sa.code === CODE && sa.them === 'Ben' && sa.me !== 'Ben', `Ann is back in ${s
 ok(sb.code === CODE && sb.them === 'Ann', `Ben is back in ${sb.code} facing ${sb.them}`);
 ok(/brought back after a restart/.test(srv.log), 'the new server rebuilt the court from the first tab back');
 ok(![...sa.toasts, ...sb.toasts].some(t => /closed|not found/i.test(t)) && sa.screen === before.a && sb.screen === before.b && sa.link === 'live' && sb.link === 'live' && sa.overlay !== 'server-down' && sb.overlay !== 'server-down', `both are on the screen they were on, connected, and nobody saw "Court closed" or the server-down card (toasts: ${JSON.stringify([...new Set([...sa.toasts, ...sb.toasts])])})`);
-ok([...sa.toasts, ...sb.toasts].some(t => /Updating/.test(t)), 'they were told it was an update');
+ok([...sa.toasts, ...sb.toasts].some(t => /updating/i.test(t)), 'they were told it was an update');
 ok(new RegExp('court=' + CODE).test(sa.search), 'the address bar still carries the court');
 await browser.close(); srv.kill(); console.log(fails ? fails + ' FAILURES' : 'REVIVE E2E PASSED'); process.exit(fails ? 1 : 0);
