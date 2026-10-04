@@ -23,6 +23,9 @@ try {
   const ev = f => pg.evaluate(f), shot = async n => { if (SHOTS) await pg.screenshot({ path: `${SHOTS}/${n}.png` }); };
   const st = () => ev(() => ({ screen: document.body.dataset.screen, set: document.body.dataset.settings || null, open: !document.getElementById('settings').hidden, mau: window.__mau.state(), sfx: (window.__sfx || []).slice() }));
   await shot('1-title');
+  const foot = await ev(() => { const f = document.querySelector('#screen-title .menu-foot'), b = f.querySelector('.ph-badge'), fr = f.getBoundingClientRect(), br = b?.getBoundingClientRect();
+    return { tagline: /Any computer/.test(f.textContent), badge: !!b, inLobby: !!document.querySelector('#screen-lobby .ph-badge'), right: br ? Math.round(fr.right - br.right) : -1, mid: br ? Math.round((br.top + br.bottom) / 2 - (fr.top + fr.bottom) / 2) : 99 }; });
+  ok(!foot.tagline && foot.badge && !foot.inLobby && foot.right < 80 && Math.abs(foot.mid) <= 2, `title footer: no tagline, the Product Hunt badge at its right end, centred on the bar, not in the lobby (${JSON.stringify(foot)})`);
   ok(await ev(() => !!document.querySelector('#screen-title .foot-credit') && /Into the Blue by Gwamm Music/.test(document.querySelector('#screen-title .foot-credit').textContent)), 'the title credits the music');
 
   // the title's settings button: the card opens over the title, it does not start the game
@@ -84,7 +87,9 @@ try {
   await pg.keyboard.press('Escape'); await sleep(300); await pg.setViewport({ width: 1440, height: 900 }); await sleep(300);
 
   // Play a bot: on the way to the court the music fades out
-  await pg.click('#btn-bot'); await sleep(1200); await ev(() => document.getElementById('btn-bot-0').click()); await sleep(2500); s = await st();
+  await pg.click('#btn-bot'); await sleep(1200); await ev(() => { window.__sfx.length = 0; document.getElementById('btn-bot-0').click(); });
+  ok((await st()).sfx[0] === 'start', 'a difficulty in Play a bot plays the start sound');
+  ok(await ev(() => document.getElementById('btn-quick').dataset.sfx === 'start'), 'Quick play has the start sound'); await sleep(2500); s = await st();
   ok(s.screen !== 'lobby' && s.screen !== 'title' && !s.mau.want && !s.mau.playing, `leaving the menu for a court: the music stops (${JSON.stringify([s.screen, s.mau])})`);
   // Back from the set-up screen leaves the court: the music comes back in the lobby
   await pg.keyboard.press('Escape'); await sleep(2200); s = await st();

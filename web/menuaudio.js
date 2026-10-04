@@ -1,5 +1,5 @@
 // Menu sounds and menu music (NOTES 181). The game's own sounds stay in scene.js; this is the console-menu layer on top:
-// soft glassy plinks on hover, a bright two-note rise on select, the same falling on Back, blips for switches and steppers,
+// soft taps on hover, a two-note rise on select, a start sound for whatever starts a match, the same falling on Back, blips for switches and steppers,
 // all through a small airy reverb. Every voice is synthesised (no samples). The music is one looping track
 // ("Into the Blue" by Gwamm Music, credited in the title footer and the Terms), played on the title and the lobby only.
 //
@@ -32,31 +32,46 @@ export function menuAudio(getAc) {
     } catch { bus = null; return false; }
     return true;
   }
-  // a bell: the note, a soft octave over it, and a short glassy partial that gives the attack its "plink"
-  function bell(f, at, dur, g, glide = 1) {
+  // a bell: the note, a soft octave over it, and a short partial that gives the attack its tap. Pitched low and warm (NOTES 183: the owner
+  // found the first set, an octave higher with a glassy 3rd partial, far too high): the tap is a quiet 2nd partial now, never a 3rd
+  function bell(f, at, dur, g, glide = 1, type = 'sine') {
     const t = ac.currentTime + at;
-    for (const [mul, gg, d, type] of [[1, g, dur, 'sine'], [2, g * 0.22, dur * 0.6, 'sine'], [3.01, g * 0.14, 0.035, 'triangle']]) {
+    for (const [mul, gg, d, ty] of [[1, g, dur, type], [2, g * 0.16, dur * 0.5, 'sine'], [2, g * 0.08, 0.03, 'triangle']]) {
       const o = ac.createOscillator(), v = ac.createGain();
-      o.type = type; o.frequency.setValueAtTime(f * mul * glide, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.025);
-      v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(gg, t + 0.004); v.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.type = ty; o.frequency.setValueAtTime(f * mul * glide, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.025);
+      v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(gg, t + 0.005); v.gain.exponentialRampToValueAtTime(0.0001, t + d);
       o.connect(v); v.connect(bus); o.start(t); o.stop(t + d + 0.03);
     }
   }
+  function thump(f0, f1, at, dur, g) {                                     // a soft low drop under the start sound
+    const t = ac.currentTime + at, o = ac.createOscillator(), v = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
+    v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(g, t + 0.008); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(v); v.connect(bus); o.start(t); o.stop(t + dur + 0.03);
+  }
+  const C4 = 261.63, E4 = 329.63, G4 = 392, A4 = 440, C5 = 523.25, E5 = 659.25, G5 = 783.99;
   const VOICES = {
-    hover: () => bell(2093, 0, 0.07, 0.07, 0.94),                                 // C7, a breath of a plink
-    select: () => { bell(1318.5, 0, 0.16, 0.16, 0.97); bell(1975.5, 0.065, 0.32, 0.17, 0.97); },      // E6 -> B6
-    back: () => { bell(1567.98, 0, 0.14, 0.12, 1.03); bell(1046.5, 0.065, 0.26, 0.12, 1.03); },      // G6 -> C6
-    on: () => { bell(1046.5, 0, 0.09, 0.13, 0.8); bell(1567.98, 0.045, 0.2, 0.13); },
-    off: () => { bell(1567.98, 0, 0.09, 0.11, 1.15); bell(1046.5, 0.045, 0.18, 0.1); },
-    pick: () => bell(1760, 0, 0.18, 0.14, 0.92),
-    open: () => [1046.5, 1318.5, 1567.98, 2093].forEach((f, i) => bell(f, i * 0.035, 0.22, 0.08)),
-    close: () => [1567.98, 1318.5, 1046.5].forEach((f, i) => bell(f, i * 0.035, 0.18, 0.07)),
-    nope: () => { bell(370, 0, 0.09, 0.12); bell(370, 0.1, 0.12, 0.1); },
+    hover: () => bell(G5, 0, 0.06, 0.08, 0.96),                                   // a breath of a tap
+    select: () => { bell(C5, 0, 0.14, 0.2, 0.97); bell(G5, 0.06, 0.26, 0.2, 0.97); },      // C5 -> G5
+    back: () => { bell(G4, 0, 0.12, 0.17, 1.03); bell(C4, 0.06, 0.22, 0.17, 1.03); },      // G4 -> C4
+    on: () => { bell(C5, 0, 0.08, 0.17, 0.85); bell(G5, 0.045, 0.18, 0.17); },
+    off: () => { bell(G4, 0, 0.08, 0.15, 1.12); bell(C4, 0.045, 0.16, 0.15); },
+    pick: () => bell(E5, 0, 0.16, 0.18, 0.94),
+    open: () => { bell(E4, 0, 0.14, 0.12); bell(A4, 0.05, 0.24, 0.12); },
+    close: () => { bell(A4, 0, 0.12, 0.1); bell(E4, 0.05, 0.2, 0.1); },
+    nope: () => { bell(185, 0, 0.09, 0.2); bell(185, 0.1, 0.12, 0.17); },
+    // Quick play (and a difficulty in Play a bot): the "here we go" of starting a match. A low drop, a fast C major run up, and a ringing chord on top
+    start: () => {
+      thump(150, 62, 0, 0.32, 0.26);
+      [C4, E4, G4, C5].forEach((f, i) => bell(f, i * 0.045, 0.16, 0.16, 0.97, 'triangle'));
+      for (const f of [C5, E5, G5]) bell(f, 0.19, 0.75, 0.1, 1, 'triangle');
+      bell(1046.5, 0.19, 0.5, 0.06);
+    },
   };
   function play(kind, n) {
     if (muted || uiVol <= 0 || !init()) return;
     if (kind === 'hover') { const t = performance.now(); if (t - hoverAt < 45) return; hoverAt = t; }      // a sweep across a row of tiles is a patter, not a buzz
-    if (kind === 'step') { const i = Math.max(0, Math.min(10, n | 0)), f = 880 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12); bell(f, 0, 0.16, 0.14); return; }
+    if (kind === 'step') { const i = Math.max(0, Math.min(10, n | 0)), f = 440 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12); bell(f, 0, 0.16, 0.18); return; }
     VOICES[kind]?.();
   }
 

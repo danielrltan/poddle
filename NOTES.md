@@ -3905,3 +3905,17 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
   the badge (target _blank, noopener noreferrer, with the campaign's utm tags).
 - Privacy section 6 names Product Hunt the way it names GitHub and YouTube (reached only on a click, the picture served by us); Last updated and
   dateModified were already today's. Not an announcement: the owner asked for the badge itself.
+
+## 183. Lower menu sounds, a start sound for Quick play, and the title footer: no tagline, the Product Hunt badge at its right end
+- The owner: "the sfx are way too high pitched. lets lower things. then for the quick play button, it should have it's own sound"; and "get rid of
+  the stupid any computer, phone text on the home page ... include the product hunt button there ... its placed in a really awkward position".
+- menuaudio.js: every voice about an octave and a half lower (hover G5, select C5 -> G5, back G4 -> C4, switches C5/G5 and G4/C4, pick E5,
+  card open E4 -> A4 and close back down, the stepper from A4 up a pentatonic, nope 185 Hz), gains up a little to match loudness; the glassy
+  3.01x partial of the attack is gone (a quiet 2x tap instead).
+- `start` (new): a soft low drop (150 -> 62 Hz), a fast C major run C4 E4 G4 C5 and a ringing C major chord with a top C. On Quick play
+  (data-sfx="start") and, decided without asking, on the four Play a bot difficulties, which start a match the same way. Peaks ~-12.5 dBFS at
+  the default level, ~4 dB over select.
+- Title footer: the "Any computer, any phone, nothing to install" line is gone; one row, the links on the left and the Product Hunt badge
+  (moved from the lobby footer, where it floated between the legal line and the key hints; NOTES 182) on the right, on the bar's centre line.
+  At 700 px and under the links wrap centred and the badge sits under them, smaller. The lobby footer is back to the legal line and the keys.
+- No data or legal change (Privacy says "the badge in the menu": still true). test/menu-audio.mjs checks the footer and the start sound.
