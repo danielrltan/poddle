@@ -955,6 +955,10 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 /* the legal links (web/privacy.html, web/terms.html): quieter than How to play, but always there. .foot-links wraps as one unit on a phone */
 .foot-links{flex:none;display:inline-flex;align-items:center;gap:var(--s-4)}
 .foot-link.foot-legal{color:var(--ink-soft);font-weight:700}
+/* the Product Hunt badge in the lobby's footer (NOTES 179): 2.75rem tall, a lift on hover, out of the way of the keyhints */
+.ph-badge{flex:none;display:inline-flex;margin:0 var(--s-4);border-radius:.625rem;transition:transform var(--d-fast) var(--ease-bounce)} .ph-badge img{display:block;height:2.75rem;width:auto;border-radius:.625rem;box-shadow:var(--sh-1)}
+@media (hover:hover){ .ph-badge:hover{transform:translateY(-.125rem) scale(1.03)} } .ph-badge:focus-visible{outline:.1875rem solid var(--line);outline-offset:.125rem}
+@media (max-width:900px){ .ph-badge{display:none} }      /* a narrow window: the footer is the legal line and the keys */
 .foot-agree{font-size:max(13px,var(--t-xs));color:var(--ink-soft);line-height:1.35} .foot-agree .foot-link{font-size:inherit;font-weight:800}
 .menu-glass .menu-foot:has(.foot-agree){height:auto;min-height:3.5rem;padding-top:var(--s-3);padding-bottom:var(--s-3)}      /* the line may wrap: the bar grows with it, never clips it */
 @media (max-width:520px){ .foot-agree ~ .keyhints-inline{display:none} .foot-agree{flex:1;text-align:center} }      /* a phone has no Esc or F key: the legal line gets the whole bar */

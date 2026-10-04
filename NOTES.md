@@ -3890,3 +3890,15 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
   narrow window fits. SHOTS=<dir> saves screenshots.
 - Existing suites, each run alone and against main (64119ed): menu.mjs and ui-next.mjs fail exactly main's assertions (ui-next's settings-row
   and Tab-order lists now also name Music and Menu sounds); camprimer.mjs and seo.test.mjs pass.
+
+## 179. The Product Hunt badge in the main menu
+- The owner pasted Product Hunt's "FIND US ON Product Hunt" embed (post 1269060) and asked for it "in the main game menu at all times". It sits in
+  the lobby's footer, between the legal line and the key hints, on every lobby view (home, Courts, Your stats, the bracket...); 2.75rem tall, a
+  lift on hover, hidden under 900px where the footer has no room. Not on the title screen or the set-up screens.
+- The embed's picture is live (it carries the upvote count), so it is not vendored as a static file. But a picture loaded from
+  api.producthunt.com would send every visitor's address to Product Hunt on every menu. So server/game.js serves it as /ph-badge.svg from its
+  own cache: fetched from Product Hunt at most every ten minutes (4 s timeout, checked to be an svg under 50 KB with no script), the last good
+  copy meanwhile, web/ph-badge.svg (a copy taken 2026-10-04) if it has never answered. The player's browser reaches Product Hunt only by clicking
+  the badge (target _blank, noopener noreferrer, with the campaign's utm tags).
+- Privacy section 6 names Product Hunt the way it names GitHub and YouTube (reached only on a click, the picture served by us); Last updated and
+  dateModified were already today's. Not an announcement: the owner asked for the badge itself.
