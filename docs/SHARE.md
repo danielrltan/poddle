@@ -94,10 +94,10 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
   trophies). The emblem artwork is hashed with `CARD_V`, so a redrawn emblem is a new picture URL (NOTES 114).
 - The Matt badge: the toughest Matt beaten in difficulty order (Rookie, Club, Tour, Pro; wire 0, 1, 3, 2), level colour
   as web/ui.css .st-matt (Rookie #3ecf72, Club #3aa0ff, Tour #a77bf3, Pro gold), or nothing if none.
-- The stats (NOTES 145, CARD_V 9; the owner's ask: "your winrate, time on court, etc. top win streak, etc."): the SAME eleven
+- The stats (NOTES 145, CARD_V 10; the owner's ask: "your winrate, time on court, etc. top win streak, etc."): the SAME eleven
   figures on every card, in the same places, zeros included (the owner's earlier rule: no selective stats, cards compare at
   a glance). `-` (drawn as a grey en dash) only where there is nothing to divide or measure yet, never for a real zero.
-  Three headline tiles (white, big figures, a note under each):
+  The three headline figures (`hero`, each with its note; the leaderboard profile sheet draws them as tiles):
   - WIN RATE: `human.wins / (human.wins + human.losses)`, rounded %: every counted match against a person (kinds `human`
     and `tour`, db.js HUMAN; tournament games against Matt are `tourbot` and go to the Matt rows). Note: the record,
     `31-12 vs people` (en-US commas; `0-0 vs people` and a `-` rate when no person was played).
@@ -106,15 +106,22 @@ Stop sharing deletes the row; sharing again makes a NEW slug (old links die). On
   - BEST STREAK: `human.bestStreak`, people only: the global leaderboard's Win streak board (the card and the board
     agree). Until CARD_V 8 it was the best of people and every Matt rung; Matt now shows only as the badge. Note:
     `wins vs people` (`win` at 1).
-  Then one well of eight, four across: RETURNS (`min(returns, chances) / chances`), POINTS WON (`pointsWon / (pointsWon +
-  pointsLost)`, every kind, Your stats' Points won), RALLY (best rally, `hits`), SWING (fastest swing in deg/s rounded to
-  10, `°/s`), WINNERS, ACES, SMASHES, TITLES (tournament titles). Counts carry en-US commas. The return-rate bar is gone.
-  Digits draw at full size, `%`, `h`, `m` and the units smaller. The leaderboard profile sheet (api.js publicCard) sends the
-  same eleven as `{ label, tag, value, unit?, note?, hero? }` (`note`, never `sub`: the leak check keeps `"sub"` for
-  Google's id) and draws the three headline tiles over the eight.
-- The brand: the Poddle wordmark/ball, "poddleball.com", a plain call to action ("Play free at poddleball.com" over "Pickleball in your browser · your phone is the paddle"; no taunt line, NOTES 118).
-- The look: the game's bright sky/court palette, chunky rounded type (M PLUS Rounded 1c 800/900), gold accents,
-  crisp at 1200x630 and legible when a chat app shrinks it to ~400 px wide. It has to make people want to click.
+  Then eight more: RETURNS (`min(returns, chances) / chances`), POINTS WON (`pointsWon / (pointsWon + pointsLost)`, every
+  kind, Your stats' Points won), RALLY (best rally, `hits`), SWING (fastest swing in deg/s rounded to 10, `°/s`), WINNERS,
+  ACES, SMASHES, TITLES (tournament titles). Counts carry en-US commas. Digits draw at full size, `%`, `h`, `m` and the
+  units smaller. The leaderboard profile sheet (api.js publicCard) sends the same eleven as `{ label, tag, value, unit?,
+  note?, hero? }` (`note`, never `sub`: the leak check keeps `"sub"` for Google's id). card.dataOf also carries `wl` (the
+  W and L) and `ret` (returns / chances, 0..1) for the card's own strip and ring; publicCard leaves them out.
+- The look (CARD_V 10, NOTES 193): the card IS the public profile card (web/index.html #lbp-card, Your stats' layout, NOTES 164)
+  drawn at 1200x630 with web/ui.css's tokens at 1rem = 24px, so a card in a chat looks like the game. Over the game's sky, a
+  .panel-sm: the name (a guest's "Poddle player" in grey) with the ball and `poddleball.com` small in the top-right corner (the
+  whole brand: no wordmark, no tagline, no call-to-action bar); the hero well (the emblem on its rank-coloured halo, the rank as
+  Your stats writes it, the trophies with the cup icon) beside the Matt tile (the disc in the level's colour with the Matt face,
+  HARDEST LEVEL BEATEN, "Tour Matt" / "None yet", the best score under it as "Best 11–7" (NOTES 192), in gold with the gold rings when flawless); the people strip (the
+  people icon, W in blue and L in orange, the won/lost bar with "72% won" under it, the Best (flame) streak chip); the play row
+  (the return ring with its arrow, RETURN RATE, then WINNERS, ACES, SMASHES, POINTS WON, ON COURT as the page's figs); and the
+  three tiles (TOURNAMENTS WON, LONGEST RALLY, FASTEST SWING) with their badge icons. The same icons as the page, from
+  web/index.html. Legible when a chat app shrinks it to ~400 px wide: the big figures carry it.
 
 **Rendering**: SVG string -> PNG with `@resvg/resvg-js` (add to dependencies; package-lock.json MUST contain the
 `@resvg/resvg-js-linux-x64-musl` entry: the Docker image is node:24-alpine — check the lockfile text). resvg cannot read

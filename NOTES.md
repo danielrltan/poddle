@@ -4038,3 +4038,17 @@ difficulty the player beat?" Only the margin was kept (bot_record.best_margin), 
 - Tests: accounts-unit (the write rule 11-4 over 11-9, the fold, a v1 file's margin-only row reads 11-3 and a later 12-10 leaves it),
   share.test (mattScore on the data and the SVG, a nonsense score dropped), lb-profile-ui (Dan "Best 11–0", Juno none; a screenshot
   test/ui-shots/accounts/lbp-card-dan-1280x800.png; 39 checks).
+
+## 193. The share card is the profile card
+- "It looks super fugly and inconsistent to the game UI": the share card (server/card.js svgOf, CARD_V 10) is redrawn as the
+  public profile card's layout (web/index.html #lbp-card, Your stats' sections, NOTES 164) at 1200x630, web/ui.css's tokens
+  at 1rem = 24px: the panel over the sky, the hero well (emblem on its rank-coloured halo, "Platinum III" in the player's
+  blue as the page writes it, the trophies with the cup icon), the Matt tile (the level's disc with the Matt face, HARDEST
+  LEVEL BEATEN, "Tour Matt" / "None yet", the best score as "Best 11–7" under it (the peer's NOTES 192, in gold when flawless, with the gold rings), the people strip (the people icon,
+  W blue and L orange, the won/lost bar with "72% won", the Best (flame) chip), the play row (the return ring and arrow, then
+  Winners, Aces, Smashes, Points won, On court as figs) and the three tiles with their badge icons. The same icons as the page.
+- The wordmark, the PICKLEBALL tagline and the big blue "Play free at poddleball.com" bar are gone ("no need for the CTA
+  button to be that large"): the brand is the ball and `poddleball.com`, small, in the top-right corner.
+- card.dataOf gains `wl` and `ret` (the W-L numbers and the ring's fraction); api.js publicCard picks its fields by name and
+  sends neither. share.test checks the rank as the page writes it ("Silver II", not capitals) and "Rookie Matt" + "11-0".
+  docs/SHARE.md 2 describes the new look. test/ui-shots/share/ re-rendered. Nothing new is stored or sent (privacy page unchanged).
