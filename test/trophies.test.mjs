@@ -218,10 +218,10 @@ report(await Promise.all([
   sc('10. four forfeits by one pair in a day: the fourth pays the stayer 0 (pair_cap counts paid forfeit wins), the leaver still pays', async t => {
     const got = [];
     for (let k = 1; k <= 4; k++) { const [a, b] = await pair({ who: 'pam' }, { who: 'quin' }); hit(a); still(b); await struck(a); b.send({ type: 'leave' }); await over(a); const pa = await prof(a); got.push(pa && pa.trophies); bye(a, b); await wait(200); }
-    t.ok(J(got.slice(0, 3).map(x => x && x.delta)) === J([30, 29, 27]) && got.slice(0, 3).every(x => x.counted === true), `the first three forfeit wins pay, the gap growing each time: ${J(got.slice(0, 3).map(x => x && x.delta))} (30, 29, 27)`);
-    t.ok(got[3] && got[3].delta === 0 && got[3].counted === false && J(got[3].why) === J(['left_early']) && got[3].trophies === 186, `the fourth: +0, why left_early (pair_cap, R10 sees the three paid rows): ${J(got[3])}`);
+    t.ok(J(got.slice(0, 3).map(x => x && x.delta)) === J([30, 29, 26]) && got.slice(0, 3).every(x => x.counted === true), `the first three forfeit wins pay, the gap growing each time and the third from Silver I (winOf 29, NOTES 203): ${J(got.slice(0, 3).map(x => x && x.delta))} (30, 29, 26)`);
+    t.ok(got[3] && got[3].delta === 0 && got[3].counted === false && J(got[3].why) === J(['left_early']) && got[3].trophies === 185, `the fourth: +0, why left_early (pair_cap, R10 sees the three paid rows): ${J(got[3])}`);
     const lp = await ladderOf('pam'), lq = await ladderOf('quin');
-    t.ok(lp && lp.trophies === 186 && lp.wins === 4 && lq && lq.trophies === 78 && lq.losses === 4, `Pam 100 -> 186 (three paid), Quin 100 -> 78 (four Bronze losses: 6, 6, 5, 5): ${J([lp && lp.trophies, lq && lq.trophies])}`);
+    t.ok(lp && lp.trophies === 185 && lp.wins === 4 && lq && lq.trophies === 78 && lq.losses === 4, `Pam 100 -> 185 (three paid), Quin 100 -> 78 (four Bronze losses: 6, 6, 5, 5): ${J([lp && lp.trophies, lq && lq.trophies])}`);
     t.ok((lastMatch(await exportOf('pam')) || {}).reasons?.includes('pair_cap') && lastMatch(await exportOf('quin'))?.trophyDelta === -5, 'the fourth row carries pair_cap and the leaver\'s -5');
   }),
   sc('11. an eligible opponent without a ladder row counts as gap 0 for the one with a row; the newcomer reads the real gap', async t => {
