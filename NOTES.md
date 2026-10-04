@@ -4250,7 +4250,11 @@ u watch it increase in real time ... exponentially in speed".
   fifth each (150 ms down to 25, so +45 is over in about two seconds), each on its own rising arc (Web Animations, 560 ms) with a soft
   'lift'; as each lands the card adds its share, bumps and pings ('arrive', up the scale), and the bar and the emblem follow the climbing
   count (rankAt: the floors mirrored from ladder.js), so a division or rank is seen to turn over; the last cup brings a pop with a gold
-  glow and the 'land' chord, then drawChip draws the card whole. A loss counts down in place. Leaving the lobby mid-flight (screen())
+  glow and the 'land' chord, then drawChip draws the card whole.
+  Same day, the owner: "it should say + xx number of trophies. the trophies should hover there for a sec so player can read, then the
+  text fades and then the trophies fly over. make them like 50% bigger too": the cups (2.25rem on the lobby, half as big again) first gather
+  in rows over Quick play, bobbing (.trophy-fly.is-hover), under a big white "+38" outlined in gold at the button's top edge (.trophy-haul);
+  after a second the label fades upward and the cups leave from where they hover, in the same accelerating order. A loss counts down in place. Leaving the lobby mid-flight (screen())
   lands everything at once. Nothing the first time the card shows, without a username, or with reduced motion.
 - Hooks: profile.init takes sfx and cupSvg (ui.cupSvg: the gold cup markup). Tests: ladder.test; ui-next's match-trophies and
   profile-ui's chip checks read the real digits and the final count, so they pass as before.

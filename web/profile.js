@@ -586,22 +586,31 @@ export function landed() {
     for (let i = 1; i <= N; i++) flyT.push(setTimeout(() => { draw(from + (up ? i : -i)); bump(); if (N <= 12 || i % 2 === 0) h.sfx?.('tick', up ? Math.round(10 * i / N) : Math.round(4 * (1 - i / N))); if (i === N) done(); }, 500 + T * Math.pow(i / N, 0.6)));
     return;
   }
-  const FLIGHT = 560; let t = 650, gap = 150;      // the first cup leaves once the home has settled (toLobby calls this as the screen comes in); the gaps between launches shrink by a fifth each time
+  // the haul shows itself first (the owner, 2026-10-04): the cups hover in a loose cluster over Quick play under a big "+38", for a second, so it can be
+  // read; the label fades, then the cups leave from where they hover, faster and faster (the gaps shrink by a fifth each: 150 ms down to 25)
+  const FLIGHT = 560, HOLD = 1000, cups = [], sr = src.getBoundingClientRect(), tag = mk('b', 'trophy-haul', `+${d.toLocaleString('en-US')}`); tag.setAttribute('aria-hidden', 'true');
+  tag.style.left = sr.left + sr.width / 2 + 'px'; tag.style.top = sr.top + 8 + 'px'; document.body.append(tag); chipFly.nodes = [tag];
+  for (let i = 0; i < n; i++) { const c = hoverCup(sr, i, n); if (c) { cups.push(c); chipFly.nodes.push(c); } }
+  flyT.push(setTimeout(() => tag.classList.add('is-gone'), HOLD)); flyT.push(setTimeout(() => tag.remove(), HOLD + 400));
+  let t = HOLD + 350, gap = 150;
   for (let i = 0; i < n; i++) {
-    const at = t; flyT.push(setTimeout(() => { launchCup(src, nEl, i); h.sfx?.('lift', i); }, at));
+    const at = t; flyT.push(setTimeout(() => { launchCup(cups[i], nEl, i); h.sfx?.('lift', i); }, at));
     flyT.push(setTimeout(() => { chipFly.cur += share[i]; draw(chipFly.cur); bump(); h.sfx?.('arrive', Math.round(10 * (i + 1) / n)); if (i === n - 1) done(); }, at + FLIGHT));
     t += gap; gap = Math.max(25, gap * 0.8);
   }
 }
-function launchCup(src, dst, i) {      // one gold cup from the middle of Quick play to the card's count, on a rising arc, gone as it lands
-  const a = src.getBoundingClientRect(), b = dst.getBoundingClientRect(); if (!a.width || !b.width) return;
-  const x0 = a.left + a.width / 2 + (Math.random() - 0.5) * a.width * 0.4, y0 = a.top + a.height / 2 + (Math.random() - 0.5) * a.height * 0.4, x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
-  const c = mk('i', 'trophy-fly'); c.innerHTML = h.cupSvg ? h.cupSvg() : ''; c.setAttribute('aria-hidden', 'true'); c.style.left = x0 + 'px'; c.style.top = y0 + 'px'; document.body.append(c);
+function hoverCup(a, i, n) {      // one cup of the cluster over Quick play: a spot in a wide ellipse over the button, bobbing gently until it leaves
+  const cols = Math.min(n, 8), row = Math.floor(i / cols), col = i % cols, x = a.left + a.width * (0.18 + 0.64 * (cols === 1 ? 0.5 : col / (cols - 1))) + (Math.random() - 0.5) * 14, y = a.top + a.height * 0.46 + row * 36 + (Math.random() - 0.5) * 12;
+  const c = mk('i', 'trophy-fly is-hover'); c.innerHTML = h.cupSvg ? h.cupSvg() : ''; c.setAttribute('aria-hidden', 'true'); c.style.left = x + 'px'; c.style.top = y + 'px'; c.style.animationDelay = `${-(i * 137) % 900}ms`; document.body.append(c); return c;
+}
+function launchCup(c, dst, i) {      // the cup leaves its hover for the card's count on a rising arc, gone as it lands
+  if (!c || !c.isConnected) return; const b = dst.getBoundingClientRect(); if (!b.width) return;
+  const x0 = parseFloat(c.style.left), y0 = parseFloat(c.style.top), x1 = b.left + b.width / 2, y1 = b.top + b.height / 2; c.classList.remove('is-hover');
   const cx = (x0 + x1) / 2 + (Math.random() - 0.5) * 120, cy = Math.min(y0, y1) - 90 - Math.random() * 60, pts = [];
-  for (let k = 0; k <= 12; k++) { const t = k / 12, u = 1 - t, x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1; pts.push({ transform: `translate(${(x - x0).toFixed(1)}px, ${(y - y0).toFixed(1)}px) scale(${(1.5 - 0.7 * t).toFixed(2)}) rotate(${(i % 2 ? 1 : -1) * 25 * (1 - t)}deg)`, opacity: t < 0.9 ? 1 : (1 - t) / 0.1 }); }
+  for (let k = 0; k <= 12; k++) { const t = k / 12, u = 1 - t, x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1; pts.push({ transform: `translate(${(x - x0).toFixed(1)}px, ${(y - y0).toFixed(1)}px) scale(${(1.2 - 0.6 * t).toFixed(2)}) rotate(${(i % 2 ? 1 : -1) * 25 * (1 - t)}deg)`, opacity: t < 0.9 ? 1 : (1 - t) / 0.1 }); }
   const an = c.animate(pts, { duration: 560, easing: 'cubic-bezier(.3,0,.7,1)', fill: 'forwards' }); an.onfinish = () => c.remove(); setTimeout(() => c.remove(), 900);
 }
-export function chipStop() { if (!chipFly) return; for (const t of chipFly.timers) clearTimeout(t); chipFly = null; for (const c of document.querySelectorAll('.trophy-fly')) c.remove(); chipShown = meLadder ? meLadder.trophies : null; drawChip(); }      // the lobby left mid-flight: the card is drawn whole
+export function chipStop() { if (!chipFly) return; for (const t of chipFly.timers) clearTimeout(t); chipFly = null; for (const c of document.querySelectorAll('.trophy-fly, .trophy-haul')) c.remove(); chipShown = meLadder ? meLadder.trophies : null; drawChip(); }      // the lobby left mid-flight: the card is drawn whole
 function drawAcct() {
   const en = on && me.enabled, a = en ? me.account : null, name = a && a.username;
   show('btn-pf-signin', en && !a); show('btn-pf-signout', !!a); show('btn-pf-rename', !!a); show('btn-pf-share', on && shareable); show('pf-acct', en || (on && shareable));      // Share card shows with sign-in off too
