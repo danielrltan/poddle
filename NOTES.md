@@ -3988,3 +3988,6 @@ not: the public card and the share card carried the toughest Matt's name only. N
 - Tests: share.test (dataOf: mattFlawless by the toughest level's margin, the SVG's 11-0), lb-profile-ui (Dan's Pro ring + tooltip, Juno
   none and no stale tip; 39 checks), profile-ui (badge gold only when the toughest level is the flawless one). share.test's five PNG checks
   and profile-ui's layout checks fail the same on untouched main here (no resvg in the shared node_modules; a peer's header change).
+## 189. The Product Hunt badge sits right in the corner
+- The owner: "the prod hunt button isnt exactly in the corner; it has a bit extra space to its right side". It was s-7 (~3 rem) in from the right;
+  now var(--edge), the HUD's own distance from the window edge, so it lines up with the title's settings button (17 px at 1440 wide). Looks only.
