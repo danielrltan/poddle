@@ -955,7 +955,7 @@ body:not([data-screen="hud"]) .hold-card{display:none}                /* the tit
 /* the legal links (web/privacy.html, web/terms.html): quieter than How to play, but always there. .foot-links wraps as one unit on a phone */
 .foot-links{flex:none;display:inline-flex;align-items:center;gap:var(--s-4)}
 .foot-link.foot-legal{color:var(--ink-soft);font-weight:700}
-/* the Product Hunt badge in the lobby's footer (NOTES 179): 2.75rem tall, a lift on hover, out of the way of the keyhints */
+/* the Product Hunt badge in the lobby's footer (NOTES 182): 2.75rem tall, a lift on hover, out of the way of the keyhints */
 .ph-badge{flex:none;display:inline-flex;margin:0 var(--s-4);border-radius:.625rem;transition:transform var(--d-fast) var(--ease-bounce)} .ph-badge img{display:block;height:2.75rem;width:auto;border-radius:.625rem;box-shadow:var(--sh-1)}
 @media (hover:hover){ .ph-badge:hover{transform:translateY(-.125rem) scale(1.03)} } .ph-badge:focus-visible{outline:.1875rem solid var(--line);outline-offset:.125rem}
 @media (max-width:900px){ .ph-badge{display:none} }      /* a narrow window: the footer is the legal line and the keys */

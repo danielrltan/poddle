@@ -12,7 +12,7 @@ const HOSTED = !!process.env.FLY_APP_NAME;                        // on Fly: the
 // The same port also serves web/ over plain HTTP, so a hosted copy (fly.io) is one process behind one address:
 // the page loads from https://<app>/ and its game socket is wss://<app>/. Locally nothing changes.
 const WEB = path.join(__dirname, '..', 'web');
-// The Product Hunt badge in the menu (NOTES 179): the live picture (it carries the upvote count) is fetched by THIS server every ten minutes and
+// The Product Hunt badge in the menu (NOTES 182): the live picture (it carries the upvote count) is fetched by THIS server every ten minutes and
 // served as /ph-badge.svg, so visitors never contact Product Hunt until they click. Unreachable (or odd): the last good copy, else web/ph-badge.svg
 const PH_BADGE = 'https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1269060&theme=light', ph = { body: null, at: 0, pending: null };
 function phBadge() {
@@ -53,7 +53,7 @@ const httpServer = http.createServer((req, res) => {
   if (rel === '/status.json') { let pl = 0, sp = 0; for (const c of wss.clients) if (c.room) (c.spec ? sp++ : pl++);      // who a restart would interrupt (deploy.sh reads it)
     const body = JSON.stringify({ courts: rooms.size, tours: tourneys.size, playing: pl, watching: sp, online: wss.clients.size - pads.size, phones: pads.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
-  if (rel === '/ph-badge.svg') return void phBadge().then(body => { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=600', 'Content-Length': Buffer.byteLength(body) }); res.end(req.method === 'HEAD' ? undefined : body); });      // the Product Hunt badge (NOTES 179), from our cache: the player's browser never calls Product Hunt
+  if (rel === '/ph-badge.svg') return void phBadge().then(body => { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=600', 'Content-Length': Buffer.byteLength(body) }); res.end(req.method === 'HEAD' ? undefined : body); });      // the Product Hunt badge (NOTES 182), from our cache: the player's browser never calls Product Hunt
   if (rel === '/404.html') return notFound(req, res);
   if (rel.startsWith('/c/')) return void share.page(req, res, rel, notFound).catch(() => {});   // a share link's page and card picture (server/share.js; docs/SHARE.md 2), never a file
   if (MENU_PATHS.has(rel)) rel = '/index.html';

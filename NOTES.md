@@ -3891,7 +3891,7 @@ statements are back before the comment. trophies.test and tourney.test pass; liv
 - Existing suites, each run alone and against main (64119ed): menu.mjs and ui-next.mjs fail exactly main's assertions (ui-next's settings-row
   and Tab-order lists now also name Music and Menu sounds); camprimer.mjs and seo.test.mjs pass.
 
-## 179. The Product Hunt badge in the main menu
+## 182. The Product Hunt badge in the main menu
 - The owner pasted Product Hunt's "FIND US ON Product Hunt" embed (post 1269060) and asked for it "in the main game menu at all times". It sits in
   the lobby's footer, between the legal line and the key hints, on every lobby view (home, Courts, Your stats, the bracket...); 2.75rem tall, a
   lift on hover, hidden under 900px where the footer has no room. Not on the title screen or the set-up screens.
