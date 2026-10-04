@@ -4,14 +4,15 @@ import WebSocket from 'ws';
 const PORT = +process.env.TEST_PORT || 8145, proc = spawn('node', ['server/game.js'], { env: { ...process.env, PORT } });
 await new Promise(r => setTimeout(r, 700));
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
-function human(skill = 1) {
-  const ws = new WebSocket('ws://localhost:' + PORT), h = { ws, side: null, info: null, hits: [0, 0], points: null, msgs: {} };
+function human(skill = 1, cid = null) {      // cid: a lobby socket (a real court, with stats) instead of the LOCAL game
+  const ws = new WebSocket('ws://localhost:' + PORT + (cid ? `/?lobby=1&cid=${cid}` : '')), h = { ws, side: null, info: null, hits: [0, 0], points: null, msgs: {} };
   let cool = 0;
   ws.on('message', raw => { const m = JSON.parse(raw); h.msgs[m.type] = (h.msgs[m.type] || 0) + 1;
     if (m.type === 'welcome') h.side = m.side;
     if (m.type === 'botinfo') h.info = m;
     if (m.type === 'hit') h.hits[m.side === h.side ? 0 : 1]++;
     if (m.type === 'point') h.points = m.score;
+    if (m.type === 'state' && Array.isArray(m.score)) h.score = m.score;
     if (m.type === 'state' && h.side != null) {
       ws.send(JSON.stringify({ type: 'paddle', auto: true, q: [0, 0, 0, 1] }));
       const me = m.paddles[h.side], s = h.side === 0 ? 1 : -1;
@@ -36,6 +37,20 @@ a.ws.send(JSON.stringify({ type: 'bot', level: 3 })); await wait(300); ok(a.info
   const btw = (c, t, p) => (c <= t && t <= p) || (p <= t && t <= c), out = ['react', 'foot', 'err', 'reach', 'place', 'lob', 'slice', 'whiff'].filter(k => !btw(B.Club[k], B.Tour[k], B.Pro[k])).concat([0, 1].filter(i => !btw(B.Club.power[i], B.Tour.power[i], B.Pro.power[i])).map(i => 'power' + i));
   ok(B.Club && B.Tour && B.Pro && !out.length, `every Tour stat lies between Club's and Pro's${out.length ? ': not ' + out : ''}`); }
 a.ws.send(JSON.stringify({ type: 'bot', level: 0 })); await wait(300); ok(a.info.name === 'Rookie', 'key 1 sets ' + a.info.name);
+// a level change after the first strike: the match counts at the easiest level played (botinfo.counted), and picking the level already on
+// again restarts the match at 0-0, counted at that level (NOTES 202). In a real court: the LOCAL game above keeps no stats, so nothing counts there
+const r = human(1, 'r1'); await wait(400); r.ws.send(JSON.stringify({ type: 'create', public: false })); await wait(400); r.ws.send(JSON.stringify({ type: 'bot', level: 1 })); await wait(400);
+ok(r.side != null && r.info && r.info.active && r.info.name === 'Club' && r.info.counted === undefined, `a private court against Club Matt, nothing to count yet: ${JSON.stringify(r.info)}`);
+r.ws.send(JSON.stringify({ type: 'bot', level: 0 })); await wait(300); ok(r.info.name === 'Rookie' && r.info.counted === undefined, 'a change before the first strike is free (no counted)');
+await wait(8000); ok(r.served >= 1, `the court's first strike (served ${r.served}x)`);
+r.ws.send(JSON.stringify({ type: 'bot', level: 2 })); await wait(300); ok(r.info.name === 'Pro' && r.info.counted === 0 && !r.info.reset, `Pro now, counted at Rookie (botinfo.counted): level ${r.info.level}, counted ${r.info.counted}`);
+r.ws.send(JSON.stringify({ type: 'bot' })); await wait(300); ok(r.info.name === 'Rookie' && r.info.counted === 0 && !r.info.reset, `B walks on to Rookie, still counted at Rookie: ${r.info.name} ${r.info.counted}`);
+r.ws.send(JSON.stringify({ type: 'bot', level: 2 })); await wait(300); const sc0 = r.score ? r.score[0] + r.score[1] : 0;
+r.ws.send(JSON.stringify({ type: 'bot', level: 2 })); await wait(400);
+ok(r.info.reset === true && r.info.name === 'Pro' && r.info.counted === undefined && r.score && r.score[0] + r.score[1] === 0, `Pro again: the match restarts at 0-0 (had ${sc0} points) counted at Pro: reset ${r.info.reset}, counted ${r.info.counted}, score ${r.score}`);
+r.ws.send(JSON.stringify({ type: 'bot', level: 2 })); await wait(300); ok(r.info.reset !== true && r.info.counted === undefined, 'Pro once more, with no change since: nothing to reset');
+const h2 = [...r.hits]; await wait(10000); ok(r.hits[1] > h2[1], `Pro plays on after the restart (${r.hits[1] - h2[1]} returns in 10s)`);
+r.ws.close();
 const h0 = [...a.hits]; await wait(10000); ok(a.hits[1] > h0[1], `Rookie still returns balls (${a.hits[1] - h0[1]} in 10s)`);
 const b = human(); await wait(1500); ok(a.info && !a.info.active, 'second human replaced the bot');
 a.ws.send(JSON.stringify({ type: 'bot' })); await wait(300); ok(a.info.reason, 'B with two humans explains itself: ' + a.info.reason);

@@ -4190,3 +4190,35 @@ row, through ui.js's 'bot' handler). It never fades. ui.js setBot shows it and c
 measures it under the right tab (under the whole board on a window up to 760 px wide, clear of the insets) and again on a resize. Gone
 with the scoreboard under a result overlay or a menu screen, and while the settings card is open (that card has its own row).
 The key hint and the settings row stay. Screens: test/ui-shots/next-05-hud-matt-*.png (spectate-e2e).
+
+
+## 202. A difficulty change mid-match says how the match counts, and the level again restarts it at 0-0; the share card's Matt label fits
+The owner (2026-10-04): "u can just change difficulty while playing matt and easily win pro mode"; then, told that a match already counts at
+the easiest level played (docs/ACCOUNTS.md 4.6, R13): "what if someone played one ball and they wanted to reset? maybe put a reset option
+once they change difficulty so they can reset the score and count it. then send confirmation; game reset, this game will be tracked for
+completion against Pro difficulty (make it more concise sounding than that though)". And: "on the sharing score card, it says 'highest matt
+level passed' but it goes off the card. maybe just make it say highest matt level? and shrink to fit too."
+- The exploit was already closed by 4.6 (Rookie 10-0, then Pro for the last point: recorded as a Rookie win, flagged level_changed), but the
+  player only learned that on the result card ("Counted at the easiest level you played"). Now the court says so at the change, and offers
+  the way out.
+- Server (botRequest): `botinfo` carries `counted` (the wire level the match is recorded at) once the level moved after the first strike
+  (`levelMoved()`: Matt seated, a live stats match with t0, levelChanged). A 'bot' request for the level ALREADY ON while levelMoved: the
+  match restarts (startMatch: 0-0, a fresh stats match at that level, the 3-2-1 again) and the botinfo says `reset: true`. The match under
+  way is dropped unrecorded, exactly as leaving it would be (record(): no row for leaving Matt), so nothing new can be dodged. Before the
+  first strike a change stays free and the level again does nothing. B still walks the order; the LOCAL legacy game keeps no match, so no
+  counted/reset there (test/bot.test.mjs's new cases run in a private court).
+- Client (main.js): on a change mid-match the toast reads `Matt · Pro · counts as Rookie · 4 again restarts at 0-0` (4.6 s; the key when
+  picked by key or B, the level's name when picked on the Settings card: `botVia`). Counted = current (Pro, then back to Rookie) says only
+  `Matt · Rookie`. On the restart: `0-0 · counts as Pro` (2.4 s). Spectators get neither line (their scoreboard shows the score and level).
+  The toast sits at z 24, above the Settings card (19-20), so a panel pick sees it.
+- Share card (server/card.js): the Matt tile's caption read HIGHEST MATT LEVEL PASSED at 19.5 px tracked .16em: 367 px into a 312 px slot,
+  off the tile. It now reads "Highest Matt level" (266 px) and shrinks by half-pixel steps to the slot if the fonts ever measure wider
+  (floor 13). Your stats and the public card keep "Highest Matt level passed" (NOTES 195, the owner's wording there). test/share.test.mjs
+  checks the new caption and that PASSED is gone.
+- Edge cases: a tournament match refuses 'bot' before any of this (reason 'tournament'); two humans the same; the result screen (over)
+  ignores it; a revived match (resumed) only counts a change after its first NEW strike, like before; a change with the panel open and the
+  game paused restarts into the pause (serveAt waits on sim time, as a rematch does); a restart mid-rally kills the ball (ball.live false)
+  like removeBot. No new data stored or sent (the level and the restart are game information already in the Privacy table); legal pages
+  untouched.
+- Tests: test/bot.test.mjs (+8 cases in a private court: counted after a change, B keeps counted, the level again resets to 0-0 and clears
+  counted, once more does nothing, Pro plays on), test/share.test.mjs updated. Both pass (TEST_PORT=8471, SHARE_PORT=8481).

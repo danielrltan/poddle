@@ -52,7 +52,8 @@ let side = 0, role = 'player', names = [null, null], state = null, players = 0, 
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
 let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', wantWatch = LOBBY && qs.get('watch') === '1', pending = null, leaveAt = 0;   // room: the court I am seated in (the wire still says 'room'). wantRoom / wantWatch: from a shared link ?court=CODE (?room= is the old spelling and still works) or a reload. pending: the lobby request still waiting for its answer
-let botWant = null, botLevel = '', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
+let botWant = null, botLevel = '', botVia = 'key', holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
+const KEY_OF = { 0: '1', 1: '2', 3: '3', 2: '4' };      // wire level -> the key that picks it (display order Rookie, Club, Tour, Pro)
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 // The two gates of docs/API-NEXT.md 4.2. seated: nothing from the game gets past the lobby messages while no room is joined
@@ -714,7 +715,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'botinfo') {
     const said = botLevel; if (m.active && typeof m.name === 'string') botLevel = m.name.slice(0, 12); drawNames();
-    if (m.reason) { if (live() && m.reason !== 'tournament') say('Court is full', null, 1800); } else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(`Matt · ${botLevel}`, null, 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
+    const counted = m.active && !spec() && Number.isInteger(m.counted) && m.counted !== m.level && Array.isArray(m.levels) && typeof m.levels[m.counted] === 'string' ? m.levels[m.counted].slice(0, 12) : '';      // the level changed mid-match: the match counts at the easiest played (docs/ACCOUNTS.md 4.6), unless the level is picked again, which restarts it at 0-0 (NOTES 202)
+    if (m.reason) { if (live() && m.reason !== 'tournament') say('Court is full', null, 1800); }
+    else if (m.reset === true) { if (live() && !spec()) say(`0-0 · counts as ${botLevel}`, null, 2400); }
+    else if (m.active && live() && botLevel !== said && !(spec() && !said)) say(counted ? `Matt · ${botLevel} · counts as ${counted} · ${botVia === 'panel' ? botLevel : KEY_OF[m.level] || botLevel} again restarts at 0-0` : `Matt · ${botLevel}`, null, counted ? 4600 : 1400);      // not on a spectator's arrival: the scoreboard already says the level, and it wiped 'We asked if you can play' in the same breath. A tournament match refuses 'bot' (reason 'tournament'): Matt stays at Tour, nothing to say
     return;
   }
   if (m.type === 'countdown') { ui.countdown(live() ? m.left : 0); return; }      // 3 - 2 - 1 over the court before a match's first serve: nobody is ready for a ball the moment an opponent sits down
@@ -825,7 +829,7 @@ ui.onSettings({
     if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
     if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); if (m === 'auto' && camOn) stopCam(); },      // Auto turns the camera off (NOTES 190); Body turns it back on above. How you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
-  bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
+  bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) { botVia = 'panel'; game.send({ type: 'bot', level }); } } });      // botVia: how the level was picked, so a mid-match hint names the same control (the button, or the key)
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
 ui.onView(name => setView(name, true));
 ui.onEmote(e => { if (room && spec()) game.send({ type: 'emote', e }); });
@@ -861,8 +865,8 @@ addEventListener('keydown', e => {
   if (k === 'p') resetPeaks();
   if (k === 'v') setPod(!showPod);
   if (k === '[' || k === ']') sens(k === ']' ? 1 : -1);          // [ = less sensitive, ] = more (the settings panel's - / +)
-  if (k === 'b') game.send({ type: 'bot' });                     // alone: join now. playing the bot: next difficulty
-  if ('1234'.includes(k)) game.send({ type: 'bot', level: [0, 1, 3, 2][+k - 1] });      // keys follow the display order: Rookie, Club, Tour, Pro (the wire keeps each level's index)
+  if (k === 'b') { botVia = 'key'; game.send({ type: 'bot' }); }                     // alone: join now. playing the bot: next difficulty
+  if ('1234'.includes(k)) { botVia = 'key'; game.send({ type: 'bot', level: [0, 1, 3, 2][+k - 1] }); }      // keys follow the display order: Rookie, Club, Tour, Pro (the wire keeps each level's index)
 });
 addEventListener('resize', () => scene.resize());
 

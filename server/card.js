@@ -210,7 +210,8 @@ ${E ? E.defs : ''}
     out.push(icon(cx - 25, cy - 25, 50, MATT, lv ? '#ffffff' : C.soft, 2.25, lv ? ' filter="url(#sh1)"' : ''));
     const tx = cx + R + 24, s = d.matt || 'None yet', fs = fit(s, 900, 42, xr - 20 - tx);      // the level alone under 'Highest Matt level passed', as Your stats and the public card (NOTES 185)
     const sc = d.mattScore || (d.mattFlawless ? '11-0' : null);   // the best score against that Matt (NOTES 183), under the level as #lbp-mscore: "Best 11–7"
-    out.push(caps(tx, y1 + (sc ? 42 : 50), 'Highest Matt level passed'));
+    { const cap = 'Highest Matt level', cw = xr - 20 - tx; let cs = 19.5; while (cs > 13 && measure(cap.toUpperCase(), 800, cs, cs * 0.16) > cw) cs -= 0.5;      // shorter than the stats pages' 'Highest Matt level passed', which ran off the tile; and shrunk to the tile when the fonts measure wider (NOTES 202)
+      out.push(caps(tx, y1 + (sc ? 42 : 50), cap, { size: cs })); }
     out.push(text(tx, y1 + (sc ? 88 : 100), s, { size: fs, wt: 900, fill: lv ? lv[1] : C.soft }));
     if (sc) out.push(text(tx, y1 + 116, `Best ${sc.replace('-', '\u2013')}`, { size: 19.5, wt: 800, fill: d.mattFlawless ? C.warnDeep : C.soft }));
   }

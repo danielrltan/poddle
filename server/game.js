@@ -774,7 +774,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   const ready = p => p.bot || p.ready && !p.cal || !AUTOBOT;    // a client sends no 'paddle' until it is calibrated (and says so when it calibrates again, 'status'): until then that player cannot see the court, so no point is played (test clients may never send one)
   // What the others see on that character (docs/SPECTATE.md Seat status): away = the seat is held for a reconnect, paused = this seat stopped the room, calibrating. Matt never has one.
   const statusOf = p => p.bot ? null : hold && hold.side === p.side ? 'away' : paused && paused.by === p.side ? 'paused' : !ready(p) ? 'calibrating' : null;
-  const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name), order: BOT_ORDER });   // levels in index order (the wire value), order = how pickers list them
+  const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name), order: BOT_ORDER, counted: levelMoved() ? BOT_ORDER[match.rank] : undefined });   // levels in index order (the wire value), order = how pickers list them. counted: the (easiest) level this match is recorded at, once the level moved after the first strike (docs/ACCOUNTS.md 4.6)
+  const levelMoved = () => !!(theBot() && match && !match.done && match.t0 && match.levelChanged && Number.isInteger(match.rank));   // the level changed mid-match: the current level again restarts the match at 0-0, counted at that level (NOTES 202)
 
   function addBot() {
     if (theBot() || humans().length !== 1) return;
@@ -792,9 +793,12 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (over) return;                                            // a match is being voted on: nothing starts behind the result screen
     if (MATCH) return send(from, { ...botInfo(), reason: 'tournament' });   // a tournament match: Matt stays at Tour, and nobody calls him in
     if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
+    if (Number.isInteger(level) && clamp(level, 0, BOTS.length - 1) === botLevel && levelMoved()) {   // the level already on, picked again after a change mid-match: the match restarts at 0-0 and counts at this level (the one under way is dropped, like leaving it: no record against Matt)
+      console.log(`[${code}] Matt match restarted at ${BOTS[botLevel].name}`);
+      startMatch(humans()[0].side); broadcast({ ...botInfo(), reset: true }); return; }
     if (Number.isInteger(level)) botLevel = clamp(level, 0, BOTS.length - 1);
     else if (theBot()) botLevel = BOT_ORDER[(BOT_ORDER.indexOf(botLevel) + 1) % BOT_ORDER.length];   // B walks the display order: Club -> Tour -> Pro -> Rookie
-    if (!theBot()) addBot(); else { stats.level(match, BOT_ORDER.indexOf(botLevel)); broadcast(botInfo()); }   // after the first strike a match is recorded at the easiest level used (docs/ACCOUNTS.md 4.6)
+    if (!theBot()) addBot(); else { stats.level(match, BOT_ORDER.indexOf(botLevel)); broadcast(botInfo()); }   // after the first strike a match is recorded at the easiest level used (docs/ACCOUNTS.md 4.6); botinfo then carries `counted`, and the level again restarts at 0-0 (above)
   }
 
   // Auto-footwork for humans: run to where the ball will be, drift home between shots. Foot speed is finite,
