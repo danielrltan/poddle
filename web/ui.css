@@ -921,6 +921,18 @@ body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none
 .emote-pop img,.emote-pop .emote-gg{width:2.25rem;height:2.25rem;filter:drop-shadow(0 .1875rem .375rem rgba(10,30,45,.35));animation:emote-in 320ms var(--ease-bounce) both}
 .emote-pop .emote-gg{width:auto;font-size:1.5rem;color:#fff;-webkit-text-stroke:.375rem var(--line-deep);paint-order:stroke fill}
 .emote-pop span{max-width:7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:max(var(--t-xs),10px);font-weight:800;line-height:1.2;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.8), 0 0 .5rem rgba(10,30,45,.5)}
+/* a player's emote (NOTES 208): a speech bubble out of their own scoreboard tab, placed by ui.js bubble() in the space beside the board
+   (or under the tab when that space is too narrow), its tail pointing at the tab. It springs out of the tail, holds, and fades: 2 s */
+.emote-bub{position:absolute;display:grid;place-items:center;min-width:3rem;height:3rem;padding:0 .5rem;border-radius:1.5rem;background:#fff;box-shadow:var(--sh-hud);animation:bub-life 2s linear forwards}
+.emote-bub img{width:2.125rem;height:2.125rem;animation:bub-in 300ms var(--ease-bounce) both}
+.emote-bub .emote-gg{font-size:1.25rem;color:var(--line-deep);animation:bub-in 300ms var(--ease-bounce) both}
+.emote-bub::after{content:"";position:absolute;width:.75rem;height:.75rem;background:#fff;transform:rotate(45deg);border-radius:.125rem}
+.emote-bub.is-side.is-me{transform-origin:100% 50%} .emote-bub.is-side.is-me::after{right:-.3125rem;top:calc(50% - .375rem)}
+.emote-bub.is-side.is-them{transform-origin:0 50%} .emote-bub.is-side.is-them::after{left:-.3125rem;top:calc(50% - .375rem)}
+.emote-bub.is-below{transform-origin:50% 0} .emote-bub.is-below::after{top:-.3125rem} .emote-bub.is-below.is-me::after{left:1rem} .emote-bub.is-below.is-them::after{right:1rem}
+@keyframes bub-life{0%{opacity:0;scale:.3} 12%{opacity:1;scale:1.08} 20%{scale:1} 80%{opacity:1;scale:1} 100%{opacity:0;scale:.9}}
+@keyframes bub-in{from{rotate:-14deg} to{rotate:0deg}}
+@media (prefers-reduced-motion: reduce){ .emote-bub{animation:emote-fade 2s linear forwards} .emote-bub img,.emote-bub .emote-gg{animation:none} }
 @keyframes emote-rise{0%{transform:translateY(0);opacity:1} 60%{opacity:1} 100%{transform:translateY(-6rem);opacity:0}}
 @keyframes emote-sway{from{transform:translateX(calc(var(--sway, .5rem) * -1))} to{transform:translateX(var(--sway, .5rem))}}
 @keyframes emote-in{from{transform:scale(.2);opacity:0} to{transform:scale(1);opacity:1}}

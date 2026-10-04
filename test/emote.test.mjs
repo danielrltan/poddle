@@ -24,7 +24,7 @@ ok(cat.room.role === 'spectator' && far.room.role === 'spectator', 'Cat, Dan and
 
 cat.send({ type: 'emote', e: 0 });
 await until(() => ann.emotes().length && dan.emotes().length && cat.emotes().length);
-ok([ann, cat, dan].every(c => c.emotes().length === 1 && c.emotes()[0].e === 0 && c.emotes()[0].name === 'Cat'), 'the player, the other spectator and the sender all get {e:0, name:Cat}');
+ok([ann, cat, dan].every(c => c.emotes().length === 1 && c.emotes()[0].e === 0 && c.emotes()[0].name === 'Cat' && !('side' in c.emotes()[0])), 'the player, the other spectator and the sender all get {e:0, name:Cat}');
 await wait(300); cat.send({ type: 'emote', e: 3 }); await wait(400);
 ok(ann.emotes().length === 1, 'the cooldown: a second emote 0.3 s later is dropped');
 await wait(500); cat.send({ type: 'emote', e: 3 }); await until(() => ann.emotes().length === 2);
@@ -37,7 +37,7 @@ ok(ann.emotes()[had]?.e === 9 && ann.emotes()[had]?.name === 'Dan', 'the cooldow
 for (const e of [10, -1, 1.5, '2', null]) far.send({ type: 'emote', e });
 const c0 = cat.emotes().length; await wait(1000); ann.send({ type: 'emote', e: 0 }); await until(() => cat.emotes().length === c0 + 1);
 ok(far.emotes().length === 0 && eve.emotes().length === 0, 'bad indexes are dropped');
-ok([ann, cat, dan].every(c => c.emotes().at(-1)?.e === 0 && c.emotes().at(-1)?.name === 'Ann'), 'a player emotes too: GG reaches the court with her name');
+ok([ann, cat, dan].every(c => c.emotes().at(-1)?.e === 0 && c.emotes().at(-1)?.name === 'Ann' && c.emotes().at(-1)?.side === 0), 'a player emotes too: GG reaches the court with her name and her seat');
 const n = ann.emotes().length;
 far.send({ type: 'emote', e: 5 }); await until(() => eve.emotes().length);
 ok(eve.emotes()[0]?.e === 5 && ann.emotes().length === n, "Far's emote stays in Eve's court");

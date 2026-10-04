@@ -719,14 +719,35 @@ export function sendEmote(i) {
   restart(box, 'is-cool'); clearTimeout(emoteT); emoteT = setTimeout(() => box.classList.remove('is-cool'), EMOTE_COOL);
   onEmoteFn(i); return true;
 }
-// one reaction arriving: rises a little from just above the bar and fades within two seconds, over the corner, never the court's middle. Five on screen at most
-export function emote(i, name) {
+// one reaction arriving. A player's (tab = 'me' | 'them': the scoreboard tab it belongs to) is a speech bubble out of that tab, in the
+// empty space beside the scoreboard (NOTES 208). A spectator's, or any while the scoreboard is hidden (a result panel), rises a little from
+// just above the bar and fades within two seconds, over the corner, never the court's middle. Five on screen at most
+export function emote(i, name, tab = null) {
   const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
+  if (tab && bubble(layer, i, tab)) return;
   while (layer.childElementCount >= 5) layer.firstElementChild.remove();
   const el = document.createElement('div'), body = document.createElement('i'), dur = 1.8 + Math.random() * .4; el.className = 'emote-pop';
   el.style.setProperty('--x', `${(Math.random() * 6).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.25 + Math.random() * .5)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
   body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only
   el.append(body); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), dur * 1000 + 500); layer.append(el);
+}
+// the bubble: beside its tab when the space there fits it (up to the corner's pills on the left, up to the camera / AirPod box or the
+// window's edge on the right), else just under the tab. One per side: a new one replaces the last. false = no scoreboard to speak from
+const boxOf = e => { const r = e && !e.hidden && e.getBoundingClientRect(); return r && r.width ? r : null; };
+function bubble(layer, i, tab) {
+  const board = $('board'), t = board?.querySelector(`.score-tab.is-${tab}`), r = boxOf(t);
+  if (!r || document.body.dataset.overlay || +getComputedStyle(board).opacity < 0.5) return false;
+  layer.querySelector(`.emote-bub.is-${tab}`)?.remove();
+  const el = document.createElement('div'), gap = 8; el.className = `emote-bub is-${tab}`; el.append(emoteImg(i)); layer.append(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const room = tab === 'me' ? r.left - Math.max(0, ...[...($('corner')?.children || [])].map(boxOf).filter(Boolean).map(b => b.right))
+    : Math.min(innerWidth, ...['camwrap', 'podwrap'].map(id => boxOf($(id))).filter(Boolean).map(b => b.left)) - r.right;
+  const side = room >= w + 2 * gap; el.classList.add(side ? 'is-side' : 'is-below');
+  const top = side ? r.top + (r.height - h) / 2 : r.bottom + gap; let left = side ? (tab === 'me' ? r.left - gap - w : r.right + gap) : (tab === 'me' ? r.left + 12 : r.right - 12 - w);
+  if (!side) for (const b of ['camwrap', 'podwrap'].map(id => boxOf($(id))).filter(Boolean)) if (b.top < top + h && top < b.bottom) left = Math.min(left, b.left - gap - w);      // under the tab on a narrow window: never on the AirPod box beside it
+  el.style.left = `${Math.round(left)}px`; el.style.top = `${Math.round(top)}px`;
+  el.addEventListener('animationend', e => { if (e.target === el && e.animationName === 'bub-life') el.remove(); }); setTimeout(() => el.remove(), 2600);
+  return true;
 }
 // someone sat down in the stands: a small card on the left edge for a few seconds. Three at most; names go in as textContent only
 const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>';

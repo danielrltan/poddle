@@ -698,7 +698,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'promoff') { if (live()) say(`${cleanName(m.name) || 'They'} wasn’t ready. Matt is back.`, null, 2600); return; }
   if (m.type === 'watcher') { if (live() && !spec()) ui.watcherNote(cleanName(m.name)); return; }
   if (m.type === 'record') { if (!spec()) ui.recordNote?.(m.what, m.v); return; }      // a new personal best, at the end of the point that set it (NOTES 132), to my seat only      // someone started watching you (the server tells only the players)
-  if (m.type === 'emote') { if (live() && Number.isInteger(m.e)) ui.emote(m.e, cleanName(m.name)); return; }      // a spectator's reaction, players and spectators alike see it
+  if (m.type === 'emote') { if (live() && Number.isInteger(m.e)) ui.emote(m.e, cleanName(m.name), m.side === 0 || m.side === 1 ? ((spec() ? m.side === 0 : m.side === side) ? 'me' : 'them') : null); return; }      // everyone on the court sees it. A player's comes out of their own scoreboard tab (the left one is mine, or seat 0 for a spectator); a spectator's pops in the corner (NOTES 208)
   if (m.type === 'state') {
     state = m; frozen = !!m.paused; scene.setFrozen(frozen || holding);
     scene.updateBall(m.p, m.v, m.live, undefined, m.spin, m); if (frozen || holding) net.idle(); else net.packet();      // a stopped room is not a bad link

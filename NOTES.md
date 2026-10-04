@@ -4329,3 +4329,20 @@ is super confusing." NOTES 202's "the level again restarts at 0-0" is gone.
 - test/bot.test.mjs: the restart message before the first strike does nothing; after a change it restarts at 0-0 and clears `counted`;
   the level picked again is only the level. docs/ACCOUNTS.md 4.6 updated. No new data (the restart is game information already listed);
   legal pages untouched.
+
+## 208. A player's emote is a speech bubble out of their own scoreboard tab
+- "I don't like where it appears. Make some space on the left and right side of the score banner for a bubble to appear with the
+  emote, right next to the names in the empty space to the left and right of the score banner, a speech bubble coming out of the
+  corresponding side." Asked about spectators: "it comes from the side where there's space, e.g. between the camera display for
+  the right side, and between the court copy drop down on the left."
+- The server's `emote` now carries `side` for a player's (not for a spectator's). main.js maps it to the tab the name is on: the
+  left tab is mine for a player, seat 0 for a spectator. ui.js bubble(): a white speech bubble (GG or the emoji, no name: the tab
+  beside it says whose) in the empty space beside that tab, its tail pointing at the tab, measured against the corner's pills on
+  the left and the camera / AirPod box (or the window edge) on the right. When that space is too narrow (about 760 px wide and
+  under, and every phone) it hangs just under the tab instead, nudged left of the AirPod box. It springs out of the tail, holds and
+  fades in 2 s; one per side, a new one replaces the last.
+- A spectator's emote has no tab, so it keeps NOTES 205's small corner pop with the name, and so does any emote while the scoreboard
+  is hidden (the result panel). Nothing new is sent or shown beyond the seat everyone already sees.
+- test/emotebar-e2e.mjs: Ann's GG is a bubble out of her tab, left for her and for Cat watching, right for Ben; at 1280, 900, 700 and
+  390 px the bubble sits 4-14 px off its tab and clear of the board, the corner and the insets. emote.test.mjs: a player's carries
+  `side`, a spectator's does not.

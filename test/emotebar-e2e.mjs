@@ -79,21 +79,29 @@ const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); await
 const bar = pg => pg.evaluate(() => { const box = document.getElementById('emotes'), r = box.getBoundingClientRect(), cs = getComputedStyle(box);
   return { shown: cs.display !== 'none' && +cs.opacity > 0.9 && r.width > 0, right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom), w: Math.round(r.width), h: Math.round(r.height), cool: box.classList.contains('is-cool'),
     keys: [...box.querySelectorAll('.emote-key')].map(k => getComputedStyle(k).display === 'none' ? '' : k.textContent).join(''), first: box.firstElementChild?.textContent.replace(/\d/g, ''), n: box.childElementCount,
-    pops: [...document.querySelectorAll('#emote-layer .emote-pop')].map(p => (p.querySelector('img')?.alt || p.querySelector('.emote-gg')?.textContent) + ':' + (p.querySelector('span')?.textContent || '')) }; });
+    pops: [...document.querySelectorAll('#emote-layer .emote-pop, #emote-layer .emote-bub')].map(p => (p.querySelector('img')?.alt || p.querySelector('.emote-gg')?.textContent) + ':' + (p.classList.contains('emote-bub') ? '@' + (p.classList.contains('is-me') ? 'me' : 'them') : p.querySelector('span')?.textContent || '')) }; });
+// a player's bubble: where it sits against its scoreboard tab, the corner's pills and the insets (NOTES 207)
+const bub = pg => pg.evaluate(() => { const b = document.querySelector('#emote-layer .emote-bub'); if (!b) return null; const r = b.getBoundingClientRect(), tab = document.querySelector(`#board .score-tab.${b.classList.contains('is-me') ? 'is-me' : 'is-them'}`).getBoundingClientRect();
+  const hit = [...document.querySelectorAll('#corner > *, #board, #camwrap, #podwrap')].filter(e => !e.hidden && e.getBoundingClientRect().width).some(e => { const q = e.getBoundingClientRect(); return r.left < q.right - 1 && q.left < r.right - 1 && r.top < q.bottom - 1 && q.top < r.bottom - 1; });
+  return { where: b.classList.contains('is-side') ? 'side' : 'below', next: b.classList.contains('is-side') ? (b.classList.contains('is-me') ? Math.round(tab.left - r.right) : Math.round(r.left - tab.right)) : Math.round(r.top - tab.bottom), hit, inside: r.left >= 0 && r.right <= innerWidth }; });
 const SIZES = [[1280, 720], [900, 700], [700, 900], [390, 844]];
 for (const [pg, who] of [[a, 'player'], [c, 'spectator']]) for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(600); await pg.mouse.move(w / 2, h / 2 + 3); await sleep(300); await pg.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);      // a toast (Your serve) hides the bar a moment
   s = await bar(pg); const bx = await boxes(pg, ['emotes', 'keys', 'views', 'btn-ask', 'toast']), hit = overlaps(bx);
   ok(s.shown && s.n === 10 && s.first === 'GG' && s.keys === '1234567890' && s.right >= 8 && s.bottom >= 8 && s.w <= 340, `${who} ${w}x${h}: the bar shows, GG first, keys 1-0, ${s.w}x${s.h} px, ${s.right}/${s.bottom} px off the corner`);
   ok(!hit.length, `${who} ${w}x${h}: nothing overlaps the bar (${hit.join(', ') || 'clear'})`);
   await pg.screenshot({ path: `${SHOTS}emotes-${who}-${w}x${h}.png` }); }
-for (const pg of [a, c]) { await pg.setViewport({ width: 1280, height: 720 }); } await sleep(600);
+for (const [w, h] of SIZES) { for (const pg of [a, b]) { await pg.setViewport({ width: w, height: h }); } await sleep(1200);
+  await a.keyboard.press('Digit3'); await sleep(450); const mine = await bub(a), theirs = await bub(b);
+  for (const [k, v] of [['Ann (her own, left)', mine], ['Ben (Ann\'s, right)', theirs]]) ok(v && !v.hit && v.inside && v.next >= 4 && v.next <= 14, `${w}x${h} ${k}: the bubble sits ${v?.where} its tab (${v?.next} px off), clear of the board, the corner and the insets`);
+  await a.screenshot({ path: `${SHOTS}emotes-bubble-me-${w}x${h}.png` }); await b.screenshot({ path: `${SHOTS}emotes-bubble-them-${w}x${h}.png` }); await sleep(2400); }
+for (const pg of [a, b, c]) { await pg.setViewport({ width: 1280, height: 720 }); } await sleep(600);
 await a.keyboard.press('Digit1'); await sleep(250);
-for (const [pg, who] of [[a, 'Ann'], [b, 'Ben'], [c, 'Cat']]) { s = await bar(pg); ok(s.pops.includes('GG:Ann'), `${who} sees Ann's GG with her name (${s.pops})`); }
+for (const [pg, who, at] of [[a, 'Ann', '@me'], [b, 'Ben', '@them'], [c, 'Cat', '@me']]) { s = await bar(pg); ok(J(s.pops) === J(['GG' + ':' + at]), `${who} sees Ann's GG in a bubble out of her tab, the ${at === '@me' ? 'left' : 'right'} one (${s.pops})`); }
 s = await bar(a); ok(s.cool, 'the bar rests after a pick');
-await a.keyboard.press('Digit2'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['GG:Ann']), `a second key inside the second does nothing (${s.pops})`);
+await a.keyboard.press('Digit2'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['GG:@them']), `a second key inside the second does nothing (${s.pops})`);
 await a.screenshot({ path: `${SHOTS}emotes-pop-player-1280x720.png` }); await c.screenshot({ path: `${SHOTS}emotes-pop-spectator-1280x720.png` });
 await sleep(1000); s = await bar(a); ok(!s.cool, 'the bar is back after a second');
-await a.keyboard.press('Digit0'); await sleep(300); s = await bar(b); ok(s.pops.includes('😢:Ann'), `0 is the tenth, 😢 (${s.pops})`);
+await a.keyboard.press('Digit0'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['😢:@them']), `0 is the tenth, 😢, and it replaces her last bubble (${s.pops})`);
 await c.keyboard.press('Digit3'); await sleep(300); s = await bar(a); ok(s.pops.includes('💚:Cat'), `the spectator's 3 reaches the player: 💚 (${s.pops})`);
 await sleep(2600); s = await bar(b); ok(s.pops.length === 0, `the pops are gone within about two seconds (${s.pops})`);
 const v = pg => pg.evaluate(() => { const x = window.__scene._dbg.view(); return x.name + (x.name === 'pov' ? x.side : ''); });
