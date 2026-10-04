@@ -3824,3 +3824,23 @@ smeared, two neighbours on adjacent rings ran into one blob, the edges were jagg
 - No data, storage, permission or third-party change (`reg` on the champion is the username flag the bracket already shows): legal untouched.
 - test/tourney-e2e.mjs checks the podium (the trophy, seat 0 alone, no rally), CHAMPION! in the corner, the panel, everyone else's title, and the
   rally back after Back to courts; its loser-card shot waits out the DEFEAT title. Shots: test/ui-shots/tour-e2e-07-champion-*.png.
+
+## 179. A flawless win against Matt turns that level's card gold
+
+The owner (2026-10-03): "when you beat matt with a flawless victory, the card for that level will turn gold. text should be like a darker
+gold colour for that gold feeling." Nothing new is recorded: bot_record.best_margin (docs/ACCOUNTS.md, per owner and level, the biggest
+winning margin, max-merged across devices) reaches WIN_AT (11) only by an 11-0, since the game ends at 11 and win-by-2 keeps every other
+win's margin at 10 or less. So profile.js rungs() marks a rung flawless when it is beaten and bestMargin >= FLAWLESS (11): past 11-0 wins
+count from the day the column was added (2026-09-25), and a dev server with a short WIN_AT never shows gold.
+
+- The chip (.st-mlv.is-flawless, Your stats > Hardest level beaten): a gold gradient (#fff4bd to --gold-2) with a --gold-3 inset ring and a
+  soft gold shadow; the level name, tick, record, streak number and flame are all the darker gold #8a5200. It wins over .is-top's level tint
+  and outline (declared after it), so a flawless Pro is gold, not purple. Tooltip "Pro Matt: beaten 11-0". The ui.css note "never gold tiles:
+  gold keeps meaning best" still holds in spirit: flawless is the best a level has.
+- Not on the public player card or the share card: they carry the toughest Matt beaten, not the four rungs (docs/SHARE.md 1).
+- Also in this change (web/main.js): NOTES 170's 'status cal' now waits for the seat's `welcome` (welcomed flag, cleared in toLobby) and is
+  sent right after profile.seated(): test/profile-ui.mjs caught the 20 Hz timer sending it between the seat and profile's hello, which
+  docs/ACCOUNTS.md 3.1 wants first. The serve gate is unchanged (calstart-e2e: 7 checks).
+- No data, storage, permission or third-party change: the legal pages are untouched. Changelog entry added.
+- Tests: test/profile-ui.mjs: a flawless Rookie (bestMargin 11) is the one gold chip, Club at 10 and a beaten Pro at 4 are not, the colour
+  is rgb(138, 82, 0), the tooltip; screenshot test/ui-shots/stats-flawless.png (94 checks).

@@ -244,6 +244,12 @@ await pg.close();
       nodes: [...document.querySelectorAll('#pf-rungs > li')].map(l => l.className.replace('st-mlv', '').trim()), best: document.getElementById('st-mbest').textContent, badge: document.getElementById('st-mbadge').className, mcap: document.getElementById('st-mcap').textContent }));
     ok(o.rank === 'Silver II' && /^\d+ to /.test(o.cap) && /^st-crest( is-link)? has-rank is-silver$/.test(o.crest) && J(o.nodes) === J(['is-won', '', '', 'is-won is-top']) && o.best === 'Pro Matt' && o.badge === 'st-mbadge is-lv3' && /^[A-Z][a-z]{2} \d/.test(o.mcap),
       `Rookie + Pro beaten: the rank is still the ladder's, the Pro Matt badge, Club and Tour simply not ticked (${J(o)})`);
+    // a flawless win (11-0, bestMargin 11) turns that level's card gold: Rookie here, not Club (11-1 is a 10) nor Pro (beaten, no 11-0)
+    API.profile = { ...FIXTURE, matt: [{ ...rung(0, 'Rookie', 3, 0, 3, 3, day), bestMargin: 11 }, { ...rung(1, 'Club', 2, 1, 1, 1, day), bestMargin: 10 }, rung(3, 'Tour', 0, 0, 0, 0, null), { ...rung(2, 'Pro', 1, 0, 1, 1, day + 7200e3), bestMargin: 4 }] }; await reopen();
+    const f = await ev(pg, () => [...document.querySelectorAll('#pf-rungs > li')].map(l => [l.className.replace('st-mlv', '').trim(), l.dataset.tip || l.title, getComputedStyle(l.querySelector('small')).color]));
+    await pg.screenshot({ path: path.join(SHOTS, 'stats-flawless.png'), clip: await ev(pg, () => { const r = document.querySelector('.st-matt').getBoundingClientRect(); return { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }; }) });
+    ok(J(f.map(x => x[0])) === J(['is-won is-flawless', 'is-won', '', 'is-won is-top']) && f[0][1] === 'Rookie Matt: beaten 11-0' && /^Club Matt: beaten /.test(f[1][1]) && f[0][2] === 'rgb(138, 82, 0)' && f[1][2] !== f[0][2],
+      `a flawless Rookie win: its card alone is gold with dark-gold text, the title says 11-0 (${J(f)})`);
     API.profile = FIXTURE; await reopen(); }
   for (const [w, h] of [[1280, 800], [390, 844]]) { await pg.setViewport({ width: w, height: h }); await sleep(400); await openStats(); await pg.screenshot({ path: path.join(SHOTS, `stats-${w}x${h}.png`) }); }
   await pg.setViewport({ width: 1280, height: 800 }); await sleep(300); await openStats();

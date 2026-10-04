@@ -5,7 +5,7 @@
 // Every string from the server or the player goes in as textContent. Nothing here logs an id, a name or a token.
 const $ = id => document.getElementById(id);
 const DEV_KEY = 'poddle.device', OLD_ON_KEY = 'poddle.stats.on', OLD_LB_SEEN = 'poddle.lbSeen', OLD_FR_SEEN = 'poddle.friendsSeen', GSI = 'https://accounts.google.com/gsi/client';
-const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2];
+const LEVEL = ['Rookie', 'Club', 'Pro', 'Tour'], ORDER = [0, 1, 3, 2], FLAWLESS = 11;      // FLAWLESS: a win by the whole game (11-0) is the only way a rung's bestMargin reaches WIN_AT; its card turns gold (NOTES 174)
 const DEV_OK = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^[0-9a-f]{32}$/;      // the server's own check (3.1): anything else is no device id
 // its own keys, NOT poddle.settings: savePrefs() rebuilds that one from a fixed list and would drop them
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } }, del(k) { try { localStorage.removeItem(k); } catch { /* same */ } } };
@@ -96,7 +96,8 @@ const cls = (id, c, onOff) => { const el = $(id); if (el) el.classList.toggle(c,
 const human = p => p && p.human && typeof p.human === 'object' ? p.human : {};
 function rungs(p) {                                         // the four Matt rows in difficulty order, and what the card makes of them
   const rows = ORDER.map(lv => (p && Array.isArray(p.matt) ? p.matt : []).find(x => x && x.level === lv) || {}), won = rows.map(r => Number.isFinite(r.firstWinAt) && r.firstWinAt > 0);
-  return { rows, won, beaten: won.filter(Boolean).length, top: won.lastIndexOf(true), nextI: won.indexOf(false) };      // top: the hardest Matt beaten = the rank (-1: none); nextI: -1 once all four are
+  const flawless = rows.map((r, i) => won[i] && num(r.bestMargin) >= FLAWLESS);      // beaten without giving up a point, at least once
+  return { rows, won, flawless, beaten: won.filter(Boolean).length, top: won.lastIndexOf(true), nextI: won.indexOf(false) };      // top: the hardest Matt beaten = the rank (-1: none); nextI: -1 once all four are
 }
 function drawRoad(p) {
   const { rows } = rungs(p), H = human(p), name = i => `${LEVEL[ORDER[i]]} Matt`;
@@ -116,17 +117,17 @@ function drawRoad(p) {
 // the Matt badge: every level can be picked at any time, so this is a badge for the toughest one beaten (difficulty order, never the
 // wire number: Tour is 3 on the wire but easier than Pro), and a chip a level with its record. No order to climb, no locks, no Next
 function drawMatt(p) {
-  const { rows, won, top } = rungs(p), badge = $('st-mbadge'), ul = $('pf-rungs');
+  const { rows, won, flawless, top } = rungs(p), badge = $('st-mbadge'), ul = $('pf-rungs');
   if (badge) badge.className = 'st-mbadge ' + (top < 0 ? 'is-none' : 'is-lv' + top);
   text('st-mbest', top < 0 ? 'None yet' : `${LEVEL[ORDER[top]]} Matt`);
   const r = top < 0 ? null : rows[top];
   text('st-mcap', r ? dayS(r.firstWinAt) : '');      // the day it was first beaten; nothing beaten: no coaching line
   if (!ul) return; ul.textContent = '';
   rows.forEach((row, i) => {
-    const li = mk('li', 'st-mlv' + (won[i] ? ' is-won' : '') + (i === top ? ' is-top' : '')); li.dataset.level = ORDER[i];
+    const li = mk('li', 'st-mlv' + (won[i] ? ' is-won' : '') + (i === top ? ' is-top' : '') + (flawless[i] ? ' is-flawless' : '')); li.dataset.level = ORDER[i];      // is-flawless: the gold card
     const rec = mk('small', '', `${num(row.wins)}-${num(row.losses)}`);      // the record (test/profile-ui.mjs reads it), the streak its small print
     if (num(row.streak)) { const s = mk('i', ''); s.innerHTML = FLAME; s.append(String(num(row.streak))); s.title = 'Win streak'; rec.append(s); }      // the flame is the word
-    li.append(mk('b', '', LEVEL[ORDER[i]]), rec); li.title = won[i] ? `${LEVEL[ORDER[i]]} Matt: beaten ${dayS(row.firstWinAt)}` : `${LEVEL[ORDER[i]]} Matt: not beaten yet`;
+    li.append(mk('b', '', LEVEL[ORDER[i]]), rec); li.title = flawless[i] ? `${LEVEL[ORDER[i]]} Matt: beaten ${FLAWLESS}-0` : won[i] ? `${LEVEL[ORDER[i]]} Matt: beaten ${dayS(row.firstWinAt)}` : `${LEVEL[ORDER[i]]} Matt: not beaten yet`;
     ul.append(li);
   });
 }

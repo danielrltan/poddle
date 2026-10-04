@@ -309,9 +309,9 @@ function startCal() { if (undo) undo.kept = false; calibrating = true; stats.cal
 // The server is told whether this seat is ON THE COURT, from what the player is looking at, never from the calibration flags: a calibration is kept
 // between courts, so 'calibrated' was true behind the share screen, the camera primer, the connect screen (the phone asleep) and the 'All set' card,
 // paddles went out from all of them, and the match was counted in and served to a player who then calibrated through it (NOTES 170).
-let toldCal = null;      // what this seat last said: null = nothing yet
+let toldCal = null, welcomed = false;      // toldCal: what this seat last said, null = nothing yet. welcomed: the seat's 'welcome' is in (nothing before it: profile's hello goes first, docs/ACCOUNTS.md 3.1)
 const onCourt = () => phase === 'play' && !ui.currentScreen();
-function tellCal() { if (!seated() || spec()) { toldCal = null; return; } const cal = !onCourt(); if (cal !== toldCal) { toldCal = cal; game.send({ type: 'status', cal }); } }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
+function tellCal() { if (!seated() || spec() || !welcomed) { toldCal = null; return; } const cal = !onCourt(); if (cal !== toldCal) { toldCal = cal; game.send({ type: 'status', cal }); } }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
   phase = 'lobby'; screen('lobby'); if (MOBILE) wantWatch = true;      // a phone opens any court link as a spectator: a join link watches
@@ -422,7 +422,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   if (undo) { undo = null; ui.backLabel('Back'); }
-  trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
+  trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
@@ -633,9 +633,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'closed') { if (room) toLobby(tourKind && ['round', 'tourstart', 'tourend', 'empty'].includes(m.reason) ? '' : m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling. A tournament's court closing is the thing moving on: its screen says the rest
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
-  if (m.type === 'welcome') { toldCal = null;      // a new seat, or the old one on a new socket: say again where I am (tellCal)
+  if (m.type === 'welcome') { toldCal = null; welcomed = true;      // a new seat, or the old one on a new socket: say again where I am (tellCal, after profile's hello below)
     ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); ranks = cleanRanks(m.rank); holding = false; dressSeats();      // rank: each seat's emblem, on any court (docs/TROPHIES.md 3, item 9)
     if (LOBBY && room && !spec()) profile.seated();              // a seat of my own: the device id is made now if there is none, and its hello goes at once (docs/ACCOUNTS.md 3.1)
+    tellCal();
     if (ui.currentOverlay() === 'game-full') ui.showOverlay(null);
     scene.setCourt(m.court); scene.setSide(spec() ? null : side);
     if (spec()) setView(VIEWS.includes(ls.get('poddle.view')) ? ls.get('poddle.view') : 'broadcast', false);
