@@ -4222,3 +4222,35 @@ level passed' but it goes off the card. maybe just make it say highest matt leve
   untouched.
 - Tests: test/bot.test.mjs (+8 cases in a private court: counted after a change, B keeps counted, the level again resets to 0-0 and clears
   counted, once more does nothing, Pro plays on), test/share.test.mjs updated. Both pass (TEST_PORT=8471, SHARE_PORT=8481).
+
+## 203. Trophies: a little less per rank and division, the count rolls up on the result card, and the haul flies into the corner card
+
+The owner (2026-10-04): "make it so that you gain ever so slightly less with each rank / division ... add a nice trophy addition animation,
+that like counts up at the end of each game to really give u that dopamine effect ... like brawlstars counting up style ... once u go to
+main menu from a game session(s), the trophies will spawn from the quickplay button as a bunch of icons and fly towards your trophy bar and
+u watch it increase in real time ... exponentially in speed".
+
+- **The gain** (server/ladder.js winOf, docs/TROPHIES.md 3): a win over an equal opponent pays 30 - floor(0.4 x division index), the index
+  counting Bronze I as 0 up the ladder: 30 through Bronze, Silver I 29, Gold I 28, Platinum I 27, Diamond I 26, Master I 24, Champion I 23,
+  Champion III and Pro 22; the gap term (+-12) and the sweep's +3 are unchanged, halveWin's floor of 8 too. With NOTES 194's losses a rank
+  holds at 17% wins in Bronze, 40% in Platinum, 57% in Champion, 61% in Pro. ladder.test checks the table and the new bounds (13..45);
+  trophies.test plays in Bronze and is untouched. how-to-play says "about 30 trophies in Bronze and a little less at each rank and division
+  above, down to about 22 in Pro".
+- **The result card** (ui.js rollTrophies, ui.css .trophy-roll): the total used to count in a CSS counter over 0.9 s with nothing to
+  mark it. Now a layer over the real digits (which hold the final number from the first frame, for readers and the tests) climbs one
+  trophy at a time, pulsing on every step, the steps coming faster (t = T x (i/N)^0.6, T = 70 ms per trophy within 0.42..1.5 s), a tick
+  up a major scale per step (menuaudio.js 'tick', n = how far along), six small cups leaping from the +N pill into the number on the
+  way, and a bigger pop with a chord ('land') when it lands; a loss walks down with low ticks and a two-note 'drop'. The rank or division
+  ceremony (RANK UP) follows 420 ms after the land instead of at a fixed 2.1 s. The roll waits out what is left of the VICTORY title's
+  2 s (stampLeft: the panel's own pops are timed from the stamp's end). Reduced motion: no roll, the final number as before. ui.js
+  onSfx(fn) takes the menu sounds from main.js (uiSfx) for the ticks.
+- **The corner card** (profile.js landed / launchCup / chipStop, called from main.js toLobby and play): the card remembers the count it
+  last showed while a lobby screen was up (chipShown, set in drawChip). Back on the home after a game (or a run of games) with more
+  trophies than that, it is set back to the old count and up to 24 gold cups leave Quick play, the gaps between launches shrinking by a
+  fifth each (150 ms down to 25, so +45 is over in about two seconds), each on its own rising arc (Web Animations, 560 ms) with a soft
+  'lift'; as each lands the card adds its share, bumps and pings ('arrive', up the scale), and the bar and the emblem follow the climbing
+  count (rankAt: the floors mirrored from ladder.js), so a division or rank is seen to turn over; the last cup brings a pop with a gold
+  glow and the 'land' chord, then drawChip draws the card whole. A loss counts down in place. Leaving the lobby mid-flight (screen())
+  lands everything at once. Nothing the first time the card shows, without a username, or with reduced motion.
+- Hooks: profile.init takes sfx and cupSvg (ui.cupSvg: the gold cup markup). Tests: ladder.test; ui-next's match-trophies and
+  profile-ui's chip checks read the real digits and the final count, so they pass as before.

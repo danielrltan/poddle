@@ -554,6 +554,8 @@ body[data-screen="title"] #screen-server-down,body[data-screen="lobby"] #screen-
 .head-acct.is-in .head-acct-ic{background:linear-gradient(180deg,var(--me),var(--me-deep))} .head-acct-t{max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-aspect-ratio: 1/1){ .head-end{right:var(--s-4)} }
 /* the player card (NOTES 161): signed in with a username the button grows into emblem | name over trophies */
+/* the trophy flight into the corner card (NOTES 203): a bump as each cup lands, a bigger pop and a gold glow when the last one does */
+.head-acct.is-bump .head-acct-n{animation:trophy-tick 180ms var(--ease-out)} .head-acct.is-landed{animation:chip-land 600ms var(--ease-bounce)} @keyframes chip-land{0%{scale:1.12;box-shadow:0 0 0 .25rem rgba(255,211,74,.55), 0 0 1.25rem rgba(255,211,74,.8)}100%{scale:1}}
 .head-acct-col{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:.125rem;min-width:0;line-height:1} .head-acct-n{display:inline-flex;align-items:center;gap:.1875rem;font-size:var(--t-md);font-weight:900;color:var(--warn-deep);font-variant-numeric:tabular-nums} .head-acct-n[hidden],.head-acct-em[hidden],.head-acct-bar[hidden]{display:none}
 .head-acct-bar{order:3;display:block;width:100%;min-width:5.5rem;height:.4375rem;border-radius:var(--r-pill);background:var(--sky-3);box-shadow:inset 0 .0625rem .125rem rgba(120,170,200,.3);overflow:hidden} .head-acct-bar i{display:block;height:100%;width:calc(100% * var(--p,0));border-radius:inherit;background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 55%,var(--gold-3))} .head-acct-n .cup-ic{width:1.25rem;height:1.25rem}
 .head-acct.is-card{height:3.75rem;padding:0 var(--s-4) 0 var(--s-2);border-radius:var(--r-lg)} .head-acct.is-card .head-acct-t{font-size:var(--t-md);font-weight:800} .head-acct.is-card .head-acct-ic{width:2.25rem;height:2.25rem} .head-acct.has-em .head-acct-ic{display:none}
@@ -1807,7 +1809,13 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 .trophy-d{display:inline-flex;align-items:center;height:2.125rem;padding:0 .875rem;border-radius:var(--r-pill);font-size:var(--t-lg);font-weight:900;font-variant-numeric:tabular-nums;background:var(--sky-2);color:var(--ink-soft);border:.125rem solid var(--line-faint)}
 .trophy-d.is-up{background:#e6f9ee;color:var(--good-deep);border-color:#bfeccf} .trophy-d.is-down{background:#fdecec;color:var(--bad-deep);border-color:#f7c8c8} .trophy-d.is-off{font-size:max(var(--t-md),12px)}
 .trophy-note{font-size:max(var(--t-sm),12px);font-weight:700;color:var(--ink-soft)} .trophy-note:empty{display:none}
-.screen.is-active .trophy.is-roll .trophy-n{animation:ov-ink 2000ms linear}      /* no fill: the real glyphs come back the moment the counter lands */ .screen.is-active .trophy.is-roll .trophy-n::before{animation:ov-trophy-count 900ms var(--ease-out) 1100ms both}
+/* the count-up (NOTES 203, ui.js rollTrophies): the real digits go clear while a layer over them climbs one trophy at a time, pulsing on every step; the land is a bigger pop */
+.trophy-count{position:relative} .trophy.is-rolling .trophy-n{color:transparent}
+.trophy-roll{position:absolute;left:0;right:0;top:0;font-size:5rem;font-weight:800;line-height:1;color:var(--warn-deep);font-variant-numeric:tabular-nums;text-align:center;pointer-events:none;transform-origin:50% 60%} #screen-match .trophy-roll{font-size:4rem}
+.trophy-roll.is-tick{animation:trophy-tick 160ms var(--ease-out)} @keyframes trophy-tick{0%{scale:1.14;filter:brightness(1.25)}100%{scale:1;filter:none}}
+.trophy-n.is-land{animation:trophy-land 520ms var(--ease-bounce)} @keyframes trophy-land{0%{scale:1.32;filter:brightness(1.4) drop-shadow(0 0 .75rem rgba(255,211,74,.9))}60%{scale:.96}100%{scale:1;filter:none}}
+.trophy.is-landed .trophy-d.is-up{animation:trophy-pill-land 420ms var(--ease-bounce)} @keyframes trophy-pill-land{0%{scale:1.3}100%{scale:1}}
+.trophy-fly{position:fixed;z-index:calc(var(--z-screen) + 5);width:1.5rem;height:1.5rem;margin:-.75rem 0 0 -.75rem;pointer-events:none} .trophy-fly .cup-ic{width:100%;height:100%;filter:drop-shadow(0 .125rem .25rem rgba(120,80,0,.4))}
 .screen.is-active .trophy-row{animation:ov-title-pop 420ms var(--ease-bounce) 900ms both} .screen.is-active .trophy-d{animation:ov-trophy-pop 420ms var(--ease-bounce) 1000ms both} .screen.is-active .trophy-note{animation:ov-title-pop 360ms var(--ease-bounce) 1100ms both}
 @keyframes ov-trophy-count{from{--n:var(--from,0);opacity:1}99.9%{opacity:1}to{--n:var(--to,0);opacity:0}}
 @keyframes ov-trophy-pop{0%{opacity:0;scale:.4}60%{opacity:1;scale:1.15}100%{opacity:1;scale:1}}

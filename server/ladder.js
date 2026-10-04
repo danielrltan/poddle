@@ -51,12 +51,17 @@ function nextDivFloorOf(tier, div) { const t = clamp(int(tier), 1, TOP), d = cla
 function applyFloor(bestTier, trophies) { return Math.max(int(trophies), floorOf(clamp(int(bestTier), 1, STICKY_TOP))); }
 
 // humanDelta(me, them, won, sweep) -> trophies for one side of a game against a person, from BOTH sides' counts at the game's start (TROPHIES.md 3.3; sweep is history, always false now):
-//   gap = clamp(them - me, -300, 300); win = 30 + round(gap / 25) (+3 for a sweep) = 18..45; loss = -round(loss of MY rank * (1 - gap / 600)): half of it to someone
+//   gap = clamp(them - me, -300, 300); win = winOf(me) + round(gap / 25) (+3 for a sweep) = 10..45; loss = -round(loss of MY rank * (1 - gap / 600)): half of it to someone
 //   300 above, one and a half times it to someone 300 below. Bronze -3..-9, Platinum -9..-27, Pro -17..-51 (NOTES 194; it was -(20 - round(gap / 25)) = -32..-8 for every rank)
 function humanDelta(me, them, won, sweep) {
   const gap = clamp(int(them) - int(me), -300, 300);
-  return won ? 30 + Math.round(gap / 25) + (sweep ? 3 : 0) : -Math.round(lossOf(tierOf(me)) * (1 - gap / 600));
+  return won ? winOf(int(me)) + Math.round(gap / 25) + (sweep ? 3 : 0) : -Math.round(lossOf(tierOf(me)) * (1 - gap / 600));
 }
+// winOf(trophies) -> what a win over an equal opponent pays at this count: 30 through Bronze, then one less every two or three divisions
+// (30 - floor(0.4 * division index): Silver I 29, Gold I 28, Platinum I 27, Diamond I 26, Master I 24, Champion I 23, Champion III and Pro 22;
+// NOTES 203: the owner wanted the climb 'slightly more intensive', a little less for every rank and division). Keep the table of lossOf in mind: a
+// rank now holds at loss / (win + loss) wins: Bronze 17%, Platinum 40%, Champion 57%, Pro 61%
+function winOf(trophies) { const t = tierOf(trophies), step = (t - 1) * DIVS + (divOf(trophies, t) - 1); return 30 - Math.floor(0.4 * step); }
 // lossOf(tier) -> the rank's loss to an equal opponent (6 in Bronze .. 34 in Pro)
 function lossOf(tier) { return TIERS[clamp(int(tier), 1, TOP) - 1].loss; }
 // halveWin(delta) -> the winner's delta over a not-yet-established opponent (R11c new_opponent): half, never under 8
@@ -71,4 +76,4 @@ function mattAward(delta, dayUsed, dayCap, trophies) { return Math.max(0, Math.m
 const EXPORT_NAMES = NAMES;                                      // the export file names ranks by these words (never by tier number alone)
 
 module.exports = { TIERS, NAMES, FLOORS, ROMAN, TOP, DIVS, RANK_W, DIV_W, STICKY_TOP, CHAMPION, MATT_CEILING, EXPORT_NAMES,
-  tierOf, divOf, hasDivs, romanOf, rankName, floorOf, divFloorOf, nextFloorOf, nextDivFloorOf, applyFloor, humanDelta, lossOf, halveWin, mattDelta, mattLevel, mattAward };
+  tierOf, divOf, hasDivs, romanOf, rankName, floorOf, divFloorOf, nextFloorOf, nextDivFloorOf, applyFloor, humanDelta, winOf, lossOf, halveWin, mattDelta, mattLevel, mattAward };

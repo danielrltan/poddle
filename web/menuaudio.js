@@ -73,8 +73,19 @@ export function menuAudio(getAc) {
       [1046.5, 1318.5, 1567.98, 2093].forEach((f, i) => bell(f, 0.24 + i * 0.05, 0.6, 0.035, 1, 'sine', hall));
     },
   };
+  // the trophy count (NOTES 203): a tick per trophy that climbs a major scale with the count (n 0..10 = how far along), a chord when it lands,
+  // a low two-note drop for a loss; the menu's flight: a soft lift as each cup leaves, a brighter ping as it lands in the corner card
+  const TICK = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 19];
+  function tick(n, g = 0.11) { const i = Math.max(0, Math.min(10, n | 0)); bell(C5 * Math.pow(2, TICK[i] / 12), 0, 0.09, g, 0.985, 'triangle'); }
+  function land() { [C5, E5, G5, C5 * 2].forEach((f, i) => bell(f, i * 0.03, 0.42, 0.14, 0.98, 'triangle')); bell(C5 * 4, 0.12, 0.4, 0.03); }
+  function drop() { bell(E4, 0, 0.14, 0.16, 1.02); bell(C4 * 0.943, 0.11, 0.3, 0.16, 1.02); }
   function play(kind, n) {
     if (muted || uiVol <= 0 || !init()) return;
+    if (kind === 'tick') return tick(n);
+    if (kind === 'land') return land();
+    if (kind === 'drop') return drop();
+    if (kind === 'lift') return bell(A4 * Math.pow(2, (n | 0) % 5 / 12), 0, 0.07, 0.05, 0.9);
+    if (kind === 'arrive') return tick(n, 0.09);
     if (kind === 'hover') { const t = performance.now(); if (t - hoverAt < 45) return; hoverAt = t; }      // a sweep across a row of tiles is a patter, not a buzz
     if (kind === 'step') { const i = Math.max(0, Math.min(10, n | 0)), f = 261.63 * Math.pow(2, (DOREMI[i % 7] + 12 * Math.floor(i / 7)) / 12); bell(f, 0, 0.16, 0.18); return; }
     VOICES[kind]?.();

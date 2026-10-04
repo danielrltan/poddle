@@ -239,7 +239,7 @@ function setSound(on) { soundOn = !!on; scene.audio.setMute(!soundOn); mau.setMu
 // Menu music and menu sounds (NOTES 181). A phone is only ever the paddle's code screen: no music there (3.7 MB on a data plan), the clicks stay
 const mau = menuAudio(() => scene.audio.ctx?.()); mau.setMusic(musicVol); mau.setUi(uiVol); mau.setMute(!soundOn);
 const uiSfx = (k, n) => mau.play(k, n);
-wireMenuSounds(uiSfx);
+wireMenuSounds(uiSfx); ui.onSfx?.(uiSfx);      // the trophy count's ticks (ui.js rollTrophies, NOTES 203)
 if (qs.get('uitest') === '1') { window.__mau = mau; const p = mau.play; mau.play = (k, n) => { (window.__sfx ||= []).push(k); p(k, n); }; }      // test/menu-audio.mjs: the music's state, every sound asked for
 function setLevel(k, dir) {
   if (k === 'music') { musicVol = Math.max(0, Math.min(10, musicVol + dir)); mau.setMusic(musicVol); uiSfx('step', musicVol); }
@@ -326,7 +326,7 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 
 // ---------- screens: title -> connect -> calibrate -> play ----------
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
-function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); mau.music(!MOBILE && (name === 'title' || name === 'lobby')); }      // the music is the title's and the lobby's: it fades out on the way to a court      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
+function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); mau.music(!MOBILE && (name === 'title' || name === 'lobby')); if (name !== 'lobby') profile.chipStop?.(); }      // off the lobby: a trophy flight to the corner card lands at once (NOTES 203)      // the music is the title's and the lobby's: it fades out on the way to a court      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
 function openCourt() { screen(null); if (over) showOver(); padPhase(); }
 // A calibration is kept (NOTES 187): localStorage poddle.cal = { phone: {...}, airpod: {...} } (web/motion.js save / restore), one per kind of paddle, written when a
 // calibration finishes. From then on a seat opens straight onto the court, the paddle re-aimed at the screen from its first sample; a toast says C recalibrates. C,
@@ -350,7 +350,7 @@ function tellCal() { if (!seated() || spec() || !welcomed) { toldCal = null; ret
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
   uiSfx('select');                                 // a click anywhere or any key: the press that starts it all gets the select sound (the button itself never sees the click: the lobby is up by then)
-  phase = 'lobby'; screen('lobby'); if (MOBILE) wantWatch = true;      // a phone opens any court link as a spectator: a join link watches
+  phase = 'lobby'; screen('lobby'); profile.landed?.(); if (MOBILE) wantWatch = true;      // landed: the corner card's count is now in sight (NOTES 203)      // a phone opens any court link as a spectator: a join link watches
   if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
 function begin() {                                 // seated: the camera primer first (once ever), then straight to calibration if the paddle is already streaming, straight to the court if that is done too
@@ -462,7 +462,7 @@ function toLobby(msg) {                            // out of a room, back to the
   trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
-  ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home');
+  ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home'); profile.landed?.();      // the trophies the games earned fly into the corner card as the home comes in (NOTES 203)
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: meName(), ...alone(), reg: [meReg(), false] });
   if (msg) say(msg, null, 2600); else ui.toastOff();                                // 'Press Q again to leave' has been answered
   tourKind = null; tourMoving = false; ui.tourCourt(null); syncSettings();
@@ -816,7 +816,7 @@ social.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.
 // Called while this module loads, so the first socket's open already sends the hello. ui calls through ?. : test/menu.mjs stubs ui.js
 profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game.send(m), redial, crest: (L, signedIn) => ui.rankCrest?.(L, signedIn), progress: L => ui.rankProgress?.(L) || 0, emblem: (el, r) => ui.rankEmblem?.(el, r), toast: (t, ms) => say(t, null, ms), view: () => phase === 'lobby' && ui.currentScreen() === 'lobby' ? ui.lobbyView() : '',      // crest: the Your stats hero (docs/TROPHIES.md 4), L = the ladder with its place or null; ui.rankCrest keeps the rank and place for the Ranks page
   acct: () => social.acct(), friend: (box, p) => social.cardRow(box, p),      // who is signed in: the friends lists (and an open profile card's friend row) follow. The profile card's friend row: web/social.js draws it
-  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), cup: el => ui.cupify?.(el), board: () => { if (!room) ui.lobbyView('leaderboard'); },
+  badge: (el, on) => ui.regBadge?.(el, on), lockName: n => ui.lockName?.(n), stats: openStats, sfx: (k, n) => uiSfx(k, n), cupSvg: () => ui.cupSvg?.(),      // the corner card's trophy flight (profile.landed, NOTES 203): its sounds and its cup tiles: () => ui.tilesFit?.(), rankBadge: (el, r) => ui.rankBadge?.(el, r), cup: el => ui.cupify?.(el), board: () => { if (!room) ui.lobbyView('leaderboard'); },
   bot: level => { if (room || pending) return; if (!myName()) { ui.lobbyView('bot'); return; } playBot(level); } });      // Next: beat Club Matt. No name yet: the bot view, where the name row asks for one
 { const v = LOBBY && wantRoom.length !== 4 && PATH_VIEW[location.pathname]; routing = true; if (v) { play(); if (v !== 'home') ui.lobbyView(v); } else if (MOBILE) play(); }      // a phone skips the title: its home is the lobby's (a court link lands in Courts, watching)      // a reload on /courts, /stats, /ranks...: straight back to that view (after profile.init: Your stats fetches through it)
 // open(): the device list is re-read every time the card opens, because headphones come and go.

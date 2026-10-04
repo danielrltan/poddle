@@ -48,17 +48,18 @@ ok(L.applyFloor(5, 400) === 450 && L.applyFloor(8, 100) === 450, 'but never belo
 ok(L.tierOf(L.applyFloor(6, 740)) === 5 && L.divOf(740) === 3, 'a Master at 740 is Diamond III');
 ok(L.tierOf(L.applyFloor(8, 1030)) === 7 && L.divOf(1030) === 3, 'a Pro at 1030 is Champion III (off the leaderboard)');
 
-console.log('humanDelta: 18..45 for a win (+3 sweep); a loss costs the loser\'s rank loss (6 Bronze .. 34 Pro), x0.5 to someone 300 above, x1.5 to someone 300 below (NOTES 194)');
-ok(L.humanDelta(500, 500, true, false) === 30 && L.humanDelta(500, 500, false, false) === -18, 'equal trophies in Platinum: +30 / -18');
-ok(L.humanDelta(500, 500, true, true) === 33, 'a 2-0 sweep: +33');
+console.log('humanDelta: winOf(me) (30 in Bronze .. 22 in Pro, NOTES 203) + gap/25 for a win (+3 sweep); a loss costs the loser\'s rank loss (6 Bronze .. 34 Pro), x0.5 to someone 300 above, x1.5 to someone 300 below (NOTES 194)');
+ok(L.humanDelta(500, 500, true, false) === 26 && L.humanDelta(500, 500, false, false) === -18, 'equal trophies in Platinum II: +26 / -18');
+ok(L.humanDelta(500, 500, true, true) === 29, 'a 2-0 sweep: +29');
+ok(JSON.stringify([0, 100, 150, 300, 450, 500, 600, 750, 900, 1000, 1050, 1350].map(L.winOf)) === JSON.stringify([30, 30, 29, 28, 27, 26, 26, 24, 23, 22, 22, 22]), 'winOf: 30 through Bronze, one less every two or three divisions, 22 from Champion III up');
 ok(L.humanDelta(0, 300, true, false) === 42 && L.humanDelta(0, 300, true, true) === 45 && L.humanDelta(0, 300, false, false) === -3, 'the underdog: +42 (+45 sweep), a Bronze loss to someone 300 above costs 3');
-ok(L.humanDelta(300, 0, true, false) === 18 && L.humanDelta(300, 0, true, true) === 21 && L.humanDelta(300, 0, false, false) === -21, 'the favourite: +18 (+21), a Gold loss to someone 300 below costs 21');
+ok(L.humanDelta(300, 0, true, false) === 16 && L.humanDelta(300, 0, true, true) === 19 && L.humanDelta(300, 0, false, false) === -21, 'the favourite (Gold I): +16 (+19), a Gold loss to someone 300 below costs 21');
 ok(L.humanDelta(0, 1000, true, false) === 42 && L.humanDelta(1000, 0, false, false) === -45, 'the gap is clamped at 300 either way (Champion: 30 x 1.5)');
 ok(JSON.stringify([0, 149, 150, 300, 450, 600, 750, 900, 1050, 5000].map(t => L.humanDelta(t, t, false, false))) === JSON.stringify([-6, -6, -10, -14, -18, -22, -26, -30, -34, -34]), 'an equal loss grows with the rank: 6, 10, 14 .. 34 in Pro');
 ok(L.humanDelta(1050, 1350, false, false) === -17 && L.humanDelta(1350, 1050, false, false) === -51, 'Pro: 17 to someone 300 above, 51 to someone 300 below');
 { let lo = Infinity, hi = -Infinity, llo = Infinity, lhi = -Infinity;
   for (let me = 0; me <= 1500; me += 7) for (let them = 0; them <= 1500; them += 11) { const w = L.humanDelta(me, them, true, true), l = L.humanDelta(me, them, false, false); lo = Math.min(lo, w); hi = Math.max(hi, w); llo = Math.min(llo, l); lhi = Math.max(lhi, l); }
-  ok(lo === 21 && hi === 45 && llo === -51 && lhi === -3, `bounds over a sweep of counts: sweep wins ${lo}..${hi}, losses ${llo}..${lhi}`); }
+  ok(lo === 13 && hi === 45 && llo === -51 && lhi === -3, `bounds over a sweep of counts: sweep wins ${lo}..${hi}, losses ${llo}..${lhi}`); }
 ok(L.humanDelta(12, 12, true, false) === 30 && L.humanDelta(12, 24, true, false) === 30 && L.humanDelta(12, 25, true, false) === 31, 'rounding: a gap of 12 rounds to 0, 13 to 1 (round half up)');
 ok(L.humanDelta('x', null, true, false) === 30, 'junk counts are 0');
 

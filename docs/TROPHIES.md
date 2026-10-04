@@ -63,7 +63,7 @@ match (guard on the room, like `X.done`). Rules, in order:
 2. **Counted?** `r.ranked` from `stats.onEnd` (abuse.judge). Not counted: `+0`, `trophies: { counted: false, why }` with the
    existing `WHY` words. Exception (the leaver rule, 4).
 3. **Deltas.**
-   - vs a person (`human`, `tour`): `humanDelta(me, them, won, false)` (since NOTES 194 a loss costs the LOSER's rank `loss`, 6 Bronze, 10, 14, 18, 22, 26, 30, 34 Pro,
+   - vs a person (`human`, `tour`): `humanDelta(me, them, won, false)` (since NOTES 203 a win pays `winOf(me)` + gap/25: 30 through Bronze, one less every two or three divisions, 22 from Champion III and in Pro; since NOTES 194 a loss costs the LOSER's rank `loss`, 6 Bronze, 10, 14, 18, 22, 26, 30, 34 Pro,
      times `1 - gap / 600`: x0.5 to someone 300 above, x1.5 to someone 300 below; the examples below that say -20 predate it) from both seats' trophies read at match START (freeze
      them on the room in `startMatch`, like `Q` did: a Matt bounty landing elsewhere mid-game never changes it). An opponent with no
      ladder row or not eligible counts as `them = me` (gap 0: +30 / -20). `new_opponent` on the game: the winner's delta is

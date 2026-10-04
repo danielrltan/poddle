@@ -239,6 +239,8 @@ export function confetti(colors, n = 46) {
 // The old positional call (won, me, them, name) still works and means a room with no vote: the next game starts by itself.
 let resultRole = 'player', voted = false, votedYes = false, noCount = false, countT = 0, countLeft = 0, countTotal = 0;
 let stampT = 0;                                                  // the VICTORY! beat's timer: the card waits for it (NOTES 130)
+let stampAt = 0;      // when the title took the court (performance.now()), 0 = no stamp: the trophy roll waits out what is left of it
+const stampLeft = () => stampAt && $('screen-match')?.classList.contains('is-stamp') ? Math.max(0, STAMP_MS - (performance.now() - stampAt)) : 0;
 const STAMP_MS = 2000;                                           // how long the title has the court to itself (NOTES 171; ui.css ov-victory runs as long, server/game.js STAMP_S matches)
 const stacked = matchMedia('(max-aspect-ratio: 1/1), (max-width: 760px)');      // ui.css: the result panel lies along the bottom instead of down the right
 // Where the court shows beside the result panel, for the winner's shot (scene.setVictory): the free pane's share of the window and its centre in NDC
@@ -250,7 +252,7 @@ export function resultPane() { const c = $('result'), W = innerWidth || 1, H = i
 function title(word, cls, fit) {
   const st = $('result-slam'), scr = $('screen-match');
   if (st) { st.textContent = word; st.className = 'result-slam' + (word ? ' is-victory' + (cls ? ' ' + cls : '') : ''); st.style.cssText = ''; if (word && fit) st.style.fontSize = `min(9rem, ${(125 / word.length).toFixed(1)}vw)`; if (word) restart(st, 'go'); }
-  clearTimeout(stampT); const v = !!(st && word) && !reduced(); scr?.classList.toggle('is-stamp', v); if (v) stampT = setTimeout(() => { scr?.classList.remove('is-stamp'); cornerStamp(st); }, STAMP_MS);
+  clearTimeout(stampT); const v = !!(st && word) && !reduced(); scr?.classList.toggle('is-stamp', v); stampAt = v ? performance.now() : 0; if (v) stampT = setTimeout(() => { scr?.classList.remove('is-stamp'); cornerStamp(st); }, STAMP_MS);
   return v ? STAMP_MS : 0;
 }
 // At the cut the title does not leave: it shrinks into the court pane's top left corner and stays while the panel is up
@@ -295,7 +297,7 @@ export function matchResult(o, me, them, name) {
 }
 // the trophy row back to nothing: the roll, its ceremony and the card's extra room for it (matchResult and champion both start clean)
 export function trophyReset() {
-  clearTimeout(upT); upT = 0; const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll', 'is-none'); } $('result')?.classList.remove('has-trophies');
+  clearTimeout(upT); upT = 0; stopRoll(); const t = $('trophy'); if (t) { t.hidden = true; t.classList.remove('is-roll', 'is-none'); } $('result')?.classList.remove('has-trophies');
   const em = $('trophy-em'); if (em) { em.querySelector('.medal-rays')?.remove(); em.querySelector('.rank-em')?.classList.remove('is-pop', 'is-down'); em.querySelector('.rank-card-em')?.classList.remove('is-flip'); em.classList.remove('is-up'); }
   { const k = $('rank-kicker'); if (k) { k.hidden = true; k.textContent = ''; } } $('result-flash')?.classList.remove('is-sweep');
   const n = $('result-note'); n?.querySelector('.result-note-sub')?.remove(); n?.classList.remove('is-quiet'); { const rs = $('rank-slam'); if (rs) { rs.textContent = ''; rs.classList.remove('go'); } }
@@ -569,6 +571,9 @@ let setOpen = false, setH = {}, sinkSig = '', handing = false;
 const SINK_HINT = { browser: 'This browser can’t move the game’s sound. Choose your speakers in System Settings › Sound.',
   devices: 'Allow audio once so the browser can list your speakers. Nothing is recorded.',
   denied: 'Audio permission is blocked, so your speakers can’t be listed. Allow it for this site in your browser, or choose them in System Settings › Sound.' };
+export const cupSvg = () => CUP_SVG.replace('LABEL', '');      // the gold cup, for a flight drawn elsewhere (profile.js launchCup)
+let sfxH = null; export function onSfx(fn) { sfxH = typeof fn === 'function' ? fn : null; }      // main.js hands in the menu sounds (menuaudio.js play): the trophy count's ticks
+const sfx = (k, n) => { try { sfxH?.(k, n); } catch { /* a sound never stops the card */ } };
 export function onSettings(h) { setH = h || {}; }                                       // { open(), close(), sens(dir), airpod(on), stats(on), recenter(), leave(), name(text), move(mode), paddle(kind), bot(level), sound(on), sink() }
 export function settings(open) {
   if (open === undefined) return setOpen;
@@ -1357,14 +1362,42 @@ function drawRanks() {
 const MATT_LV = ['Rookie', 'Club', 'Pro', 'Tour'], MATT_NEED = [0, 1, 1, 3, 3, 2, 2, 2];      // Matt's wire level -> name; per rank, the lowest level a win pays at: the server says it (t.need, server/ladder.js TIERS[].matt); the table is the fallback for an older server
 const TROPHY_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count', left_early: 'They left before the game finished' };
 const NONE_LINE = { signin: 'Sign in to earn trophies', username: 'Pick a username to earn trophies' };
-let upT = 0;
+let upT = 0, rollT = [];
+const ROLL_AT = 1100;      // ms after the card: the row has popped (900) and the pill (1000); then the count climbs
+function stopRoll() { for (const t of rollT) clearTimeout(t); rollT = []; $('trophy-roll')?.remove(); for (const c of document.querySelectorAll('.trophy-fly')) c.remove(); const b = $('trophy'); if (b) b.classList.remove('is-rolling', 'is-landed'); $('trophy-n')?.classList.remove('is-land'); }
+// The count-up (NOTES 203, the owner: 'like brawlstars counting up'): the total climbs one trophy at a time in a layer over the real digits (which hold the
+// final number from the first frame, for readers and tests), each step a small pulse and a tick that climbs the scale; the steps come faster and faster
+// (t = T * (i/N)^0.6) so +45 takes no longer than ~1.5 s; cups jump from the +N pill into the number on the way; it lands with a bigger pop and a chord.
+// A loss counts down with a low drop at the end and no cups. -> when the count lands (ms after the card), for the rank ceremony that follows
+function rollTrophies(box, num, from, to) {
+  const N = Math.abs(to - from), t0 = ROLL_AT + stampLeft(); if (!N || reduced()) return t0;      // the panel's own pops are timed from the stamp's end (ui.css .screen.is-active delays): so is the roll
+  const roll = document.createElement('b'); roll.className = 'trophy-roll'; roll.id = 'trophy-roll'; roll.textContent = String(from); num.after(roll); box.classList.add('is-rolling');
+  const up = to > from, T = Math.min(1500, Math.max(420, 70 * N)), every = Math.max(1, Math.ceil(N / 6)), at = i => t0 + T * Math.pow(i / N, 0.6);
+  for (let i = 1; i <= N; i++) rollT.push(setTimeout(() => {
+    roll.textContent = String(from + (up ? i : -i)); roll.classList.remove('is-tick'); void roll.offsetWidth; roll.classList.add('is-tick');
+    if (N <= 15 || i % 2 === 0 || i === N) sfx('tick', up ? Math.round(10 * i / N) : Math.round(4 * (1 - i / N)));      // up the scale as it climbs; a loss walks down the low end
+    if (up && (i === 1 || i % every === 0) && i < N) flyCup(box);
+    if (i === N) { rollT = []; box.classList.remove('is-rolling'); box.classList.add('is-landed'); roll.remove(); num.classList.remove('is-land'); void num.offsetWidth; num.classList.add('is-land'); sfx(up ? 'land' : 'drop'); }
+  }, at(i)));
+  return t0 + T;
+}
+// one small cup leaps from the +N pill into the count (a short arc, 420 ms), then is gone
+function flyCup(box) {
+  const pill = $('trophy-d'), num = $('trophy-n'); if (!pill || !num || !box.offsetParent) return;
+  const a = pill.getBoundingClientRect(), b = num.getBoundingClientRect(), c = document.createElement('i'); c.className = 'trophy-fly'; c.innerHTML = CUP_SVG.replace('LABEL', ''); c.setAttribute('aria-hidden', 'true');
+  const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x1 = b.left + b.width / 2 + (Math.random() - 0.5) * b.width * 0.6, y1 = b.top + b.height / 2;
+  c.style.left = x0 + 'px'; c.style.top = y0 + 'px'; document.body.append(c);
+  const cx = (x0 + x1) / 2, cy = Math.min(y0, y1) - 70 - Math.random() * 30, pts = [];
+  for (let k = 0; k <= 10; k++) { const t = k / 10, u = 1 - t, x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1; pts.push({ transform: `translate(${(x - x0).toFixed(1)}px, ${(y - y0).toFixed(1)}px) scale(${(1.2 - 0.5 * t).toFixed(2)})`, opacity: t < 0.85 ? 1 : (1 - t) / 0.15 }); }
+  const an = c.animate(pts, { duration: 420, easing: 'ease-in', fill: 'forwards' }); an.onfinish = () => c.remove(); setTimeout(() => c.remove(), 700);
+}
 export function trophyRow(r) {
   const box = $('trophy'); if (!box || !r || typeof r !== 'object') return; trophyReset(); $('result')?.classList.add('has-trophies');
   if (NONE_LINE[r.none]) { box.classList.add('is-none'); setText($('trophy-note'), NONE_LINE[r.none]); show('trophy-note', true); box.hidden = false; return; }
   const now = rankRef(r), was = rankRef({ tier: r.tierWas, div: r.divWas }) || now, tier = now ? now.tier : 0, n = Math.max(0, r.trophies | 0), d = Number.isInteger(r.delta) ? r.delta : 0;
   const had = was || now || { tier: 1, div: 1 }, card = trophyCard(had.tier, had.div), e = card && card.querySelector('.rank-em'); if (e) e.classList.remove('is-down', 'is-pop');      // the rank I had until the count lands, named under its emblem
-  const num = $('trophy-n'); num.textContent = String(n); setText($('trophy-word'), n === 1 ? 'trophy' : 'trophies'); num.style.setProperty('--from', String(Math.max(0, n - d))); num.style.setProperty('--to', String(n));      // final from the first frame
-  box.classList.toggle('is-roll', d !== 0);
+  const num = $('trophy-n'); num.textContent = String(n); setText($('trophy-word'), n === 1 ? 'trophy' : 'trophies');      // final from the first frame: the roll draws over it
+  box.classList.toggle('is-roll', d !== 0); const landAt = rollTrophies(box, num, Math.max(0, n - d), n);
   const pill = $('trophy-d'); let text, cls = '', note = '';
   const why = (Array.isArray(r.why) ? r.why : []).find(w => TROPHY_WHY[w]), limit = r.matt === true && d === 0 ? r.limit : '';
   if (d < 0) { text = `−${-d}`; cls = 'is-down'; }      // the change as applied comes first: a loss is never 'No trophies' (a leaver's is taken whatever the verdict, docs/TROPHIES.md 3.4; they are in the lobby by then and see no card)
@@ -1378,7 +1411,7 @@ export function trophyRow(r) {
   pill.className = 'trophy-d' + (cls ? ' ' + cls : ''); setText(pill, text); setText($('trophy-note'), note); show('trophy-note', !!note);
   box.hidden = false;
   if (now && was && (now.tier !== was.tier || now.div !== was.div)) { const kind = now.tier > was.tier ? 'rank' : now.tier < was.tier || now.div < was.div ? 'down' : 'div';
-    upT = setTimeout(() => { upT = 0; if (slots.overlay === 'match') rankUp({ tier: now.tier, div: now.div, kind }); }, reduced() ? 0 : 2100); }      // after the count lands
+    upT = setTimeout(() => { upT = 0; if (slots.overlay === 'match') rankUp({ tier: now.tier, div: now.div, kind }); }, reduced() ? 0 : landAt + 420); }      // after the count lands
 }
 // the ceremony (docs/RANKED.md 8.10; NOTES 117): { tier, div, kind: 'rank' | 'div' | 'down' }. The emblem card in the trophy row names the new rank. rank: the emblem swaps, pops and
 // stays grown, rays open behind it, one band of light crosses the card, 'Rank up' under the delta; div: a pop and the numeral flips on its tag, 'Division up';

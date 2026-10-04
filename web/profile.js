@@ -20,7 +20,7 @@ const num = v => Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 let nonceP = null;      // one sign-in nonce per card: a reopened card reuses it, so the cookie (set by whichever response lands last) always holds the nonce Google is given
 let on = false, h = {}, sockHello = false, saved = null, viewGen = 0, loadGen = 0, gsi = null, lastFocus = null, lastBack = null, openAt = 0, meDone = false, lostP = null;      // openAt: when a card last opened (the veil ignores the rest of a double click). meDone: /api/me has answered (or failed). lostP: acctLost's /api/me check in flight      // saved: the server has a guest profile for this device (true / false / null = not asked)
 let me = { enabled: false, clientId: null, account: null, db: false };      // GET /api/me: sign-in on or off, the Google client id, who is signed in
-let meLadder = null, loading = false;      // meLadder: my ladder as last heard (/api/me for a signed-in account, then every /api/stats answer and each game's trophies): the hero draws it while /api/stats is asked, so Your stats never opens on 'No trophies yet' and then grows (NOTES 150). loading: showProfile's first draw, before the answer
+let meLadder = null, loading = false, chipShown = null, chipFly = null;      // chipShown: the count the corner card last showed on a lobby screen (null: never); chipFly: the trophies in flight to it (NOTES 203)      // meLadder: my ladder as last heard (/api/me for a signed-in account, then every /api/stats answer and each game's trophies): the hero draws it while /api/stats is asked, so Your stats never opens on 'No trophies yet' and then grows (NOTES 150). loading: showProfile's first draw, before the answer
 let share = null, shareable = false, shareP = null;      // share: { url, image } of my live link (docs/SHARE.md 2), null = none yet. shareable: the server answered a profile with a share field (an older server has no /api/share)
 
 // ---------- the device id (3.1): made at the first seat, never at load. A bearer secret for the guest profile: never in a URL or a log ----------
@@ -381,7 +381,7 @@ export function acctLost() {
   lostP = (async () => { let r = null; try { r = await api('/api/me'); } catch { r = null; }
     if (!me.account || !r || !r.ok || !r.j) return '';      // no answer: unknown, so nothing is dropped
     const a = acct(r.j.account), what = !a ? 'signin' : !a.username ? 'username' : '';
-    if (what) { me.account = a; meLadder = null; drawAcct(); redrawView(); } return what; })().finally(() => { lostP = null; });
+    if (what) { me.account = a; meLadder = null; chipShown = null; drawAcct(); redrawView(); } return what; })().finally(() => { lostP = null; });
   return lostP;
 }
 const redrawView = () => { const v = h.view(); if (v === 'profile') showProfile(); else if (v === 'leaderboard') showBoard(); else if (v === 'ranks') showRanks(); };      // after a sign-in, sign-out or new username: the open view redraws
@@ -443,7 +443,7 @@ async function onCredential(resp) {                        // Google's popup ans
   nonceP = null;                                            // single use: the server cleared it with this answer
   if (!r.ok || !r.j) { const msg = r.status === 403 ? 'That sign-in timed out. Try again.' : r.status === 503 ? 'Sign-in isn’t available right now. You can keep playing as a guest.' : 'Couldn’t sign you in. Try again.';
     if (r.status === 503) { show('signin-btn', false); show('signin-hint', false); err('signin-err', msg); } else loadGoogle().then(() => err('signin-err', msg)); return; }      // the nonce is single use: Google's button comes back with a new one
-  me.account = acct(r.j.account) || { username: null, renameAt: null }; saved = null; meLadder = null; drawAcct(); h.redial();      // the socket opens again (after the match) so its upgrade carries the cookie
+  me.account = acct(r.j.account) || { username: null, renameAt: null }; saved = null; meLadder = null; chipShown = null; drawAcct(); h.redial();      // the socket opens again (after the match) so its upgrade carries the cookie
   redrawView();
   if (!me.account.username) claimCard(); else { closeCard(); h.toast(`Signed in as ${me.account.username}`, 2400); }      // no username yet: pick one now (Skip for now is there)
 }
@@ -451,7 +451,7 @@ export async function signOut() {                           // only the server's
   if (!on) return;
   let r; try { r = await api('/api/signout', 'POST', {}); } catch { r = { ok: false, status: 0, j: null }; }
   if (r.status !== 204) { h.toast(r.status === 429 ? `Couldn’t sign you out. Try again in ${Math.max(1, num(r.j && r.j.retryAfter))} s.` : 'Couldn’t sign you out. Try again.', 2600); return; }
-  me.account = null; meLadder = null; forgetDevice(); drawAcct(); h.redial(); h.toast('Signed out', 1800);
+  me.account = null; meLadder = null; chipShown = null; forgetDevice(); drawAcct(); h.redial(); h.toast('Signed out', 1800);
   redrawView();
 }
 
@@ -552,12 +552,56 @@ export async function claimName(name) {                    // -> true when the s
 // the player card in the header's corner (NOTES 161): my rank emblem, name and trophies without opening Your stats. Drawn from meLadder, so it follows
 // /api/me, every /api/stats answer and each game's trophies. No trophies yet: the person icon and 0. A guest or an account without a username keeps the plain button
 function drawChip() {
+  if (chipFly) return;      // the flight draws the card itself, and draws it whole when the last cup lands
   const b = $('btn-head-acct'); if (!b) return; const a = on && me.enabled ? me.account : null, name = a && a.username, L = name ? meLadder : null;
   b.classList.toggle('is-card', !!name); show('head-acct-n', !!name); text('head-acct-tr', (L ? L.trophies : 0).toLocaleString('en-US'));
   { const em = $('head-acct-em'); if (em && em.dataset.r !== (L ? L.tier + '.' + L.div : '')) { em.dataset.r = L ? L.tier + '.' + L.div : ''; h.emblem(em, L ? { tier: L.tier, div: L.div } : null); } show('head-acct-em', !!L); b.classList.toggle('has-em', !!L); }
   { const bar = $('head-acct-bar'); if (bar) { const p = L ? h.progress(L) : 0; bar.style.setProperty('--p', p.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(p * 100))); } show('head-acct-bar', !!name); }      // the trophy bar: the hero's, across the current division
   if (name) b.setAttribute('aria-label', `${name}, ${(L ? L.trophies : 0).toLocaleString('en-US')} trophies: your stats`);
+  if (document.body.dataset.screen === 'lobby') chipShown = L ? L.trophies : null;      // what the player has seen: a lobby screen is up. On the court the card is out of sight, so the new count waits for landed()
 }
+// ---------- back in the menu after a game: the trophies won fly from Quick play into the corner card (NOTES 203, the owner: 'spawn from the quickplay
+// button as a bunch of icons and fly towards your trophy bar and u watch it increase in real time ... exponentially in speed'). main.js calls landed()
+// once the lobby's home is up. The card is set back to the count it last showed, cups leave Quick play faster and faster (gaps shrink by a fifth each,
+// 150 ms down to 25) and each one that lands adds its share, bumps the card and pings; the last brings the emblem and the bar up to date.
+// A loss counts down in place with no cups. Nothing happens the first time the card is drawn, with no username, or with reduced motion.
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FLOORS = [0, 150, 300, 450, 600, 750, 900, 1050], DIV_W = 50;      // server/ladder.js TIERS floors and DIV_W (web/emblems.js mirrors them too): where a count sits, for the flight's bar and emblem
+function rankAt(v) { let t = 1; while (t < FLOORS.length && v >= FLOORS[t]) t++; if (t === FLOORS.length) return { tier: t, div: 1, p: 1 }; const d = Math.min(3, 1 + Math.floor((v - FLOORS[t - 1]) / DIV_W)); return { tier: t, div: d, p: Math.max(0, Math.min(1, (v - FLOORS[t - 1] - (d - 1) * DIV_W) / DIV_W)) }; }
+export function landed() {
+  const a = on && me.enabled ? me.account : null, L = a && a.username ? meLadder : null, to = L ? L.trophies : null, from = chipShown;
+  if (chipFly || to == null || from == null || from === to || reduced()) { chipShown = to; drawChip(); return; }
+  const nEl = $('head-acct-tr'), bar = $('head-acct-bar'), card = $('btn-head-acct'), src = $('btn-quick'); if (!nEl || !card || card.hidden) { chipShown = to; drawChip(); return; }
+  const d = to - from, up = d > 0, n = up && src && src.offsetParent ? Math.min(d, 24) : 0, share = [];      // n cups, the whole gain spread over them (the first ones carry the remainder)
+  for (let i = 0; i < n; i++) share.push(Math.floor(d / n) + (i < d % n ? 1 : 0));
+  chipFly = { cur: from, timers: [] }; const flyT = chipFly.timers;
+  const em = $('head-acct-em'); let shownR = '';
+  const draw = v => { const r = rankAt(v); text('head-acct-tr', v.toLocaleString('en-US')); if (bar) bar.style.setProperty('--p', r.p.toFixed(3));      // the bar and the emblem follow the climbing count, not the final one
+    const key = r.tier + '.' + r.div; if (em && key !== shownR) { shownR = key; h.emblem(em, { tier: r.tier, div: r.div }); em.dataset.r = key; if (v !== from) { em.classList.remove('is-pop'); void em.offsetWidth; em.classList.add('is-pop'); } } };
+  const bump = () => { card.classList.remove('is-bump'); void card.offsetWidth; card.classList.add('is-bump'); };
+  const done = () => { chipFly = null; chipShown = to; drawChip(); card.classList.remove('is-bump'); void card.offsetWidth; card.classList.add('is-landed'); setTimeout(() => card.classList.remove('is-landed'), 700); h.sfx?.(up ? 'land' : 'drop'); };
+  draw(from);
+  if (!n) {      // a loss, or nowhere to fly from: the count walks to the new number in place, faster and faster
+    const N = Math.abs(d), T = Math.min(900, Math.max(300, 50 * N));
+    for (let i = 1; i <= N; i++) flyT.push(setTimeout(() => { draw(from + (up ? i : -i)); bump(); if (N <= 12 || i % 2 === 0) h.sfx?.('tick', up ? Math.round(10 * i / N) : Math.round(4 * (1 - i / N))); if (i === N) done(); }, 500 + T * Math.pow(i / N, 0.6)));
+    return;
+  }
+  const FLIGHT = 560; let t = 650, gap = 150;      // the first cup leaves once the home has settled (toLobby calls this as the screen comes in); the gaps between launches shrink by a fifth each time
+  for (let i = 0; i < n; i++) {
+    const at = t; flyT.push(setTimeout(() => { launchCup(src, nEl, i); h.sfx?.('lift', i); }, at));
+    flyT.push(setTimeout(() => { chipFly.cur += share[i]; draw(chipFly.cur); bump(); h.sfx?.('arrive', Math.round(10 * (i + 1) / n)); if (i === n - 1) done(); }, at + FLIGHT));
+    t += gap; gap = Math.max(25, gap * 0.8);
+  }
+}
+function launchCup(src, dst, i) {      // one gold cup from the middle of Quick play to the card's count, on a rising arc, gone as it lands
+  const a = src.getBoundingClientRect(), b = dst.getBoundingClientRect(); if (!a.width || !b.width) return;
+  const x0 = a.left + a.width / 2 + (Math.random() - 0.5) * a.width * 0.4, y0 = a.top + a.height / 2 + (Math.random() - 0.5) * a.height * 0.4, x1 = b.left + b.width / 2, y1 = b.top + b.height / 2;
+  const c = mk('i', 'trophy-fly'); c.innerHTML = h.cupSvg ? h.cupSvg() : ''; c.setAttribute('aria-hidden', 'true'); c.style.left = x0 + 'px'; c.style.top = y0 + 'px'; document.body.append(c);
+  const cx = (x0 + x1) / 2 + (Math.random() - 0.5) * 120, cy = Math.min(y0, y1) - 90 - Math.random() * 60, pts = [];
+  for (let k = 0; k <= 12; k++) { const t = k / 12, u = 1 - t, x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1; pts.push({ transform: `translate(${(x - x0).toFixed(1)}px, ${(y - y0).toFixed(1)}px) scale(${(1.5 - 0.7 * t).toFixed(2)}) rotate(${(i % 2 ? 1 : -1) * 25 * (1 - t)}deg)`, opacity: t < 0.9 ? 1 : (1 - t) / 0.1 }); }
+  const an = c.animate(pts, { duration: 560, easing: 'cubic-bezier(.3,0,.7,1)', fill: 'forwards' }); an.onfinish = () => c.remove(); setTimeout(() => c.remove(), 900);
+}
+export function chipStop() { if (!chipFly) return; for (const t of chipFly.timers) clearTimeout(t); chipFly = null; for (const c of document.querySelectorAll('.trophy-fly')) c.remove(); chipShown = meLadder ? meLadder.trophies : null; drawChip(); }      // the lobby left mid-flight: the card is drawn whole
 function drawAcct() {
   const en = on && me.enabled, a = en ? me.account : null, name = a && a.username;
   show('btn-pf-signin', en && !a); show('btn-pf-signout', !!a); show('btn-pf-rename', !!a); show('btn-pf-share', on && shareable); show('pf-acct', en || (on && shareable));      // Share card shows with sign-in off too
@@ -581,7 +625,7 @@ let mePromise = Promise.resolve(me);
 const click = (id, f) => { const el = $(id); if (el) el.addEventListener('click', f); };
 export function init(hooks) {
   const noop = () => {};
-  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, tiles: noop, crest: noop, progress: () => 0, emblem: noop, rankBadge: noop, board: noop, cup: noop, acct: noop, friend: noop };      // acct, friend: web/social.js (the account changed; the profile card's friend row)
+  h = { send: noop, redial: noop, toast: noop, view: () => '', badge: noop, lockName: noop, stats: noop, bot: noop, tiles: noop, crest: noop, progress: () => 0, emblem: noop, rankBadge: noop, board: noop, cup: noop, acct: noop, friend: noop, sfx: noop, cupSvg: () => '' };      // sfx, cupSvg: the corner card's trophy flight (NOTES 203). acct, friend: web/social.js (the account changed; the profile card's friend row)
   for (const k of Object.keys(h)) if (hooks && typeof hooks[k] === 'function') h[k] = hooks[k];      // only the names above: nothing else is copied in
   on = !!(hooks && hooks.on === true);
   ls.del(OLD_ON_KEY);      // Save my stats was removed (NOTES 116): a browser that had turned it off would otherwise keep a dead key. Stats are always kept now
