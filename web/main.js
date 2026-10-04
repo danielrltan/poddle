@@ -3,6 +3,7 @@ import { MotionModel, qrot } from './motion.js';
 import { createScene, shownN, lookFor } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
+import { menuAudio, wireMenuSounds } from './menuaudio.js';      // menu sounds and menu music (NOTES 181)
 import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
 import * as profile from './profile.js';        // player stats (docs/ACCOUNTS.md 9): the device id, the hello, /api, sign-in. Its DOM is its own
 import * as social from './social.js';          // friends (docs/SOCIAL.md 6, 8): search, requests, who is online, the profile card's friend row. Its DOM is its own too
@@ -59,7 +60,7 @@ const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverl
 // or heard over the court (toasts, banners, the result, the hold card) waits until the court is what is on screen.
 const seated = () => !LOBBY || !!room, live = () => phase === 'play' || phase === 'watch', spec = () => role === 'spectator';
 if (qs.get('uitest') === '1') { window.__ui = ui; window.__scene = scene; }      // test hooks: test/e2e.mjs forces UI states for screenshots, test/menu.mjs reads the scene's mode
-const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } } };
+const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } }, del(k) { try { localStorage.removeItem(k); } catch { /* same */ } } };
 const BADGE_OUT = /[\u221a\u2122\u2610-\u2612\u2705\u2713\u2714\u{1f5f8}\u{1f5f9}\u{1f197}][\ufe0e\ufe0f]?/gu;      // text imitations of the registered badge (docs/ACCOUNTS.md 7.3): √ ™ ☐☑☒ ✅ ✓ ✔ 🗸 🗹 🆗 and a selector after one. The badge itself is an element
 const cleanName = t => { const n = [...String(t == null ? '' : t).replace(BADGE_OUT, '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
 const myName = () => cleanName(ui.playerName()) || cleanName(ls.get('poddle.name'));      // the lobby field; what was kept last time when the field is not there
@@ -208,21 +209,33 @@ function setView(name, flip) {                     // flip: asked for by the vie
 // ---------- settings panel (docs/API-NEXT.md 3.2): every row is also a silent key ----------
 let showPod = prefs.airpod !== false, showBody = prefs.body !== false, showStats = false;      // showBody: your own see-through player model (off = the original ghost forearm alone)      // the stats panel has no switch any more (NOTES 52): off at every load, H still shows it for whoever is tuning
 // Sound (NOTES 60). sinkId is a deviceId the browser gave us for THIS origin; sinks is what it is willing to name right now.
+const lvl = (v, d) => Number.isInteger(v) && v >= 0 && v <= 10 ? v : d;      // Music and Menu sounds, 0..10 (NOTES 181)
+let musicVol = lvl(prefs.music, 5), uiVol = lvl(prefs.menuSfx, 6);
 let soundOn = prefs.sound !== false, sinkId = typeof prefs.sink === 'string' ? prefs.sink : '', sinks = [], sinkDenied = false;
 // sound / sink are left out while they are the default, so a player who never opens the Sound rows keeps the same saved object as before
-const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined }));
+const savePrefs = () => ls.set('poddle.settings', JSON.stringify({ airpod: showPod, stats: showStats, reach: body ? body.reach : prefs.reach, sound: soundOn ? undefined : false, body: showBody ? undefined : false, sink: sinkId || undefined, music: musicVol === 5 ? undefined : musicVol, menuSfx: uiVol === 6 ? undefined : uiVol }));
 const reachNow = () => body ? body.reach : Number.isFinite(prefs.reach) ? prefs.reach : 0.3;
 const sensOf = () => { const r = reachNow(); return { sens: Math.round((0.42 - r) / 0.03) + 1, sensMin: r > 0.419, sensMax: r < 0.081 }; };      // 1 = least sensitive. Range is Body's: how far you step to reach the sideline
 function syncSettings() { ui.setSettings({ ...sensOf(), airpod: showPod, body: showBody, stats: showStats, inRoom: LOBBY && !!room, spectator: spec(), bodyOk: !NO_CAM, bodyNote: NO_CAM || (body ? body.ready : camOn) ? '' : 'Body turns the camera on', tourMatch: tourKind === 'match',      // bodyOk: Body can be picked wherever a camera can be asked for
-  sound: soundOn, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
+  sound: soundOn, music: musicVol, uisfx: uiVol, sink: sinkId, sinks: [{ id: '', label: 'System default' }, ...sinks],
   sinkWhy: !scene.audio.canSwitch() ? 'browser' : sinks.length ? '' : sinkDenied ? 'denied' : 'devices' }); }
 function sens(dir, quiet) {                        // ] / + = more sensitive, [ / - = less. The panel shows the number, the keys say it
-  if (!body) return;
+  if (!body) { if (!ui.currentScreen()) return; prefs.reach = Math.max(0.08, Math.min(0.42, reachNow() - dir * 0.03)); savePrefs(); syncSettings(); return; }      // no camera yet (the menu): the kept range, for when it starts
   body.reach = Math.max(0.08, Math.min(0.42, body.reach - dir * 0.03)); if (!quiet) say(`Range: step ${(body.reach * 100).toFixed(0)}% of the view to reach the sideline`);
   savePrefs(); syncSettings();
 }
 const show = ui.show;
-function setSound(on) { soundOn = !!on; scene.audio.setMute(!soundOn); if (soundOn) unlock(); savePrefs(); syncSettings(); }
+function setSound(on) { soundOn = !!on; scene.audio.setMute(!soundOn); mau.setMute(!soundOn); if (soundOn) unlock(); savePrefs(); syncSettings(); }
+// Menu music and menu sounds (NOTES 181). A phone is only ever the paddle's code screen: no music there (3.7 MB on a data plan), the clicks stay
+const mau = menuAudio(() => scene.audio.ctx?.()); mau.setMusic(musicVol); mau.setUi(uiVol); mau.setMute(!soundOn);
+const uiSfx = (k, n) => mau.play(k, n);
+wireMenuSounds(uiSfx);
+if (qs.get('uitest') === '1') { window.__mau = mau; const p = mau.play; mau.play = (k, n) => { (window.__sfx ||= []).push(k); p(k, n); }; }      // test/menu-audio.mjs: the music's state, every sound asked for
+function setLevel(k, dir) {
+  if (k === 'music') { musicVol = Math.max(0, Math.min(10, musicVol + dir)); mau.setMusic(musicVol); uiSfx('step', musicVol); }
+  else { uiVol = Math.max(0, Math.min(10, uiVol + dir)); mau.setUi(uiVol); uiSfx('step', uiVol); }      // heard at the level just set
+  savePrefs(); syncSettings();
+}
 function forgetSink(why) { sinkId = ''; scene.audio.setSink(''); savePrefs(); syncSettings(); if (why) say(why, null, 2600); }      // the device went away: back to wherever the system points, and the row must stop naming it
 const loadSinks = () => scene.audio.devices().then(ds => { sinks = ds; syncSettings(); });      // empty until the page holds MICROPHONE permission: nothing else makes the browser name an output device
 // Asking for it is the ONLY way to get a device list (measured: a camera grant does not do it, NOTES 64). The track is
@@ -303,7 +316,7 @@ function resetPeaks() { peaks = []; log10 = []; sessionPeak = 0; ui.setStat('sw'
 
 // ---------- screens: title -> connect -> calibrate -> play ----------
 function showCal(e) { if (phase === 'calibrate') ui.calibration(e, { camLost: !!(body && body.ready && !body.seen()) }); }
-function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); }      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
+function screen(name) { ui.showScreen(name); scene.setMenu(!!name); route(); mau.music(!MOBILE && (name === 'title' || name === 'lobby')); }      // the music is the title's and the lobby's: it fades out on the way to a court      // a menu screen over the court = the menu camera and the cheap render mode (docs/API-NEXT.md 2.4)
 function openCourt() { screen(null); if (over) showOver(); padPhase(); }
 function startCal() { if (undo) undo.kept = false; calibrating = true; stats.calibrated = false; model.startCalibration(); phase = 'calibrate'; ui.calibrationReset(); screen('calibrate'); tellCal(); padPhase(); }
 // The server is told whether this seat is ON THE COURT, from what the player is looking at, never from the calibration flags: a calibration is kept
@@ -314,6 +327,7 @@ const onCourt = () => phase === 'play' && !ui.currentScreen();
 function tellCal() { if (!seated() || spec() || !welcomed) { toldCal = null; return; } const cal = !onCourt(); if (cal !== toldCal) { toldCal = cal; game.send({ type: 'status', cal }); } }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
+  uiSfx('select');                                 // a click anywhere or any key: the press that starts it all gets the select sound (the button itself never sees the click: the lobby is up by then)
   phase = 'lobby'; screen('lobby'); if (MOBILE) wantWatch = true;      // a phone opens any court link as a spectator: a join link watches
   if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
 }
@@ -757,9 +771,10 @@ setInterval(() => {                               // 20Hz: tell the server where
 let unlocked = false;
 // The AudioContext only exists from the first gesture on, so the kept output is applied HERE, not at load. A device that has
 // since been unplugged rejects: drop it rather than let the panel name a speaker nothing is playing out of.
-const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That speaker was disconnected. Using the system default.'); }); } };
+const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (!MOBILE) mau.prime(); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That speaker was disconnected. Using the system default.'); }); } };
 scene.audio.onDevicesChanged(loadSinks);           // an AirPod connecting mid-match changes the list under the open card
-addEventListener('pointerdown', () => { unlock(); play(); });
+let setAtDown = false; addEventListener('pointerdown', () => { setAtDown = ui.settings(); }, true);      // before ui.js closes the card: that click only closes it
+addEventListener('pointerdown', e => { unlock(); if (!setAtDown && !e.target.closest?.('.menu-set, #settings')) play(); });      // the title's settings button and its card are not "anywhere to start"
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: MOBILE || wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // a phone's Enter in the code boxes, or a court row, watches      // the code screen of a watch link watches
   watch: code => request({ type: 'watch', code }),             // a Watch button, or Yes on 'Court is full. Watch instead?'
@@ -781,10 +796,12 @@ profile.init({ on: HOSTED && LOBBY || qs.get('acctest') === '1', send: m => game
 // open(): the device list is re-read every time the card opens, because headphones come and go.
 // Keep every handler below on its own line: an end-of-line comment here once swallowed six of them (NOTES 64).
 ui.onSettings({
-  open: () => { pause(true); setDim(); loadSinks(); },
-  close: over => { if (!over) pause(false); setDim(); },      // over: the friends card opens in its place and keeps the pause
-  sens: dir => sens(dir < 0 ? -1 : 1, true), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
-  move: m => { if (!MODES.includes(m)) return; if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); },      // how you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
+  open: () => { pause(true); setDim(); loadSinks(); uiSfx('open'); },
+  close: over => { if (!over) { pause(false); uiSfx('close'); } setDim(); },      // over: the friends card opens in its place and keeps the pause
+  sens: dir => { sens(dir < 0 ? -1 : 1, true); uiSfx('step', sensOf().sens - 1); }, music: dir => setLevel('music', dir < 0 ? -1 : 1), uisfx: dir => setLevel('ui', dir < 0 ? -1 : 1), airpod: setPod, body: setBody, stats: setStats, recenter, leave, name: rename,
+  move: m => { if (!MODES.includes(m)) return;
+    if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
+    if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); },      // how you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
   paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
@@ -795,7 +812,8 @@ ui.onRematch(yes => { if (!room) return; if (spec()) { if (!yes) leave(); return
   votedYes = !!yes; votedNo = !yes; game.send({ type: 'rematch', yes: !!yes });      // Leave = no: the server closes the room for everyone, 'closed' brings us back to the lobby
   if (!yes) { const r = room; setTimeout(() => { if (room === r && votedNo) leave(); }, 3000); } });      // unless it never answers
 ui.onRetry(() => location.reload());
-function esc() { if (ui.championShowing()) { tourCourts(); return; } if (ui.currentOverlay() === 'tour-vs') return;
+function esc() { if (ui.settings() && ui.currentScreen()) { ui.settings(false); return; }      // the menu's settings card first
+  if (ui.championShowing()) { tourCourts(); return; } if (ui.currentOverlay() === 'tour-vs') return;
   if (ui.tourCard()) { ui.tourCard(false); return; }
   if (ui.friendsCard?.()) { ui.friendsCard(false); return; }      // the friends card: Esc closes it (a profile card over it closed first: profile.js has those keys)
   if (tourKind === 'match' && spec() && live() && !ui.currentScreen() && !ui.currentOverlay() && !ui.settings()) { leave(); return; }      // watching one of its matches: Esc (and T) is back to the bracket
@@ -808,7 +826,7 @@ addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') { if (k === 'escape') esc(); return; }      // typing a room code or a name: F, C, B, M are letters there
   if ((k === 'y' || k === 'n') && ui.askShowing()) { if (!e.repeat) answer(k === 'y'); return; }      // only while the card shows: otherwise Y and N do nothing
   if (k === 'f') { ui.fullscreen(); return; }
-  if (phase === 'title') { if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
+  if (phase === 'title') { if (ui.settings()) { if (k === 'escape') ui.settings(false); return; } if (e.repeat) return; if (k === ' ' || k === 'enter') { e.preventDefault(); ui.fullscreen(true); } play(); return; }   // first gesture: any key presses Play
   if (k === 'escape') { esc(); return; }
   if (k === 't' && tour && !e.repeat) { tourKey(); return; }     // T: the tournament (its card in a warm-up; back to the bracket while watching; its screen from the lobby)
   if (ui.currentOverlay() === 'tour-vs') return;      // the VS card: the seat is already drawn, so Q Q, C, B and 1-4 would only tear the card down and the seat would still pull me in (Esc is gated in esc())

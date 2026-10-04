@@ -3851,3 +3851,42 @@ NOTES 178's one server line added `reg` to t.champ with a trailing `//` comment,
 `t.phase = 'done'; t.doneAt = Date.now(); t.next = null;`. A final's result never made a tournament 'done': no champion screen, the bracket
 stuck in 'play', and trophies.test.mjs failed ("the final ends, a champion"), which the deploy gate caught on the next ship. The three
 statements are back before the comment. trophies.test and tourney.test pass; live from this deploy (the broken server was deployed with 178).
+
+## 181. Menu music, menu sounds, and Settings from the menu
+- The owner: "add UI SFX ... as close to the aesthetic of wii ... add menu music and menu settings that allow you to change game settings from the
+  main menu as well as turn down menu sfx", with a YouTube link to the music: "Into the Blue" by Gwamm Music (the launch video's track, v8), "credit him".
+- web/menuaudio.js (new). Menu sounds, all synthesised through scene.js's AudioContext (scene.audio.ctx(), so Settings > Output applies): each
+  voice is a soft bell (the note, a quiet octave, a 35 ms glassy partial for the plink) into a small 0.7 s generated reverb. hover C7 breath;
+  select E6 -> B6; back G6 -> C6; switch on/off up/down; radio pick A6; card open/close a four/three-note arpeggio; stepper notes climb a major
+  pentatonic with the value (never sour); nope (a disabled control) two low taps. Hover = a mouse entering a NEW control (45 ms throttle) or a
+  keyboard focus move (Tab/arrows), never touch, never a focus() the code gives. Scope: .screen, .settings, [role=dialog], .acct-layer; the HUD
+  stays quiet. data-sfx="none" opts a control out (the settings buttons and the steppers play their own sound from main.js), data-sfx="<kind>" picks one.
+- Music: web/audio/into-the-blue.mp3 (from ~/poddle-launch-video/music/into-the-blue.wav: whole track, 4:28, loudnorm -18 LUFS, 112 kbps, 3.7 MB).
+  Plays on the title and the lobby (main.js screen()), fades in 1.6 s, out 0.6 s for anything else (connect, calibrate, the court, spectating)
+  and pauses rather than stops, so back in the menu the song carries on. Fetched only after the first gesture, whole, into a blob URL (the
+  static server has no byte ranges, which Safari needs to stream), on an <audio loop> blessed inside that first gesture with 0.1 s of silence
+  (iOS will not start it later otherwise), routed through a MediaElementSource to its own gain (no compressor). Paused while the tab is hidden.
+  Never on a phone (MOBILE: it is only the paddle-code screen there, and 3.7 MB on a data plan); the clicks still play there.
+- Levels: Settings > Sound > Music and Menu sounds, 0..10 steppers (Sensitivity's markup), defaults 5 and 6, gain curve (v/10)^1.7. The Sound
+  switch mutes both. Kept in poddle.settings as music / menuSfx, left out while at the default. At the defaults a select peaks near -19 dBFS
+  (offline render), the music near -16. Changing Menu sounds plays its step at the new level.
+- Settings from the menu: a settings button (sliders icon, .menu-set) top right on the title and in the lobby header opens the SAME #settings
+  card (one card rule), solid background, anchored under that button. ui.settings() now opens on the title and lobby (body[data-settings=menu],
+  .settings.is-menu); hidden there: the status lights, Recenter, Difficulty, Social (the lobby has the Friends tile) and the Leave foot. On a phone
+  the Paddle and Match groups and Music are hidden too. Rows that need a camera work without one from the menu: Sensitivity edits the kept range
+  (prefs.reach) when there is no tracker, on the menu only (a court without a camera is unchanged); Move only sets the mode (picking Body after Play without camera clears poddle.camPrimer so the primer
+  asks again at the next court, never the camera itself from the menu).
+- Edge cases: the title's "click anywhere to start" ignores the settings button and the card, and a click that only closes the card does not
+  start the game either (main.js setAtDown); keys on the title with the card open do nothing but Esc closes it; Esc in the lobby closes the card
+  before Back; moving to another screen closes the card (swap). The select sound for Play comes from play() (the pointerdown swaps to the lobby
+  before the button can see its click). A first visit hears no music until its first click or key (autoplay rules).
+- Credit: the title footer link "Music: Into the Blue by Gwamm Music" (youtube.com/@GwammMusic), the changelog, and Terms 9.
+  Licence: his description allows use "in videos, livestreams or podcasts as background music" with credit and forbids "selling or uploading my
+  music on any platform"; a game menu is not named either way. Shipped on the owner's explicit ask; confirming with contact@gwamm.tv is open.
+- Legal (CLAUDE.md): Privacy 5 (poddle.settings now holds the two volumes), Privacy third parties (YouTube, only on a click of the credit), Terms 9
+  (the music's copyright is the artist's, not covered by our licence). Last updated + dateModified + sitemap lastmod bumped. MIME .mp3 in server/game.js.
+- test/menu-audio.mjs (new, real server): card opens on title and lobby without leaving them, above the title, court rows hidden; music plays
+  after the first gesture, carries into the lobby, stops for Sound off and for a court; levels step and are kept; hover once per control;
+  narrow window fits. SHOTS=<dir> saves screenshots.
+- Existing suites, each run alone and against main (64119ed): menu.mjs and ui-next.mjs fail exactly main's assertions (ui-next's settings-row
+  and Tab-order lists now also name Music and Menu sounds); camprimer.mjs and seo.test.mjs pass.

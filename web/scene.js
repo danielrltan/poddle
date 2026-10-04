@@ -1602,6 +1602,7 @@ export function createScene(containerEl) {
       devices: () => !navigator.mediaDevices?.enumerateDevices ? Promise.resolve([])
         : navigator.mediaDevices.enumerateDevices().then(ds => ds.filter(d => d.kind === 'audiooutput' && d.deviceId && d.label).map(d => ({ id: d.deviceId, label: d.label })), () => []),
       onDevicesChanged(fn) { try { navigator.mediaDevices?.addEventListener?.('devicechange', fn); } catch { /* not everywhere */ } },
+      ctx: () => ac,                                      // menuaudio.js plays through the same context: the chosen speaker applies to it
       setMute(on) { muted = !!on; if (master) master.gain.value = muted ? 0 : GAIN; },
       setSink(id) { unlockAudio(); return !ac || typeof ac.setSinkId !== 'function' ? Promise.resolve(false) : ac.setSinkId(id || '').then(() => true, () => false); },
     },

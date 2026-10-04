@@ -566,17 +566,21 @@ const SINK_HINT = { browser: 'This browser can’t move the game’s sound. Choo
 export function onSettings(h) { setH = h || {}; }                                       // { open(), close(), sens(dir), airpod(on), stats(on), recenter(), leave(), name(text), move(mode), paddle(kind), bot(level), sound(on), sink() }
 export function settings(open) {
   if (open === undefined) return setOpen;
-  open = !!open && !slots.menu && !slots.overlay; if (open === setOpen) return setOpen;
-  const el = $('settings'), btn = $('btn-menu'); if (!el) return false;
+  open = !!open && (!slots.menu || MENU_SET.includes(slots.menu)) && !slots.overlay; if (open === setOpen) return setOpen;      // the title and the lobby open it too, from their own button (NOTES 181)
+  const el = $('settings'), btn = slots.menu ? menuSetBtn() : $('btn-menu'); if (!el) return false;
+  el.classList.toggle('is-menu', !!slots.menu); for (const b of document.querySelectorAll('.menu-set')) b.setAttribute('aria-expanded', String(open && b === btn));
   if (open) { tourCard(false); friendsCard(false, true); }                           // one card at a time (the friends card hands over: its Back, the hamburger)
   setOpen = open; el.hidden = !open; btn?.setAttribute('aria-expanded', String(open));
-  if (open) { document.body.dataset.settings = 'open'; fullSync(); placeSettings(); const n = $('set-name-input'); if (n) n.value = lockedName || savedName; el.focus({ preventScroll: true }); }      // the card takes focus, not its name field: Esc and the game keys must still reach main.js
-  else { delete document.body.dataset.settings; if (el.contains(document.activeElement)) { if (btn && !slots.menu && !slots.overlay) btn.focus({ preventScroll: true }); else document.activeElement.blur(); } }
+  if (open) { document.body.dataset.settings = slots.menu ? 'menu' : 'open'; fullSync(); placeSettings(); const n = $('set-name-input'); if (n) n.value = lockedName || savedName; el.focus({ preventScroll: true }); }      // the card takes focus, not its name field: Esc and the game keys must still reach main.js
+  else { delete document.body.dataset.settings; if (el.contains(document.activeElement)) { if (btn && (!slots.menu || btn.offsetParent) && !slots.overlay) btn.focus({ preventScroll: true }); else document.activeElement.blur(); } }
   const fn = open ? setH.open : setH.close; if (fn) fn(handing);      // handing: closed only because the friends card opens in its place (main.js keeps the pause)
   return setOpen;
 }
+const MENU_SET = ['title', 'lobby'];
+const menuSetBtn = () => screenEl(slots.menu)?.querySelector('.menu-set');
 function placeSettings() {                                 // under the hamburger; on a narrow window the corner is a column and the scoreboard reaches over the card, so go under those too
   const el = $('settings'), board = $('board'); if (!el || el.hidden) return; let y = 0;
+  if (slots.menu) { const b = menuSetBtn(); el.style.setProperty('--set-top', `calc(${Math.round(b ? b.getBoundingClientRect().bottom : 0)}px + .5rem)`); return; }      // the menu: under its own button, top right
   for (const c of $('corner').children) if (c.id !== 'dev' && c.offsetParent) y = Math.max(y, c.getBoundingClientRect().bottom);
   const r = el.getBoundingClientRect(), b = board ? board.getBoundingClientRect() : null; if (b && b.width && b.left < r.right && b.right > r.left) y = Math.max(y, b.bottom);
   el.style.setProperty('--set-top', `calc(${Math.round(y)}px + .5rem)`);
@@ -595,6 +599,9 @@ export function setSettings(o = {}) {
       s.replaceChildren(...(o.sinks || []).map(d => { const op = document.createElement('option'); op.value = d.id; op.textContent = d.label; return op; }));      // device names are the system's text: textContent only
       s.value = o.sink != null ? o.sink : keep; if (!s.selectedOptions.length) s.value = ''; } }
   if ('sink' in o) { const s = $('set-sink-sel'); if (s && s.value !== o.sink) s.value = o.sink || ''; }
+  for (const k of ['music', 'uisfx']) if (typeof o[k] === 'number') { const v = $(`set-${k}-val`), t = String(o[k]), was = +v?.textContent;      // 0..10, the ends disable their button like Sensitivity's
+    if (v && v.textContent !== t) { v.textContent = t; if (setOpen) { v.classList.remove('ov-up', 'ov-down'); restart(v, +t > was ? 'ov-up' : 'ov-down'); } }
+    for (const [id, off] of [[`btn-${k}-less`, o[k] <= 0], [`btn-${k}-more`, o[k] >= 10]]) { const b = $(id); if (!b) continue; if (off && document.activeElement === b) $('settings')?.focus({ preventScroll: true }); b.disabled = off; } }
   if ('inRoom' in o) show('btn-leave-room', !!o.inRoom);
   { let n = false; for (const k of ['forfeit', 'canPause', 'tourMatch']) if (k in o) { setNote[k] = !!o[k]; n = true; } if (n) drawNote(); }      // the Leave button and the note under it: what leaving costs, and why a match cannot pause
   if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }
@@ -618,8 +625,10 @@ export function setPaused(on) {                            // the rest is CSS: b
 }
 {
   on2('btn-menu', 'click', () => settings(!setOpen));
-  addEventListener('pointerdown', e => { if (setOpen && !e.target.closest?.('#settings, #btn-menu')) settings(false); });
+  addEventListener('pointerdown', e => { if (setOpen && !e.target.closest?.('#settings, #btn-menu, .menu-set')) settings(false); });
+  for (const b of document.querySelectorAll('.menu-set')) b.addEventListener('click', () => settings(!setOpen));
   const call = (k, ...a) => { if (setH[k]) setH[k](...a); };
+  for (const k of ['music', 'uisfx']) { on2(`btn-${k}-less`, 'click', () => call(k, -1)); on2(`btn-${k}-more`, 'click', () => call(k, 1)); }
   on2('btn-sens-less', 'click', () => call('sens', -1)); on2('btn-sens-more', 'click', () => call('sens', 1));
   for (const [id, k] of [['tog-airpod', 'airpod'], ['tog-sound', 'sound'], ['tog-body', 'body']]) on2(id, 'click', e => call(k, e.currentTarget.getAttribute('aria-checked') !== 'true'));      // the NEW value; main.js answers with setSettings
   on2('set-sink-sel', 'change', e => call('sink', e.currentTarget.value));      // main.js answers with setSettings: if the device refuses, the row goes back by itself

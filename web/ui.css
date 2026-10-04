@@ -2191,3 +2191,10 @@ body[data-overlay="match"] .emote-layer{opacity:1;right:40vw;z-index:calc(var(--
   body[data-overlay="match"] .emote-layer{right:0;bottom:58dvh}
 }
 @media (prefers-reduced-motion: reduce){ #screen-match::before{display:none} }
+
+/* ---------- Settings from the menu (NOTES 181): the hamburger's card, opened by the title's and the lobby's own button, top right ----------
+   Rows that need a court (the status lights, Recenter, Difficulty, Friends: the lobby has its own tile, Leave) are hidden here, not removed */
+.title-set{position:absolute;top:var(--edge);right:var(--edge);z-index:2}
+body[data-settings="menu"] .settings{left:auto;right:var(--edge);z-index:calc(var(--z-screen) + 3);transform-origin:calc(100% - 1.375rem) -.75rem;background:linear-gradient(180deg,#f6fafc,#e7f1f6)}      /* solid: over the tiles a see-through card is unreadable */
+.settings.is-menu .set-status,.settings.is-menu #btn-recenter,.settings.is-menu #set-bot,.settings.is-menu #grp-social,.settings.is-menu #set-foot{display:none}
+[data-mobile] .settings.is-menu #grp-paddle,[data-mobile] .settings.is-menu #grp-match,[data-mobile] .settings #set-music{display:none}      /* a phone's menu: it is the paddle, not the player's screen, and it plays no music */
