@@ -1893,6 +1893,7 @@ body:has(> #acct-layer:not([hidden])) .toast{z-index:calc(var(--z-toast) + 2)}  
 /* the (i) beside the rank: opens the Ranks page, where how ranks work is written once (NOTES 158) */
 .st-info{flex:none;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:none;color:var(--ink-soft);cursor:pointer;outline:none;transition:color var(--d-fast),background var(--d-fast)} .st-info svg{width:1.5rem;height:1.5rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .st-info:hover,.st-info:focus-visible{color:var(--line-deep);background:#fff;box-shadow:var(--glow)}
+.conn-help svg{width:1.5rem;height:1.5rem;fill:none;stroke:currentColor;stroke-width:2.25;stroke-linecap:round}      /* Getting ready: How to play in a new tab, so the pairing QR keeps its session */
 .st-mtext small:empty,.st-cap:empty,.pf-who small:empty,.st-ret-n small:empty{display:none}
 .st-mlv small i{display:inline-flex;align-items:center;gap:.0625rem;margin-left:.375rem;vertical-align:baseline} .st-mlv .st-flame{width:.875rem;height:.875rem;fill:var(--them);stroke:var(--them-deep)}
 .st-hero.is-none .st-rank-cap > b,.st-hero.is-none .st-rank-cap > .cup-ic,.st-hero.is-none .st-rank-bar{display:none}

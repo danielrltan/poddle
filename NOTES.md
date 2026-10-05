@@ -4375,3 +4375,19 @@ centred, then (sometimes) a jump to the grid. Now drawAcct takes the hosted site
 otherwise (meOk), so the six blocks lay out from the first frame; and loadMe asks again when the answer did not come, 1 s, 2, 4 ... 16 s,
 up to eight times, redrawing on a real answer (a server without a database would then hide the tiles). The three-square layout is still
 what a local copy without accounts gets. profile-ui and social-ui pass as before.
+
+## 209. Without JavaScript, the home plays a loop of real rallies; How to play from Getting ready
+- The `<noscript>` home (what a browser with JavaScript off, and a crawler, sees) was five lines of text. It now opens on a muted
+  11.8 s loop of real play, web/video/teaser.mp4 (854x480, 30 fps, H.264, 745 KB, no audio track) with web/video/teaser.jpg as its
+  poster, cut from the launch video's rally (3.2 to 15.0 s of poddle-launch-final-v10: no sky intro, no end card). Self-hosted: no
+  YouTube, no third party, so the legal pages are unchanged. No sound at all: autoplay needs muted, and the music licence covers the
+  video, not the site. The words, the How to play link and the "needs JavaScript" line are kept (test/seo.test.mjs checks them).
+- server/game.js serves `.mp4` as video/mp4 (a week's cache, like images) and answers byte ranges for `.mp4` only (206, 416 past the
+  end, `Accept-Ranges: bytes`): Safari will not play a video whose server answers a range with the whole file. Every other file is
+  served exactly as before.
+- Getting ready (the connect screen) has an (i) at the right of its header: How to play, in a new tab, so the pairing QR and the
+  phone's session stay where they are. It is a link, not a hint or overlay (CLAUDE.md "No announcement notices").
+- Not built, on purpose: a first-visit tutorial overlay. It would be a one-time "did you know" hint and coaching lines, which CLAUDE.md
+  and the owner's copy rules forbid; How to play stays the one explanation, now reachable where a new player first needs it.
+- Not changed: Settings. The paddle choice (Phone / AirPod) is already the heading of Getting ready, and the Camera row there turns on
+  body tracking, so neither hides behind the Settings card.

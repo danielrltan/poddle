@@ -66,11 +66,13 @@
 
 <div id="stage"></div>
 <noscript>
-  <div style="position:fixed;inset:0;z-index:9999;display:grid;place-content:center;gap:.75rem;padding:2rem;text-align:center;font:500 1.125rem/1.5 system-ui,sans-serif;color:#39434d;background:#dfeef6">
-    <h1 style="margin:0;font-size:3rem">Poddle</h1>
-    <p style="margin:0">Pickleball in your browser, on any computer. Hold your phone (iPhone or Android) like a paddle and swing. Play friends online or take on Matt the bot.</p>
-    <p style="margin:0">Poddle needs JavaScript. Turn it on and reload.</p>
-    <p style="margin:0">Nothing to install: scan a code and your phone is the paddle. On a Mac, one AirPod can be the paddle instead.</p>
+  <!-- without JavaScript: a muted loop of real play (web/video/teaser.mp4, cut from the launch video, no sound) over the sky, then the words and the way in -->
+  <div style="position:fixed;inset:0;z-index:9999;overflow:auto;display:grid;place-content:center;justify-items:center;gap:.75rem;padding:1.5rem 1rem;text-align:center;font:500 1.125rem/1.5 system-ui,sans-serif;color:#39434d;background:linear-gradient(#bfe1f4,#dfeef6 60%)">
+    <video src="/video/teaser.mp4" poster="/video/teaser.jpg" width="854" height="480" autoplay muted loop playsinline preload="auto" aria-label="Poddle gameplay: two players rally on a sunny court" style="display:block;width:min(100%,46rem);height:auto;aspect-ratio:16/9;border:5px solid #fff;border-radius:18px;box-shadow:0 12px 32px rgba(30,70,100,.25);background:#9fd0ea"></video>
+    <h1 style="margin:.5rem 0 0;font-size:3rem;line-height:1.1">Poddle</h1>
+    <p style="margin:0;max-width:40rem">Pickleball in your browser, on any computer. Hold your phone (iPhone or Android) like a paddle and swing. Play friends online or take on Matt the bot.</p>
+    <p style="margin:0;max-width:40rem">Nothing to install: scan a code and your phone is the paddle. On a Mac, one AirPod can be the paddle instead.</p>
+    <p style="margin:0;max-width:40rem"><b>Poddle needs JavaScript. Turn it on and reload.</b></p>
     <p style="margin:0"><a href="/how-to-play.html">How to play</a></p>
   </div>
 </noscript>
@@ -574,7 +576,7 @@
 
 <!-- ============================================== CONNECT ============================================== -->
 <section class="screen menu-bg" id="screen-connect" data-screen="connect" hidden>
-  <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg><span class="back-text">Back</span></button><span class="menu-title">Getting ready</span></header>
+  <header class="menu-head"><button class="btn btn-sm btn-back" data-back hidden><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg><span class="back-text">Back</span></button><span class="menu-title">Getting ready</span><div class="head-end"><a class="btn btn-icon conn-help" id="btn-conn-help" href="/how-to-play.html" target="_blank" rel="noopener" aria-label="How to play" title="How to play" onpointerdown="event.stopPropagation()" onkeydown="event.stopPropagation()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5v.25"/></svg></a></div></header>
   <div class="menu-body">
     <div class="panel panel-mid" data-fit>
       <h2 class="t-title" id="connect-title" style="margin-bottom:1.5rem">Connect your phone</h2>

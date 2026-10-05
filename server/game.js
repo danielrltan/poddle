@@ -24,9 +24,9 @@ function phBadge() {
     return ph.body || fs.readFileSync(path.join(WEB, 'ph-badge.svg'), 'utf8'); })();
 }
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4',
+  '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.mp4': 'video/mp4',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
-const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico', '.m4a', '.mp3']);                // the share card is busted by ?v=, icons rarely change, a new track is a new file name: a week
+const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico', '.m4a', '.mp3', '.mp4']);                // the share card is busted by ?v=, icons rarely change, a new track is a new file name: a week
 const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats', '/ranks', '/leaderboard', '/friends']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
 const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats',
   '/ranked': '/ranks', '/ranked/': '/ranks' };            // clean URLs: a fixed map, no extension guessing. /ranked: the old Ranked view (removed, docs/TROPHIES.md 2): its links land on the Ranks page
@@ -69,6 +69,16 @@ const httpServer = http.createServer((req, res) => {
     const inm = req.headers['if-none-match'], ims = Date.parse(req.headers['if-modified-since']);
     const same = inm ? inm.split(',').some(t => t.trim() === '*' || t.trim().replace(/^W\//, '') === head.ETag.slice(2)) : ims >= mtime;
     if (same) { res.writeHead(304, head); return res.end(); }
+    // Byte ranges for video only (the no-JavaScript teaser, web/video/): Safari will not play a <video> whose server answers a range with the whole file
+    const rg = ext === '.mp4' && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (ext === '.mp4') head['Accept-Ranges'] = 'bytes';
+    if (rg && (rg[1] || rg[2])) {
+      const from = rg[1] === '' ? Math.max(0, st.size - +rg[2]) : +rg[1], to = rg[1] === '' || rg[2] === '' ? st.size - 1 : Math.min(+rg[2], st.size - 1);
+      if (from > to || from >= st.size) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}`, ...head }); return res.end(); }
+      res.writeHead(206, { 'Content-Type': MIME[ext], 'Content-Length': to - from + 1, 'Content-Range': `bytes ${from}-${to}/${st.size}`, ...head });
+      if (req.method === 'HEAD') return res.end();
+      return void fs.createReadStream(file, { start: from, end: to }).on('error', () => res.destroy()).pipe(res);
+    }
     res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': st.size, ...head });
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);   // a file that went away after the stat must not be an uncaught 'error'
