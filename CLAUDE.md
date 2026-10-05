@@ -43,7 +43,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   paddle turn rate + orientation (20 Hz, held per match for the R19 swing check, NOTES 198; only the flag is stored). Reconnect URL
   carries name, cid, code, score, side, bot (revive()); never the device id or any sign-in value. Logs: activity lines
   with court codes and ranked/unranked, no names/IPs/cids/device ids/account ids/Google subs/tokens (friends lines too: no names, no ids).
-- Server memory only, up to 24 h, gone on restart (server/abuse.js): keyed hashes (daily key) of IPs / IPv6 /64s linked
+- Server memory only, up to 24 h, gone on restart (server/abuse.js): kin (NOTES 214: after a sign-out, the tab ids (cid) of that session share a random key for 2 h, so a signed-out tab is still the person on the court in the other tab; game.js kins); keyed hashes (daily key) of IPs / IPv6 /64s linked
   to device-id hashes, cids and recent results (link map, pair and new-guest counters), and API rate-limit buckets keyed
   the same way (server/api.js, its own key, also replaced every 24 h). SHA-256 of each sign-in nonce issued, 10 min,
   single use. The raw IP is compared in memory at match end and never written to the database. Share cards

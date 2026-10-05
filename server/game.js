@@ -89,7 +89,7 @@ try {                                                            // docs/ACCOUNT
   db.open(process.env.PODDLE_DB || ':memory:'); db.sweep(Date.now()); setInterval(() => { try { db.sweep(Date.now()); } catch { /* next day */ } }, 24 * 3600e3).unref();
 } catch { /* db logs its own code */ }
 api.init({ env: process.env, social: { status: id => socialStatus(id), changed: (push, drop) => socialChanged(push, drop) } });   // friends (docs/SOCIAL.md 4): the API reads presence and pushes snapshots through these; they run only after boot
-stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients, detached: ws => socialDetached(ws) });
+stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients, detached: ws => socialDetached(ws), kin: list => kin(list) });
 httpServer.listen(+process.env.PORT || 8080);
 
 const COURT = { halfW: 3.05, halfL: 6.7, kitchen: 2.13, net: 0.91 };
@@ -195,7 +195,7 @@ const ROOM_TTL = (process.env.ROOM_TTL != null ? +process.env.ROOM_TTL : 30) * 1
 const ROOM_CAP = +process.env.ROOM_CAP || 40;                  // rooms at once: one small machine hosts them all (tests lower it)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';          // no I, L, O, 0, 1: a code gets read out across a room
 const SPEC_CAP = 8;                                            // spectators per room (docs/SPECTATE.md)
-const EMOTES = 10, EMOTE_GAP = 900;                             // emotes, players' and spectators': an index into web/ui.js EMOTES. The client waits 1 s between two (NOTES 205; NOTES 46 had none); 900 ms here so a tap on time is never dropped
+const EMOTES = 10, EMOTE_GAP = 900, EMOTE_FLOOD = 60;           // emotes: an index into web/ui.js EMOTES. A PLAYER waits 1 s between two (NOTES 205; 900 ms here so a tap on time is never dropped). A SPECTATOR has no cooldown (NOTES 213, as NOTES 46): 60 ms only stops a script flooding the court
 const ADDR_ROOMS = +process.env.ADDR_ROOMS || 4;               // rooms one address may have made and still standing: 40 idle sockets from one machine took every court (busy beyond that)
 const MSG_DROP = 200 * SCALE, MSG_KILL = 1000 * SCALE;         // messages a second from one socket: a client sends about 25. Past the first the rest are dropped unread, past the second the socket goes (one flooding socket held every court at 8-12 packets a second)
 const BUF_MAX = 256 * 1024;                                    // bytes queued on a socket that has stopped reading: it is dead weight, and 8 of them took the process to 1.6 GB on a 256 MB machine
@@ -895,7 +895,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
   function emote(ws, e, pl) {                                     // a reaction: everyone in the room (the sender too) sees it pop up in the corner, with the sender's name. pl: a seated player's own, under their court name
     if (!(pl ? pl.ws === ws : spectators.has(ws)) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
-    const ms = Date.now(); if (ms - (ws.emoteAt || 0) < EMOTE_GAP) return; ws.emoteAt = ms;
+    const ms = Date.now(); if (ms - (ws.emoteAt || 0) < (pl ? EMOTE_GAP : EMOTE_FLOOD)) return; ws.emoteAt = ms;      // a player rests a second between two, a spectator never (NOTES 213)
     broadcast({ type: 'emote', e, name: safeName(pl ? pl.name : ws.name, ''), side: pl ? pl.side : undefined });   // side: a player's, so the bubble comes out of their own tab on the scoreboard (NOTES 208)
   }
   // ---------- asking to play (docs/SPECTATE.md Asking to play): a spectator watching one human play Matt asks for Matt's seat. ONE request per court,
@@ -931,7 +931,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (!spectators.has(w) || w.readyState !== 1) return send(me, { type: 'askoff', id, why: 'gone' });
     if (!askable()) { send(me, { type: 'askoff', id, why: 'gone' }); return askSay(w, 'gone', 0); }
     if (match && match.t0 && !over) { record(null, 'dropped'); stats.drop(match); }   // G3: the player gave Matt's seat away after the first strike: an abandon (no W/L, the streak ends), or a second tab of their own could erase a losing match. No profile line: no result card came before it
-    spectators.delete(w); askSay(w, 'yes'); tell(w, { type: 'room', code, public: pub, role: 'player', promoted: true });
+    spectators.delete(w); w.emoteAt = 0; askSay(w, 'yes'); tell(w, { type: 'room', code, public: pub, role: 'player', promoted: true });      // emoteAt: a spectator's last emote must not cost the new player their first (NOTES 213)
     join(w);                                                     // resumes a pause, Matt goes, w sits in his seat, a new match from 0-0, names: the player's usual 'Sam joined to play'
     promo = { side: w.pl.side, until: Date.now() + PROMO_S * 1000, level: lv }; send(me, { type: 'askoff', id, why: 'yes' });
     console.log(`[${code}] a spectator took Matt's seat`); if (pub) lobbyChanged();
@@ -1239,6 +1239,38 @@ function lobbyChanged() {
 }
 function enterLobby(ws) { lobby.add(ws); put(ws, ws.lobbySeen = lobbyMsg()); lobbyChanged(); }   // its own copy now; the rest hear within the second (online went up)
 
+// One person, one court (NOTES 214). A second tab of the same browser (the device id's hash from its hello, docs/ACCOUNTS.md 3.2), or any
+// tab of the same account, may not sit down, watch or sign up for a tournament while the first is on a court or in a tournament: not its
+// own court (a match against yourself, or a look at your own court from the other side) and not another. The same tab coming back (its
+// cid) is the ghost takeover in seat / watchCode, never this; a pad socket is not a tab; a socket that has stopped answering the heartbeat
+// is terminated within 2 HEARTBEAT and does not count (readyState), so a tab that crashed does not lock its owner out for long. The
+// lobby is told joinfail 'self' (selfOut). Checked at every way in: the lobby's quick, create, join, watch and tcreate; a tournament's
+// twarm and twatch and a sign-up by tourJoin; the socket URL's room= / tour= at connect and revive() (a reconnect of the SAME tab is
+// its cid, excluded; a crafted URL from a second tab is not); and, since the hello comes after the URL is acted on, helloMsg checks
+// again when the device id arrives on a socket already on a court, and that socket is put back in the lobby (selfOut while seated:
+// quit first). Two browsers (or a private window) are still two people, as a household on one address is (NOTES 153).
+const ENTER = new Set(['quick', 'create', 'join', 'watch', 'tcreate']);   // the lobby's ways onto a court or into a tournament
+const samePerson = (a, b) => !!(Buffer.isBuffer(a.devHash) && Buffer.isBuffer(b.devHash) && a.devHash.equals(b.devHash) || a.acct && b.acct && a.acct.accountId != null && a.acct.accountId === b.acct.accountId || a.kin && a.kin === b.kin);   // devHash: a Buffer (auth.deviceHash)
+// Kin: a sign-out in a second tab rotates the browser's device id (web/profile.js forgetDevice) and takes the account off every socket of the
+// session, so the tab that signed out would reconnect unlinked from the tab still on its court and sit down against it. stats.forget hands
+// the sockets it touched (one session's, or one device's at Delete my data) to kin(): they share a random key, kept by tab id for KIN_MS so
+// the reconnecting socket inherits it (at connect). In memory only, never logged, pruned on the heartbeat.
+const KIN_MS = 2 * 3600e3, kins = new Map();                    // cid -> { key, until }
+function kin(list) {
+  const ms = Date.now(); let key = null; for (const ws of list) if (ws.kin) { key = ws.kin; break; }
+  if (!key) key = require('crypto').randomBytes(8).toString('hex');
+  for (const ws of list) { ws.kin = key; if (ws.cid) kins.set(ws.cid, { key, until: ms + KIN_MS }); }
+}
+function elsewhere(ws) {
+  if (ws.pad) return null;
+  for (const o of wss.clients) if (o !== ws && !o.pad && o.readyState === 1 && !(ws.cid && o.cid === ws.cid) && (o.room || o.tour && tourActive(o)) && samePerson(ws, o)) return o;
+  return null;
+}
+function selfOut(ws) {                                         // true = refused (and told). On a court already (a late hello): off it, back to the lobby, told
+  if (!elsewhere(ws)) return false;
+  if (ws.room) { quit(ws); if (ws.viaLobby) enterLobby(ws); }
+  tell(ws, { type: 'joinfail', reason: 'self' }); return true;
+}
 // false = both seats are taken by other humans
 function seat(ws, r) {
   if (r.only && !r.only(ws.cid)) return false;                 // a tournament's court: only the member(s) it was made for sit down (a stranger with the code may watch)
@@ -1396,6 +1428,7 @@ function tourCreate(ws) {
 function tourJoin(ws, t) {                                     // join by a tournament's code: sign up (in reg), or come back to it
   if (!ws.cid) return tell(ws, { type: 'joinfail', reason: 'nocid' });
   const m = byCid(t, ws.cid);
+  if (!(m && !m.left) && selfOut(ws)) return;                   // a new sign-up from a second tab of a person on a court (NOTES 214); a member coming back is not new
   if (m && !m.left) { tourBind(t, m, ws); sendTour(t, ws); if (t.phase === 'reg') tourWarm(ws); else tourSeat(t, ws); return; }
   if (t.phase !== 'reg') return tell(ws, { type: 'joinfail', reason: 'started', watch: true, code: t.code });   // under way: watch it
   if (t.members.size >= TOUR_MAX) return tell(ws, { type: 'joinfail', reason: 'tfull', watch: true, code: t.code });
@@ -1522,6 +1555,7 @@ function tourMsg(ws, m) {
   const t = ws.tour;
   if (m.type === 'tstart') return tourStart(ws);
   if (m.type === 'tleave') return tourLeave(ws);
+  if ((m.type === 'twarm' || m.type === 'twatch') && !ws.room && selfOut(ws)) return;   // a second tab of a person on a court elsewhere (NOTES 214)
   if (m.type === 'twarm') { const me = tmember(ws); if (me && !ws.room) { me.warmFull = false; tourWarm(ws); } return; }
   if (m.type === 'twatch') {                                     // watch one of THIS tournament's live matches
     const r = typeof m.room === 'string' ? roomOf(m.room) : null;
@@ -1676,6 +1710,7 @@ function helloMsg(ws, m) {
   if (socialSock(ws)) try { socialPush(new Set([ws.acct.accountId]), ws); } catch { /* friends are best effort */ }   // docs/SOCIAL.md 5: the friends snapshot after a signed-in socket's hello (a username only)
   const h = auth.deviceHash(m.dev); if (!h) return;              // malformed: no device id
   ws.devHash = h; stats.seen(ws);
+  if (ws.room && selfOut(ws)) return;                         // the id links this socket to another tab already on a court: off this one, back to the lobby (NOTES 214). Not the same tab: its cid is excluded
   if (ws.pl && ws.room && ws.room.identify) ws.room.identify(ws.pl, ws);   // already seated (back=1 / room= in the URL, or the lazy id arriving just after welcome)
   const mem = tmember(ws); if (mem) { stats.member(mem, ws); memberRank(mem, ws); }
 }
@@ -1697,6 +1732,7 @@ wss.on('connection', (ws, req) => {
   if (ws.originOk && req.url && !/[?&]padfor=/.test(req.url)) { try { const raw = auth.readSession(hdr.cookie), s = raw && db.session.lookup(raw, Date.now()); if (s) { ws.acct = s; ws.tokenHash = s.tokenHash; } } catch { /* a guest */ } }
   let q; try { q = new URL(req.url, 'http://x').searchParams; } catch { q = new URLSearchParams(); }
   ws.cid = q.get('cid') || null; ws.room = ws.pl = null; ws.spec = false; ws.viaLobby = q.get('lobby') === '1';
+  { const k = ws.cid && kins.get(ws.cid); if (k && k.until > Date.now()) ws.kin = k.key; }      // a tab that signed out: still the person it was (NOTES 214)
   ws.name = cleanName(q.get('name'));                          // names a seat taken by URL (room=CODE); otherwise it rides on the seat request
 
   ws.msgN = 0; ws.msgT = 0;
@@ -1721,6 +1757,7 @@ wss.on('connection', (ws, req) => {
       else if (m.type === 'emote') ws.room.emote(ws, m.e);
       else if (m.type === 'ask') ws.room.ask(ws);                // a spectator asks for Matt's seat
     } else if (lobby.has(ws)) {
+      if (ENTER.has(m.type) && selfOut(ws)) return;         // already on a court in another tab (NOTES 214)
       if (m.type === 'quick') quick(ws); else if (m.type === 'create') create(ws, m.public === true); else if (m.type === 'join') joinCode(ws, m.code); else if (m.type === 'watch') watchCode(ws, m.code);
       else if (m.type === 'tcreate') tourCreate(ws);
     }
@@ -1737,6 +1774,7 @@ wss.on('connection', (ws, req) => {
     if (!t) return tell(ws, { type: 'tourend', why: Date.now() - BOOT < REVIVE_S * 1000 ? 'restart' : 'gone' });   // an ordinary court it was on is not dropped: the client reconnects without &tour= and gets it back (revived) as any other
     return tourRebind(ws, t, q); }
   const ws0 = +q.get('side'); if (q.get('back') === '1' && (ws0 === 0 || ws0 === 1) && q.get('side') !== null && q.get('side') !== '') ws.wantSide = ws0;   // an old tab's ?rk=1 (the removed Ranked mode) is not read: it is an ordinary lobby socket
+  if (q.get('room') && selfOut(ws)) return;                      // a crafted URL from a second tab (an account links at connect; a device id links at its hello, helloMsg) (NOTES 214)
   if (q.get('room') && !(q.get('back') === '1' && !roomOf(q.get('room')) && revive(ws, q))) { (q.get('watch') === '1' ? watchCode : joinCode)(ws, q.get('room'));
     const lv = q.get('bot'); if (q.get('back') === '1' && lv != null && lv !== '' && ws.pl && ws.room && ws.room.mattBack) ws.room.mattBack(ws.pl, +lv); }   // a spectator rebuilt the court first: the player who was playing Matt gets him back at their level, and the match stays under way (resumed)   // a reconnect getting its seat (or its place to watch) back, or a shared link
 });
@@ -1756,6 +1794,7 @@ setInterval(() => {
 // half-open sockets never fire 'close' and would hold a seat forever ("nobody can join"): ping them out
 setInterval(() => {
   for (const ws of wss.clients) { if (!ws.alive) { ws.terminate(); continue; } ws.alive = false; ws.ping(); }
+  { const ms = Date.now(); for (const [c, k] of kins) if (k.until <= ms) kins.delete(c); }
 }, HEARTBEAT);
 
 console.log('game server on port ' + (+process.env.PORT || 8080));

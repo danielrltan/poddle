@@ -15,7 +15,7 @@ const SPEED_CAP = 45, SPEED_BAD = 48;
 const SMASH_N = 0.76, SMASH_PK = 12;                              // a settled smash (n >= SMASH, server/game.js) under 12 rad/s is a careless forgery (R15)
 const FIX_AGREE = 0.15;                                           // a settled report within this of the bet that struck the ball speaks for that contact
 
-let db = null, cfg = abuse.config({}), links = null, signin = false, sockets = () => [], detached = () => {}, seq = 0, pruner = null;
+let db = null, cfg = abuse.config({}), links = null, signin = false, sockets = () => [], detached = () => {}, kinHook = () => {}, seq = 0, pruner = null;
 const live = new Set();                                           // matches still being played: forget() marks their seats, done/drop removes them
 
 // init({ db, env, signinEnabled, sockets, detached }) -> once at boot. sockets: () => iterable of the open game sockets (for forget). detached(ws): forget
@@ -24,6 +24,7 @@ function init(o = {}) {
   db = o.db || null; cfg = abuse.config(o.env || process.env); signin = !!o.signinEnabled;
   if (typeof o.sockets === 'function') sockets = o.sockets;
   if (typeof o.detached === 'function') detached = o.detached;
+  if (typeof o.kin === 'function') kinHook = o.kin;             // kin(list): the sockets a forget touched are one person (game.js, NOTES 214)
   links = abuse.createLinks();
   if (pruner) clearInterval(pruner);
   pruner = setInterval(() => { try { links.prune(); } catch { /* never breaks the server */ } }, 60e3); pruner.unref();   // 24 h hygiene (5.4)
@@ -298,17 +299,20 @@ function title(members, champ, now = Date.now()) {
 // Sockets stop speaking for it at once; on deletion, live seats frozen on it are marked gone (no owner is written or re-created for them),
 // and the sockets forget the device too, so a rematch that starts before the client reconnects is anonymous rather than a new guest.
 function forget({ tokenHash = null, accountId = null, devHash = null, deleted = false } = {}) {
+  const touched = [];
   for (const ws of sockets()) {
     try {
       const tok = !!tokenHash && eqHash(ws.tokenHash, tokenHash), acct = deleted && accountId != null && !!ws.acct && ws.acct.accountId === accountId;
       const dev = deleted && !!devHash && eqHash(ws.devHash, devHash);
       const had = !!ws.acct;
+      if (tok || acct || dev) touched.push(ws);
       if (tok || acct) { ws.acct = null; ws.tokenHash = null; }
       if (dev || acct) ws.devHash = null;
       if ((tok || acct || dev) && ws.pl && !ws.pl.bot) ws.pl.sockIdent = identOf(ws);
       if ((tok || acct) && had) try { detached(ws); } catch { /* the social panel is best effort */ }
     } catch { /* one odd socket never stops the rest */ }
   }
+  if (touched.length) try { kinHook(touched); } catch { /* the link is best effort */ }      // before they forget: these were one person (NOTES 214)
   if (!deleted) return;
   const hit = id => !!id && ((accountId != null && id.accountId === accountId) || (!!devHash && eqHash(id.devHash, devHash)));
   for (const m of live) for (const s of m.seats) if (s && !s.bot && hit(s.ident)) s.gone = true;

@@ -102,15 +102,15 @@ removes it on the next one. Max width 46vw so it never crosses the court's centr
 ```html
 <div class="scoreboard" id="board">
   <div class="score-tab is-me"><span class="chip chip-me"></span>
-    <span class="score-who"><b id="name-me">You</b><small id="sub-me"></small></span>
+    <span class="score-who"><span class="score-name"><b id="name-me">You</b></span><small id="sub-me"></small></span>
     <span class="serve-ind" id="sv-me"></span><span class="score-num" id="sc-me">0</span></div>
   <div class="rally"><small>Rally</small><b id="rally">0</b></div>
   <div class="score-tab is-them"><span class="chip chip-them"></span>
-    <span class="score-who"><b id="name-them">Waiting</b><small id="sub-them"></small></span>
+    <span class="score-who"><span class="score-name"><b id="name-them">Waiting</b></span><small id="sub-them"></small></span>
     <span class="serve-ind" id="sv-them"></span><span class="score-num" id="sc-them">0</span></div>
 </div>
 ```
-Two fixed-width tabs (17.5rem x 4.25rem, so the rally lozenge stays centred), flat colour underline, 3.25rem/900 digits — the score is the one
+Two fixed-width tabs (19.5rem x 4.25rem since NOTES 212, so the rally lozenge stays centred; the name sits in `.score-name` with its badge and emblem after it, and ui.js fitNames shrinks a wide name's type down to max(.9375rem, 12px) before it ellipsizes), flat colour underline, 3.25rem/900 digits — the score is the one
 thing read from two metres. `.is-them` mirrors itself (row-reverse) — keep the same child order in both tabs. The sub-labels are **empty in
 normal play** (`small:empty` collapses): they only carry "B adds a bot" while waiting outside a room, and "Near side"/"Far side" (or "Setting up" for an opponent still calibrating) in a two-human game.
 Add `.pop` to `.score-num` / `#rally` when the value changes (450ms; the score pop peaks at 1.18 so a two-digit score stays inside the tab's

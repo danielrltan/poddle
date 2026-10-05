@@ -70,7 +70,24 @@ export function setNames({ me, meSub, them, themSub, reg, rank } = {}) {
   if (them != null) setText($('name-them'), them); if (themSub != null) setText($('sub-them'), themSub);
   if (reg !== undefined) { const r = Array.isArray(reg) ? reg : []; regBadge($('name-me'), r[0] === true); regBadge($('name-them'), r[1] === true); }      // [left, right]: a registered username (docs/ACCOUNTS.md 7.5). Left out = unchanged
   if (rank !== undefined) { const r = Array.isArray(rank) ? rank : []; rankBadge($('name-me'), r[0]); rankBadge($('name-them'), r[1]); }      // [left, right]: { tier, div } on any court (docs/TROPHIES.md 3.9), null = no emblem. Left out = unchanged
+  fitNames();
 }
+// The name's fit in its score tab (NOTES 212). The row (.score-name) holds the name and, after it, its badge and emblem; the badges keep their size, the name
+// gets what is left. A name wider than that shrinks its type to fit, down to max(.9375rem, 12px), and only a name that is still too wide at the floor
+// ellipsizes. Measured, never guessed: run after every setNames and (a ResizeObserver) whenever a row's width changes, which the root type's scaling with
+// the window and the tab's own breakpoints both do. --name-fs on the row sets the name's size (ui.css); cleared when the name fits at full size.
+export function fitNames() {
+  for (const id of ['name-me', 'name-them']) {
+    const b = $(id), row = b?.parentElement; if (!row || !row.classList.contains('score-name')) continue;
+    row.style.removeProperty('--name-fs'); const avail = row.clientWidth; if (!avail) continue;      // not laid out (the HUD is hidden): nothing to fit to; the observer runs this again when it shows
+    let others = 0; for (const s of row.children) if (s !== b) { const cs = getComputedStyle(s); others += s.getBoundingClientRect().width + parseFloat(cs.marginLeft) + parseFloat(cs.marginRight); }
+    const need = b.scrollWidth + 1, room = avail - others; if (need <= room) continue;      // fits at full size
+    const full = parseFloat(getComputedStyle(b).fontSize), floor = Math.max(.9375 * parseFloat(getComputedStyle(document.documentElement).fontSize), 12);
+    row.style.setProperty('--name-fs', Math.max(floor, Math.floor(full * room / need * 4) / 4) + 'px');      // quarter-pixel steps: no jitter between two sizes on a resize
+  }
+}
+if (typeof ResizeObserver === 'function') { let raf = 0; const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitNames); }); for (const r of document.querySelectorAll('.score-name')) ro.observe(r); }
+if (document.fonts?.ready) document.fonts.ready.then(fitNames);      // a name measured in the fallback font (a cold cache, straight into a court) is measured again when Poddle Rounded lands: the row's box does not change, so the observer would not
 // The registered-name badge: its own element BESIDE the name, never in the name's text, drawn as a pill with an SVG tick, so no
 // name a guest can type reproduces it (docs/ACCOUNTS.md 7.5). Made and removed here: a guest's seat has no .reg-badge at all.
 const HAMMER = '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(40 12 12)"><rect x="10.3" y="7" width="3.4" height="16" rx="1.7"/><path d="M5.5 1.5h10l4 1.5v5l-4 1.5h-10A1.5 1.5 0 0 1 4 8V3a1.5 1.5 0 0 1 1.5-1.5z"/></g></svg';      // the developer's badge: a hammer (NOTES 134), was the letters DEV
@@ -702,7 +719,8 @@ on2('views', 'click', e => { const c = e.target.closest('.view-chip'); if (c && 
 on2('views', 'keydown', e => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; const cs = [...$('views').querySelectorAll('.view-chip')], i = cs.indexOf(document.activeElement); if (i < 0) return; e.preventDefault(); cs[(i + d + 4) % 4].focus(); });
 // ---------- emotes, for players and spectators: a small bar of GG and nine Apple emoji bottom-right (web/emoji/, from iamcal/emoji-data
 // img-apple-160), each with its key, 1 to 0. A pick goes to the server; it comes back to everyone in the court (the sender too) and pops up
-// briefly in the corner. One a second (NOTES 205): the bar dims meanwhile, and a key or tap then does nothing.
+// briefly in the corner. A player sends one a second (NOTES 205): the bar dims meanwhile, and a key or tap then does nothing. A spectator has no
+// cooldown (NOTES 213): the stands react as fast as they tap (the server keeps a 60 ms flood floor per socket, which a hand never reaches).
 export const EMOTES = [['gg', 'GG', 'GG'], ['1fae1', '🫡', 'Salute'], ['1f49a', '💚', 'Green heart'], ['1f602', '😂', 'Tears of joy'], ['1f975', '🥵', 'Hot'],
   ['1f621', '😡', 'Angry'], ['1f92f', '🤯', 'Mind blown'], ['1f480', '💀', 'Skull'], ['1f940', '🥀', 'Wilted flower'], ['1f622', '😢', 'Crying']];     // the index is the wire value (server EMOTES); key i + 1, the tenth on 0
 const EMOTE_COOL = 1000;
@@ -714,11 +732,11 @@ const emoteImg = i => { if (EMOTES[i][0] === 'gg') { const g = document.createEl
   if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'), k = document.createElement('span'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.setAttribute('aria-keyshortcuts', String((i + 1) % 10)); b.title = em[2];
     k.className = 'emote-key'; k.textContent = String((i + 1) % 10); k.setAttribute('aria-hidden', 'true'); b.append(emoteImg(i), k); box.append(b); });
   on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (b) sendEmote(+b.dataset.e); }); }
-// a click or a key (main.js: 1-9, 0): the face squashes and springs as it goes, then the bar rests for a second. false = resting, nothing sent
+// a click or a key (main.js: 1-9, 0): the face squashes and springs as it goes, then (a player's) the bar rests for a second. false = resting, nothing sent
 export function sendEmote(i) {
-  const box = $('emotes'), t = performance.now(); if (!box || !EMOTES[i] || !onEmoteFn || t < emoteCool) return false;
-  emoteCool = t + EMOTE_COOL; const b = box.children[i]; if (b) restart(b, 'ov-sent');
-  restart(box, 'is-cool'); clearTimeout(emoteT); emoteT = setTimeout(() => box.classList.remove('is-cool'), EMOTE_COOL);
+  const box = $('emotes'), t = performance.now(), spec = document.body.dataset.role === 'spectator'; if (!box || !EMOTES[i] || !onEmoteFn || (!spec && t < emoteCool)) return false;
+  const b = box.children[i]; if (b) restart(b, 'ov-sent');
+  if (!spec) { emoteCool = t + EMOTE_COOL; restart(box, 'is-cool'); clearTimeout(emoteT); emoteT = setTimeout(() => box.classList.remove('is-cool'), EMOTE_COOL); }      // the stands never rest (NOTES 213)
   onEmoteFn(i); return true;
 }
 // one reaction arriving. A player's (tab = 'me' | 'them': the scoreboard tab it belongs to) is a speech bubble out of that tab, in the
@@ -727,7 +745,7 @@ export function sendEmote(i) {
 export function emote(i, name, tab = null) {
   const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
   if (tab && bubble(layer, i, tab)) return;
-  while (layer.childElementCount >= 5) layer.firstElementChild.remove();
+  { const pops = layer.querySelectorAll('.emote-pop'); for (let k = 0; k <= pops.length - 5; k++) pops[k].remove(); }      // five pops at most; a player's bubble is never the one evicted (the stands have no cooldown, NOTES 213)
   const el = document.createElement('div'), body = document.createElement('i'), dur = 1.8 + Math.random() * .4; el.className = 'emote-pop';
   el.style.setProperty('--x', `${(Math.random() * 6).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.25 + Math.random() * .5)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
   body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only

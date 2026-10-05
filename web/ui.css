@@ -179,13 +179,17 @@ body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}       
 /* scoreboard: two slim translucent tabs around a rally lozenge. The round ends are half the tab's height (2.125rem), not --r-pill:
    a 999px corner makes the browser scale every radius on that edge down to fit, and the inner corners by the rally came out square */
 .scoreboard{position:fixed;top:var(--edge);left:50%;transform:translateX(-50%);z-index:calc(var(--z-hud) + 2);display:flex;align-items:stretch;gap:.375rem}
-.score-tab{position:relative;display:flex;align-items:center;gap:.625rem;width:17.5rem;height:4.25rem;padding:0 1.125rem 0 .625rem;border-radius:2.125rem var(--r-md) var(--r-md) 2.125rem;
+.score-tab{position:relative;display:flex;align-items:center;gap:.625rem;width:19.5rem;height:4.25rem;padding:0 1.125rem 0 .625rem;border-radius:2.125rem var(--r-md) var(--r-md) 2.125rem;
   background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(238,246,250,.93));border:.125rem solid #fff;box-shadow:var(--sh-hud);overflow:hidden}
 .score-tab::after{content:"";position:absolute;left:0;right:0;bottom:0;height:.3125rem;background:var(--me)}
 .score-tab.is-them{flex-direction:row-reverse;padding:0 .625rem 0 1.125rem;border-radius:var(--r-md) 2.125rem 2.125rem var(--r-md);text-align:right}
 .score-tab.is-them::after{background:var(--them-deep)}
 .score-who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
-.score-who b{font-size:1.3125rem;font-weight:700;color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* the name row (NOTES 212): the name, then its badge and emblem (ui.js regBadge / rankBadge put them after the name, inside this row). The badges never shrink and
+   hug the name; the name gives way first: ui.js fitNames scales its type down (--name-fs, never under max(.9375rem, 12px)) before it ellipsizes. 19.5rem wide (was 17.5): the room for a name was 7rem */
+.score-name{display:flex;align-items:center;min-width:0;max-width:100%;min-height:calc(1.3125rem * 1.15)}      /* the row keeps the full type's height: a fitted name does not lift the sub-label */ .score-tab.is-them .score-name{justify-content:flex-end}
+.score-who b{flex:0 1 auto;min-width:0;font-size:var(--name-fs,1.3125rem);font-weight:700;color:var(--ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score-name > .reg-badge,.score-name > .rank-badge{flex:none}      /* sized by the row's type (1rem), not the name's: a badge keeps its size while the name shrinks */
 .score-who small{font-size:max(.75rem,11px);font-weight:700;letter-spacing:.06em;color:var(--ink-soft);white-space:nowrap} .score-who small:empty{display:none}
 .score-num{min-width:3.5rem;text-align:center;font-size:var(--t-score);font-weight:900;line-height:1;transform-origin:50% 55%;color:var(--ink-strong);font-variant-numeric:tabular-nums;display:inline-block}
 .is-me .score-num{color:var(--me-ink)} .is-them .score-num{color:var(--them-ink)}
@@ -265,7 +269,7 @@ body[data-overlay] .toast.on{opacity:0}
 .light-lg{width:1.125rem;height:1.125rem}
 /* HUD corner, top-left: hamburger, room code, then the spectator bits. No status pills any more: the three statuses are rows in the settings panel. */
 .corner-br{flex-basis:100%;height:0}                                 /* the stats panel always starts its own row */
-.corner{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;align-items:center;flex-wrap:wrap;gap:.375rem var(--s-2);max-width:calc(50vw - 21.5rem - var(--edge))}   /* never under the scoreboard (40.3rem, centred, drawn above): it wraps to a second row first */
+.corner{position:fixed;left:var(--edge);top:var(--edge);z-index:var(--z-hud);display:flex;align-items:center;flex-wrap:wrap;gap:.375rem var(--s-2);max-width:calc(50vw - 23.5rem - var(--edge))}   /* never under the scoreboard (up to 45.2rem since the 19.5rem tabs, NOTES 212; centred, drawn above): it wraps to a second row first */
 body[data-settings] .corner{z-index:var(--z-screen)}                /* paused + open: the hamburger stays sharp above the blur, it is the way back */
 .btn-icon{width:2.75rem;height:2.75rem;padding:0;flex:none;box-shadow:var(--sh-hud), var(--inner-hi)}
 .btn-icon svg{width:1.5rem;height:1.5rem;fill:none;stroke:var(--ink-strong);stroke-width:2.75;stroke-linecap:round}
@@ -796,7 +800,7 @@ input.code-box:focus{border-color:var(--line);box-shadow:var(--glow), inset 0 .1
   .corner{flex-direction:column;align-items:flex-start;flex-wrap:nowrap;max-width:none} .corner-br{display:none}
   .room-menu .copy-caret{display:none}       /* the court pill keeps its old width beside the narrower board; hover and a tap still open it */
   .inset-cam{width:9rem} .inset-pod{top:calc(var(--edge) + 5.6875rem + .5rem)}       /* 5.6875rem = the smaller webcam frame's height */
-  .scoreboard{width:min(41rem, calc(100vw - 2 * (10rem + var(--edge))))}
+  .scoreboard{width:min(45.25rem, calc(100vw - 2 * (10rem + var(--edge))))}      /* 45.25rem: the board's natural width with 19.5rem tabs (NOTES 212), so nothing jumps at the breakpoint */
   .score-tab{flex:1 1 0;width:auto;min-width:0;gap:.375rem}
   .score-num{min-width:2.25rem} .rally{min-width:3rem;padding:0 .375rem}
   .score-tab .chip{display:none} .score-tab,.score-tab.is-them{padding:0 .75rem}       /* the coloured underline already says whose tab it is; the name and its sub-label need the room */
@@ -899,7 +903,7 @@ body[data-role="spectator"][data-view="split"] #split-line{display:block}
 body[data-role="spectator"] #ping-pill{display:none}                           /* the ping is shown while seated only (docs/NEXT.md 14g) */
 /* emotes (NOTES 205): everyone on a court gets a small bar bottom-right, GG and nine Apple emoji, each with its key (1 to 0) under it.
    Everyone in the court sees each one rise a little from just above the bar and fade within two seconds, with the sender's name.
-   After a pick the bar rests for a second: it dims, and a thin line along its foot runs out. */
+   After a player's pick the bar rests for a second: it dims, and a thin line along its foot runs out (never for a spectator, NOTES 213). */
 .emotes{display:flex;position:fixed;right:var(--edge);bottom:var(--edge);z-index:var(--z-hud);padding:.1875rem;border-radius:.875rem;background:rgba(255,255,255,.86);border:.09375rem solid #fff;box-shadow:var(--sh-hud);overflow:hidden;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
 .emote-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.0625rem;width:2rem;height:2.5rem;padding:0;border:0;border-radius:.625rem;background:none;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce), opacity var(--d-fast)}
 .emote-btn img{width:1.375rem;height:1.375rem;pointer-events:none;user-select:none}
@@ -1599,8 +1603,6 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .tip{position:fixed;left:0;top:0;z-index:1000;pointer-events:none;padding:var(--s-1) var(--s-3);border-radius:var(--r-pill);background:var(--ink-strong);color:#fff;font:800 var(--t-xs)/1.3 var(--font);letter-spacing:.02em;text-align:center;max-width:min(18rem,calc(100vw - 1rem));box-shadow:var(--sh-2);opacity:0;transform:translateY(.25rem);transition:opacity 120ms,transform 120ms var(--ease-out)}
 .tip.is-below{transform:translateY(-.25rem)} .tip.on{opacity:1;transform:none}      /* every tooltip on the page (ui.js tipShow, NOTES 136): the browser's own never shows. The developer's name is no longer orange (NOTES 135) */
 @media (prefers-reduced-motion:reduce){ .tip{transition:none;transform:none} }
-.score-who:has(> .reg-badge){display:grid;grid-template-columns:minmax(0,max-content) auto;justify-content:start;align-items:center;column-gap:0} .score-who:has(> .reg-badge) small{grid-column:1 / -1}      /* the name and its badge on one line, the sub-label under both */
-.score-tab.is-them .score-who:has(> .reg-badge){justify-content:end}
 .tally-side:has(> .reg-badge){display:grid;grid-template-columns:auto auto;justify-content:center;justify-items:center;align-items:center;row-gap:.375rem} .tally-side:has(> .reg-badge) .chip{grid-column:1 / -1}
 .br-p:has(> .reg-badge) .br-name,.tour-chip:has(> .reg-badge) .tour-chip-name{flex:0 1 auto} .br-name + .reg-badge,.tour-chip-name + .reg-badge{margin:0 auto 0 0}      /* bracket and chips: the badge hugs the name, the tags and score stay at the end (the flex gap spaces it) */
 .court-who .reg-badge{display:inline-grid;margin-left:.25em} .vs-side > .reg-badge{margin:0}      /* the court list: inline in the nowrap line. The VS card: under the name, in its column */
@@ -1628,12 +1630,9 @@ body[data-paused] .tour-card{background:linear-gradient(180deg,#f6fafc,#e7f1f6)}
 .rank-card-em:has(> .is-md),.rank-badge:has(> .is-md){--em-h:2.5rem;--div-fs:max(.6875rem,11px)} .rank-card-em:has(> .is-lg),.rank-badge:has(> .is-lg){--em-h:5rem;--div-fs:max(.875rem,11px)} .rank-card-em:has(> .is-xl),.rank-badge:has(> .is-xl){--em-h:7.5rem;--div-fs:max(1.0625rem,11px)}      /* never under the 11 px label floor (docs/ui-spec.md) */
 /* the emblem beside a name (docs/RANKED.md 6, ui.rankBadge): its own element after the badge (or the name), never in the name's text */
 .rank-badge{flex:none;display:inline-grid;place-items:center;margin-left:.35em;vertical-align:-.12em;line-height:0}
-.score-who:has(> .reg-badge),.score-who:has(> .rank-badge){display:grid;grid-template-columns:minmax(0,max-content) auto auto;justify-content:start;align-items:center;column-gap:0} .score-who:has(> .reg-badge) small,.score-who:has(> .rank-badge) small{grid-column:1 / -1}      /* the name, its badge and its emblem on one line, the sub-label under all three */
-.score-tab.is-them .score-who:has(> .rank-badge){justify-content:end}
 .tally-side:has(> .rank-badge){display:grid;grid-template-columns:auto auto auto;justify-content:center;justify-items:center;align-items:center;row-gap:.375rem} .tally-side:has(> .rank-badge) .chip{grid-column:1 / -1}
 .vs-side > .rank-badge{margin:0} .view-chip .rank-badge{margin-left:.25em}
-.score-who .rank-badge{margin-left:.25em} .score-who .rank-badge .rank-em{width:1.1em;height:1.1em}      /* the 17.5rem tab: a 12-character name, its badge and the emblem must share one line, so the emblem sits at the badge's height */
-.score-who:has(> .rank-badge) b{font-size:1.1875rem} .score-who:has(> .rank-badge) .reg-badge{margin-left:.25em}      /* with both, each gives a little: the name keeps the most room (a long name still ellipsizes at the 10px floor, as it does with the badge alone) */
+.score-who .rank-badge{margin-left:.25em} .score-who .rank-badge .rank-em{width:1.1em;height:1.1em} .score-who .reg-badge{margin-left:.25em}      /* the score tab: the name, its badge and the emblem share one line, so the emblem sits at the badge's height (the name's fit is ui.js fitNames, NOTES 212) */
 
 /* the result card's line (9.3): what this match did to my record. Quiet, under the tally; it never takes focus */
 .result-save{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:calc(-1 * var(--s-3)) auto var(--s-4);max-width:36rem;text-align:center}

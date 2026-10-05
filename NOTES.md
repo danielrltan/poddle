@@ -4429,6 +4429,61 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
 - test/profile-ui.mjs reads the aria-label and checks the button has no text; it fails the same checks as main otherwise
   (two phone header layouts, pre-existing).
 
+## 212. The scoreboard fits a name instead of cutting it off
+- The owner's name was ellipsized in his score tab beside the hammer and the rank emblem. Two causes. The tab is 17.5rem and the
+  chip, the serve dot, the 3.5rem score and the paddings left the name row about 7rem (ui.css .score-tab). And the grid the badges
+  switched on (`.score-who:has(> .reg-badge)`, three fixed columns) gave an empty third track (a name with an emblem but no hammer)
+  a share of the sub-label's width, so "Priyanka" read "Priy..." at 1280 px with half the tab empty.
+- Now: the name and its badges sit in their own row, `<span class="score-name">` round the `<b>` (index.html, docs/ui-spec.md;
+  regBadge / rankBadge still put the badge and the emblem after the name, so they land in the row). A flex row: the badges never
+  shrink and hug the name, the name gives way first. ui.js fitNames, after every setNames and from a ResizeObserver on the rows
+  (the root type scales with the window): the row's width less the badges is the name's; a wider name shrinks its type (--name-fs on
+  the row, quarter-pixel steps) down to max(.9375rem, 12px), and only a name still too wide at the floor ellipsizes. The row keeps
+  the full type's height so a fitted name does not lift the sub-label. The tab is 19.5rem; with it the ≤900 px cap on the board is
+  45.25rem (was 41, sized for the old tabs: the board would have jumped 44 px narrower crossing the breakpoint) and the top-left
+  corner's max-width keeps clear of the wider board (50vw - 23.5rem, was 21.5: a tournament pill could have run under it). A name
+  measured before Poddle Rounded landed is measured again on document.fonts.ready. The grid rules and the 1.1875rem with-emblem
+  size are gone; docs/ui-spec.md and docs/RANKED.md say so.
+- Measured in test/ui-mock.html at 1280, 900, 600, 430 and 375 px: Dan + hammer + emblem, Priyanka + emblem, Maximiliano / Christopher
+  with emblems and a 12-letter name all fit at full or slightly reduced type; only WWWWWWWWWWWW with an emblem still ellipsizes, at
+  the floor. test/ui-next.mjs part A: the same checks fail as on 3abdae7 (settings rows, Sound, Tab order, key hints: none of them the board).
+
+## 213. Spectators' emotes have no cooldown
+- The owner: the stands should not rest between emotes. A player still sends one a second (NOTES 205); a spectator sends as fast as
+  they tap. server/game.js: EMOTE_GAP 900 ms for a seated player, EMOTE_FLOOD 60 ms for a spectator (a script's flood, never a
+  hand's, as NOTES 46 had). web/ui.js sendEmote: no cooldown, no dimmed bar, while body[data-role=spectator].
+- test/emote.test.mjs covers both (a spectator's second emote 0.3 s later gets through, a burst of 30 lets one through, a player's
+  second 0.4 s later is dropped); test/emotebar-e2e.mjs presses 3 then 4 from the stands and sees both, and the bar never dims.
+
+## 214. One person, one court: a second tab may not join, watch or play against its own browser
+- The owner opened another tab and could sit on his own court (a match against himself) and watch his own court from the other
+  side. Now the server refuses it. server/game.js elsewhere(ws): another live socket (readyState 1, not a pad, not this tab's cid)
+  of the same person, on a court or active in a tournament, blocks quick, create, join, watch and tcreate from the lobby with
+  joinfail 'self'; the client says "You're already on a court in another tab". The same person = the same device-id hash (the
+  hello, docs/ACCOUNTS.md 3.2; a Buffer, compared with equals) or the same account id (any browser signed into it: a phone's home
+  watching your own laptop's court is refused too).
+- Every way in is gated (selfOut): the lobby's five; a tournament's twarm and twatch and a new sign-up through tourJoin (a viewer of
+  a tournament in the lobby could otherwise watch its own match); the socket URL's room= at connect and revive() (an account links at
+  connect); and, because the hello comes after the URL is acted on, helloMsg checks again when a device id arrives on a socket already
+  on a court and puts that socket back in the lobby (the client: 'You're already on a court in another tab' instead of 'Court closed').
+  A tab open before the browser's first seat has no id: web/profile.js now sends its hello when the id appears in storage (the
+  'storage' event for poddle.device), so two lobby tabs are linked the moment one sits down. A sign-out in the second tab rotates the
+  device id and takes the account off every socket of the session, which would have unlinked it: stats.forget hands the sockets it
+  touched to game.js kin(), which gives them one random key kept by tab id (cid) for 2 h in memory (pruned on the heartbeat), and a
+  socket connecting with that cid inherits it; samePerson compares kin too. Review by three finders and twelve verifiers (a workflow)
+  found the viewer, late-hello and sign-out shapes; all closed.
+- Not linked: two browsers, a private window, another machine on the same address (a household is not one person, NOTES 153); two
+  tabs of a browser that has no device id at all (neither has seated). The same tab reloading (its cid) still takes its seat over, a
+  tab that crashed is a ghost the heartbeat clears within 8 s, and leaving the court in the first tab frees the second.
+- Testing two players on one machine now takes a private window or a second browser. test/selftab.test.mjs covers the refusals, the
+  other browser, the reload, the release, the crafted room= URL and its late hello, a tournament host's second tab, and on a second
+  server with sign-in: one account on two devices, and the sign-out + reconnect (kin); rooms, tourney, watcher, joinreq and stats
+  tests pass as before.
+- Legal: web/privacy.html (section 7's tab-ID row, a change entry dated October 5, Last updated / dateModified) and the sitemap's
+  lastmod say the tab ID, device hash and account now also keep one person to one court, and that a sign-in's tab IDs stay linked in
+  memory for up to two hours after a sign-out. Nothing new is sent, stored or logged. CLAUDE.md's memory-only list has the kin map.
+
+
 ## 215. The paddle cursor: on the menus the mouse is a pickleball paddle
 - The owner asked for a cursor pack in the menu's look: a simple paddle with the ball at its corner as the pointer, hover and click
   effects, something for scrolling. New web/cursor.js (builds `#cur`, follows the mouse, sets its states) and web/cursor.css (the

@@ -655,7 +655,7 @@ function wire() {
   for (const id of ['btn-pf-signout', 'btn-set-signout']) click(id, () => signOut());
   for (const id of ['btn-pf-rename', 'btn-name-change', 'btn-set-name-change']) click(id, () => claimCard());      // Change: the lobby's name row and Settings > You (9.5)
 
-  addEventListener('storage', e => { if (e.key === null) storageCleared(); });      // the site's storage was cleared in another tab
+  addEventListener('storage', e => { if (e.key === null) storageCleared(); else if (e.key === DEV_KEY && e.newValue && !sockHello && on) { sockHello = true; h.send({ type: 'hello', dev: e.newValue, v: 1 }); } });      // the site's storage was cleared in another tab; the device id made by another tab's first seat: this socket's hello now, so the server knows the two tabs are one person (NOTES 214)
   click('btn-head-acct', () => { const a = me.account; if (!a) signIn(); else if (!a.username) claimCard(); else h.stats(); });      // the header's account button (NOTES 151)
   click('btn-signin-close', () => closeCard()); wireShare();
   click('tog-lb-show', () => toggleShow());      // Show me on the global leaderboard (NOTES 126)

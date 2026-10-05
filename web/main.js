@@ -657,10 +657,11 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   }
   if (m.type === 'joinfail') {
     const was = pending, watching = !!was && was.type === 'watch'; settle(); wantRoom = ''; wantWatch = false; botWant = null;
-    if (room) { toLobby('Court closed'); return; }                                            // a reconnect found the room gone
+    if (room) { toLobby(m.reason === 'self' ? 'You’re already on a court in another tab' : 'Court closed'); return; }      // a reconnect found the room gone; self: the server put this tab off a court the person is already on from another (NOTES 214)
     if (tourOn()) setUrl(tour.code, !!(tour.you && tour.you.viewer)); else setUrl(null);
     const tcode = ui.cleanCode(typeof m.code === 'string' ? m.code : was && was.code);
     if ((m.reason === 'tfull' || m.reason === 'started') && m.watch === true && tcode.length === 4) { ui.askWatch(tcode, m.reason === 'tfull' ? 'This tournament is full. Watch instead?' : 'This tournament has started. Watch instead?'); return; }      // a tournament's code: watch its bracket instead
+    if (m.reason === 'self') { say('You’re already on a court in another tab', null, 3200); return; }      // one person, one court (NOTES 214): before the tournament and watch texts, which it beats
     if (m.reason === 'intour') { say(`You’re in tournament ${tcode}. Leave it first.`, null, 3200); if (tour) tourScreen(true); return; }
     if (was && was.type === 'twatch') { say('That match just ended', null, 2200); return; }      // a Watch on the bracket, a moment too late
     if (was && was.type === 'tcreate') { say(m.reason === 'busy' ? 'Too many tournaments right now. Try again soon.' : 'Couldn’t create the tournament. Reload and try again.', null, 3000); return; }

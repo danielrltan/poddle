@@ -102,7 +102,8 @@ await a.keyboard.press('Digit2'); await sleep(300); s = await bar(b); ok(J(s.pop
 await a.screenshot({ path: `${SHOTS}emotes-pop-player-1280x720.png` }); await c.screenshot({ path: `${SHOTS}emotes-pop-spectator-1280x720.png` });
 await sleep(1000); s = await bar(a); ok(!s.cool, 'the bar is back after a second');
 await a.keyboard.press('Digit0'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['😢:@them']), `0 is the tenth, 😢, and it replaces her last bubble (${s.pops})`);
-await c.keyboard.press('Digit3'); await sleep(300); s = await bar(a); ok(s.pops.includes('💚:Cat'), `the spectator's 3 reaches the player: 💚 (${s.pops})`);
+await c.keyboard.press('Digit3'); await sleep(150); await c.keyboard.press('Digit4'); await sleep(300); s = await bar(a); ok(s.pops.includes('💚:Cat') && s.pops.includes('😂:Cat'), `the spectator's 3 reaches the player, and the 4 right after it: no cooldown in the stands, NOTES 213 (${s.pops})`);
+ok(!(await bar(c)).cool, 'the spectator\'s bar never dims');
 await sleep(2600); s = await bar(b); ok(s.pops.length === 0, `the pops are gone within about two seconds (${s.pops})`);
 const v = pg => pg.evaluate(() => { const x = window.__scene._dbg.view(); return x.name + (x.name === 'pov' ? x.side : ''); });
 const seen = []; for (let i = 0; i < 5; i++) { await c.keyboard.press('KeyV'); await sleep(250); seen.push(await v(c)); }
