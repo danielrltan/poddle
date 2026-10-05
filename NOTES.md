@@ -4391,3 +4391,22 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
   and the owner's copy rules forbid; How to play stays the one explanation, now reachable where a new player first needs it.
 - Not changed: Settings. The paddle choice (Phone / AirPod) is already the heading of Getting ready, and the Camera row there turns on
   body tracking, so neither hides behind the Settings card.
+
+## 210. Three search landing pages: the game, the phone paddle, what you need
+- New static pages for the searches people make before they know the name: web/pickleball-browser-game.html ("pickleball browser
+  game": the modes, Matt's four levels, tournaments, scoring as the server plays it, trophies and the eight ranks, friends, watching),
+  web/phone-paddle.html ("phone paddle controller": pairing, the grip, what the phone measures, how a swing becomes a shot, calibration,
+  the iPhone motion permission, where the motion goes) and web/pickleball-no-download.html ("pickleball no download": what you need
+  and do not, computer, phone, webcam, what runs in the browser, when a sensor is blocked, free with no ads). Each has ONE subject and
+  links the others for the rest, so they are not near-copies (search engines treat those as doorway pages); setup steps stay in How
+  to play and are linked by anchor (#setup, #airpod, #tournament, #watch, #trophies).
+- Written by a workflow (one writer per page, then three reviewers each: facts checked against the code, duplication + SEO basics,
+  the owner's voice rules), then fixed. No invented numbers, no market statistics, no testimonials, no other games' names. Device
+  claims carry their limits (a phone with a gyroscope; the AirPod needs a Mac on macOS 14+, Chrome, AirPods Pro / 3 / 4 / Max and
+  Poddle Helper). No JavaScript on them; the head copies how-to-play.html's (canonical, Open Graph, one JSON-LD block with FAQPage);
+  they use how-to-play.css. Captions beside the Play buttons were cut (NOTES 158's rule).
+- Linked from How to play's footer and from the no-JavaScript home (so a crawler reaches them from /), listed in sitemap.xml, and
+  /pickleball-browser-game, /phone-paddle, /pickleball-no-download 301 to the .html (server/game.js MOVED).
+- test/seo.test.mjs checks each page: one title / h1 / canonical / JSON-LD, description length, no script, links that resolve,
+  the clean-URL redirect, the voice, and that How to play and the home link it.
+- Legal pages unchanged: static text, no new data, storage or third party.

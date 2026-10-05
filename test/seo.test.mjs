@@ -114,7 +114,7 @@ try {
     const xml = (await req('/sitemap.xml')).body.toString(), locs = [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map(m => m[1]), mods = [...xml.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)].map(m => m[1]);
     const opens = (xml.match(/<(?![?\/!])[^>]*[^\/]>/g) || []).length, closes = (xml.match(/<\/[^>]+>/g) || []).length;
     ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>') && /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/.test(xml) && xml.trim().endsWith('</urlset>') && opens === closes && !/&(?!amp;|lt;|gt;|quot;|apos;)/.test(xml), `sitemap.xml is well formed (${opens} tags open, ${closes} close)`);
-    ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
+    ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/pickleball-browser-game.html,${ORIGIN}/phone-paddle.html,${ORIGIN}/pickleball-no-download.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
     ok(mods.length === locs.length && mods.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d)) && Date.parse(d) <= Date.now() + 864e5), `lastmod is a W3C date, not in the future: ${mods}`);
     for (const l of locs) { const p = new URL(l).pathname, r = await req(p); ok(r.status === 200 && /text\/html/.test(r.h['content-type']), `${p} from the sitemap: ${r.status}`);
       if (r.status === 200) { const c = [...r.body.toString().matchAll(/<link rel="canonical" href="([^"]*)"/g)].map(m => m[1]); ok(c.length === 1 && c[0] === l, `its canonical is itself: ${c}`); } } }
@@ -142,6 +142,20 @@ try {
   console.log('downloads');
   if (!has('download/Poddle-Helper.zip')) pending('/download/Poddle-Helper.zip: web/download/Poddle-Helper.zip is not yet built'); else { const r = await req('/download/Poddle-Helper.zip', { method: 'HEAD' });
     ok(r.status === 200 && r.h['content-type'] === 'application/zip' && r.h['content-disposition'] === 'attachment; filename="Poddle-Helper.zip"' && r.h['cache-control'] === 'no-cache', `/download/Poddle-Helper.zip: ${r.status} ${r.h['content-type']} | ${r.h['content-disposition']} | ${r.h['cache-control']}`); }
+
+  console.log('landing pages (NOTES 210: one subject each, linked from How to play and the no-JavaScript home)');
+  for (const f of ['pickleball-browser-game', 'phone-paddle', 'pickleball-no-download']) { const r = await req(`/${f}.html`), t = r.body.toString();
+    if (r.status !== 200) { ok(false, `/${f}.html: ${r.status}`); continue; }
+    const d = (t.match(/<meta name="description" content="([^"]*)"/) || [])[1] || '', ld = [...t.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    let parses = ld.length === 1; try { JSON.parse(ld[0][1]); } catch { parses = false; }
+    ok(t.startsWith('<!doctype html>') && (t.match(/<title>/g) || []).length === 1 && (t.match(/<h1\b/g) || []).length === 1 && t.includes(`<link rel="canonical" href="${ORIGIN}/${f}.html">`) && d.length >= 70 && d.length <= 160 && parses && (t.match(/<script\b/g) || []).length === 1,
+      `/${f}.html: one title, one h1, its own canonical, a ${d.length}-char description, one JSON-LD block that parses, no other script`);
+    ok(/href="\/"/.test(t) && /href="\/privacy\.html"/.test(t) && /href="\/terms\.html"/.test(t) && /href="\/how-to-play\.html/.test(t) && !/(href|src)="(?!\/|https:|#|mailto:)/.test(t), 'it links home, How to play, Privacy and Terms, with no relative URL');
+    const seen = t.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<!doctype html>/, '').replace(/<[^>]+>/g, ' ');
+    ok(!/[–—…!]|\.\.\.|\b(Wii|Nintendo|simply|seamless|effortless)\b/i.test(seen) && !/AirPod!/.test(t), 'voice: no exclamation mark, long dash, ellipsis, filler or other games\' names');
+    for (const m of new Set([...t.matchAll(/(?:href|src)="(\/[^"#?]*)/g)].map(m => m[1]))) { if (m === '/') continue; const x = await req(m, { method: 'HEAD' }); if (x.status !== 200) ok(false, `/${f}.html links ${m}: ${x.status}`); }
+    const mv = await req('/' + f); ok(mv.status === 301 && mv.h.location === `/${f}.html`, `/${f}: ${mv.status} -> ${mv.h.location}`);
+    const htp = (await req('/how-to-play.html')).body.toString(); ok(htp.includes(`href="/${f}.html"`) && home.includes(`href="/${f}.html"`), 'How to play and the no-JavaScript home link it'); }
 
   console.log('help page');
   if (!has('how-to-play.html')) pending('how-to-play.html is not yet written'); else { const t = (await req('/how-to-play.html')).body.toString();

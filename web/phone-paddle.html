@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone paddle controller: how Poddle turns a swing into a shot</title>
+<meta name="description" content="Pair your phone by QR code and it becomes a motion controller. How Poddle reads its sensors and turns each swing into a shot.">
+<link rel="canonical" href="https://poddleball.com/phone-paddle.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#dfeef6">
+<meta name="color-scheme" content="light">
+<meta name="application-name" content="Poddle">
+<meta name="apple-mobile-web-app-title" content="Poddle">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poddle">
+<meta property="og:title" content="How the Poddle phone paddle works">
+<meta property="og:description" content="Scan a code and your phone is a motion controller. How Poddle turns a swing into a drive, lob or smash.">
+<meta property="og:url" content="https://poddleball.com/phone-paddle.html">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://poddleball.com/og.jpg?v=9">
+<meta property="og:image:secure_url" content="https://poddleball.com/og.jpg?v=9">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How the Poddle phone paddle works">
+<meta name="twitter:description" content="Scan a code and your phone is a motion controller. How Poddle turns a swing into a drive, lob or smash.">
+<meta name="twitter:image" content="https://poddleball.com/og.jpg?v=9">
+<meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod.">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="preload" href="/vendor/fonts/mplus-rounded-1c-500.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/how-to-play.css">
+<style>
+  .shots{margin:0 0 .75rem}
+  .shots dt{margin:.875rem 0 .125rem;font-weight:800;color:var(--ink-strong)}
+  .shots dt:first-child{margin-top:0}
+  .shots dd{margin:0}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://poddleball.com/phone-paddle.html",
+      "url": "https://poddleball.com/phone-paddle.html",
+      "name": "Phone paddle controller: how Poddle turns a swing into a shot",
+      "description": "Pair your phone by QR code and it becomes a motion controller. How Poddle reads its sensors and turns each swing into a shot.",
+      "inLanguage": "en",
+      "primaryImageOfPage": "https://poddleball.com/og.jpg",
+      "about": { "@id": "https://poddleball.com/#game" },
+      "isPartOf": { "@type": "WebSite", "name": "Poddle", "url": "https://poddleball.com/" }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://poddleball.com/phone-paddle.html#questions",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Why did my fast flick come out soft?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A wrist flick travels a short way, so it is a tap however fast it is. A relaxed, full arm stroke tops out at a drive. Only a full stroke that is also fast becomes a smash."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does the paddle point off to one side after a while?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A phone's sense of heading drifts over minutes. Press R on the computer, or hold Recentre on the phone, to point the paddle at the screen again."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does my iPhone not buzz on a hit?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "iPhone browsers cannot vibrate the phone. Other phones whose browser allows it buzz on each hit, longer for a harder shot."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo-mark" href="/"><span class="vh">Poddle</span><span class="lg-a" aria-hidden="true">P</span><span class="logo-ball" aria-hidden="true"></span><span class="lg-a" aria-hidden="true">d</span><span class="lg-b" aria-hidden="true">dle</span></a>
+    <a class="btn btn-sm" href="/">Play</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro" aria-labelledby="title">
+    <img class="hero" src="/og.jpg?v=9" width="1200" height="630" alt="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod.">
+    <h1 id="title">Your phone as a paddle controller</h1>
+    <p class="lead">In Poddle the computer shows the court and the phone in your hand is the paddle. The phone sends what its motion sensors measure, and the game turns each swing into a shot. Courts, opponents and Matt the bot are on <a href="/pickleball-browser-game.html">Poddle, the pickleball game in your browser</a>.</p>
+    <p class="note"><strong>What the phone needs:</strong> a gyroscope, a modern browser and an internet connection. Without a gyroscope a phone cannot report how fast it turns, so it cannot be the paddle.</p>
+    <p class="cta"><a class="btn btn-lg" href="/">Play Poddle</a></p>
+  </section>
+
+  <section class="card" aria-labelledby="pair">
+    <h2 id="pair">How pairing works</h2>
+    <p>The steps are in <a href="/how-to-play.html#setup">How to play</a>: scan the QR code on the computer, or type the paddle code at <strong>poddleball.com/pad</strong>, then tap Start. The code is P- and 4 characters, with no I, O, 0 or 1 to misread.</p>
+    <p>The code belongs to that one browser tab. If the connection drops, the phone and the tab find each other again by it.</p>
+  </section>
+
+  <section class="card" aria-labelledby="hold">
+    <h2 id="hold">Hold it like a paddle handle</h2>
+    <p>Hold the phone on its edge, with its screen to the side and its top toward the computer. A phone has no wrist strap, so keep a firm grip and clear space around you. The phone page keeps its screen awake where the browser allows it, and flashes on each hit, white for a soft shot up to red for a smash.</p>
+  </section>
+
+  <section class="card" aria-labelledby="sensors">
+    <h2 id="sensors">What the phone measures</h2>
+    <p>The page sends one sample per motion reading: which way the phone points, measured against gravity; how fast it turns about each of its three axes; its acceleration without gravity; and a timestamp.</p>
+    <p>Browsers disagree about which axis they call which, so the page checks the reported turn rates against the change in orientation and keeps the naming that agrees.</p>
+    <p>The orientation sets the paddle's angle and swings it on a virtual forearm. Where your player stands is a separate setting, Move. With Move on Body, your steps on the computer's webcam (see <a href="/pickleball-no-download.html#webcam">why the webcam is optional</a>) place your player, and the phone steers too: tip the paddle forward to walk toward the net, or back to retreat. Your tilt adds to the footwork the game does for you. With Move on Auto, the game runs you to the ball.</p>
+    <p>On a Mac, one AirPod can stand in for the phone and is read the same way. Setup is in <a href="/how-to-play.html#airpod">How to play</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="shots">
+    <h2 id="shots">How a swing becomes a shot</h2>
+    <p>A swing starts when the turn rate rises past a threshold and ends when your hand settles.</p>
+    <dl class="shots">
+      <dt>Power</dt>
+      <dd>Effort first, then speed. The game measures how far your hand traveled before the swing peaked, and how fast it turned at the peak.</dd>
+      <dt>Direction</dt>
+      <dd>The way the swing turns sends the ball left or right.</dd>
+      <dt>Lob</dt>
+      <dd>The share of your hand's path that goes up. A gentle scoop drops in the kitchen as a dink. A firmer one goes deep and high.</dd>
+      <dt>Spin</dt>
+      <dd>A roll of the wrist or a curved path cuts the ball into a slice. It flies lower and kicks sideways off the bounce, the way the paddle cut across it.</dd>
+      <dt>Timing</dt>
+      <dd>Waiting for the peak would cost 150 to 300 ms, so the game calls a sharp flick at once and a building arm swing about 80 ms in, then corrects the shot as the swing arrives.</dd>
+    </dl>
+    <p>Near the net you can block instead: hold the paddle in the ball's path and it pops back soft. That works with Move set to Body while the camera sees you, never on a serve.</p>
+  </section>
+
+  <section class="card" aria-labelledby="calibrate">
+    <h2 id="calibrate">Calibration</h2>
+    <p>Calibration learns how you hold the phone: still in your grip, tipped up, then held the way you will play, which becomes the paddle's neutral pose.</p>
+    <p>The finished calibration is saved in the computer's browser, one for the phone and one for an AirPod, so the next game on that computer starts on the court. Another computer, a private window or cleared site data means calibrating again. To redo it, press <kbd>C</kbd> on the computer or hold the phone's Calibrate again button.</p>
+    <p>Both phone buttons, Calibrate again and Recentre, answer only to a press held about 0.7 seconds, so a squeezing grip sets nothing off.</p>
+  </section>
+
+  <section class="card" aria-labelledby="permission">
+    <h2 id="permission">Motion permission on iPhone</h2>
+    <p>Phone browsers give motion sensors only to a secure (https) page. An iPhone also asks first, when you tap Start. Choose Allow. If the phone shows Motion is switched off or No motion sensors here, see <a href="/pickleball-no-download.html#fix">when the browser blocks a sensor</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="relay">
+    <h2 id="relay">Where the motion goes</h2>
+    <p>The phone opens its own connection to the Poddle game server and names the paddle code. The server rebuilds each sample from its numbers and passes the raw readings only to the one tab that showed that code, so a phone can send only motion and its two button presses.</p>
+    <p>That tab sends the server your paddle's angle and turn rate along with your position. Your opponent and anyone watching see the paddle's position and angle live. During a match the server also holds the last 1.5 seconds of your paddle's turn rate and angle in memory, to check that each swing matches the paddle's motion. Only the result of that check is kept, with the match. The motion itself is not stored. The details are in the <a href="/privacy.html">privacy policy</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="questions">
+    <h2 id="questions">Questions</h2>
+
+    <h3>Why did my fast flick come out soft?</h3>
+    <p>A wrist flick travels a short way, so it is a tap however fast it is. A relaxed, full arm stroke tops out at a drive. Only a full stroke that is also fast becomes a smash.</p>
+
+    <h3>Why does the paddle point off to one side after a while?</h3>
+    <p>A phone's sense of heading drifts over minutes. Press <kbd>R</kbd> on the computer, or hold Recentre on the phone, to point the paddle at the screen again.</p>
+
+    <h3>Why does my iPhone not buzz on a hit?</h3>
+    <p>iPhone browsers cannot vibrate the phone. Other phones whose browser allows it buzz on each hit, longer for a harder shot.</p>
+  </section>
+</main>
+
+<footer class="end wrap">
+  <a class="btn btn-lg" href="/">Play Poddle</a>
+  <p><a href="/">Back to Poddle</a> · <a href="/how-to-play.html">How to play</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></p>
+</footer>
+
+</body>
+</html>

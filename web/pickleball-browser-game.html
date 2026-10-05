@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pickleball browser game: play Poddle online</title>
+<meta name="description" content="Poddle is a free pickleball game in your browser. Play people online, Matt the bot at four levels or a tournament, climb eight ranks and watch live matches.">
+<link rel="canonical" href="https://poddleball.com/pickleball-browser-game.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#dfeef6">
+<meta name="color-scheme" content="light">
+<meta name="application-name" content="Poddle">
+<meta name="apple-mobile-web-app-title" content="Poddle">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poddle">
+<meta property="og:title" content="Poddle: a pickleball game in your browser">
+<meta property="og:description" content="Poddle is a free pickleball game in your browser. Play people online, Matt the bot at four levels or a tournament, climb eight ranks and watch live matches.">
+<meta property="og:url" content="https://poddleball.com/pickleball-browser-game.html">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://poddleball.com/og.jpg?v=9">
+<meta property="og:image:secure_url" content="https://poddleball.com/og.jpg?v=9">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Poddle: a pickleball game in your browser">
+<meta name="twitter:description" content="Poddle is a free pickleball game in your browser. Play people online, Matt the bot at four levels or a tournament, climb eight ranks and watch live matches.">
+<meta name="twitter:image" content="https://poddleball.com/og.jpg?v=9">
+<meta name="twitter:image:alt" content="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod.">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="preload" href="/vendor/fonts/mplus-rounded-1c-500.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/how-to-play.css">
+<style>
+  .modes{list-style:none;padding:0;margin:.25rem 0 0;display:grid;gap:.625rem}
+  .modes li{margin:0;padding:.75rem 1rem;border-radius:var(--r-md);border:.125rem solid var(--line-soft);background:var(--white)}
+  .modes b{display:block;font-weight:800;color:var(--ink-strong)}
+  @media (min-width:40rem){.modes{grid-template-columns:1fr 1fr}}
+  .ranks{display:flex;flex-wrap:wrap;gap:.375rem;list-style:none;padding:0;margin:.25rem 0 .75rem}
+  .ranks li{margin:0;padding:.125rem .75rem;border-radius:var(--r-pill);border:.125rem solid var(--line-soft);background:var(--white);font-weight:800;color:var(--ink-strong)}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://poddleball.com/pickleball-browser-game.html",
+      "url": "https://poddleball.com/pickleball-browser-game.html",
+      "name": "Poddle: a pickleball game in your browser",
+      "description": "Poddle is a free pickleball game in your browser. Play people online, Matt the bot at four levels or a tournament, climb eight ranks and watch live matches.",
+      "inLanguage": "en",
+      "primaryImageOfPage": "https://poddleball.com/og.jpg",
+      "about": { "@id": "https://poddleball.com/#game" },
+      "isPartOf": { "@type": "WebSite", "name": "Poddle", "url": "https://poddleball.com/" }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://poddleball.com/pickleball-browser-game.html#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Can I play pickleball online against real people?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Quick play seats you on an open public court with another player, or opens a new court that others can join. To play someone you know, create a court and send them its code or link." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Poddle use official pickleball rules?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Partly. Games go to 11, win by 2, on a court with pickleball's lines and kitchen. Scoring is rally scoring with the serve changing sides every point, and the game calls no kitchen or two-bounce faults." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I play pickleball against the computer?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Play a bot puts Matt on the other side at Rookie, Club, Tour or Pro, and you can change his level mid-match with B. In Quick play, Matt also takes the other side if nobody turns up within a few seconds." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo-mark" href="/"><span class="vh">Poddle</span><span class="lg-a" aria-hidden="true">P</span><span class="logo-ball" aria-hidden="true"></span><span class="lg-a" aria-hidden="true">d</span><span class="lg-b" aria-hidden="true">dle</span></a>
+    <a class="btn btn-sm" href="/">Play</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro" aria-labelledby="title">
+    <img class="hero" src="/og.jpg?v=9" width="1200" height="630" alt="Poddle logo over a sunny pickleball court. A player in red hits the ball over the net to Matt in orange. Below them, the words: Play pickleball with your phone or AirPod.">
+    <h1 id="title">A pickleball game you play in your browser</h1>
+    <p class="lead">Poddle is an online pickleball game at poddleball.com. The court runs in a browser tab on a computer or tablet, and your phone is the paddle. You play singles against a person or against Matt, the bot. It is free, and you can play without an account.</p>
+    <p class="cta"><a class="btn btn-lg" href="/">Play Poddle</a></p>
+  </section>
+
+  <section class="card" aria-labelledby="modes">
+    <h2 id="modes">What you can play</h2>
+    <ul class="modes">
+      <li><b>Quick play</b> A match against whoever is waiting for an opponent.</li>
+      <li><b>Courts</b> Join or watch a public court, or make your own.</li>
+      <li><b>Play a bot</b> Matt at four levels, from Rookie to Pro.</li>
+      <li><b>Tournaments</b> Knockout brackets for 4 to 16 players.</li>
+      <li><b>Watch</b> Any public match, live.</li>
+      <li><b>Leaderboard</b> Global boards for signed-in players with a username.</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="online">
+    <h2 id="online">Play people online</h2>
+    <p>Quick play seats you where someone is waiting, or opens a new public court. If nobody turns up within a few seconds, Matt takes the other side. A new player can still take his seat until the first ball is struck. After that, someone watching can press Ask to play, and you have 10 seconds to say yes or no.</p>
+    <p>Courts lists every public court and can search them by code. Create court makes a public court, or a private one that only people with its 4 character code or link can find.</p>
+  </section>
+
+  <section class="card" aria-labelledby="bot">
+    <h2 id="bot">Matt, the bot</h2>
+    <p>Matt plays the other side at four levels: Rookie, Club, Tour and Pro. Rookie is slow to the ball, hits soft and often misses. Each level above reacts sooner, covers more court, hits harder and places the ball better. Tour is the level tournaments use.</p>
+    <p>Pick a level in Play a bot, or press <kbd>B</kbd> during a match to move to the next one. Once the first ball is struck, hold <kbd>B</kbd> for 3 seconds to restart at 0-0 at the level you are on. Outside tournaments, a match against Matt pauses when you open Settings or press <kbd>Esc</kbd>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="tourney">
+    <h2 id="tourney">Tournaments</h2>
+    <p>A tournament is a single-elimination bracket for 4 to 16 players. Rounds are played to 7 and the final to 11. Every match is won by 2, and one that reaches 15 ends there. When the count is odd, Matt fills the open spot. <a href="/how-to-play.html#tournament">How to host or join a tournament</a> covers the steps.</p>
+  </section>
+
+  <section class="card" aria-labelledby="rules">
+    <h2 id="rules">How scoring works</h2>
+    <p>Every rally scores a point for whoever wins it, and the serve changes sides after every point. A game goes to 11 and must be won by 2.</p>
+    <ul>
+      <li><strong>Serve.</strong> The ball hangs in front of you until you swing at it. It always lands in your opponent's half. If you never swing, the game serves for you after 9 seconds.</li>
+      <li><strong>Points.</strong> Every shot you make lands in, so the skill is reaching the ball and timing your swing. A rally ends when the ball bounces twice before it is returned, or gets past a player.</li>
+      <li><strong>The kitchen.</strong> The court has one, but no faults are called there. You may volley from anywhere, and there is no two-bounce rule.</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="ladder">
+    <h2 id="ladder">Trophies, ranks and leaderboards</h2>
+    <p>Sign in with Google and pick a username, and counted matches earn or cost trophies. The ranks, from the bottom:</p>
+    <ol class="ranks">
+      <li>Bronze</li><li>Silver</li><li>Gold</li><li>Platinum</li><li>Diamond</li><li>Master</li><li>Champion</li><li>Pro</li>
+    </ol>
+    <p>Each rank below Pro has three divisions of 50 trophies. Pro has no divisions. A Pro player on the trophies board is shown with their place there instead, such as Pro #4. Wins against Matt at your rank's level or harder pay a few trophies, up to a daily limit, and carry you as far as Master. Above that, only wins against people count.</p>
+    <p>The Leaderboard has three global boards: Trophies, Longest rally and Win streak. Each shows the top 100 signed-in players with a username. A switch there takes you off them. <a href="/how-to-play.html#trophies">What a win or loss is worth</a> is in How to play.</p>
+  </section>
+
+  <section class="card" aria-labelledby="friends">
+    <h2 id="friends">Friends</h2>
+    <p>With a username you can search for players and send friend requests. Your friends list shows who is online, playing Matt, in a game, watching or in a tournament. You can also add a player from their profile card, which opens from a name on the leaderboard or in search results.</p>
+  </section>
+
+  <section class="card" aria-labelledby="watch">
+    <h2 id="watch">Watch live matches</h2>
+    <p>Up to 8 people can watch each court, from the court list or a shared link. Watching needs no paddle and works on a phone.</p>
+    <p><a href="/how-to-play.html#watch">Camera views and reactions for watchers</a> are listed in How to play.</p>
+  </section>
+
+  <section class="card" aria-labelledby="setup">
+    <h2 id="setup">What it takes to play</h2>
+    <p>The court runs in a browser on a computer or tablet. The paddle is a phone with motion sensors and a modern browser, linked by scanning a code. An iPhone asks for motion access first. Read <a href="/phone-paddle.html">how your phone becomes a pickleball paddle</a> for the details, or <a href="/pickleball-no-download.html">why Poddle needs no app or download</a>.</p>
+    <p>On a Mac with macOS 14 or later and Google Chrome, one AirPod (AirPods Pro, AirPods 3, AirPods 4 or AirPods Max) can be the paddle instead, with the <a href="/how-to-play.html#airpod">free Poddle Helper app</a>. AirPods 1 and 2 cannot. A webcam is optional for stepping side to side, and its video stays on your computer. Step-by-step setup is in <a href="/how-to-play.html">How to play</a>.</p>
+  </section>
+
+  <section class="card" aria-labelledby="faq">
+    <h2 id="faq">Questions</h2>
+
+    <h3>Can I play pickleball online against real people?</h3>
+    <p>Yes. Quick play seats you on an open public court with another player, or opens a new court that others can join. To play someone you know, create a court and send them its code or link.</p>
+
+    <h3>Does Poddle use official pickleball rules?</h3>
+    <p>Partly. Games go to 11, win by 2, on a court with pickleball's lines and kitchen. Scoring is rally scoring with the serve changing sides every point, and the game calls no kitchen or two-bounce faults.</p>
+
+    <h3>Can I play pickleball against the computer?</h3>
+    <p>Yes. Play a bot puts Matt on the other side at Rookie, Club, Tour or Pro, and you can change his level mid-match with B. In Quick play, Matt also takes the other side if nobody turns up within a few seconds.</p>
+  </section>
+
+  <p class="cta"><a class="btn btn-lg" href="/">Play Poddle</a></p>
+</main>
+
+<footer class="end wrap">
+  <p><a href="/">Back to Poddle</a> · <a href="/how-to-play.html">How to play</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></p>
+</footer>
+
+</body>
+</html>
