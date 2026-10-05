@@ -190,13 +190,14 @@ report(await Promise.all([
       bye(a, b);
     }
   }),
-  sc('5. one network: same address, two browsers -> counts (NOTES 153); same device on two addresses -> same_device', async t => {
+  sc('5. one network: same address, two browsers -> counts (NOTES 153); same device in two tabs -> refused (NOTES 214)', async t => {
     const X = ip(); let [a, b] = await pair({ A: { addr: X, d: dev() }, B: { addr: X, d: dev() } }), [pa, pb] = await duel(a, b);
     t.ok(pa && pa.ranked && pb && pb.ranked, 'same fly-client-ip, two device ids: ranked for both (two people on one network)');
     { const m = lastMatch(await exportOf(a.d, X)); t.ok(m && !m.reasons.includes('same_computer'), `the export has no same_computer (${m && m.reasons})`); } bye(a, b);
-    const D = dev(); [a, b] = await pair({ A: { addr: ip(), d: D }, B: { addr: ip(), d: D } }); [pa, pb] = await duel(a, b);
-    t.ok(pa && !pa.ranked && pa.why.join() === 'self' && pb.why.join() === 'self', 'one device id in both seats: unranked, why self');
-    const P = await profileOf(D, a.addr); t.ok(P && P.played === 1 && P.human.wins === 0 && P.human.losses === 0, 'one owner in both seats: played once, no W/L'); bye(a, b);
+    const D = dev(); a = tab({ addr: ip(), d: D }); b = tab({ addr: ip(), d: D }); await a.open(); await b.open(); await until(() => a.n('lobby') && b.n('lobby'));      // one device id in two tabs (NOTES 214): the second never gets a seat, so the match it would have made unranked (why self) is never played
+    a.send({ type: 'create', public: false }); await until(() => a.room); b.send({ type: 'join', code: a.room.code }); await until(() => b.n('joinfail') >= 1, 8000);
+    t.ok(b.got('joinfail').at(-1)?.reason === 'self' && !b.room && a.side != null, 'one device id in both seats: the second tab is refused (joinfail self), the court stays one person');
+    const P = await profileOf(D, a.addr); t.ok(!P || (P.played === 0 && P.human.wins === 0 && P.human.losses === 0), 'one owner, one seat: nothing played, no W/L'); bye(a, b);
   }),
   sc('17. identity downgrade mid-match: the loss stays on the frozen device', async t => {
     const A = { addr: ip(), d: dev() }, B = { addr: ip(), d: dev() };

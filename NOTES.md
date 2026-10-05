@@ -4477,8 +4477,9 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
   tab that crashed is a ghost the heartbeat clears within 8 s, and leaving the court in the first tab frees the second.
 - Testing two players on one machine now takes a private window or a second browser. test/selftab.test.mjs covers the refusals, the
   other browser, the reload, the release, the crafted room= URL and its late hello, a tournament host's second tab, and on a second
-  server with sign-in: one account on two devices, and the sign-out + reconnect (kin); rooms, tourney, watcher, joinreq and stats
-  tests pass as before.
+  server with sign-in: one account on two devices, and the sign-out + reconnect (kin); rooms, tourney, watcher and joinreq tests pass
+  as before. test/stats.test.mjs 5 seated one device id in both seats to see the match unranked (why self): that second seat is now
+  refused, so the case asserts the refusal and an empty profile (the stats rule stays as a backstop).
 - Legal: web/privacy.html (section 7's tab-ID row, a change entry dated October 5, Last updated / dateModified) and the sitemap's
   lastmod say the tab ID, device hash and account now also keep one person to one court, and that a sign-in's tab IDs stay linked in
   memory for up to two hours after a sign-out. Nothing new is sent, stored or logged. CLAUDE.md's memory-only list has the kin map.
