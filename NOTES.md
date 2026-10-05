@@ -4420,3 +4420,11 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
   fix pass: four Matt levels (BOT_ORDER), eight ranks (ladder TIERS), tournaments 4 to 16, to 7 / final 11 / golden point 15
   (TOUR_*), 8 watchers (SPEC_CAP), 10 s to answer Ask to play (ASK_S), hold B 3 s (NOTES 207), 0.7 s phone button hold (pad.js),
   the 80 ms early call and 150 to 300 ms peak wait (motion.js EARLY_T), the pad code alphabet (no I, O, 0, 1).
+
+## 212. Share card is the share icon alone
+- "Remove the sharecard text, it's not necessary." (asked which text: the words "Share card" on the button.)
+- Your stats' gold Share card button (#btn-pf-share) is the white circle with the share arrow and nothing beside it: an icon that
+  says it, no word next to it (NOTES 158). "Share card" stays as its title (the hover tip) and its aria-label. The button is round:
+  centred, at least 44 px wide as well as tall, and no longer stretched on a phone. The share sheet's own text is unchanged.
+- test/profile-ui.mjs reads the aria-label and checks the button has no text; it fails the same checks as main otherwise
+  (two phone header layouts, pre-existing).
