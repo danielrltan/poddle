@@ -4558,3 +4558,15 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
 - Privacy Policy section 5 lists poddle.tutorial (the page was already dated October 5, 2026); CLAUDE.md's storage list too.
 - Edge cases decided without asking: guests and accounts alike (the flag is per browser, not per account, so a new computer shows it
   once more unless the browser already holds Poddle keys); phones get it too (their own first card, no keys card).
+
+## 217. The Wii pointer's hover and click are visible now
+- The owner: "the wii style pointer is static, there is no hover state or click animation". The poses of NOTES 216 were there
+  (a 7% lift, a 10% push) but too faint to register. Now, over something to press, the hand lifts 16% about the fingertip and 2px
+  up, waves hello once (cur-wave: -11deg, +7deg, back, 480 ms) and a soft blue halo (the buttons' glow colour, a radial disc under
+  the fingertip) breathes in time with the button's own pulse (--d-pulse). A press jabs the finger in to 80% and 3px down, flares
+  the halo, and a blue ring ripples out of the fingertip (cur-pop, 380 ms; is-hit replays it on every press). A press on nothing in
+  particular is a lighter jab (90%) with a smaller, shorter ripple. Reduced motion: no wave, no breathing, no ripple; the lift and
+  the jab still snap.
+- web/cursor.js: a third svg (.cur-fx: halo + ring, under the hands) and the is-hit replay on pointerdown; cursor.css: the rules.
+  test/cursor-e2e.mjs checks the 1.16 lift, the halo up and the wave running, the .8 jab with the ripple out, the .9 lighter jab
+  (27 checks, all pass).

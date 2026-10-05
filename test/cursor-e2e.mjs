@@ -47,11 +47,15 @@ try {
   await glide(bx, by);
   s = await st(); ok(s.on && s.ready, `over Play the hand lifts (${JSON.stringify([s.on, s.ready])})`);
   const scaleOf = () => ev(() => parseFloat(getComputedStyle(document.querySelector('#cur .cur-hand')).scale));
-  ok(Math.abs(await scaleOf() - 1.07) < 0.01, `the lift is a scale about the fingertip (${await scaleOf()})`);
+  ok(Math.abs(await scaleOf() - 1.16) < 0.01, `the lift is a scale about the fingertip (${await scaleOf()})`);
+  const halo = await ev(() => ({ o: getComputedStyle(document.querySelector('#cur .cur-halo')).opacity, wave: getComputedStyle(document.querySelector('#cur .cur-hand')).animationName }));
+  ok(+halo.o > 0.5 && halo.wave === 'cur-wave', `the halo is up and the hand waved (${JSON.stringify(halo)})`);
   await shot('2-ready');
-  await pg.mouse.down(); await sleep(140);
+  await pg.mouse.down(); await sleep(120);
   s = await st(); ok(s.down && !s.plain, `the press pushes in (${JSON.stringify([s.down, s.plain])})`);
-  ok(Math.abs(await scaleOf() - 0.9) < 0.01, `the finger is pushed in (${await scaleOf()})`);
+  ok(Math.abs(await scaleOf() - 0.8) < 0.01, `the finger jabs in (${await scaleOf()})`);
+  const pop = await ev(() => ({ hit: document.getElementById('cur').classList.contains('is-hit'), o: getComputedStyle(document.querySelector('#cur .cur-pop')).opacity }));
+  ok(pop.hit && +pop.o > 0.2, `the ripple is out (${JSON.stringify(pop)})`);
   await shot('3-down');
   await pg.mouse.up(); await sleep(400);
   s = await st(); ok(!s.down, 'release lets go');
@@ -60,7 +64,7 @@ try {
   // a press on nothing: a half swing, no burst
   await glide(200, 450); await pg.mouse.down(); await sleep(60);
   s = await st(); ok(s.down && s.plain && !s.ready, `a press on the ground is a lighter push (${JSON.stringify([s.down, s.plain])})`);
-  await sleep(100); ok(Math.abs(await scaleOf() - 0.95) < 0.01, `lighter (${await scaleOf()})`);
+  await sleep(100); ok(Math.abs(await scaleOf() - 0.9) < 0.01, `lighter (${await scaleOf()})`);
   await pg.mouse.up(); await sleep(300);
 
   // a lobby tile: ready. The name field: hidden, native text cursor

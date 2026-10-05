@@ -2,8 +2,9 @@
 // of a console menu, drawn in the UI's own white and outline blue with a soft shadow (cursor.css draws it). This file builds #cur,
 // keeps it under the mouse and sets its states:
 //   is-on / is-off   shown; hidden over a text field, the court list's scrollbar or a busy name (their native cursor says more)
-//   is-ready         over something to press (the controls menuaudio.js plays its hover tap for): the hand lifts a little
-//   is-down          the button is down: the finger pushes in; is-plain when the press was on nothing in particular (a lighter push)
+//   is-ready         over something to press (the controls menuaudio.js plays its hover tap for): the hand lifts, waves once, a halo breathes
+//   is-down / is-hit the button is down: the finger jabs in and the halo flares; is-hit replays the ripple out of the fingertip on every
+//                    press; is-plain when the press was on nothing in particular (a lighter jab, a smaller ripple)
 //   is-roll          a wheel is turning: the hand closes into the grab fist and nudges the way the page goes (--roll-y)
 // and it tilts with fast moves, as a pointer does when the remote rolls in the hand (the hot spot, the fingertip, never moves).
 // The native cursor is hidden (html.has-cur) only while the hand can show: a menu screen, an overlay card or the settings card is
@@ -27,6 +28,10 @@ const HAND = `<svg class="cur-hand" viewBox="0 0 ${BOX} ${BOX}" aria-hidden="tru
   <rect class="cur-cuff" x="9" y="47" width="34" height="8" rx="3.5"/>
 </g></svg>`;
 // the grab: the same glove closed, four knuckles over the top, the thumb folded across. Shown while a wheel turns (is-roll)
+// under both: the halo that breathes over a button and the ring a press ripples out, both centred on the fingertip
+const FX = `<svg class="cur-fx" viewBox="0 0 ${BOX} ${BOX}" aria-hidden="true"><defs>
+  <radialGradient id="cur-halo-g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#34beed" stop-opacity=".7"/><stop offset=".6" stop-color="#34beed" stop-opacity=".22"/><stop offset="1" stop-color="#34beed" stop-opacity="0"/></radialGradient>
+</defs><circle class="cur-halo" cx="${HOT[0]}" cy="${HOT[1]}" r="17"/><circle class="cur-pop" cx="${HOT[0]}" cy="${HOT[1]}" r="9"/></svg>`;
 const FIST = `<svg class="cur-fist" viewBox="0 0 ${BOX} ${BOX}" aria-hidden="true"><g class="cur-body">
   <path class="cur-glove" d="M9 24Q9.5 18.5 14.5 18.5Q19.5 18.5 19.5 23.5Q20.5 18 25.5 18Q30.5 18 30.5 23.5Q31.5 18.5 36.5 18.5Q41.5 18.5 41.5 24Q44.5 21.5 46.5 24.5Q48 27 46.5 32L45 42Q44 50 36 50L15 50Q8 50 8 43Z"/>
   <path class="cur-crease" d="M19.5 24L19.5 30M30.5 24L30.5 30M41.5 25L41.5 31"/>
@@ -36,7 +41,7 @@ const FIST = `<svg class="cur-fist" viewBox="0 0 ${BOX} ${BOX}" aria-hidden="tru
 
 export function wiiCursor() {
   if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return null;
-  const el = document.createElement('div'); el.id = 'cur'; el.setAttribute('aria-hidden', 'true'); el.innerHTML = `<div class="cur-box">${HAND}${FIST}</div>`;
+  const el = document.createElement('div'); el.id = 'cur'; el.setAttribute('aria-hidden', 'true'); el.innerHTML = `<div class="cur-box">${FX}${HAND}${FIST}</div>`;
   document.body.appendChild(el);
   const html = document.documentElement, body = document.body;
   let x = -100, y = -100, vx = 0, vy = 0, lean = 0, lastT = 0, raf = 0, mouse = false, inside = false, native = false, ready = false, lastTarget = null, rollT = 0;
@@ -45,7 +50,7 @@ export function wiiCursor() {
     const show = mouse && inside && menuUp() && !html.hasAttribute('data-mobile') && document.visibilityState === 'visible';
     html.classList.toggle('has-cur', show);
     el.classList.toggle('is-on', show && !native); el.classList.toggle('is-off', show && native);
-    if (!show) { el.classList.remove('is-ready', 'is-down', 'is-roll'); ready = false; lastTarget = null; }
+    if (!show) { el.classList.remove('is-ready', 'is-down', 'is-hit', 'is-roll'); ready = false; lastTarget = null; }
   }
   const place = () => { el.style.transform = `translate3d(${x}px,${y}px,0) rotate(${lean}deg)`; };
   function look(t) {                                                                 // what is under the mouse: a text field (native), a control (ready) or nothing
@@ -77,6 +82,7 @@ export function wiiCursor() {
     if (e.pointerType !== 'mouse') { if (mouse) { mouse = false; sync(); } return; }
     look(e.target); if (!el.classList.contains('is-on')) return;
     el.classList.toggle('is-plain', !ready); el.classList.add('is-down');
+    el.classList.remove('is-hit'); void el.offsetWidth; el.classList.add('is-hit');      // replay the ripple on every press
   }, true);
   const up = () => el.classList.remove('is-down');
   addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true); addEventListener('blur', () => { up(); inside = false; sync(); });

@@ -26,16 +26,31 @@ html.has-cur, html.has-cur :where(*):not(input, textarea, select, [contenteditab
 .cur-cuff{fill:url(#cur-cuff-g);stroke:#fff;stroke-width:1.4}
 .cur-fist{opacity:0}      /* the two hands swap: the pointing glove is the one you see, the fist only while a wheel turns */
 
+/* the halo: the pill buttons' glow as a soft blue disc under the fingertip, and the ripple a press sends out of it */
+.cur-fx{transform-origin:21.875% 6.25%}
+.cur-halo{fill:url(#cur-halo-g);transform-origin:14px 4px;opacity:0;transform:scale(.6);transition:opacity 160ms linear, transform 240ms var(--ease-bounce)}
+.cur-pop{fill:none;stroke:var(--line);stroke-width:2.2;transform-origin:14px 4px;opacity:0}
+
 /* ---------- states (classes cursor.js sets on #cur) ---------- */
-/* over something to press: the hand lifts a little (scale about the fingertip, so the tip stays put) and its shadow stretches */
-#cur.is-ready .cur-hand{scale:1.07}
-#cur.is-ready .cur-body{filter:drop-shadow(0 .8px 0 rgba(90,150,185,.35)) drop-shadow(2.5px 4px 3px rgba(20,60,90,.26))}
-/* the press: the finger pushes in. In at 90 ms like the buttons, back with the 200 ms spring */
-#cur.is-down .cur-hand{scale:.9;translate:0 1px;transition-duration:90ms;transition-timing-function:var(--ease-soft)}
-#cur.is-down.is-plain .cur-hand{scale:.95}      /* a press on nothing in particular: a lighter push */
+/* over something to press: the hand lifts (scale about the fingertip, so the tip stays put), waves hello once, its shadow
+   stretches and the halo breathes under the fingertip, in time with the button's own pulse (ui.css glow-pulse, --d-pulse) */
+#cur.is-ready .cur-hand{scale:1.16;translate:0 -2px;animation:cur-wave 480ms var(--ease-bounce) 1}
+#cur.is-ready .cur-body{filter:drop-shadow(0 .8px 0 rgba(90,150,185,.35)) drop-shadow(3px 5px 3.5px rgba(20,60,90,.26))}
+#cur.is-ready .cur-halo{opacity:1;transform:scale(1);animation:cur-breathe var(--d-pulse) var(--ease-soft) infinite}
+@keyframes cur-wave{0%{rotate:0deg}30%{rotate:-11deg}65%{rotate:7deg}100%{rotate:0deg}}
+@keyframes cur-breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.18);opacity:1}}
+/* the press: the finger jabs in hard (in at 90 ms like the buttons, back with the 200 ms spring), the halo flares and a ring
+   ripples out of the fingertip (is-hit replays it on every press) */
+#cur.is-down .cur-hand{scale:.8;translate:0 3px;transition-duration:90ms;transition-timing-function:var(--ease-soft);animation:none}
+#cur.is-down .cur-halo{transform:scale(1.4);opacity:1;animation:none}
+#cur.is-down.is-plain .cur-hand{scale:.9;translate:0 2px}      /* a press on nothing in particular: a lighter jab */
+#cur.is-hit .cur-pop{animation:cur-pop 380ms var(--ease-out) both}
+#cur.is-hit.is-plain .cur-pop{animation-duration:240ms;stroke-width:1.4}
+@keyframes cur-pop{0%{transform:scale(.4);opacity:1;stroke-width:3}55%{opacity:.75}100%{transform:scale(2.6);opacity:0;stroke-width:.4}}
 /* a wheel: the hand closes into the grab fist and nudges the way the page goes (--roll-y from cursor.js) */
 #cur.is-roll .cur-hand{opacity:0} #cur.is-roll .cur-fist{opacity:1;translate:0 var(--roll-y,0px)}
 
 @media (prefers-reduced-motion: reduce){
-  .cur-box svg{transition-duration:1ms}      /* the poses still change; they snap */
+  .cur-box svg,.cur-halo{transition-duration:1ms}      /* the poses still change; they snap */
+  #cur.is-ready .cur-hand,#cur.is-ready .cur-halo{animation:none} #cur.is-hit .cur-pop{animation:none}      /* no wave, no breathing, no ripple */
 }
