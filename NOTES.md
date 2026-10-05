@@ -4410,3 +4410,13 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
 - test/seo.test.mjs checks each page: one title / h1 / canonical / JSON-LD, description length, no script, links that resolve,
   the clean-URL redirect, the voice, and that How to play and the home link it.
 - Legal pages unchanged: static text, no new data, storage or third party.
+
+## 211. The (i) on Getting ready lets keys through; scoring copy matches the server
+- NOTES 209's (i) stopped every keydown while focused, so F (full screen) and Escape did nothing with it focused; it now stops only
+  Enter, like the title footer's links.
+- pickleball-browser-game.html (NOTES 210) said every shot "lands in". The server aims each shot in (game.js solve) but still calls
+  'out' (line ~1198), so the page now says the game aims each shot into the other court, and that a rally ends on a double bounce,
+  a ball that lands out, or one that gets past a player. Other figures on the three pages were re-checked against the code after the
+  fix pass: four Matt levels (BOT_ORDER), eight ranks (ladder TIERS), tournaments 4 to 16, to 7 / final 11 / golden point 15
+  (TOUR_*), 8 watchers (SPEC_CAP), 10 s to answer Ask to play (ASK_S), hold B 3 s (NOTES 207), 0.7 s phone button hold (pad.js),
+  the 80 ms early call and 150 to 300 ms peak wait (motion.js EARLY_T), the pad code alphabet (no I, O, 0, 1).
