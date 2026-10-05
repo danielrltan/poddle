@@ -4479,7 +4479,9 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
   other browser, the reload, the release, the crafted room= URL and its late hello, a tournament host's second tab, and on a second
   server with sign-in: one account on two devices, and the sign-out + reconnect (kin); rooms, tourney, watcher and joinreq tests pass
   as before. test/stats.test.mjs 5 seated one device id in both seats to see the match unranked (why self): that second seat is now
-  refused, so the case asserts the refusal and an empty profile (the stats rule stays as a backstop).
+  refused, so the case asserts the refusal and an empty profile (the stats rule stays as a backstop). test/trophies.test.mjs 12 (Ron in
+  both seats) asserts the refusal the same way, and 8's lobby sockets have their own accounts (Oli, Pia): scenarios run side by side,
+  and Ann was on a court in scenario 1 while 8 opened a court as her.
 - Legal: web/privacy.html (section 7's tab-ID row, a change entry dated October 5, Last updated / dateModified) and the sitemap's
   lastmod say the tab ID, device hash and account now also keep one person to one court, and that a sign-in's tab IDs stay linked in
   memory for up to two hours after a sign-out. Nothing new is sent, stored or logged. CLAUDE.md's memory-only list has the kin map.

@@ -5,7 +5,7 @@
 // first strike is silent; the emblem rides welcome.rank / names.rank / matchover.rank on a plain court; old-client rk messages are ignored;
 // /ranked is a 301 to /ranks. Then (the verify round): four forfeits by one pair hit pair_cap on the fourth (a paid forfeit win counts like a
 // counted one, db.js PAID); an eligible opponent without a row is gap 0 (3.3); one person on both seats or an anonymous seat: +0 left_early, and
-// the same_account leaver pays nothing; an account deleted mid-game saves nothing; a tournament of four pays +30 / -6 as kind tour and carries
+// a second tab of one account is refused a seat (the same_account rule stays a backstop); an account deleted mid-game saves nothing; a tournament of four pays +30 / -6 as kind tour and carries
 // the emblem on tmove (vs, you) and the bracket snapshot. Every game is one point (WIN_AT 1); scenarios run side by side on their own courts. Under 90 s.
 //   node test/trophies.test.mjs        TROPHIES_PORT=<port> moves the server (default 9460). Last line: TROPHIES TESTS PASSED or n FAILURES.
 import { spawn } from 'child_process';
@@ -39,7 +39,8 @@ const RAW = {}, OWNER = {};
   mk('eve', 'Eve', 899);                                         // Master III at the ceiling: Matt cannot take her further
   mk('pam', 'Pam', 100); mk('quin', 'Quin', 100);                // four forfeits by one pair: the pair cap
   mk('max', 'Max', 180); mk('ned', 'Ned');                       // Silver Max (180: a loss of 20 stays over Silver's floor) against an eligible opponent without a row
-  mk('ron', 'Ron', 100); mk('sid', 'Sid', 100);                  // Ron on both seats; Sid against an anonymous seat
+  mk('ron', 'Ron', 100); mk('sid', 'Sid', 100);                  // Ron in two tabs (refused, NOTES 214); Sid against an anonymous seat
+  mk('oli', 'Oli'); mk('pia', 'Pia');                            // scenario 8's lobby sockets: their own accounts, since one account is one court at a time (NOTES 214) and Ann and Ben play in scenario 1
   mk('wes', 'Wes', 100); mk('xan', 'Xan', 100);                  // Xan deletes the account mid-game
   mk('tia', 'Tia', 100); mk('uli', 'Uli', 100); mk('vera', 'Vera', 100); mk('wil', 'Wil', 100);   // a tournament of four, Bronze III all: gap 0 everywhere
   db.close(); console.error = quiet; }
@@ -201,19 +202,19 @@ report(await Promise.all([
     bye(c);
   }),
   sc('8. old clients: rk, rkleave, rkwarm and ?rk=1 are ignored; /ranked is a 301; no mode fields', async t => {
-    const c = tab({ who: 'ann' }); await c.open(); await until(() => c.n('lobby')); const n0 = c.log.length;
+    const c = tab({ who: 'oli' }); await c.open(); await until(() => c.n('lobby')); const n0 = c.log.length;
     c.send({ type: 'rk', name: 'Ann' }); c.send({ type: 'rkwarm' }); c.send({ type: 'rkleave' }); await wait(500);
     t.ok(!c.closed && c.log.slice(n0).every(m => m.type === 'lobby' || m.type === 'social') && !c.log.some(m => ['rk', 'rkfail', 'rkend', 'rkvs', 'rkres'].includes(m.type)), `the lobby socket stays open and hears no mode message (${J(c.log.slice(n0).map(m => m.type))})`);
-    const r = tab({ who: 'ben', q: 'lobby=1&rk=1' }); await r.open(); await until(() => r.n('lobby')); await wait(300);
+    const r = tab({ who: 'pia', q: 'lobby=1&rk=1' }); await r.open(); await until(() => r.n('lobby')); await wait(300);
     t.ok(!r.closed && r.n('lobby') >= 1 && !r.log.some(m => ['rk', 'rkfail', 'rkend'].includes(m.type)), 'a socket connecting with ?rk=1 is an ordinary lobby socket');
     t.ok(!/bad message/.test(out), 'the server logged nothing about them');
     const h = await api('GET', '/ranked', undefined, { origin: null }), h2 = await api('GET', '/ranked?x=1', undefined, { origin: null });
     t.ok(h.status === 301 && h.headers.location === '/ranks' && h2.status === 301 && h2.headers.location === '/ranks?x=1', `GET /ranked -> 301 /ranks (${h.status} ${h.headers.location})`);
     const st = await api('GET', '/status.json', undefined, { origin: null }), me = await api('GET', '/api/me', undefined, { who: 'ann' });
     t.ok(st.json && !('rk' in st.json) && me.json && !('rkSignin' in me.json) && me.json.ladder && me.json.ladder.trophies >= 140, 'status.json has no rk, /api/me no rkSignin (its ladder block stays)');
-    const w = tab({ who: 'ann' }); await w.open(); await until(() => w.n('lobby')); w.send({ type: 'create', public: false }); await until(() => w.side != null);
+    bye(c); const w = tab({ who: 'oli' }); await w.open(); await until(() => w.n('lobby')); w.send({ type: 'create', public: false }); await until(() => w.side != null);      // c first: one account is one court (NOTES 214)
     t.ok(!('venue' in w.last('welcome')) && !('series' in w.last('welcome')) && Array.isArray(w.last('welcome').rank), 'welcome carries rank but no venue or series');
-    bye(c, r, w);
+    bye(r, w);
   }),
   sc('10. four forfeits by one pair in a day: the fourth pays the stayer 0 (pair_cap counts paid forfeit wins), the leaver still pays', async t => {
     const got = [];
@@ -230,12 +231,11 @@ report(await Promise.all([
     t.ok(pm && pm.trophies && pm.trophies.delta === -10 && pm.trophies.trophies === 170 && pm.trophies.floorHeld === false, `Max loses to a rowless opponent: Silver's -10 (gap 0, not -15 from Ned's 0): ${J(pm && pm.trophies)}`);
     bye(n, m);
   }),
-  sc('12. one person on both seats (same_account): a leave charges nobody; a stayer facing an anonymous seat gets +0 left_early', async t => {
-    const [a, b] = await pair({ who: 'ron' }, { who: 'ron' }); hit(a); still(b); await struck(a); b.send({ type: 'leave' }); await over(a); const pa = await prof(a);
-    t.ok(a.last('matchover').forfeit && pa && pa.trophies && pa.trophies.delta === 0 && pa.trophies.counted === false && J(pa.trophies.why) === J(['left_early']) && pa.trophies.trophies === 100, `the stayer: +0, left_early (same_account is beyond the forfeit's own flags): ${J(pa && pa.trophies)}`);
-    await wait(300); const lr = await ladderOf('ron'); t.ok(lr && lr.trophies === 100 && lr.losses === 0 && lr.wins === 1, `Ron paid nothing as the leaver either (R6: nobody left anyone): ${J(lr && [lr.trophies, lr.wins, lr.losses])}`);
-    t.ok(/match recorded: human unranked \(0\/0\)/.test(out), 'the log line: human unranked (0/0)');
-    bye(a, b);
+  sc('12. one person on both seats: the second tab is refused (NOTES 214; same_account stays a backstop); a stayer facing an anonymous seat gets +0 left_early', async t => {
+    const a = tab({ who: 'ron' }), b = tab({ who: 'ron' }); await a.open(); await b.open(); await until(() => a.n('lobby') && b.n('lobby')); a.send({ type: 'create', public: false }); await until(() => a.room);
+    b.send({ type: 'join', code: a.room.code }); await until(() => b.n('joinfail') >= 1, 8000);
+    t.ok(b.last('joinfail')?.reason === 'self' && !b.room, `Ron's second tab may not sit against Ron: joinfail self (${J(b.last('joinfail'))})`);
+    bye(a, b); await wait(300); const lr = await ladderOf('ron'); t.ok(lr && lr.trophies === 100 && lr.wins === 1 && lr.losses === 0, `nothing was played, nothing paid: ${J(lr && [lr.trophies, lr.wins, lr.losses])}`);
     const [x, s] = await pair({ hello: false }, { who: 'sid' }); still(x); hit(s); await struck(s); x.send({ type: 'leave' }); await over(s); const ps = await prof(s);
     t.ok(ps && ps.trophies && ps.trophies.delta === 0 && ps.trophies.counted === false && J(ps.trophies.why) === J(['left_early']), `Sid, left by an anonymous seat (anon_opponent): +0, left_early: ${J(ps && ps.trophies)}`);
     t.ok((await ladderOf('sid')).trophies === 100, 'nothing moved on Sid\'s row');
