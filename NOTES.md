@@ -4428,3 +4428,32 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
   centred, at least 44 px wide as well as tall, and no longer stretched on a phone. The share sheet's own text is unchanged.
 - test/profile-ui.mjs reads the aria-label and checks the button has no text; it fails the same checks as main otherwise
   (two phone header layouts, pre-existing).
+
+## 215. The paddle cursor: on the menus the mouse is a pickleball paddle
+- The owner asked for a cursor pack in the menu's look: a simple paddle with the ball at its corner as the pointer, hover and click
+  effects, something for scrolling. New web/cursor.js (builds `#cur`, follows the mouse, sets its states) and web/cursor.css (the
+  drawing and every motion), linked from index.html after main.js; nothing else changed except menuaudio.js exporting SEL / SCOPE.
+- The drawing (a 64-unit square, the ball's centre at 10,10 = the hot spot, the box's origin): the ball is the serve indicator's
+  (ui.css .serve-ind: the same yellow, five holes, a white ring), the paddle hangs off it to the bottom-right like an arrow's stem:
+  a glossy white face in the pill buttons' gradient with the outline blue as its edge guard, a blue diagonal stripe and a small round
+  mark (as the game's paddle face has), a dark wrapped grip with a blue butt cap. 3.5rem box, so it scales with the root type.
+- The hot spot never moves. The paddle pivots at the grip's butt: over something to press (the controls menuaudio.js plays its hover
+  tap for: SEL inside SCOPE, not disabled) it winds back 24deg, the ball lifts a hair and floats (cur-toss) and a blue ring glows
+  round it (is-ready). A press swings the face through to +22deg in 90 ms and holds it while the button is down (is-down), the ball
+  squashes against it, a ring bursts out and three ticks fly off the far side (is-hit); release springs it back in 240 ms. A press on
+  nothing in particular (the title's "anywhere to start") is a 12deg half swing with no burst (is-plain). A fast move leans the whole
+  paddle around the ball into the direction of travel (up to 16deg, eased, dies with the velocity) and the ball rolls with the travel
+  (its holes spin, a touch slower than a ball its size would). A wheel rolls the ball by the delta and nods the paddle 1.5px the way
+  the page goes for 140 ms (is-roll). Reduced motion: no lean, no rolling, no toss; the poses still change.
+- Where: a menu screen, an overlay card or the settings card (body data-screen != hud, or data-overlay / data-settings; a
+  MutationObserver). The bare court keeps the native cursor (the paddle would read as a game object there). html.has-cur hides the
+  native cursor with `cursor:none!important` on everything except text fields, selects, contenteditable, the court list's scrollbar
+  (grab) and a busy name (progress): over those the paddle fades out (is-off) and the native cursor says what it is. Mouse only: a
+  touch or pen hands the native cursor back until the mouse moves; the pointer leaving the window, a hidden tab or a blur hides it;
+  `(hover:hover) and (pointer:fine)` or it is never built; the phone home (html[data-mobile]) never shows it.
+- Not added: a Settings switch (that is a new poddle.settings key and a privacy-table row; say the word and it is a small change).
+- test/cursor-e2e.mjs (26 checks, real server, CUR_PORT=<port>, SHOTS=<dir>): built for a fine pointer, hidden until the mouse moves,
+  cursor:none under it, the ball's centre on the mouse point to the pixel, the lean and its settling, the roll, ready over Play and a
+  lobby tile with the -24deg pose and the glow, down + hit + burst on a press, the plain half swing, hidden over the name field with
+  its text cursor kept, the wheel's roll and nod, out of the window and back, the phone home. All pass; no page errors.
+- Legal pages unchanged: nothing sent, stored or shown to others; no new storage key.

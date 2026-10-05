@@ -1,0 +1,69 @@
+/* ==========================================================================================================
+   The paddle cursor (NOTES 215). On the menus (title, lobby, set-up screens, result and error cards, the settings card) the mouse
+   is a small pickleball paddle: the ball is the pointer's hot spot, the paddle hangs off it to the bottom-right like an arrow's
+   stem. cursor.js builds #cur, follows the mouse and sets the states; this file is every look and motion.
+   Glossy white face with the signature outline blue, a dark grip: the same materials as the pill buttons. The ball is the
+   serve indicator's (ui.css .serve-ind).
+   The hot spot NEVER moves: everything here rotates around it (the lean) or around the grip (the wind-up and the hit), the ball
+   only spins, squashes and lifts by a hair. On the court (body[data-screen="hud"] with nothing over it) the native cursor is back.
+   Pointer:fine and hover:hover only; cursor.js never starts on a touch device.
+   ========================================================================================================== */
+
+/* the native cursor goes where the paddle shows. Text fields, the court list's scrollbar grab and a busy name keep theirs:
+   cursor.js hides the paddle over them (is-off) and they say what they are better than a paddle could */
+html.has-cur, html.has-cur :where(*):not(input, textarea, select, [contenteditable], .room-bar, .room-bar *, .is-opening[aria-busy="true"]){cursor:none!important}
+
+#cur{position:fixed;left:0;top:0;z-index:100;width:3.5rem;height:3.5rem;pointer-events:none;transform-origin:0 0;will-change:transform;
+  opacity:0;transition:opacity 120ms linear}      /* the box: its origin is the hot spot (the ball's centre); cursor.js writes translate3d(x,y) rotate(lean) */
+#cur.is-on{opacity:1}
+#cur.is-off{opacity:0;transition-duration:80ms}      /* over a text field or the scrollbar: gone fast, the native cursor is already there */
+/* the drawing is a 64-unit square with the ball's centre at (10,10): shifted so that point sits on the box's origin */
+.cur-box{position:absolute;left:-15.625%;top:-15.625%;width:100%;height:100%}
+.cur-box svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+
+/* the paddle: pivots at the grip's butt (46,46), so a wind-up swings the face away from the ball and the hit swings it through */
+.cur-pad{transform-origin:71.875% 71.875%;rotate:0deg;transition:rotate 240ms var(--ease-bounce)}
+.cur-face{fill:url(#cur-face-g);stroke:var(--line);stroke-width:2.6;stroke-linejoin:round;filter:drop-shadow(0 .6px 0 rgba(90,150,185,.35)) drop-shadow(0 1.4px 2px rgba(40,80,110,.28))}
+.cur-stripe{fill:var(--line);opacity:.9}
+.cur-logo{fill:#fff;stroke:var(--line);stroke-width:1.4}      /* the small round mark under the stripe, as on the game's paddle face */
+.cur-gloss{fill:url(#cur-gloss-g)}
+.cur-grip{fill:url(#cur-grip-g);stroke:#30363d;stroke-width:1.2;stroke-linejoin:round}
+.cur-wrap{stroke:rgba(255,255,255,.28);stroke-width:1;fill:none}
+.cur-cap{fill:var(--line-deep)}
+
+/* the ball: the serve indicator's palette; the holes are their own group so the ball can spin without its shading turning with it */
+.cur-ball{transform-origin:15.625% 15.625%;transition:scale 160ms var(--ease-bounce), translate 200ms var(--ease-out)}
+.cur-ball-body{fill:url(#cur-ball-g);stroke:#fff;stroke-width:1.8;filter:drop-shadow(0 .8px 1.6px rgba(10,30,50,.4))}
+.cur-holes{transform-origin:10px 10px;fill:var(--ball-deep);transition:rotate 90ms linear}      /* cursor.js: rotate(spin) as it rolls and as the page scrolls */
+.cur-ring{fill:none;stroke:var(--line);stroke-width:1.6;transform-origin:10px 10px;opacity:0;transform:scale(.9)}      /* the ready halo: the pill buttons' glow in one ring */
+.cur-ring.is-glow{opacity:.55;transform:scale(1.25);transition:opacity 160ms linear, transform 240ms var(--ease-bounce)}
+
+/* the hit: a ring bursts from the ball and three ticks fly off the face's far side (up and left, away from the paddle) */
+.cur-fx{transform-origin:10px 10px;opacity:0}
+.cur-pop{fill:none;stroke:var(--line);stroke-width:1.5;transform-origin:10px 10px}
+.cur-tick{stroke:var(--line-deep);stroke-width:2.2;stroke-linecap:round;transform-origin:10px 10px}
+#cur.is-hit .cur-fx{animation:cur-fx 320ms var(--ease-out) both}
+#cur.is-hit .cur-pop{animation:cur-pop 320ms var(--ease-out) both}
+#cur.is-hit .cur-tick{animation:cur-tick 300ms var(--ease-out) both}
+@keyframes cur-fx{0%,45%{opacity:1}100%{opacity:0}}
+@keyframes cur-pop{0%{transform:scale(.7);stroke-width:3}100%{transform:scale(2.4);stroke-width:.5}}
+@keyframes cur-tick{0%{transform:translate(0,0) scale(.6);opacity:1}100%{transform:translate(var(--tx,-6px),var(--ty,-6px)) scale(1.1);opacity:0}}      /* each tick flies its own way (--tx/--ty on the line) */
+
+/* ---------- states (classes cursor.js sets on #cur) ---------- */
+/* over something to press: the paddle winds back and the ball lifts a hair and floats, a toss waiting for the swing */
+#cur.is-ready .cur-pad{rotate:-24deg}
+#cur.is-ready .cur-ball{translate:0 -1.5px;animation:cur-toss 1400ms var(--ease-soft) infinite}
+@keyframes cur-toss{0%,100%{translate:0 -1.5px}50%{translate:0 -3px}}
+/* the hit: the face swings through fast (the press goes in at 90 ms, like the buttons) and holds there while the button is down;
+   the ball squashes against it and springs back. Release: the 240 ms spring takes it back to ready or rest */
+#cur.is-down .cur-pad{rotate:22deg;transition-duration:90ms;transition-timing-function:var(--ease-soft)}
+#cur.is-down.is-plain .cur-pad{rotate:12deg} #cur.is-plain .cur-fx{animation:none;opacity:0}      /* a press on nothing in particular: a half swing, no burst */
+#cur.is-hit .cur-ball{animation:cur-squash 260ms var(--ease-bounce) both}
+@keyframes cur-squash{0%{scale:1}30%{scale:1.22 .82}100%{scale:1}}
+/* a wheel over a list: the paddle nods the way the page goes and the ball rolls (cur-holes spin, from cursor.js) */
+#cur.is-roll .cur-pad{translate:0 var(--roll-y,0px);transition:rotate 240ms var(--ease-bounce), translate 120ms var(--ease-soft)}
+
+@media (prefers-reduced-motion: reduce){
+  #cur.is-ready .cur-ball{animation:none;translate:0 -1.5px}      /* the toss holds still; the pose still says "ready" */
+  #cur.is-hit .cur-fx,#cur.is-hit .cur-pop,#cur.is-hit .cur-tick{animation:none;opacity:0}
+}

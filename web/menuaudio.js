@@ -129,8 +129,8 @@ export function menuAudio(getAc) {
 
 // Hover and click sounds for every control in the menus and the cards. Hover: a mouse entering a new control, or the keyboard
 // moving focus (never a focus() the code gives on its own, never a touch). The court's own HUD stays quiet, except the cards.
-const SEL = 'button, a[href], [role="switch"], [role="radio"], select, input:not([type="hidden"]), summary';
-const SCOPE = '.screen, .settings, [role="dialog"], .acct-layer';
+export const SEL = 'button, a[href], [role="switch"], [role="radio"], select, input:not([type="hidden"]), summary';      // exported: the paddle cursor (cursor.js) winds up over the same controls the hover tap plays for
+export const SCOPE = '.screen, .settings, [role="dialog"], .acct-layer';
 export function wireMenuSounds(sfx) {
   let last = null, keyNav = false;
   const ctl = t => { const c = t?.closest?.(SEL); return c && c.closest(SCOPE) && !c.closest('[data-quiet]') ? c : null; };
