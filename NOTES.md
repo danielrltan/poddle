@@ -4515,3 +4515,21 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
   lobby tile with the -24deg pose and the glow, down + hit + burst on a press, the plain half swing, hidden over the name field with
   its text cursor kept, the wheel's roll and nod, out of the window and back, the phone home. All pass; no page errors.
 - Legal pages unchanged: nothing sent, stored or shown to others; no new storage key.
+
+## 216. The Wii-style pointer replaces the paddle cursor
+- The owner was not a fan of the paddle (NOTES 215): "can we just make a wii-style one that matches the aesthetic". Same wiring
+  (web/cursor.js builds #cur and sets the states, cursor.css draws it; where it shows, the native-cursor handoff, the mouse-only
+  and phone rules are all as in 215), new drawing and poses.
+- The drawing: a console menu's white pointing glove, one outline path (the index finger up from the fingertip, three curled
+  fingers as knuckle bumps to its right, the thumb out left), light creases, a blue cuff at the wrist, a soft drop shadow under it.
+  White in the pill buttons' gradient, the signature outline blue as its line. 3.5rem box; the fingertip (14,4 of 64) is the hot
+  spot and never moves. A second drawing, the closed grab fist (four knuckles over the top, the thumb folded across), swaps in
+  while a wheel turns.
+- Poses: over something to press the hand lifts (scale 1.07 about the fingertip, a longer shadow); a press pushes the finger in
+  (scale .9, 1px down, in at 90 ms like the buttons, back with a 200 ms spring; .95 for a press on nothing in particular); a fast
+  move tilts the hand around the fingertip as a rolled remote would (up to 12deg, eased, dies with the velocity); a wheel shows the
+  fist nudged 2px the way the page goes for 220 ms after the last tick. No burst, no ring, no ball: the hand is the pointer and
+  the buttons already glow. Reduced motion: no tilt; the poses snap.
+- test/cursor-e2e.mjs reworked for the hand (25 checks: fingertip on the mouse point to the pixel, the tilt and its settling, the
+  lift's scale, the push's scale and the lighter one, the fist with the hand hidden on a wheel and its opening after, the rest as
+  before). All pass; no page errors.
