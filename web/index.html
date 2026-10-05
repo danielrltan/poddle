@@ -177,6 +177,10 @@
     <li class="is-wait" id="set-camera"><span class="light"></span><b>Camera</b><em id="set-camera-state">Waiting</em></li>
   </ul></div>
   <!-- no "You" group: renaming, signing in or out mid-match redials the socket (a forfeit mid-match). The name lives on the lobby name row, the account on Your stats -->
+  <!-- Help (NOTES 217): the tutorial again, first in the menu's settings, from there only (a court's card hides it: the cards would cover a live match) -->
+  <section class="set-group" id="grp-help"><h3 class="set-label">Help</h3><div class="set-list">
+    <button class="set-row set-nav" id="btn-set-tut" aria-haspopup="dialog" aria-controls="tutorial"><span>Tutorial</span><span class="set-end"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M2 2l8 8-8 8"/></svg></span></button>
+  </div></section>
   <section class="set-group" id="grp-paddle"><h3 class="set-label">Paddle</h3><div class="set-list">
     <div class="set-row set-pick set-wide" id="set-paddle" hidden><span class="vh">Paddle</span><span class="seg seg-sm" id="paddle-seg2" role="radiogroup" aria-label="Paddle"><button class="seg-opt" role="radio" aria-checked="true" data-paddle="phone">Phone</button><button class="seg-opt" role="radio" aria-checked="false" data-paddle="airpod">AirPod</button></span></div>
     <div class="set-row" id="set-sens"><span>Sensitivity</span>

@@ -4533,3 +4533,28 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
 - test/cursor-e2e.mjs reworked for the hand (25 checks: fingertip on the mouse point to the pixel, the tilt and its settling, the
   lift's scale, the push's scale and the lighter one, the fist with the hand hidden on a wheel and its opening after, the rest as
   before). All pass; no page errors.
+
+## 217. A tutorial: seven quick cards, once for a new browser, then Settings > Tutorial
+- The owner asked for it on 2026-10-05 ("make the tutorial overlay and cache it smartly so people wont see it ever again unless they
+  press view tutorial in settings"; "quick, easy and fun to read ... small details too like the spin indicator, types of hits").
+  It overrides NOTES 209's decision not to build one, and CLAUDE.md "No announcement notices" now names it as the one first-visit overlay.
+- web/tutorial.js, one dialog (#tutorial, built on first open) over the menu: Your phone is the paddle (pairing; AirPod on a Mac),
+  Grip it then rip it (the grip, calibration, no strap), Pick your shot (Drive, Smash, Lob, Dink, Slice, Block with a little flight
+  icon each, and that the shot's name pops up on a hit), Read the ball (the landing ring, the spin swirl that turns the way the ball
+  will kick on its first bounce, the trail's white to red heat, the phone's flash), Move your feet (Body / Auto, tip forward to the
+  net), Rules the Poddle way (11 win by 2, rally scoring, the serve waits 9 s, double bounce / out / passed, no kitchen faults) and
+  Handy keys (Esc, B and hold B, V, F, C, R, 1 to 0, Y / N; not on a phone, which has no keyboard: six cards there, and card 1 says
+  to open poddleball.com on a computer). Each card's facts were checked against the code (scene.js spin swirl and trail, game.js
+  shotKind / pushKind / serveBy / point endings, main.js keys). Animated SVG art, still under prefers-reduced-motion.
+- Next / Back / dots / swipe / arrow keys, Esc or the x or a click outside closes it, the last button is Let's play. While it is up
+  every key is the tutorial's (a capturing keydown): F, Esc and the menu keys never reach the game, and Tab stays inside.
+- Remembered: localStorage poddle.tutorial = '1', written the moment it opens (a reload halfway never brings it back); sessionStorage
+  if localStorage is blocked, memory if both are. A browser that already holds any Poddle key (name, settings, device, cal, courts,
+  view, camPrimer) is a returning player: marked seen, never shown. It opens by itself only on the home (main.js play(), after the
+  home's entrance), never on a court or watch link, never under automation (navigator.webdriver: every browser test starts with
+  empty storage); ?tut=1 forces it, ?tut=0 keeps it shut.
+- Settings > Help > Tutorial, the first row of the menu's Settings (title and lobby); a court's settings card hides it, so the cards
+  never cover a live match.
+- Privacy Policy section 5 lists poddle.tutorial (the page was already dated October 5, 2026); CLAUDE.md's storage list too.
+- Edge cases decided without asking: guests and accounts alike (the flag is per browser, not per account, so a new computer shows it
+  once more unless the browser already holds Poddle keys); phones get it too (their own first card, no keys card).

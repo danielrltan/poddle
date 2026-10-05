@@ -2263,3 +2263,43 @@ body[data-settings="menu"]::after{opacity:1;visibility:visible;transition-delay:
 @media (max-width:700px){ #screen-title .menu-body{padding-bottom:calc(2.125rem + 2 * var(--s-3))}
   #screen-lobby .menu-body{padding-bottom:var(--s-4)} #screen-lobby .menu-foot{flex-wrap:wrap;height:auto;justify-content:center;row-gap:var(--s-2);padding-block:var(--s-3)}
   #screen-lobby .menu-foot .ph-badge{position:static;order:-1} #screen-lobby .menu-foot .foot-agree{flex:1 1 100%;text-align:center} }      /* a phone-wide lobby scrolls, so a corner badge would sit over the panels: there it rides in the footer, over the legal line */
+
+/* ---------- the tutorial (web/tutorial.js, NOTES 217): a few cards over the menu, once for a new browser, then Settings > Tutorial ---------- */
+.settings:not(.is-menu) #grp-help{display:none}      /* a court's settings card: the cards would cover a live match */
+.tut{position:fixed;inset:0;z-index:calc(var(--z-screen) + 6);display:grid;place-items:center;padding:var(--s-4);background:rgba(160,205,230,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:tut-fade var(--d-med) var(--ease-out) both}
+.tut[hidden]{display:none}
+@keyframes tut-fade{from{opacity:0}}
+.tut-card{position:relative;width:min(34rem,100%);max-height:calc(100dvh - 2rem);overflow:auto;padding:var(--s-6) var(--s-6) var(--s-5);display:flex;flex-direction:column;gap:var(--s-4);outline:0;animation:tut-pop 420ms var(--ease-bounce) both}
+@keyframes tut-pop{from{opacity:0;transform:translateY(1.25rem) scale(.94)}}
+.tut-x{position:absolute;top:var(--s-3);right:var(--s-3);width:2.5rem;height:2.5rem;padding:0;border:0;border-radius:50%;background:none;color:var(--ink-soft);cursor:pointer;display:grid;place-items:center;outline:0}
+.tut-x svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round} .tut-x:hover,.tut-x:focus-visible{background:#fff;color:var(--ink-strong);box-shadow:var(--glow)}
+.tut-page{display:flex;flex-direction:column;justify-content:center;gap:var(--s-3);min-height:27rem} .tut-body{text-align:center} .tut-body ul,.tut-shot{text-align:left}
+.tut-page.is-in{animation:tut-slide 360ms var(--ease-out) both} @keyframes tut-slide{from{opacity:0;transform:translateX(calc(var(--dir,1) * 2.5rem))}}
+.tut-art{align-self:center;width:min(17rem,80%);aspect-ratio:240/130;border-radius:var(--r-lg);background:linear-gradient(180deg,#e6f5fd,#fff);border:.1875rem solid var(--line-soft);display:grid;place-items:center;overflow:hidden}
+.tut-art svg{width:100%;height:100%}
+.tut-title{margin:0;text-align:center;font:800 var(--t-xl)/1.15 var(--font);color:var(--ink-strong);letter-spacing:var(--track-title)}
+.tut-body{font:600 var(--t-md)/1.45 var(--font);color:var(--ink)} .tut-body p{margin:0 0 var(--s-2)} .tut-body b{color:var(--ink-strong)}
+.tut-more{margin:0;padding:var(--s-2) var(--s-3);border-radius:var(--r-md);background:var(--line-faint);font:600 var(--t-sm)/1.4 var(--font);color:var(--ink-soft)} .tut-more a{color:var(--line-deep);font-weight:800}
+.tut-facts{margin:0;padding:0;list-style:none;display:grid;gap:var(--s-2)} .tut-facts li{position:relative;padding-left:1.4rem}
+.tut-facts li::before{content:"";position:absolute;left:.15rem;top:.45em;width:.7rem;height:.7rem;border-radius:50%;background:var(--ball);box-shadow:inset 0 0 0 .125rem var(--ball-deep)}
+.tut-shots{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s-2)}
+.tut-shot{display:grid;grid-template-columns:3rem 1fr;grid-template-rows:auto auto;column-gap:var(--s-2);align-items:center;padding:var(--s-2) var(--s-3);border-radius:var(--r-md);background:#fff;border:.125rem solid var(--line-soft);box-shadow:var(--sh-1)}
+.tut-shot svg{grid-row:span 2;width:3rem;height:1.75rem;color:var(--line-deep)} .tut-shot b{font:800 var(--t-md)/1.1 var(--font);color:var(--ink-strong)} .tut-shot span{font:600 var(--t-xs)/1.3 var(--font);color:var(--ink-soft)}
+.tut-shot:nth-child(2) svg{color:var(--bad-deep)} .tut-shot:nth-child(5) svg{color:var(--them-deep)}
+.tut-keys{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s-2) var(--s-4)} .tut-keys li{display:flex;align-items:center;gap:var(--s-2);font:600 var(--t-sm)/1.25 var(--font)} .tut-keys .keycap{flex:none;background:#fff}
+.tut-foot{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3)}
+.tut-dots{display:flex;gap:.5rem;margin:0;padding:0;list-style:none} .tut-dots button{width:.75rem;height:.75rem;padding:0;border:0;border-radius:50%;background:var(--sky-4);cursor:pointer;transition:width var(--d-fast) var(--ease-out),background var(--d-fast)}
+.tut-dots button[aria-current]{width:1.75rem;border-radius:var(--r-pill);background:var(--line)}
+.tut-next.is-last{background:linear-gradient(180deg,#5cc4ff 0%,#3aa0ff 50%,#1f86ec 52%,#2b93f4 100%);color:#fff;border-color:var(--me-deep);text-shadow:0 .0625rem 0 rgba(10,60,130,.4)}
+@media (prefers-reduced-motion:no-preference){
+  .tut-bob{animation:tut-bob 1.8s var(--ease-soft) infinite} @keyframes tut-bob{50%{transform:translate(190px,64px) scale(1.25)}}
+  .tut-beam{animation:tut-dash 1.2s linear infinite} .tut-arc{animation:tut-dash 1.6s linear infinite} @keyframes tut-dash{to{stroke-dashoffset:-22}}
+  .tut-swing{transform-origin:120px 104px;animation:tut-swing 1.6s var(--ease-soft) infinite} @keyframes tut-swing{0%,100%{transform:rotate(-55deg)}55%{transform:rotate(48deg)}}
+  .tut-pop{transform-origin:196px 46px;animation:tut-hit 1.6s var(--ease-out) infinite} @keyframes tut-hit{0%,50%{transform:scale(1);opacity:1}75%{transform:translate(30px,-26px) scale(.7);opacity:0}76%,100%{transform:none;opacity:1}}
+  .tut-ring{transform-origin:150px 100px;animation:tut-ring 1.4s var(--ease-out) infinite} @keyframes tut-ring{0%{transform:scale(.4);opacity:0}40%{opacity:1}100%{transform:scale(1.15);opacity:.2}}
+  .tut-swirl{transform-origin:136px 36px;animation:tut-spin 1s linear infinite} @keyframes tut-spin{to{transform:rotate(360deg)}}
+  .tut-step{animation:tut-step 2.4s var(--ease-soft) infinite} @keyframes tut-step{25%{transform:translateX(-34px)}75%{transform:translateX(34px)}}
+  .tut-bounce{animation:tut-bounce .9s var(--ease-soft) infinite alternate} @keyframes tut-bounce{to{transform:translateY(-14px)}}
+}
+@media (max-width:480px){ .tut-card{padding:var(--s-5) var(--s-4) var(--s-4)} .tut-shots,.tut-keys{grid-template-columns:1fr} .tut-page{min-height:0} .tut-title{font-size:var(--t-lg)} }
+.tut-next.is-last::before{opacity:.3}

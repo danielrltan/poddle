@@ -22,7 +22,9 @@ know" hints, NEW badges / dots / pills on tiles or buttons, banners or modals ab
 themselves; there is no changelog page either (the owner removed it on 2026-10-04, NOTES 186: NOTES.md is the only record of changes). The only exception is a
 notice the Terms / Privacy pages legally promise for an important change to how data is handled, and even then ask the
 owner before adding one (he had the leaderboard and profile-card ones removed for good on 2026-10-02, NOTES 168: do not bring them back; poddle.lbSeen is a dead key profile.js deletes at load). Toasts that answer something the player
-just did (a friend request arrived, a copy worked, an error) are fine: they are not announcements.
+just did (a friend request arrived, a copy worked, an error) are fine: they are not announcements. The one first-visit overlay is
+the tutorial (web/tutorial.js, NOTES 217): the owner asked for it on 2026-10-05. It opens by itself once per browser, never for a
+returning player, then only from Settings > Tutorial; extend it rather than adding any other first-visit popup or hint.
 
 ## One card per thing, and it opens whole (the owner's rule, 2026-09-29, NOTES 150)
 The owner saw a "shittier, less full stats card" appear and then the friend card pop up after it, and read it as a feature built
@@ -99,7 +101,7 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   The camera runs only while seated on a court with Move on Body; leaving the court, watching, Auto and a hidden tab turn it off (NOTES 190).
-  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, cam (Show camera, NOTES 204), sink, music, menuSfx (0..10 volumes, NOTES 181)}, poddle.camPrimer (allow|skip), poddle.cal ({phone, airpod}: a finished calibration's frame quaternions and axes + `at`, NOTES 187; never sent), poddle.view, poddle.airpod,
+  Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, cam (Show camera, NOTES 204), sink, music, menuSfx (0..10 volumes, NOTES 181)}, poddle.camPrimer (allow|skip), poddle.tutorial ('1' = the tutorial was shown or the browser was already a player's; sessionStorage if local is blocked, NOTES 217), poddle.cal ({phone, airpod}: a finished calibration's frame quaternions and axes + `at`, NOTES 187; never sent), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,
   NOTES 116; the server still accepts an old tab's `nostats` frame for compatibility); sessionStorage cid, pad. Cookies (only if the player signs in): `__Host-poddle_s`

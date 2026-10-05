@@ -6,6 +6,7 @@ import { createBodyTracker } from './bodytrack.js';
 import { menuAudio, wireMenuSounds } from './menuaudio.js';      // menu sounds and menu music (NOTES 181)
 import * as ui from './ui.js';                  // every HUD / screen DOM change goes through here
 import * as profile from './profile.js';        // player stats (docs/ACCOUNTS.md 9): the device id, the hello, /api, sign-in. Its DOM is its own
+import * as tut from './tutorial.js';          // the tutorial (NOTES 217): once for a new browser, then Settings > Tutorial
 import * as social from './social.js';          // friends (docs/SOCIAL.md 6, 8): search, requests, who is online, the profile card's friend row. Its DOM is its own too
 
 const $ = id => document.getElementById(id);
@@ -353,7 +354,7 @@ function play() {                                  // leave the title for the lo
   if (phase !== 'title') return;
   uiSfx('select');                                 // a click anywhere or any key: the press that starts it all gets the select sound (the button itself never sees the click: the lobby is up by then)
   phase = 'lobby'; screen('lobby'); profile.landed?.(); if (MOBILE) wantWatch = true;      // landed: the corner card's count is now in sight (NOTES 203)      // a phone opens any court link as a spectator: a join link watches
-  if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else ui.lobbyView('home');      // no name yet: the code is filled in, the field asks, Join does the rest
+  if (wantRoom.length === 4) { ui.lobbyView('courts', { code: wantRoom, watch: wantWatch }); if (myName()) request({ type: wantWatch ? 'watch' : 'join', code: wantRoom }); } else { ui.lobbyView('home'); tut.maybe(); }      // no name yet: the code is filled in, the field asks, Join does the rest
 }
 function begin() {                                 // seated: the camera primer first (once ever), then straight to calibration if the paddle is already streaming, straight to the court if that is done too
   phase = 'connect'; const ask = mode === 'body' ? camAsk() : '';      // Auto: no camera, so no primer either
