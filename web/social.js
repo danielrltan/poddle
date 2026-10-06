@@ -34,7 +34,7 @@ function snapOf(j) {                                        // -> { friends, inc
 
 // ---------- state: one list per tab, whoever it belongs to (who). known: every incoming name already seen, so only a NEW one toasts ----------
 let h = {}, on = false, snap = null, who = null, loadGen = 0, snapGen = 0, quiet = true, seats = [], early = null;      // early: a socket's snapshot that came before /api/me said who is signed in. snapGen: lists applied so far (a GET older than one drops)
-const known = new Set(), seen = new Set(), busy = new Set(), rels = new Map(), panels = [];      // rels: what the server last said a name is to me (a POST's rel), for the profile card until the lists hold the name. seen: every name the lists have held, so a name that LEFT them (removed me, withdrew) reads as none, not as the server's older answer
+const known = new Set(), seen = new Set(), busy = new Set(), rels = new Map(), panels = []; let tallies = [];      // tallies: the result card's friend slots (NOTES 226)      // rels: what the server last said a name is to me (a POST's rel), for the profile card until the lists hold the name. seen: every name the lists have held, so a name that LEFT them (removed me, withdrew) reads as none, not as the server's older answer
 const gate = () => acctGate();      // '' = friends work; 'signin' | 'username' = the step that is missing; 'off' = no accounts here (sign-in or the database is off); 'wait' = /api/me has not answered yet
 const me = () => low(username());
 const relOf = name => { const n = low(name); if (n === me()) return 'self'; if (!snap) return 'none';
@@ -211,7 +211,7 @@ function draw(p) {
 // every panel, the home tile, the Settings row and an open profile card: one state, drawn everywhere it shows
 function redraw() {
   const a = document.activeElement, p0 = a && panels.find(p => p.root.contains(a)), keep = p0 && a.closest('.fr-row') ? [low(a.closest('.fr-row').dataset.name), a.classList.contains('fr-more') ? '.fr-more' : a.classList.contains('fr-name') ? '.fr-name' : 'button:not(:disabled)'] : null;
-  for (const p of panels) draw(p); entry(); cardRedraw();      // an open profile card's friend row follows too (its buttons wait while a request is out)
+  for (const p of panels) draw(p); entry(); cardRedraw(); drawTallies();      // an open profile card's friend row follows too (its buttons wait while a request is out)
   if (keep && !p0.root.contains(document.activeElement)) { focusRow(p0, keep[0], keep[1]); if (!p0.root.contains(document.activeElement)) (p0.els.q.offsetParent ? p0.els.q : p0.root.closest('[tabindex]') || p0.root).focus({ preventScroll: true }); }      // a redraw rebuilt the row under the player's focus: the same control on the new row, else the search
 }
 // the home tile (index.html #btn-friends) and Settings > Friends: requests as a badge, who is online as the line
@@ -238,6 +238,29 @@ export function card(open) {                                // the friends card 
 export function court(list) {                               // main.js: who sits on this court now ([{ name, rank }] of the registered seats that are not mine). [] off the court
   seats = (Array.isArray(list) ? list : []).map(s => s && typeof s === 'object' ? { name: nameOf(s.name), rank: rankOf(s.rank) } : null).filter(s => s && s.name);
   for (const p of panels) if (p.ctx === 'game') draw(p);
+}
+
+// ---------- the result card (NOTES 226, the owner: "make it so you can add friends after a game"): under a registered player's name in the tally,
+// the same one control the profile card has (Add friend / Requested / Accept / Friends), live with the lists. Only for a signed-in player with a
+// username (a guest gets nothing: signing in from a court would redial). main.js result(): [{ el, name }] of the tally slots to fill, [] to empty them (tallies)
+export function result(list) {
+  for (const t of tallies) { t.el.textContent = ''; t.el.hidden = true; delete t.el.dataset.sig; }
+  tallies = (Array.isArray(list) ? list : []).map(x => x && x.el ? { el: x.el, name: nameOf(x.name) } : null).filter(x => x && x.name);
+  drawTallies(); if (tallies.length && on && !gate() && !snap) load();      // the lists, if this tab has none yet: Requested or Friends must not show as Add friend
+}
+function drawTallies() {
+  const g = gate();
+  for (const t of tallies) {
+    const k = low(t.name), rel = !on || g ? '' : relNow(t.name, rels.get(k) || 'none'), wait = busy.has(k), sig = rel + '|' + wait;
+    t.el.hidden = !rel || rel === 'self'; if (t.el.dataset.sig === sig) continue;
+    const had = t.el.contains(document.activeElement); t.el.dataset.sig = sig; t.el.textContent = ''; if (t.el.hidden) continue;
+    const B = (cls, txt, fn) => { const x = btn('btn btn-sm ' + cls, txt, fn); x.disabled = wait; return x; };
+    if (rel === 'none') { const x = addIc(B('fr-add tally-fr-btn', 'Add friend', () => act('add', t.name))); x.setAttribute('aria-label', `Add ${t.name} as a friend`); t.el.append(x); }
+    else if (rel === 'in') { const x = B('is-add tally-fr-btn', 'Accept', () => act('accept', t.name)); x.setAttribute('aria-label', `Accept ${t.name}'s friend request`); t.el.append(x); }
+    else if (rel === 'out') t.el.append(mk('span', 'fr-tag', 'Requested'));
+    else if (rel === 'friend') { const x = mk('span', 'fr-tag is-friend', 'Friends'); x.prepend(tick()); t.el.append(x); }
+    if (had && !t.el.contains(document.activeElement)) t.el.closest('[tabindex]')?.focus({ preventScroll: true });
+  }
 }
 
 // ---------- the profile card (#lbp-card, web/profile.js): a name opens it; its friend row is drawn here, from the lists (the pushes keep it live) ----------

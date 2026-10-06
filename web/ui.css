@@ -2306,3 +2306,18 @@ body[data-settings="menu"]::after{opacity:1;visibility:visible;transition-delay:
 .tut-next.is-last::before{opacity:.3}
 
 .logo-mark [data-l]::before{content:attr(data-l)}      /* NOTES 225: the logo's letters are drawn, so the heading reads "Poddle" (its .vh text) to search engines and screen readers, not "P o d dle" */
+/* NOTES 226: add a registered player as a friend from the result card. A row of its own under the name (the side may be a grid of chip, name and badges), the friends card's compact size */
+.tally-fr{grid-column:1 / -1;display:flex;justify-content:center;margin-top:.125rem} .tally-fr[hidden]{display:none}
+.tally-fr .btn,.tally-fr .fr-tag{height:2rem;min-height:0;padding:0 .75rem;font-size:max(var(--t-xs),12px);white-space:nowrap}
+.tally:has(.tally-fr:not([hidden])) .tally-side{align-self:flex-start}      /* the side with the friend control is taller: both names stay level, the score stays centred */
+/* NOTES 227, the owner: "make the footer SMALLER, there is way too much stuff in it ... on mobile, it takes up like a quarter of the screen".
+   The lobby footer no longer repeats the three page links (the title footer keeps them, NOTES 218). On a computer the legal line and the keys
+   share one row; on a phone it is one short block: the legal sentence, then the Product Hunt badge (smaller) beside the age line */
+@media (min-width:701px){ html:not([data-mobile]) #screen-lobby .menu-foot .foot-agree{order:0;flex:0 1 auto;text-align:left} }
+@media (max-width:700px){
+  #screen-lobby .menu-foot{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:var(--s-3);row-gap:.3125rem;min-height:0;padding-block:.5rem}
+  #screen-lobby .menu-foot .foot-agree{display:contents;font-size:12px;line-height:1.25}
+  #screen-lobby .menu-foot .foot-agree > span:first-child{grid-column:1 / -1;grid-row:1;justify-self:center}
+  #screen-lobby .menu-foot .ph-badge{grid-row:2;grid-column:1;justify-self:end} #screen-lobby .menu-foot .ph-badge img{height:1.625rem;border-radius:.4375rem}
+  #screen-lobby .menu-foot .foot-agree > span:last-child{grid-row:2;grid-column:2;justify-self:start}
+}

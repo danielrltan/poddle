@@ -195,6 +195,8 @@ function showOver() {                              // the result card. A matchov
   const endRanks = Array.isArray(m.rank) ? cleanRanks(m.rank) : ranks;      // the ranks as they were when it ended (docs/TROPHIES.md 3, item 9)
   overForfeit = !!m.forfeit && !spec();      // for the trophy row (drawTrophies): the stayer's win notes the forfeit
   const wait = +ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [rg[L], rg[1 - L]], rank: [endRanks[L], endRanks[1 - L]], stats: mstats }) || 0;      // ms the panel waits behind VICTORY! (0: it is in at once)
+  { const end = Array.isArray(m.names) ? cleanNames(m.names) : [], at = i => end[i] || nameOf(i), nm = [spec() ? at(0) : null, at(1 - L)], ids = ['tally-fr-me', 'tally-fr-them'];      // add a registered player as a friend from the result card (NOTES 226): the opponent, or either seat for a spectator. Never Matt, never a guest name
+    social.result([0, 1].map(i => rg[i ? 1 - L : L] && nm[i] && nm[i] !== 'Matt' ? { el: document.getElementById(ids[i]), name: nm[i] } : null)); }
   vicSide = W; vicAt = performance.now() + wait;
   const reveal = () => { if (ui.currentOverlay() !== 'match') return; if (vote) { const by = +m.rematchBy || 20; ui.rematch({ left: Math.max(0, Math.min(by, Math.round(by + (m.forfeit ? 0 : 2) - (performance.now() - overAt) / 1000))) }); }      // the vote's clock starts with the panel (the server gave the title its 2.6 s on top: STAMP_S)
     if (trophyParked) { const t = trophyParked; trophyParked = null; drawTrophies(t); }      // its trophies came first (the 'profile' message can land before the matchover, behind VICTORY!, or while a set-up screen was up): the row goes on the card as it comes in, so its roll and ceremony are seen
@@ -471,7 +473,7 @@ function toLobby(msg) {                            // out of a room, back to the
   if (undo) { undo = null; ui.backLabel('Back'); }
   camAway = null; if (camOn) stopCam();      // off the court: the camera goes off (NOTES 190). The next seat turns it on again, without asking twice
   trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
-  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]);
+  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]); social.result([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home'); profile.landed?.();      // the trophies the games earned fly into the corner card as the home comes in (NOTES 203)
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: meName(), ...alone(), reg: [meReg(), false] });

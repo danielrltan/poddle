@@ -416,6 +416,29 @@ r = await ev(pg, () => document.querySelector('#lbp-friend .lbp-fr-go')?.getAttr
 ok(r === 'Pick a username to add friends', `no username: the card's Add friend button is labelled "${r}"`);
 await pg.ctx.close();
 
+// ---------- after a game (NOTES 226): the result card offers the friend control under a registered player's name; a guest's side and a guest viewer get none ----------
+world = W0(); API.acct = { username: 'Sam', renameAt: null }; API.fail = null;
+pg = await page('result'); await pg.goto(`http://127.0.0.1:${W}/web/index.html${URLQ}&court=WWWW&watch=1`); await sleep(1500); await pg.click('#btn-start'); await sleep(2500);
+const slots = () => ev(pg, () => Object.fromEntries(['me', 'them'].map(s => { const e = document.getElementById('tally-fr-' + s), r = e.getBoundingClientRect(); return [s, e.hidden || !r.width ? null : e.textContent.trim()]; })));
+pushAll({ type: 'matchover', winner: 0, score: [11, 6], names: ['Ann', 'Rico'], reg: [true, false], rematchBy: 20 }); await sleep(4500);
+r = await slots(); ok(r.me === 'Add friend' && r.them === null, `the result card: Add friend under Ann (registered), nothing under Rico (a guest) (${J(r)})`);
+r = await ev(pg, () => document.querySelector('#tally-fr-me button')?.getAttribute('aria-label')); ok(r === 'Add Ann as a friend', `its label: ${r}`);
+await shot(pg, 'result-add-1440'); await pg.setViewport(PHONE); await shot(pg, 'result-add-390'); await pg.setViewport(DESK);
+n0 = posts().length; await ev(pg, () => document.querySelector("#tally-fr-me button").click()); await sleep(900);
+r = await slots(); ok(J(posts().slice(n0)) === J([{ op: 'add', name: 'Ann' }]) && r.me === 'Requested' && (await toasts(pg)).includes('Request sent to Ann'), `pressed: one add for Ann, the slot says Requested (${J(r)}, ${J(posts().slice(n0))})`);
+await shot(pg, 'result-requested-1440');
+pushAll({ type: 'matchover', winner: 1, score: [8, 11], names: ['Bea', 'Ann'], reg: [true, true], rematchBy: 20 }); await sleep(4500);
+r = await slots(); ok(r.me === 'Friends' && r.them === 'Requested', `the next match: Bea is a friend, Ann still Requested (${J(r)})`);
+world.inc.push({ k: 'eve', at: now }); world.friends.delete('eve'); pushAll({ type: 'social', ...snap() }); await sleep(400);
+pushAll({ type: 'matchover', winner: 0, score: [11, 9], names: ['Eve', 'Rico'], reg: [true, false], rematchBy: 20 }); await sleep(4500);
+r = await slots(); ok(r.me === 'Accept', `Eve asked first: Accept (${J(r)})`); n0 = posts().length;
+await ev(pg, () => document.querySelector('#tally-fr-me button').click()); await sleep(900); r = await slots(); ok(J(posts().slice(n0)) === J([{ op: 'accept', name: 'Eve' }]) && r.me === 'Friends', `accepted there: Friends (${J(r)})`);
+await pg.ctx.close();
+pg = await page('result-guest', { acct: null }); await pg.goto(`http://127.0.0.1:${W}/web/index.html${URLQ}&court=WWWW&watch=1`); await sleep(1500); await pg.click('#btn-start'); await sleep(2500);
+pushAll({ type: 'matchover', winner: 0, score: [11, 6], names: ['Ann', 'Rico'], reg: [true, false], rematchBy: 20 }); await sleep(4500);
+r = await slots(); ok(r.me === null && r.them === null, `a guest watching: no friend control (${J(r)})`);
+await pg.ctx.close(); API.acct = { username: 'Sam', renameAt: null };
+
 clearTimeout(bail); await browser.close(); wss.close(); web.close();
 console.log(out.join('\n'));
 if (errs.length) console.log('page errors:\n' + errs.join('\n'));

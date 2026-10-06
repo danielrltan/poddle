@@ -4709,3 +4709,40 @@ parent first."). Now (web/index.html, web/ui.css):
   for the site name. And `icon-192.png` as a 192x192 icon: Google's result icon wants a multiple of 48 px; the page offered only the SVG and
   a 32 px PNG. Both show only after Google recrawls (Search Console > URL inspection > Request indexing speeds it up).
 - test/seo.test.mjs: two JSON-LD blocks (the site, the game), the WebSite one checked; the icon list includes /icon-192.png.
+
+## 226. Add a friend from the result card
+- The owner (2026-10-06): "make it so you can add friends after a game".
+- Under a registered player's name in the result card's tally (#tally-fr-me / #tally-fr-them), the same one control the profile card has, compact:
+  Add friend (the person+ icon), Requested, Accept (they asked first) or Friends with a tick. social.js result() / drawTallies(), redrawn with
+  the lists (a push, a POST's answer), so it is live. A player gets it under the opponent; a spectator under either seat. Never under Matt, a
+  guest's name or my own; the names are matchover's own (a forfeiter's seat is already empty by then). Nothing for a guest or an account with no
+  username: signing in from a court redials, and a words-only line would be filler (NOTES 158). The tab's lists are fetched if it has none
+  yet, so Requested / Friends never show as Add friend. Emptied when the court is left.
+- Both tally sides stay level when one has the control (the score keeps its centre).
+- Nothing new is sent, stored or shown: the friend request is the one Friends already makes (Terms 5, Privacy). No legal change.
+- test/social-ui.mjs, new section: Add friend under Ann and nothing under Rico (a guest), its label, a press posts one add and shows Requested,
+  the next match shows Friends for Bea and Requested for Ann, Eve's request shows Accept and accepting there makes Friends, a guest
+  watching gets nothing. Screenshots social-result-*.png.
+
+## 227. A smaller footer: the lobby drops the page links, a phone gets two short lines
+- The owner (2026-10-06): "make the footer SMALLER, there is way too much stuff in it. this is especially the case on mobile, it takes up
+  like a quarter of the screen".
+- The lobby footer (the desktop lobby and the phone home) no longer repeats the three landing-page links (NOTES 218). The title footer keeps
+  them, outside <noscript>, so Google's render still finds them on the home (seo.test checks it), and How to play and the sitemap link them too.
+- A computer: the legal line and the Esc / F keys share one row (48 px at 1280x720, was 68 in two rows); NOTES 223's own row is no longer
+  needed. A phone (700 px and under): the agree sentence on one line, then the Product Hunt badge (1.625 rem, was 2.125) beside "Under 18?
+  Ask a parent." The words are unchanged, word for word, and neither sentence breaks. 45 px at 390x844 (was 127: 5% of the screen, was 15%).
+- The desktop title footer (one row: How to play, the three pages, Privacy, Terms, the music credit) is unchanged.
+- Tests: seo.test, mobile-ui pass. Screenshots compared before and after at 390x844 and 1280x720.
+
+## 228. The Terms say plainly that an inappropriate username can be replaced
+- The owner (2026-10-06): "add a thing to the tos where if a user has an inappropriate username we reserve the right to change it", naming
+  the top trophy account (an obscene name the profanity filter missed: no token edge, "puss" is not a stem).
+- web/terms.html section 5: "We may change or remove a username that we consider offensive or otherwise inappropriate (vulgar, sexual,
+  hateful or harassing, including through misspellings, numbers or look-alike characters), that impersonates anyone or that is reserved ...
+  at any time, without notice and at our sole discretion, including by replacing it with a username we choose." The account, stats,
+  trophies and friends are kept; the player may then pick another name; repeated or serious breaches may cost the account. Last updated,
+  dateModified and the sitemap lastmod are October 6. No home notice: the right was already there (section 5 said "We may change or remove a
+  username that is offensive"), this only spells it out.
+- The rename itself is the operator's: `fly ssh console -a poddle -C "node server/admin.js rename <username> <new>"`. poddler1 is refused
+  (names starting with poddle are reserved, usernames.js RES_PREFIX). admin rename clears renamed_at, so the player can choose again at once.
