@@ -4677,3 +4677,14 @@ markers never moved: only an opponent's shots did, which is why it was seen in m
   landing, on the bounce, after the re-aim (smash, tap), the unchanged settled report (~80 ms) or the window's end (~250 ms) and
   never before; a settled swing's comes with its hit.
 
+## 223. The lobby's legal line never breaks mid-sentence: a row of its own on a computer
+With the three page links in the lobby footer (NOTES 218), "By playing you agree to the Terms and Privacy Policy. Under 18? Ask a
+parent first." no longer fitted beside them and the Esc / F keys (one row needs ~1490 px) and wrapped mid-sentence ("Ask a /
+parent first."). Now (web/index.html, web/ui.css):
+- on a computer (over 520 px, not data-mobile) it is a centered row of its own under the links and the keys, nowrap, at every
+  width: a width breakpoint could not decide it, the footer's type scales with the window's height too (at 1512x982 the keys
+  wrapped instead).
+- its two sentences are spans that never break inside, so a phone splits it between them.
+- the words: "first" is gone from "Ask a parent first."; "By playing you agree to the Terms and Privacy Policy." stays word for
+  word (test/seo.test.mjs pins it, CLAUDE.md "Legal pages"), and so does the age line (web/terms.html section 2). pad.html's own
+  line is unchanged.
