@@ -4615,6 +4615,8 @@ people came from; the next posts (Show HN, Reddit, itch.io, the pickleball press
   totals; section 2 gains the Page views row (what, why, the in-memory scrambled address); section 7 the retention line. CLAUDE.md's
   data flows carry it. test/traffic.test.mjs (sources, pages, counting, deltas, a new day, the cap, no address in the table) is in
   deploy.sh's gate.
+- Day one showed 1,470 "direct" views from one person: fly.toml's http_service check GETs / every 15 s. A request with no public
+  client address (Fly's checker never has one) is not counted now, and health/consul user agents read as bot.
 
 ## 220. Away: a player who leaves the game tab shows Away; against Matt it is a pause
 - The owner (2026-10-05): "an 'away' character status if a player tabs out or unfocuses from a game tab. if they're in a bot match, it

@@ -5,10 +5,10 @@
 // traffic table (server/db.js) once a minute as deltas. Source: ?ref= or ?utm_source= on the link (what we tag our own posts with),
 // else the Referer's host (www. dropped; our own host is 'site': a click inside the game), else 'direct'. Crawlers and link
 // previews land in 'bot' by user agent. Only a GET of an HTML page that was found counts: not HEAD, not a 404, not /api, not a share
-// card (the slug would be a person). `node server/admin.js traffic [days]` prints the table.
+// card (the slug would be a person), not a request with no client address (Fly's health check). `node server/admin.js traffic [days]` prints the table.
 const crypto = require('node:crypto');
 const DAY = 86400e3, SOURCE_CAP = 200;                              // distinct sources a day before the rest fold into 'other': a Referer is anyone's string
-const BOT = /bot|crawl|spider|slurp|fetch|preview|headless|curl|wget|python|java\/|go-http|facebookexternalhit|whatsapp|telegram|discord|slack|skype|lighthouse|pagespeed|pingdom|uptime|monitor|validator|embedly|quora|twitterbot|linkedinbot|bingpreview/i;
+const BOT = /bot|crawl|spider|slurp|fetch|preview|headless|curl|wget|python|java\/|go-http|health|consul|facebookexternalhit|whatsapp|telegram|discord|slack|skype|lighthouse|pagespeed|pingdom|uptime|monitor|validator|embedly|quora|twitterbot|linkedinbot|bingpreview/i;
 const SAFE = /^[a-z0-9][a-z0-9_.-]{0,31}$/;                         // a ref tag or a host, as stored
 
 let now = Date.now, site = 'poddleball.com', addrOf = () => 'local', dbh = null, log = console.log, timer = null;
@@ -59,7 +59,8 @@ function hit(req, rel) {
     const t = now(); roll(t);
     let source = sourceOf(req);
     if (source !== 'bot' && source !== 'direct' && source !== 'site' && !cells.has(day + '\0\0' + source)) { if (sources >= SOURCE_CAP) source = 'other'; else sources++; }
-    const page = pageOf(rel), who = crypto.createHmac('sha256', salt).update(String(addrOf(req))).digest('base64').slice(0, 22);
+    const addr = String(addrOf(req) || ''); if (!addr || addr === 'bad') return;   // no client address: Fly's health check (fly.toml, GET / every 15 s, not through the proxy), never a person
+    const page = pageOf(rel), who = crypto.createHmac('sha256', salt).update(addr).digest('base64').slice(0, 22);
     for (const [p, s] of [[page, source], ['', source], [page, ''], ['', '']]) {   // the cell, its source total, its page total, the day total
       const c = cell(day, p, s); c.views++; c.dv++;
       if (!c.seen.has(who)) { c.seen.add(who); c.people++; c.dp++; }

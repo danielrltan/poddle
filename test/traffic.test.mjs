@@ -12,7 +12,7 @@ const hitUrl = (u, o) => traffic.hit(req(u, o), u.split('?')[0]);   // as game.j
 const quiet = f => { const e = console.error; console.error = () => {}; try { return f(); } finally { console.error = e; } };
 
 ok(quiet(() => db.open(':memory:')), 'the database opens with the traffic table');
-traffic.init({ db, now: () => T, site: 'poddleball.com', addrOf: r => r.socket.remoteAddress, flushMs: 3600e3, log: () => {} });
+traffic.init({ db, now: () => T, site: 'poddleball.com', addrOf: r => r.socket.remoteAddress === 'none' ? 'bad' : r.socket.remoteAddress, flushMs: 3600e3, log: () => {} });   // 'none': what auth.clientAddr gives a request with no client address on Fly
 
 console.log('source');
 const src = (u, o) => traffic.sourceOf(req(u, o));
@@ -27,21 +27,21 @@ ok(traffic.pageOf('/index.html') === '/' && traffic.pageOf('/how-to-play.html') 
 console.log('counting');
 hitUrl('/index.html?ref=hn'); hitUrl('/index.html?ref=hn'); hitUrl('/how-to-play.html', { referer: 'https://poddleball.com/' });
 hitUrl('/index.html?ref=hn', { addr: '198.51.100.9' }); hitUrl('/index.html', { addr: '198.51.100.9', referer: 'https://www.reddit.com/r/x' });
-hitUrl('/index.html', { method: 'HEAD', addr: '192.0.2.1' }); hitUrl('/index.html', { ua: 'curl/8', addr: '192.0.2.2' });
+hitUrl('/index.html', { method: 'HEAD', addr: '192.0.2.1' }); hitUrl('/index.html', { ua: 'curl/8', addr: '192.0.2.2' }); hitUrl('/index.html', { addr: 'none' }); hitUrl('/index.html', { ua: 'Consul Health Check', addr: '192.0.2.3' });
 let r = traffic.report(1); let d = r[0];
-ok(r.length === 1 && d.day === '2026-10-06' && d.views === 6 && d.people === 3, `today: 6 views (HEAD not counted), 3 people (the bot is one): ${JSON.stringify({ v: d.views, p: d.people })}`);
-ok(eq(d.sources.map(s => [s.source, s.people, s.views]), [['hn', 2, 3], ['bot', 1, 1], ['reddit.com', 1, 1], ['site', 1, 1]]), `by source, most people first: ${JSON.stringify(d.sources)}`);
-ok(eq(d.pages.map(p => [p.page, p.people, p.views]), [['/', 3, 5], ['/how-to-play', 1, 1]]), `by page, most views first: ${JSON.stringify(d.pages)}`);
-ok(eq(db.trafficReport('2026-10-06').find(x => x.page === '' && x.source === ''), { day: '2026-10-06', page: '', source: '', views: 6, people: 3 }), 'the report flushed to the table');
+ok(r.length === 1 && d.day === '2026-10-06' && d.views === 7 && d.people === 4, `today: 7 views (HEAD and the address-less health check not counted), 4 people (the bots are two): ${JSON.stringify({ v: d.views, p: d.people })}`);
+ok(eq(d.sources.map(s => [s.source, s.people, s.views]), [['hn', 2, 3], ['bot', 2, 2], ['reddit.com', 1, 1], ['site', 1, 1]]), `by source, most people first: ${JSON.stringify(d.sources)}`);
+ok(eq(d.pages.map(p => [p.page, p.people, p.views]), [['/', 4, 6], ['/how-to-play', 1, 1]]), `by page, most views first: ${JSON.stringify(d.pages)}`);
+ok(eq(db.trafficReport('2026-10-06').find(x => x.page === '' && x.source === ''), { day: '2026-10-06', page: '', source: '', views: 7, people: 4 }), 'the report flushed to the table');
 hitUrl('/index.html?ref=hn'); ok(traffic.flush() === 4, 'a repeat visit: a delta of one view on four cells (the cell, its source, its page, the day; not the people), flushed');
 const all = db.trafficReport('2026-10-06').find(x => x.page === '' && x.source === '');
-ok(all.views === 7 && all.people === 3, `the table adds deltas, never double counts: ${all.views} views, ${all.people} people`);
+ok(all.views === 8 && all.people === 4, `the table adds deltas, never double counts: ${all.views} views, ${all.people} people`);
 ok(traffic.flush() === 0, 'nothing to flush twice');
 
 console.log('a new day');
 T += DAY; hitUrl('/index.html?ref=hn');
 r = traffic.report(2);
-ok(r.length === 2 && r[0].day === '2026-10-07' && r[0].people === 1 && r[0].views === 1 && r[1].day === '2026-10-06' && r[1].views === 7, `two days, newest first, the same address is a new person today: ${r.map(x => x.day + ':' + x.people + '/' + x.views)}`);
+ok(r.length === 2 && r[0].day === '2026-10-07' && r[0].people === 1 && r[0].views === 1 && r[1].day === '2026-10-06' && r[1].views === 8, `two days, newest first, the same address is a new person today: ${r.map(x => x.day + ':' + x.people + '/' + x.views)}`);
 ok(traffic.report(1).length === 1, 'report(1) is today only');
 ok(db.trafficReport('nope') === null && db.trafficAdd([{ day: 'x', page: '/', source: '', views: 1, people: 1 }]) === true && db.trafficReport('2026-10-06').filter(x => x.day === 'x').length === 0, 'bad days are refused or skipped');
 
