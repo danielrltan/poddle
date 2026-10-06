@@ -176,7 +176,15 @@ CREATE TABLE IF NOT EXISTS friend_reqs (
   PRIMARY KEY (from_id, to_id),
   CHECK (from_id <> to_id)
 );
-CREATE INDEX IF NOT EXISTS friend_reqs_to ON friend_reqs(to_id);`;   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
+CREATE INDEX IF NOT EXISTS friend_reqs_to ON friend_reqs(to_id);
+CREATE TABLE IF NOT EXISTS traffic (
+  day     TEXT    NOT NULL CHECK (length(day) = 10),
+  page    TEXT    NOT NULL,
+  source  TEXT    NOT NULL,
+  views   INTEGER NOT NULL DEFAULT 0,
+  people  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, page, source)
+);`;   // traffic (server/traffic.js, NOTES 219): page views as daily totals, page '' = every page, source '' = every source; no person in it   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
 // a request from -> to (the PK indexes from_id, friend_reqs_to the other side: an account's cascade never scans). sent 0 = a row its from side never sent
 // (a removal's block, or a declined request its sender cancelled): it still blocks re-requests until it expires, but nobody is ever shown it. created_at is
 // the from side's clock (expiry, the 'at' its sender sees; a blocked re-add restarts it as a real request would); asked_at is the to side's and never moves
@@ -290,6 +298,8 @@ function prepare() {                                             // every statem
   const q = sql => D.prepare(sql);
   S = {
     pageCount: q('PRAGMA page_count'), freePages: q('PRAGMA freelist_count'),
+    trafAdd: q('INSERT INTO traffic (day, page, source, views, people) VALUES (?, ?, ?, ?, ?) ON CONFLICT(day, page, source) DO UPDATE SET views = views + excluded.views, people = people + excluded.people'),
+    trafFrom: q('SELECT day, page, source, views, people FROM traffic WHERE day >= ? ORDER BY day DESC'),
     devByHash: q('SELECT id, owner_id, account_id FROM devices WHERE dev_hash = ?'),
     ownerIns: q('INSERT INTO owners (kind, created_at, touched_at) VALUES (?, ?, ?)'),
     ownerGet: q('SELECT id, kind, created_at, touched_at FROM owners WHERE id = ?'),
@@ -920,7 +930,10 @@ function cleanBackups(now, dir) {                                // 11.6: /tmp/p
 }
 
 // Operator helpers for admin.js (additions, never reachable over HTTP).
-const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs'];
+const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs', 'traffic'];
+// traffic.js's flush (deltas, one transaction) and report (every row from a day on). Rows are counts of pages and sources: never swept, never in an export
+const trafficAdd = guard(false, rows => { tx(() => { for (const r of rows) if (/^\d{4}-\d{2}-\d{2}$/.test(r.day) && typeof r.page === 'string' && typeof r.source === 'string') S.trafAdd.run(r.day, r.page.slice(0, 64), r.source.slice(0, 32), Math.max(0, r.views | 0), Math.max(0, r.people | 0)); }); return true; });
+const trafficReport = guard(null, from => /^\d{4}-\d{2}-\d{2}$/.test(from) ? S.trafFrom.all(from) : null);
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
@@ -928,4 +941,4 @@ const ladderRecomputed = () => recomputed;                       // rows the las
 module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
-  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey };
+  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey, trafficAdd, trafficReport };

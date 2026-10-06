@@ -10,11 +10,12 @@
 //   unshare <link or code>      stop one share link (docs/SHARE.md 2): a request by e-mail that sends the link itself (holding the link is all
 //                               the link grants, so no proof of ownership is needed to stop it), or a link the Terms let us disable
 //   unshare-user <username>     stop the share link of that account (an offensive username on a card: Terms 5)
+//   traffic [days]              page views per day (default 7): people and views in all, then by source (?ref= tag or referring site) and by page (NOTES 219)
 // Output never carries a Google subject, a device hash or an account id.
 const fs = require('node:fs'), path = require('node:path');
 const db = require('./db');
 
-const USAGE = 'usage: node server/admin.js counts | rename <username> <new> | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username>';
+const USAGE = 'usage: node server/admin.js counts | rename <username> <new> | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username> | traffic [days]';
 function names() {                                               // usernames.js (7.1-7.2) is loaded only by the commands that need it
   try { return require('./usernames'); } catch { throw new Error('server/usernames.js is not available'); }
 }
@@ -30,7 +31,7 @@ const stamp = d => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(
 
 async function main(argv) {
   const [cmd, a1, a2] = argv;
-  if (!cmd || !['counts', 'rename', 'release', 'reset-stats', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user'].includes(cmd)) throw new Error(USAGE);
+  if (!cmd || !['counts', 'rename', 'release', 'reset-stats', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user', 'traffic'].includes(cmd)) throw new Error(USAGE);
   if (cmd === 'backup' && a1 === '--clean') {                    // needs no database: deletes the /tmp copies after they were downloaded
     let k = 0; for (const f of fs.readdirSync('/tmp')) if (/^poddle-backup-[0-9-]+\.db$/.test(f)) { const p = path.join('/tmp', f); if (fs.lstatSync(p).isFile()) { fs.unlinkSync(p); k++; } }
     return console.log('removed ' + k + ' backup file(s)');
@@ -42,6 +43,14 @@ async function main(argv) {
   try {
     const now = Date.now();
     if (cmd === 'counts') { const c = db.counts(); if (!c) throw new Error('count failed'); for (const [t, n] of Object.entries(c)) console.log(t.padEnd(11) + ' ' + n); return; }
+    if (cmd === 'traffic') {                                     // the table only: the running server's last minute is not flushed yet
+      const days = Math.min(400, Math.max(1, Number(a1) || 7)), from = new Date(now - (days - 1) * 86400e3).toISOString().slice(0, 10), rows = db.trafficReport(from);
+      if (!rows) throw new Error('report failed'); if (!rows.length) return console.log('no page views since ' + from);
+      const byDay = new Map(); for (const r of rows) { if (!byDay.has(r.day)) byDay.set(r.day, { all: null, src: [], pg: [] }); const d = byDay.get(r.day); if (r.page === '' && r.source === '') d.all = r; else if (r.page === '') d.src.push(r); else if (r.source === '') d.pg.push(r); }
+      for (const [day, d] of byDay) { console.log(`${day}  ${d.all ? d.all.people + ' people, ' + d.all.views + ' views' : ''}`);
+        for (const r of d.src.sort((x, y) => y.people - x.people)) console.log(`  ${r.source.padEnd(24)} ${String(r.people).padStart(6)} people ${String(r.views).padStart(7)} views`);
+        for (const r of d.pg.sort((x, y) => y.views - x.views)) console.log(`  ${r.page.padEnd(24)} ${String(r.people).padStart(6)} people ${String(r.views).padStart(7)} views`); }
+      return; }
     if (cmd === 'sweep') { const n = await db.sweep(now); if (!n) throw new Error('sweep failed'); return console.log(JSON.stringify(n)); }
     if (cmd === 'backup') { const out = '/tmp/poddle-backup-' + stamp(new Date(now)) + '.db'; if (fs.existsSync(out)) throw new Error('a backup from this minute exists');
       if (!db.vacuumInto(out)) throw new Error('backup failed'); fs.chmodSync(out, 0o600);

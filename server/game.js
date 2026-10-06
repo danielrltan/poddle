@@ -3,7 +3,7 @@
 // docs/SPECTATE.md + docs/API-NEXT.md 4: spectators, names, match end -> rematch vote -> closed, a dropped seat held then forfeited, pause.
 const { WebSocketServer } = require('ws');
 const http = require('http'), fs = require('fs'), path = require('path');
-const db = require('./db'), stats = require('./stats'), auth = require('./auth'), api = require('./api'), abuse = require('./abuse'), usernames = require('./usernames');   // player stats (docs/ACCOUNTS.md): none does anything when loaded
+const db = require('./db'), stats = require('./stats'), auth = require('./auth'), api = require('./api'), abuse = require('./abuse'), usernames = require('./usernames'), traffic = require('./traffic');   // player stats (docs/ACCOUNTS.md): none does anything when loaded
 const share = require('./share');                                // share links: /c/<slug>, its page and its picture (docs/SHARE.md 2); nothing runs on require
 const LAD = require('./ladder');                                 // trophies and ranks (docs/TROPHIES.md 3): the pure table and the deltas; the hook in record() applies them
 const safeName = (n, fb) => (n && !usernames.impersonates(n) ? n : fb);   // a guest name that passes as Matt or staff is shown as `fb` wherever others see it (docs/ACCOUNTS.md 7.3)
@@ -62,6 +62,7 @@ const httpServer = http.createServer((req, res) => {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return notFound(req, res);
     const ext = path.extname(file).toLowerCase(), mtime = Math.floor(st.mtimeMs / 1000) * 1000;
+    if (ext === '.html') traffic.hit(req, rel);                     // a page someone opened (GET only, found): counted, never who
     // Validators make 'no-cache' cheap: a reload is a handful of 304s, not 300 KB of JS and CSS again. The tag is weak because the proxy in front (fly) compresses the body.
     const head = { 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : IMAGE.has(ext) ? 'public, max-age=604800' : 'no-cache',     // vendor/ is 18 MB and never changes
       ETag: `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`, 'Last-Modified': new Date(mtime).toUTCString() };
@@ -88,6 +89,7 @@ const wss = new WebSocketServer({ server: httpServer, maxPayload: 4096 });   // 
 try {                                                            // docs/ACCOUNTS.md 11.3: the stats database before the first socket; a failure is one log line and the game plays as before
   db.open(process.env.PODDLE_DB || ':memory:'); db.sweep(Date.now()); setInterval(() => { try { db.sweep(Date.now()); } catch { /* next day */ } }, 24 * 3600e3).unref();
 } catch { /* db logs its own code */ }
+traffic.init({ db, site: SITE, addrOf: req => abuse.computerKey(auth.clientAddr(req).addr), flushMs: Number(process.env.TRAFFIC_FLUSH_MS) || 60e3 });   // page views as daily totals (NOTES 219): the keyed address stays in memory for the day, never on disk
 api.init({ env: process.env, social: { status: id => socialStatus(id), changed: (push, drop) => socialChanged(push, drop) } });   // friends (docs/SOCIAL.md 4): the API reads presence and pushes snapshots through these; they run only after boot
 stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients, detached: ws => socialDetached(ws), kin: list => kin(list) });
 httpServer.listen(+process.env.PORT || 8080);

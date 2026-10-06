@@ -4595,3 +4595,24 @@ the Wii-Sports-style page the audit suggested is not written; an AirPods motion 
 Search Console (the domain is DNS-verified) needs Request indexing on the five content URLs, and the first real links (Show HN,
 Reddit, itch.io, the pickleball press) are the only thing that moves non-brand queries.
 
+## 219. Page views are counted: per day, per page, per source, no cookie, no script, no third party
+The site ran no analytics, so the launch's "about 100 visitors" was a guess off Fly's request graph and could not be split by where
+people came from; the next posts (Show HN, Reddit, itch.io, the pickleball press) need a number per link. Now:
+- server/traffic.js: on every GET of an HTML page the server found (200 or 304; not HEAD, not /api, not a 404, not a share card) it
+  adds one view to four cells for the UTC day: (page, source), (every page, source), (page, every source), (every page, every source).
+  Source is ?ref= or ?utm_source= on the link, else the Referer's host (www. dropped; our own host is "site"), else "direct"; a
+  crawler or link-preview user agent is "bot". "People" is distinct network addresses per cell per day: the address is keyed
+  (HMAC, a random salt the process makes each day) and the key kept in a Set in memory until the day ends; nothing of it is written,
+  so a restart starts the day's people over. At most 200 distinct sources a day, the rest fold into "other" (a Referer is anyone's
+  string). Deltas flush to the traffic table once a minute (TRAFFIC_FLUSH_MS in tests).
+- server/db.js: table traffic (day, page, source, views, people), trafficAdd (upsert of deltas) and trafficReport (from a day on);
+  in counts; never swept, never in an export (no person in it).
+- `node server/admin.js traffic [days]` prints each day's people and views, then by source and by page. On Fly:
+  fly ssh console -C "node server/admin.js traffic 14".
+- Tag every link we post: poddleball.com/?ref=hn, ?ref=reddit, ?ref=linkedin, ?ref=itch. Product Hunt's outbound link is
+  rel="noreferrer", so its visits read as "direct" until the listing's URL carries ?ref=producthunt (an edit on the PH page).
+- web/privacy.html: the summary and the meta descriptions say "no third-party analytics" and that page views are counted as daily
+  totals; section 2 gains the Page views row (what, why, the in-memory scrambled address); section 7 the retention line. CLAUDE.md's
+  data flows carry it. test/traffic.test.mjs (sources, pages, counting, deltas, a new day, the cap, no address in the table) is in
+  deploy.sh's gate.
+

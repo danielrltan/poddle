@@ -110,7 +110,9 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   fallback; email forwarding for hello@danielrltan.com), the mailbox provider, GitHub (Helper source, only on click), YouTube (the menu music's artist channel, only on click of the credit; the track itself, web/audio/into-the-blue.m4a, is served by us),
   Google (Sign in with Google: its script loads only after the player opens the sign-in card; its ID
   token carries email/name/picture, which the server discards, keeping only `sub`; Google sets its own cookies / FedCM
-  in its window). No analytics, no ads.
+  in its window). No ads, no third-party analytics. Page views (server/traffic.js, NOTES 219): per UTC day, page and source (?ref= tag, referring
+  host, direct, bot) two totals in the traffic table, views and people; "people" keys the network address with a per-day in-memory salt and
+  keeps the key in memory for the day only, never on disk. Adding a page kind or a new query field that reaches the count is a Privacy 2/7 change.
 - Poddle Helper (Mac, MIT, ~/poddle-helper): AirPod motion over localhost only; accepts poddleball.com,
   www.poddleball.com, poddle.fly.dev, localhost pages.
 
