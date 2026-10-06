@@ -4651,3 +4651,29 @@ people came from; the next posts (Show HN, Reddit, itch.io, the pickleball press
   new one like on the favicon").
 - Tests: emotebar-e2e: 3 s in the pops are 3.375 rem, solid, past halfway and bound for 70%; a 30-emote flood from the stands shows 24;
   they are gone in about 5.5 s.
+
+## 222. A bet's landing marker shows once, where the ball really lands: it no longer appears and then slides
+In two-player games the marker showed for a split second and then moved, and the receiver had already set off for the first spot.
+Every human swing is reported first on an early bet (web/motion.js) and the ball is struck on it at once (NOTES 64); the settled
+report follows ~80-120 ms later (200 at most) and re-aims it (reaim()). The server broadcast the bet's landing with the hit, then the
+re-aim's, and the client glided the marker between the two (NOTES 154). Replaying the recorded swings, 66 of 75 bets re-aim and the
+landing moves p50 0.7 m, p90 1.8 m, 2.8 m at most, mostly in depth; a settled smash also swoops sideways. Matt never bets, so his
+markers never moved: only an opponent's shots did, which is why it was seen in multiplayer.
+- server/game.js: a human's shot struck on a bet (and a serve struck on its first report, the "through" stroke, which was not
+  flagged a bet but was re-aimed all the same) launches with `quiet`: the hit goes out as ever, the ball leaves at once and flies
+  exactly as before, but its `launch` (the landing) is held. pl.hit.quiet is when no re-aim can come any more (FIX_WINDOW, or
+  PUSH.fix near the net). It is told ONCE: by the re-aim's own launch (reaim() clears the hold first; both its broadcasts carry
+  the landing), or by sayLand() when the settled report changed nothing, or in sim() when the fix gates close (the window ran out,
+  the ball passed the gate, someone else hit it). A ball that bounced first, or a dead one, tells nothing.
+- web/scene.js: a hit fades the marker it finds (the last shot's), so a volley's held landing pops fresh instead of gliding from a
+  stale one. Old tabs (a deploy only reconnects them) get the server side of it without this line.
+- What it costs: on a human's bet shot the receiver sees the marker ~80-120 ms later (250 ms when no settled report comes), at the
+  right spot, instead of a wrong one at once that slid there over the next 0.2 s. Matt's shots and settled swings show it with the
+  hit, as before.
+- Not changed: the ball itself still leaves on the bet's line and bends onto the settled one about 0.1 s in (the BEND window). Taking
+  that out means striking on the settled report, ~100 ms of input lag, which NOTES 64 turned down. Also left: a held block pushed
+  within PUSH.late (rare, not a bet) still glides its marker; a legacy client that sends no `final` is re-aimed on every report.
+- test/landhold.test.mjs (in deploy.sh's gate): a bettor and a settled swinger rally; every bet shot tells the receiver exactly one
+  landing, on the bounce, after the re-aim (smash, tap), the unchanged settled report (~80 ms) or the window's end (~250 ms) and
+  never before; a settled swing's comes with its hit.
+

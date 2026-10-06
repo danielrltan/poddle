@@ -1399,6 +1399,7 @@ export function createScene(containerEl) {
       cam.shake = Math.max(cam.shake, (0.06 + 0.17 * n) * sk);
       ball.kind = m.kind || 'drive'; ball.betN = m.bet ? shownN(n, ball.kind) : null; ball.betUntil = timeS + 0.3;
       const shown = shownN(m.bet ? Math.min(n, BET_SHOW) : n, ball.kind);      // ring, shake and pock stay on n (the stroke's force); the colour is the shot's
+      if (marker.visible && mk.fade === 0) mk.fade = 1e-4;      // the last shot's landing goes as the ball is struck again: a bet's own may come ~0.1 s later (NOTES 222), never glided from a stale one
       flashAt(p, 0.5 + n * 0.9); ball.pulse = 1; ball.power = ball.hot = shown;      // the trail takes this shot's colour at once, not eased up from the last one
       if (m.kind === 'smash') smashFx(p, m.side, m.spin, rs, sk);
       trail.glow = 0.8 + 0.2 * shown; ballTake(ball, m, stampOf);      // the ball record: spin, the blend onto the new path, this contact's arc, and the launch that rides on the hit

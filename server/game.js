@@ -388,7 +388,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     pl.tier = L && L.row ? L.tier : null; pl.div = pl.tier ? L.div : null; seatTier[pl.side] = pl.tier ? { tier: pl.tier, div: pl.div } : null;
   }
 
-  function launch(side, n, dir, lob, hit, slice, blk, curl = 0) {     // curl: only strike() passes 1 (see solve)
+  function launch(side, n, dir, lob, hit, slice, blk, curl = 0, quiet = false) {     // curl: only strike() passes 1 (see solve). quiet: a human's bet, its landing told later (sayLand)
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
     ball.p[1] = Math.max(ball.p[1], R);
     if (!started && pub) lobbyChanged();                          // the first strike turns a Matt court from Join to Ask to play in the list (sent on its timer, after this)
@@ -397,7 +397,14 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     stats.launched(match);                                        // every struck ball: the rally length, and the match's first strike (docs/ACCOUNTS.md 4.4)
     planFootwork(1 - side);
     if (hit) broadcast({ ...hit, p: ball.p, v: ball.v, spin: ball.spin, k: ball.kick, c: ball.curl || undefined, t: now });   // p + v: the hitter's screen bends the ball away on this very frame
-    broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, c: sol.curl });
+    if (!quiet) broadcast({ type: 'launch', by: side, land: sol.land, spin: sol.spin, c: sol.curl });
+  }
+  // A human's shot struck on the bet (or a serve on its first report) is still to be re-aimed by its settled report ~100 ms later, by up to 2.8 m
+  // (p50 0.7 m): its landing used to be shown at once and then slid, and the receiver ran to the first one (NOTES 222). The ball leaves at once
+  // as ever (NOTES 64); only the marker waits: the re-aim's launch tells it, or this one, once the settled report changed nothing or no re-aim can come.
+  function sayLand(pl) {
+    const h = pl && pl.hit; if (!h || !h.quiet) return; h.quiet = 0;
+    if (ball.live && ball.lastHit === pl.side && !ball.bounces) broadcast({ type: 'launch', by: pl.side, land: ball.land, spin: ball.spin, c: ball.curl });
   }
 
   // A corrected power arrived just after the hit (the settled report of a swing struck on its bet, a block's push, a serve's settled
@@ -417,6 +424,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // mid-flight was a step). A ball struck curling keeps its curl from contact.
   // -> true when it flew the settled `kind` (announced it): the callers keep pl.hit.kind true to the ball, which stats counts smashes from
   function reaim(side, n, dir, lob, slice, kind, blk, curl = 0) {
+    const hp = bySide(side); if (hp && hp.hit) hp.hit.quiet = 0;   // both of its launches tell the landing: the held one never goes out
     const sol = solve(ball.p, side, n, dir, lob, slice, blk, curl);
     if (kind && (kind === 'lob' || kind === 'dink') !== ball.lofted) kind = undefined;   // the arc was chosen at contact: a flat ball is never announced as a lob (a white trail on a drive), a lofted one never as a drive or a smash
     const x = ball.p[0], y = Math.max(ball.p[1], R), pz = ball.p[2], [vx, vy, vz] = ball.v, g = ball.bounces ? G : gOf(ball.spin), c0 = ball.bounces ? 0 : ball.curl, ws = ball.bend || [];
@@ -535,8 +543,9 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     // a block may be corrected too now (its own window: see fixBlock). floor: a serve's correction keeps the serve floor
     pl.swing = null; pl.hit = { at: now, n: sw.n, dir: sw.dir, lob: sw.lob, slice: sw.slice || 0, floor: sw.floor || 0, kind, blk: push ? { w, spd } : null, near: w, spd, held: !!sw.held };
     pl.lunge = { z: pl.z + clamp(ball.p[2] + sgn(pl.side) * CONTACT - pl.z, -0.45, 0.45), until: now + 0.15 };   // a small step into the ball, never a jump
+    pl.hit.quiet = !pl.bot && (bet || sw.quiet) ? now + (w > 0 ? PUSH.fix : FIX_WINDOW) : 0;   // until when its settled report may still move the landing (sayLand)
     if (!pl.bot && stats.contact(match, pl, sw)) pl.hit.statted = true;   // a human contact; a SETTLED real swing may set a hit/speed best (docs/ACCOUNTS.md 4.5)
-    launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind, bet: bet ? 1 : undefined }, sw.slice, blk, sw.floor || bet ? 0 : 1);      // bet: the client shows it cool until the settled swing (or its absence) says what it was
+    launch(pl.side, n, sw.dir, sw.lob, { type: 'hit', side: pl.side, n, kind, bet: bet ? 1 : undefined }, sw.slice, blk, sw.floor || bet ? 0 : 1, !!pl.hit.quiet);      // bet: the client shows it cool until the settled swing (or its absence) says what it was
   }
   // The settled report for a shot that was struck on the near-net curve: put it where that power belongs on the same curve.
   function fixBlock(pl, n, dir, lob, slice) {
@@ -1009,7 +1018,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }                                                              // else: held until c.at in case it was a wind-up (step() strikes with it when nothing better came)
   function serveSwing(me, fix, power, sw, final, through) {
     const pend = me.servePending, own = fix && pend && pend.of === me.swAt;     // own: this corrects the very swing that is being held
-    if (through && power >= SERVE_POWER && !own) { me.swSaid = me.swAt; broadcast({ type: 'swung', side: me.side }); sw.power = power; serveStrike(me, { sw }); if (ball.serving == null) return; }   // came back through the ball: that is the stroke, struck on its first report (the settled one re-aims it, like any hit)
+    if (through && power >= SERVE_POWER && !own) { me.swSaid = me.swAt; broadcast({ type: 'swung', side: me.side }); sw.power = power; serveStrike(me, { sw: { ...sw, quiet: !final } }); if (ball.serving == null) return; }   // came back through the ball: that is the stroke, struck on its first report (the settled one re-aims it, like any hit)
     if (power < SERVE_POWER) { if (own) me.servePending = pend.after; return; }   // a twitch, a flick, a quick step: nothing happens at all (and a held swing that settles as one is dropped: the bet said 30, the hand did 8)
     if (me.swSaid !== me.swAt) { me.swSaid = me.swAt; broadcast({ type: 'swung', side: me.side }); }   // animates at once, held or not; once per swing
     sw.power = power;
@@ -1069,6 +1078,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
           Object.assign(me.hit, { n: pw, dir, lob, slice, kind }); if (!reaim(me.side, pw, dir, lob, slice, changed ? kind : undefined, undefined, me.hit.floor ? 0 : 1) && changed) me.hit.kind = was;   // struck a moment ago on the early guess: bend it onto the real shot while it is still on my side. Only the SETTLED report does: the ones in between bent it two and three times (NOTES 63)
           ran = true;
         }
+        if (final && !me.swing) sayLand(me);                     // settled and it changed nothing: the landing it has is the one
         if (sure && !me.swing && stats.fixRecords(me.hit, betN, pw, ran, now, Math.max(FIX_WINDOW, PUSH.fix))) { swingStat(me, pw, pk, src); me.hit.statted = true; }   // a settled report that speaks for the contact (docs/ACCOUNTS.md 4.5)
         return;
       }
@@ -1168,6 +1178,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       ball.rest = DT - h; if (ball.rest > 0) ball.p[1] = R;
       if (ball.bend && !(ball.bend = ball.bend.filter(w => now < w.t0 + w.W - 1e-9)).length) ball.bend = null;   // a bend that has all its velocity is in v now: straight on from here
       remember();
+      for (const pl of players) { const h = pl.hit; if (h && h.quiet && (now >= h.quiet - 1e-9 || ball.lastHit !== pl.side || ball.p[2] * sgn(pl.side) <= (h.near > 0 ? PUSH.gate : 1))) sayLand(pl); }   // no re-aim can come now (the fix gates): tell the landing
     }
 
     // Close to the net you don't need a swing: hold the paddle in the ball's path and it pops back as a soft dink.

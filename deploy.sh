@@ -9,7 +9,7 @@
 set -e
 cd "$(dirname "$0")"
 if [ "$1" != "--now" ]; then
-  for t in revive.test.mjs rooms.test.mjs seo.test.mjs accounts-unit.test.mjs stats.test.mjs auth.test.mjs ladder.test.mjs trophies.test.mjs motion-check.test.mjs traffic.test.mjs; do printf "%-22s " "$t"; node "test/$t" 2>&1 | tail -1 | grep -E "PASS" || { echo "FAILED: not deploying"; exit 1; }; done
+  for t in revive.test.mjs rooms.test.mjs seo.test.mjs accounts-unit.test.mjs stats.test.mjs auth.test.mjs ladder.test.mjs trophies.test.mjs motion-check.test.mjs traffic.test.mjs landhold.test.mjs; do printf "%-22s " "$t"; node "test/$t" 2>&1 | tail -1 | grep -E "PASS" || { echo "FAILED: not deploying"; exit 1; }; done
 fi
 echo "online right now: $(curl -sf -m 5 https://poddleball.com/status.json | grep "^{" || echo unknown)"
 fly deploy --ha=false 2>&1 | grep -E "Visit|rror|✖" || true
