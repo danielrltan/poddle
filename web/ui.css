@@ -2304,3 +2304,5 @@ body[data-settings="menu"]::after{opacity:1;visibility:visible;transition-delay:
 }
 @media (max-width:480px){ .tut-card{padding:var(--s-5) var(--s-4) var(--s-4)} .tut-shots,.tut-keys{grid-template-columns:1fr} .tut-page{min-height:0} .tut-title{font-size:var(--t-lg)} }
 .tut-next.is-last::before{opacity:.3}
+
+.logo-mark [data-l]::before{content:attr(data-l)}      /* NOTES 225: the logo's letters are drawn, so the heading reads "Poddle" (its .vh text) to search engines and screen readers, not "P o d dle" */

@@ -119,3 +119,5 @@ kbd{display:inline-block;min-width:1.625rem;padding:0 .4375rem;border-radius:.43
 .data-btns{display:inline-flex;flex-wrap:wrap;gap:.75rem;margin-top:.75rem} .data-confirm{font-weight:700} .data-confirm .data-btns{display:flex;margin-top:.625rem}
 .data-tools > .data-btns{margin-top:.75rem}      /* p.data-btns: beats .data-tools p */
 .data-status{font-weight:700;color:var(--ink-strong)} .data-status:empty{display:none}
+
+.logo-mark [data-l]::before{content:attr(data-l)}      /* NOTES 225: the logo's letters are drawn, so the heading reads "Poddle" (its .vh text) to search engines and screen readers, not "P o d dle" */

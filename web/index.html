@@ -32,8 +32,19 @@
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://poddleball.com/#website",
+  "name": "Poddle",
+  "alternateName": ["poddleball", "poddleball.com"],
+  "url": "https://poddleball.com/"
+}
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -320,7 +331,7 @@
   <button class="btn btn-icon menu-set title-set" id="btn-title-set" aria-label="Settings" aria-expanded="false" aria-controls="settings" data-sfx="none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg></button>
   <div class="menu-body" style="gap:var(--s-6)">
     <div class="logo" data-fit>
-      <h1 class="logo-mark"><span class="lg-a">P</span><span class="logo-ball"><span class="vh">o</span></span><span class="lg-a">d</span><span class="lg-b">dle</span></h1>
+      <h1 class="logo-mark"><span class="lg-a" data-l="P" aria-hidden="true"></span><span class="logo-ball" aria-hidden="true"></span><span class="lg-a" data-l="d" aria-hidden="true"></span><span class="lg-b" data-l="dle" aria-hidden="true"></span><span class="vh">Poddle</span></h1>      <!-- the letters are drawn by CSS (data-l): the heading's text is "Poddle", not "P o d dle" (NOTES 225) -->
       <p class="logo-tag">Phone pickleball</p>
     </div>
     <div class="title-prompt" data-fit>

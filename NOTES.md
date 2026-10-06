@@ -4695,3 +4695,17 @@ parent first."). Now (web/index.html, web/ui.css):
 - The owner (2026-10-06): "the emojis are a bit too wide in their spread; i'd decrease it by half so that they are closer to the right side
   of the screen and are less intrusive". ui.js emote(): a pop's random offset from the right is 0-4.5 rem (was 0-9, NOTES 221). Size, life,
   rise and the cap of 24 are unchanged.
+
+## 225. Search results name the site Poddle, not "P o d dle", and get an icon size Google takes
+- The owner (2026-10-06): "the website title for poddle is messed up; it contains unnecessary spaces between the text Poddle" and "the
+  thumbnail seems to be gone / broken". The page's <title> and og tags were clean; what was not: the home's only h1 when JavaScript runs is the
+  logo, and its rendered text was "P\no\nd\ndle" (each letter a flex item, the o a ball with a hidden "o"). A crawler that renders the page
+  reads that as "P o d dle", and with no WebSite structured data Google builds the site name from the page. The subpages' logo links had the
+  same split letters beside their hidden "Poddle".
+- Now the letters are drawn by CSS (`data-l` + `.logo-mark [data-l]::before{content:attr(data-l)}`, ui.css and how-to-play.css), aria-hidden,
+  and each logo's text is one .vh "Poddle" (the home's goes last, so the letters' nth-child pop-in delays are unchanged). Rendered: the home h1
+  and every subpage logo read "Poddle". Same look (screenshots compared with live).
+- index.html gains a second JSON-LD block, `WebSite` (name Poddle, alternateName poddleball / poddleball.com, url): Google's documented source
+  for the site name. And `icon-192.png` as a 192x192 icon: Google's result icon wants a multiple of 48 px; the page offered only the SVG and
+  a 32 px PNG. Both show only after Google recrawls (Search Console > URL inspection > Request indexing speeds it up).
+- test/seo.test.mjs: two JSON-LD blocks (the site, the game), the WebSite one checked; the icon list includes /icon-192.png.
