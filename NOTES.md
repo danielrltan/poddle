@@ -4690,3 +4690,8 @@ parent first."). Now (web/index.html, web/ui.css):
 - the words: "first" is gone from "Ask a parent first."; "By playing you agree to the Terms and Privacy Policy." stays word for
   word (test/seo.test.mjs pins it, CLAUDE.md "Legal pages"), and so does the age line (web/terms.html section 2). pad.html's own
   line is unchanged.
+
+## 224. The stands' emotes stream closer to the right edge
+- The owner (2026-10-06): "the emojis are a bit too wide in their spread; i'd decrease it by half so that they are closer to the right side
+  of the screen and are less intrusive". ui.js emote(): a pop's random offset from the right is 0-4.5 rem (was 0-9, NOTES 221). Size, life,
+  rise and the cap of 24 are unchanged.

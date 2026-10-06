@@ -741,14 +741,14 @@ export function sendEmote(i) {
 }
 // one reaction arriving. A player's (tab = 'me' | 'them': the scoreboard tab it belongs to) is a speech bubble out of that tab, in the
 // empty space beside the scoreboard (NOTES 208). A spectator's, or any while the scoreboard is hidden (a result panel), streams up from just
-// above the bar on the right (NOTES 221): big, about 4.5 s, to 70% of the way up the layer before it fades. EMOTE_POPS on screen at most
+// above the bar on the right (NOTES 221, spread over 4.5 rem since NOTES 224): big, about 4.5 s, to 70% of the way up the layer before it fades. EMOTE_POPS on screen at most
 const EMOTE_POPS = 24;
 export function emote(i, name, tab = null) {
   const layer = $('emote-layer'); if (!layer || !EMOTES[i]) return;
   if (tab && bubble(layer, i, tab)) return;
   { const pops = layer.querySelectorAll('.emote-pop'); for (let k = 0; k <= pops.length - EMOTE_POPS; k++) pops[k].remove(); }      // the oldest pops go first; a player's bubble is never the one evicted (the stands have no cooldown, NOTES 213)
   const el = document.createElement('div'), body = document.createElement('i'), dur = 4.2 + Math.random() * .8; el.className = 'emote-pop';
-  el.style.setProperty('--x', `${(Math.random() * 9).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.35 + Math.random() * .6)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
+  el.style.setProperty('--x', `${(Math.random() * 4.5).toFixed(2)}rem`); el.style.setProperty('--sway', `${((Math.random() < .5 ? -1 : 1) * (.35 + Math.random() * .6)).toFixed(2)}rem`); el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
   body.append(emoteImg(i)); if (name) { const n = document.createElement('span'); n.textContent = name; body.append(n); }      // names: textContent only
   el.append(body); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), dur * 1000 + 500); layer.append(el);
   const lh = layer.clientHeight, from = lh - el.offsetTop - el.offsetHeight;      // the rise, from the layer itself (on a phone's result panel it is only the court's top part): its top reaches 70% of the way up
