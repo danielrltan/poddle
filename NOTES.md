@@ -4570,3 +4570,28 @@ what a local copy without accounts gets. profile-ui and social-ui pass as before
 - web/cursor.js: a third svg (.cur-fx: halo + ring, under the hands) and the is-hit replay on pointerdown; cursor.css: the rules.
   test/cursor-e2e.mjs checks the 1.16 lift, the halo up and the wave running, the .8 jab with the ripple out, the .9 lighter jab
   (27 checks, all pass).
+
+## 218. Search can find the game: the home title names it, the landing pages say what people type, and every page links the three
+Two weeks after launch Google had one URL of poddleball.com indexed (the home) and its <title> was the one word Poddle; the three
+search landing pages (NOTES 210) were not indexed and the home linked them only inside <noscript>, which the renderer drops. A
+seven-lens audit (crawl, on-page, schema, performance, visibility, keywords, off-page; 50 findings, 23 confirmed) found the cause
+in four places, all here:
+- web/index.html <title> is "Poddle: pickleball you play with your phone" (what og:title already said and what Google was showing
+  anyway). The tab still reads just Poddle (NOTES 96): main.js sets document.title at the first pointerdown, keydown or touchstart,
+  once; a crawler renders the page and never touches it. JSON-LD alternateName lists "Poddle pickleball" and "poddleball".
+- The title screen's footer links the three pages beside How to play (Pickleball in your browser, Your phone as the controller,
+  What you need), and the lobby footer (desktop lobby and the phone home, which is what Google's smartphone render sees) carries the
+  same three before the legal line. ui.css: under 700px the lobby footer wraps and the row sits on its own line.
+- The landing pages are retitled to the phrases people search, with og/twitter and the h1 to match: pickleball-browser-game.html
+  "Pickleball game online: free multiplayer pickleball in your browser" (the h2 Play people online is Online multiplayer; the
+  lead says online multiplayer); phone-paddle.html "Use your phone as a motion controller: a pickleball game you swing" (h1 Your
+  phone is the controller); pickleball-no-download.html "Pickleball game for PC, Mac and Chromebook: nothing to install" (the
+  computer section is headed by the platforms; no download is not a phrase anyone types, the platforms are). File names, canonicals,
+  the MOVED 301s and the sitemap are unchanged; the sitemap lastmods are today.
+- test/seo.test.mjs: the home title must start with "Poddle:" and say pickleball and phone; the landing links must be in the home
+  outside <noscript>.
+Not done, by the owner's own rules: no "Wii Sports" anywhere on the site (the landing-page voice check bans other games' names), so
+the Wii-Sports-style page the audit suggested is not written; an AirPods motion page is still open. The rest of the audit is off-site:
+Search Console (the domain is DNS-verified) needs Request indexing on the five content URLs, and the first real links (Show HN,
+Reddit, itch.io, the pickleball press) are the only thing that moves non-brand queries.
+

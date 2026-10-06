@@ -491,7 +491,9 @@ function refreshStatus() {
 
 scene.setSelfBody(showBody); show('podwrap', showPod); ui.setCamView?.(showCam); show('dev', showStats); ui.setMode(MODE_NAME[mode]); syncSettings();      // what was chosen last time (poddle.settings)
 if (LOBBY && qs.get('room')) setUrl(wantRoom.length === 4 ? wantRoom : null, wantWatch);      // an old ?room= link: same court, the address bar now says ?court=
-if (!LOBBY) { phase = 'connect'; screen('connect'); setTimeout(begin); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
+if (!LOBBY) { phase = 'connect'; screen('connect'); setTimeout(begin); } else { ui.titleRoom(wantRoom.length === 4 ? wantRoom : '', wantWatch); screen('title'); scene.startAttract(); }
+// The tab reads just Poddle (NOTES 96) from the first touch or key on; until then the <title> says what the game is, for the crawler that renders this page and never touches it (NOTES 218)
+for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => { document.title = 'Poddle'; }, { once: true, capture: true, passive: true });      // the menu's own endless rally, client-side only (docs/NEXT.md 11)
 refreshStatus(); setInterval(refreshStatus, 250);
 
 // ---------- sockets (auto-reconnect) ----------

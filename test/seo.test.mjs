@@ -57,7 +57,7 @@ try {
   console.log('home page head');
   const home = (await req('/')).body.toString(), attr = (tag, k, v, want = 'content') => { const m = [...home.matchAll(new RegExp(`<${tag}\\b[^>]*\\b${k}="${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`, 'g'))]; return m.map(x => (x[0].match(new RegExp(`\\b${want}="([^"]*)"`)) || [])[1]); };
   const one = (tag, k, v, want) => { const a = attr(tag, k, v, want); return a.length === 1 ? a[0] : null; };
-  { const titles = [...home.matchAll(/<title>([^<]*)<\/title>/g)].map(m => m[1]); ok(titles.length === 1 && titles[0] === 'Poddle', `one <title>, just the name (the owner's call): ${titles[0]}`);
+  { const titles = [...home.matchAll(/<title>([^<]*)<\/title>/g)].map(m => m[1]); ok(titles.length === 1 && /^Poddle: .*pickleball.*phone/.test(titles[0]), `one <title>, the name and what it is (NOTES 218; the tab shows just Poddle once the player touches anything): ${titles[0]}`);
     const d = one('meta', 'name', 'description'); ok(d && d.length >= 70 && d.length <= 160 && /phone/.test(d) && /any computer/i.test(d) && /friends/.test(d), `one meta description, ${d && d.length} chars (70 to 160), says phone, any computer and friends`);
     ok(one('link', 'rel', 'canonical', 'href') === ORIGIN + '/', `one canonical: ${attr('link', 'rel', 'canonical', 'href')}`);
     const robots = one('meta', 'name', 'robots'); ok(robots && /\bindex\b/.test(robots) && !/noindex/.test(robots), `meta robots: ${robots}`);
@@ -155,7 +155,7 @@ try {
     ok(!/[–—…!]|\.\.\.|\b(Wii|Nintendo|simply|seamless|effortless)\b/i.test(seen) && !/AirPod!/.test(t), 'voice: no exclamation mark, long dash, ellipsis, filler or other games\' names');
     for (const m of new Set([...t.matchAll(/(?:href|src)="(\/[^"#?]*)/g)].map(m => m[1]))) { if (m === '/') continue; const x = await req(m, { method: 'HEAD' }); if (x.status !== 200) ok(false, `/${f}.html links ${m}: ${x.status}`); }
     const mv = await req('/' + f); ok(mv.status === 301 && mv.h.location === `/${f}.html`, `/${f}: ${mv.status} -> ${mv.h.location}`);
-    const htp = (await req('/how-to-play.html')).body.toString(); ok(htp.includes(`href="/${f}.html"`) && home.includes(`href="/${f}.html"`), 'How to play and the no-JavaScript home link it'); }
+    const htp = (await req('/how-to-play.html')).body.toString(); ok(htp.includes(`href="/${f}.html"`) && home.replace(/<noscript>[\s\S]*?<\/noscript>/g, '').includes(`href="/${f}.html"`), 'How to play and the rendered home (not only its noscript) link it'); }
 
   console.log('help page');
   if (!has('how-to-play.html')) pending('how-to-play.html is not yet written'); else { const t = (await req('/how-to-play.html')).body.toString();
