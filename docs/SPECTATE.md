@@ -84,10 +84,13 @@ and "Waiting for a rematch" and are carried into the next match or back to the l
 - Names are rendered with textContent only, never innerHTML.
 
 ## Seat status (shown on the character)
-`state.paddles[n].status` is `'calibrating' | 'paused' | 'away' | null`. `calibrating`: no `paddle` received yet from that
+`state.paddles[n].status` is `'calibrating' | 'paused' | 'away' | 'afk' | null`. `calibrating`: no `paddle` received yet from that
 seat, or the client sent `{type:'status', cal:true}` (cleared by `cal:false` or the next `paddle` after it). The next serve
 waits while any human is calibrating. `paused`: the seat that paused the room. `away`: the seat being held for a reconnect.
-Clients white out that character and float a tag over it: Paused / Calibrating / Reconnecting, each with an icon.
+`afk` (NOTES 220): the player's tab is hidden or its window lost focus (`{type:'status', away}`, booleans only); the rally plays on
+and nothing waits for it. Where a pause is allowed (one human, not a tournament match) `away:true` pauses the room instead (`paused`, by that
+seat) and `away:false` resumes it, unless a card's pause was already on. Order: away > paused > afk > calibrating.
+Clients white out that character and float a tag over it: Paused / Calibrating / Reconnecting / Away, each with an icon.
 
 ## As built (the integrator's notes; where the code and the text above differ, this is what runs)
 - `matchover` also carries `names` (as they were at the end: a forfeit has emptied a seat by then). A `rematch` message follows

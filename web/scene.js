@@ -806,9 +806,9 @@ export function createScene(containerEl) {
   const vic = { side: -1, t: 0, cx: 0, cz: 0, hopAt: 0, pane: { fw: 0.6, fh: 1, px: -0.4, py: 0 } };
   const vicOn = () => vic.side >= 0 && !menu && !at.on;
   const casters = []; for (const pd of pads) for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.castShadow) casters.push(m); });
-  // ---------- seat status (docs/NEXT.md 14a): calibrating / paused / away. The character and its paddle go pale and see-through, a tag floats over the head ----------
+  // ---------- seat status (docs/NEXT.md 14a): calibrating / paused / away (reconnecting) / afk (their tab is out, NOTES 220). The character and its paddle go pale and see-through, a tag floats over the head ----------
   // One tween value per pad (pd.ghost, 0.25 s each way) drives the SAME materials toward white: nothing is swapped, nothing is allocated per frame.
-  const WHITE = new THREE.Color(0xffffff), GLOW_GHOST = new THREE.Color(0.3, 0.3, 0.3), TAG_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' }, tagTex = {};
+  const WHITE = new THREE.Color(0xffffff), GLOW_GHOST = new THREE.Color(0.3, 0.3, 0.3), TAG_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting', afk: 'Away' }, tagTex = {};
   for (const pd of pads) { const seen = new Set(); for (const o of [pd.group, pd.avatar, pd.hand]) o.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (!seen.has(mt)) { seen.add(mt); pd.mats.push(mt); } }); rebase(pd); }      // (the paddle's face is a mesh with several materials)
   function rebase(pd) { for (const m of pd.mats) { const b = m.userData.base; m.userData.base = { c: (b ? b.c : new THREE.Color()).copy(m.color), o: b ? b.o : m.opacity, t: b ? b.t : m.transparent, e: b ? b.e : m.emissive ? m.emissive.clone() : null }; } }   // the colours to come back to, taken once at build (paint() updates the ones it sets). e: the emissive, taken once (paint never changes it)
   function ghostify(pd) {
@@ -834,6 +834,7 @@ export function createScene(containerEl) {
       g.beginPath(); g.roundRect(x0, 12, w, H - 24, r); g.fillStyle = 'rgba(255,255,255,.96)'; g.fill(); g.lineWidth = 6; g.strokeStyle = '#34beed'; g.stroke();
       const ix = x0 + 78, iy = H / 2; g.strokeStyle = g.fillStyle = '#1c8fd0'; g.lineWidth = 11; g.lineCap = 'round';
       if (status === 'paused') { g.beginPath(); g.roundRect(ix - 26, iy - 32, 19, 64, 7); g.roundRect(ix + 7, iy - 32, 19, 64, 7); g.fill(); }
+      else if (status === 'afk') { g.beginPath(); g.arc(ix, iy, 32, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(ix + 15, iy - 12, 27, 0, 7); g.fill(); }      // a crescent moon: the white bite is the pill's own white
       else if (status === 'calibrating') { g.beginPath(); g.arc(ix, iy, 30, 0, 7); g.stroke(); g.beginPath(); g.arc(ix, iy, 9, 0, 7); g.fill(); g.beginPath(); for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { g.moveTo(ix + dx * 30, iy + dy * 30); g.lineTo(ix + dx * 42, iy + dy * 42); } g.stroke(); }
       else { for (const rr of [50, 31]) { g.beginPath(); g.arc(ix, iy + 28, rr, -Math.PI * 0.76, -Math.PI * 0.24); g.stroke(); } g.beginPath(); g.arc(ix, iy + 24, 9, 0, 7); g.fill(); }      // a wifi mark
       g.fillStyle = '#39434d'; g.textBaseline = 'middle'; g.fillText(word, x0 + 140, H / 2 + 5); tex.needsUpdate = true;

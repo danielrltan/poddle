@@ -721,8 +721,16 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   function pause(me, on) {
     if (typeof on !== 'boolean') return;
     if (on && (humans().length !== 1 || MATCH)) return send(me, { type: 'paused', on: false, refused: true });   // an online game cannot pause, nor a tournament match (even against Matt)
-    if (on === !!paused) return send(me, { type: 'paused', on, by: paused ? paused.by : me.side });     // already so: just the answer
+    if (on === !!paused) { if (on && paused.afk) paused.afk = false; return send(me, { type: 'paused', on, by: paused ? paused.by : me.side }); }     // already so: just the answer. A card opened over a tab-out pause keeps it when they come back
     if (on) { paused = { by: me.side, until: Date.now() + PAUSE_S * 1000 }; broadcast({ type: 'paused', on: true, by: me.side }); } else resume();
+  }
+  // Away (NOTES 220): the player's tab is hidden or the window lost focus ({type:'status', away}). Where a pause is allowed (one human, not a
+  // tournament match) that IS a pause, and coming back ends it unless a card had paused it already. Elsewhere the seat only shows 'afk'
+  // (Away) to the others: the rally plays on, nothing waits for them, it is not calibrating
+  function setAway(me, on) {
+    if (!!me.afk === on) return; me.afk = on;
+    if (on && !paused && humans().length === 1 && !MATCH) { paused = { by: me.side, until: Date.now() + PAUSE_S * 1000, afk: true }; broadcast({ type: 'paused', on: true, by: me.side }); }
+    else if (!on && paused && paused.afk && paused.by === me.side) resume();
   }
 
   function point(winner, why) {
@@ -784,8 +792,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   const humans = () => players.filter(p => !p.bot);
   const theBot = () => players.find(p => p.bot);
   const ready = p => p.bot || p.ready && !p.cal || !AUTOBOT;    // a client sends no 'paddle' until it is calibrated (and says so when it calibrates again, 'status'): until then that player cannot see the court, so no point is played (test clients may never send one)
-  // What the others see on that character (docs/SPECTATE.md Seat status): away = the seat is held for a reconnect, paused = this seat stopped the room, calibrating. Matt never has one.
-  const statusOf = p => p.bot ? null : hold && hold.side === p.side ? 'away' : paused && paused.by === p.side ? 'paused' : !ready(p) ? 'calibrating' : null;
+  // What the others see on that character (docs/SPECTATE.md Seat status): away = the seat is held for a reconnect, paused = this seat stopped the room, afk = its tab is hidden or unfocused (NOTES 220), calibrating. Matt never has one.
+  const statusOf = p => p.bot ? null : hold && hold.side === p.side ? 'away' : paused && paused.by === p.side ? 'paused' : p.afk ? 'afk' : !ready(p) ? 'calibrating' : null;
   const botInfo = () => ({ type: 'botinfo', active: !!theBot(), level: botLevel, name: BOTS[botLevel].name, levels: BOTS.map(b => b.name), order: BOT_ORDER, counted: levelMoved() ? BOT_ORDER[match.rank] : undefined });   // levels in index order (the wire value), order = how pickers list them. counted: the (easiest) level this match is recorded at, once the level moved after the first strike (docs/ACCOUNTS.md 4.6)
   const levelMoved = () => !!(theBot() && match && !match.done && match.t0 && match.levelChanged && Number.isInteger(match.rank));   // the level changed mid-match (the court then says what the match counts as, and that holding B restarts it: NOTES 202, 206)
 
@@ -1016,7 +1024,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (m.type === 'rematch') return vote(me, m.yes);
     if (m.type === 'name') { if (!me.reg) me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel. A registered seat keeps its username
     if (m.type === 'bot') return botRequest(me, m.level, m.restart === true);
-    if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. Booleans only
+    if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; if (typeof m.away === 'boolean') setAway(me, m.away); return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. away: the tab is hidden / unfocused (NOTES 220). Booleans only
     if (m.type === 'emote') return emote(me.ws, m.e, me);        // before the pause gate too: a GG over the result panel or a paused court
     if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
     if (paused || hold) return;                                  // room time stands still: no paddle, no swing
@@ -1094,7 +1102,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (!frozen) { now += DT; if (players.length) sim(); }       // an empty room costs nothing while it waits to be joined or closed
     if (!players.length) return;
     const paddles = [null, null];
-    for (const pl of players) paddles[pl.side] = { x: pl.x, y: pl.y, z: pl.z, q: pl.q, bot: pl.bot, wait: ready(pl) ? undefined : true, status: statusOf(pl) || undefined };   // wait: still calibrating. status: 'calibrating' | 'paused' | 'away' (both only sent while set)
+    for (const pl of players) paddles[pl.side] = { x: pl.x, y: pl.y, z: pl.z, q: pl.q, bot: pl.bot, wait: ready(pl) ? undefined : true, status: statusOf(pl) || undefined };   // wait: still calibrating. status: 'calibrating' | 'paused' | 'away' | 'afk' (both only sent while set)
     const srv = ball.live && ball.serving != null && bySide(ball.serving);
     const packet = JSON.stringify({ type: 'state', t: now, p: ball.p, v: ball.v, spin: ball.spin, b: ball.bounces, k: ball.kick, c: ball.curl && !ball.bounces ? ball.curl : undefined, w: ball.live ? bendW() : undefined, live: ball.live, serving: ball.serving, reach: srv ? serveReach(srv) : false, score, paddles,
       watchers: spectators.size, paused: frozen || undefined });   // reach: the server could serve it right now. paused (only sent while true): t stands still, by a pause or a held seat; late joiners see it too

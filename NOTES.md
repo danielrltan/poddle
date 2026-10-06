@@ -4616,3 +4616,38 @@ people came from; the next posts (Show HN, Reddit, itch.io, the pickleball press
   data flows carry it. test/traffic.test.mjs (sources, pages, counting, deltas, a new day, the cap, no address in the table) is in
   deploy.sh's gate.
 
+## 220. Away: a player who leaves the game tab shows Away; against Matt it is a pause
+- The owner (2026-10-05): "an 'away' character status if a player tabs out or unfocuses from a game tab. if they're in a bot match, it
+  just registers that as 'paused'".
+- Client (main.js): away = the tab is hidden, or the window lost focus for 0.4 s or more (so a click into devtools or a prompt that comes
+  straight back says nothing). A seated player (never a spectator) sends `{type:'status', away}` when it changes, and again after every
+  welcome (reconnect, revive, promoted from the stands). The page sends only that boolean, never what else is open. The state from the
+  events is used, not hasFocus() at load: a page opened behind another window is not away until it is left.
+- Server (game.js setAway): stored on the seat (`afk`). Where a pause is allowed (one human: Matt or nobody opposite, and not a tournament
+  match) away IS a pause (`paused`, by that seat, flagged afk); coming back resumes it. A pause a card made is kept: away and back over an
+  open card, or a card opened over an away pause (the flag drops), stays paused. PAUSE_S (10 min) still ends it. Elsewhere the seat shows
+  `status: 'afk'` (order: away/reconnecting > paused > afk > calibrating); the rally plays on and nothing waits (not ready(), not CAL_S).
+- What the others see: the character whited out like the other statuses, a tag "Away" with a crescent moon over the head (scene.js), and
+  "Away" under the name on the scoreboard (STATUS_WORD). Against Matt the spectators see Paused, as before.
+- main.js's heal (a frozen room with no card open sends pause off) waits while away: it ran on every state packet, which keep arriving in a
+  hidden tab, and would have undone the pause within a second.
+- Edge cases: guest or signed in, same; reload while hidden: the new seat says away on its welcome; sign-out mid-match does not touch it;
+  a tournament match against Matt cannot pause, so Away shows; a second human joining an away-paused court resumes it (an online game
+  cannot pause) and Away shows; the phone paddle keeps streaming while the computer tab is hidden and does not clear it.
+- Legal: privacy.html (game information + what others see on a court) and CLAUDE.md's data flows name it. docs/SPECTATE.md Seat status.
+- Tests: test/away.test.mjs (server: pause vs Matt, card pauses kept, afk between two humans, booleans only), test/away-e2e.mjs (Chromes:
+  hidden tab and blur for the opponent and the stands, a quick blur says nothing, against Matt paused and no heal while hidden).
+
+## 221. The stands' emotes stream: bigger, longer, higher, 24 at once; the scoreboard's serve ball is the favicon's
+- The owner (2026-10-05): "make sure spectators can see player's emotes, and make spectator emotes like 50% bigger, along with a longer
+  life time, they should reach to like 70% way of the screen length before fading away ... allow for a bit more emojis to stream up".
+- Spectators already saw a player's emote in every view (broadcast, split, both POVs, free) and on a phone: the speech bubble out of
+  that player's scoreboard tab (NOTES 208). test/emotebar-e2e.mjs now checks it in every view.
+- The corner pops (a spectator's, or anyone's while the scoreboard is hidden): 3.375 rem (was 2.25; GG 2.25 rem with a thicker stroke),
+  4.2-5 s (was 1.8-2.2), spread over 9 rem (was 6). ui.js sets `--rise` from the layer's own height, so the pop's top reaches 70% of the
+  way up the layer (on a phone's result panel the layer is only the court's part) and stays solid until 80% of its time, then fades.
+  The cap is 24 pops (was 5); a player's bubble still never counts or gets evicted. Reduced motion: a fade over the same time.
+- The serve ball on the scoreboard tab was the old CSS drawing (five dots in a gradient); it is web/favicon.svg now (the owner: "use the
+  new one like on the favicon").
+- Tests: emotebar-e2e: 3 s in the pops are 3.375 rem, solid, past halfway and bound for 70%; a 30-emote flood from the stands shows 24;
+  they are gone in about 5.5 s.

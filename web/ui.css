@@ -208,8 +208,7 @@ body.has-toast .keyhints,body.has-toast .views{transition-duration:140ms}       
 
 /* serve indicator: a little pickleball that bobs beside the server's score */
 .serve-ind{flex:none;width:1.125rem;height:1.125rem;border-radius:50%;visibility:hidden;
-  background:radial-gradient(circle at 32% 34%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 66% 30%, var(--ball-deep) 0 11%, transparent 12%), radial-gradient(circle at 50% 62%, var(--ball-deep) 0 11%, transparent 12%),
-    radial-gradient(circle at 24% 66%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 76% 64%, var(--ball-deep) 0 9%, transparent 10%), radial-gradient(circle at 35% 30%, #fbffd6, var(--ball) 60%, #ffe01a);
+  background:url(favicon.svg) center / 100% 100% no-repeat;      /* the favicon's ball (NOTES 221), not the old five-dot gradient drawing */
   box-shadow:0 0 0 .125rem #fff, 0 .0625rem .25rem rgba(10,30,50,.35)}
 .serve-ind{scale:0;transition:scale 180ms var(--ease-soft), visibility 0s linear 180ms}
 .serve-ind.on{visibility:visible;scale:1;animation:serve-bob 900ms var(--ease-soft) infinite;transition:scale 420ms var(--ease-bounce) 120ms, visibility 0s}      /* the serve changes sides: the ball shrinks away on one tab and springs up on the other just after (scale: composes with the bob) */
@@ -922,8 +921,8 @@ body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none
 .emote-pop{position:absolute;right:calc(var(--edge) + var(--x, 0rem));bottom:calc(var(--edge) + 3.25rem);display:flex;flex-direction:column;align-items:center;gap:.125rem;
   animation:emote-rise var(--dur, 2s) cubic-bezier(.3,.2,.6,1) forwards}
 .emote-pop > i{display:flex;flex-direction:column;align-items:center;gap:.125rem;font-style:normal;animation:emote-sway calc(var(--dur, 2s) / 2) ease-in-out infinite alternate}
-.emote-pop img,.emote-pop .emote-gg{width:2.25rem;height:2.25rem;filter:drop-shadow(0 .1875rem .375rem rgba(10,30,45,.35));animation:emote-in 320ms var(--ease-bounce) both}
-.emote-pop .emote-gg{width:auto;font-size:1.5rem;color:#fff;-webkit-text-stroke:.375rem var(--line-deep);paint-order:stroke fill}
+.emote-pop img,.emote-pop .emote-gg{width:3.375rem;height:3.375rem;filter:drop-shadow(0 .1875rem .375rem rgba(10,30,45,.35));animation:emote-in 320ms var(--ease-bounce) both}
+.emote-pop .emote-gg{width:auto;font-size:2.25rem;color:#fff;-webkit-text-stroke:.5rem var(--line-deep);paint-order:stroke fill}
 .emote-pop span{max-width:7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:max(var(--t-xs),10px);font-weight:800;line-height:1.2;text-shadow:0 .0625rem .1875rem rgba(10,30,45,.8), 0 0 .5rem rgba(10,30,45,.5)}
 /* a player's emote (NOTES 208): a speech bubble out of their own scoreboard tab, placed by ui.js bubble() in the space beside the board
    (or under the tab when that space is too narrow), its tail pointing at the tab. It springs out of the tail, holds, and fades: 2 s */
@@ -937,12 +936,12 @@ body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none
 @keyframes bub-life{0%{opacity:0;scale:.3} 12%{opacity:1;scale:1.08} 20%{scale:1} 80%{opacity:1;scale:1} 100%{opacity:0;scale:.9}}
 @keyframes bub-in{from{rotate:-14deg} to{rotate:0deg}}
 @media (prefers-reduced-motion: reduce){ .emote-bub{animation:emote-fade 2s linear forwards} .emote-bub img,.emote-bub .emote-gg{animation:none} }
-@keyframes emote-rise{0%{transform:translateY(0);opacity:1} 60%{opacity:1} 100%{transform:translateY(-6rem);opacity:0}}
+@keyframes emote-rise{0%{transform:translateY(0);opacity:1} 80%{opacity:1} 100%{transform:translateY(calc(var(--rise, 6rem) * -1));opacity:0}}      /* NOTES 221: --rise (ui.js) takes it 70% of the way up; it fades only near the top */
 @keyframes emote-sway{from{transform:translateX(calc(var(--sway, .5rem) * -1))} to{transform:translateX(var(--sway, .5rem))}}
 @keyframes emote-in{from{transform:scale(.2);opacity:0} to{transform:scale(1);opacity:1}}
 body:not([data-role="spectator"]) .emote-pop{bottom:calc(var(--edge) + 5.25rem)}      /* a player's are born above the key strip */
 @media (max-width: 700px){ body[data-role="spectator"] .emote-pop{bottom:calc(var(--edge) + 8rem)} }      /* a spectator's bar sits higher here (above the view chips) */
-@media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade 1.8s linear forwards} .emote-pop > i,.emote-pop img,.emote-pop .emote-gg{animation:none} @keyframes emote-fade{0%,75%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} .emotes.is-cool::after{animation:none} }
+@media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade var(--dur, 4.5s) linear forwards} .emote-pop > i,.emote-pop img,.emote-pop .emote-gg{animation:none} @keyframes emote-fade{0%,75%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} .emotes.is-cool::after{animation:none} }
 @media (max-width: 700px){ .emote-btn{width:1.875rem} body[data-role="spectator"] .emotes{bottom:calc(var(--edge) + 5.25rem)} }      /* the view chips wrap to two rows here: a spectator's bar sits above them (19.3125rem wide) */
 body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-events:none}
 

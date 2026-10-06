@@ -175,7 +175,7 @@ function drawNames() {
   else if (o.bot) ui.setNames({ me: meName(), meSub: '', them: nameOf(1 - side), themSub: botLevel, reg: [meReg(), false], rank: [ranks[side], null] });
   else ui.setNames({ me: meName(), meSub: side === 0 ? 'Near side' : 'Far side', them: lastOpp = nameOf(1 - side), themSub: sub(1 - side) || (side === 0 ? 'Far side' : 'Near side'), reg: [meReg(), regs[1 - side]], rank: [ranks[side], ranks[1 - side]] });      // 'You' is not a name: no badge on it. The emblem is a rank, not a name: yours shows beside your own name too
 }
-const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting' };
+const STATUS_WORD = { calibrating: 'Calibrating', paused: 'Paused', away: 'Reconnecting', afk: 'Away' };
 const seatsOn = () => [0, 1].filter(i => (spec() || i !== side) && regs[i] && names[i] && names[i] !== 'Matt').map(i => ({ name: names[i], rank: ranks[i] }));      // On this court (docs/SOCIAL.md 6): the registered SEATS only, never mine, never a spectator (their registration is not on the wire)
 function setPaused(on) { if (on !== pausedUi) ui.setPaused(pausedUi = on); setDim(); }
 
@@ -347,9 +347,17 @@ function startCal() { if (undo) undo.kept = false; calibrating = true; stats.cal
 // The server is told whether this seat is ON THE COURT, from what the player is looking at, never from the calibration flags: a calibration is kept
 // between courts, so 'calibrated' was true behind the share screen, the camera primer, the connect screen (the phone asleep) and the 'All set' card,
 // paddles went out from all of them, and the match was counted in and served to a player who then calibrated through it (NOTES 170).
+// Away (NOTES 220): my tab hidden or the window unfocused. The others see 'Away' over my character; against Matt (one human, not a tournament
+// match) the server pauses the room instead, and my coming back resumes it (not a pause a card made). A blur waits a moment: a click into
+// devtools or a browser prompt that comes straight back is not leaving
+let toldAway = null, awayT = 0;
+const tabAway = () => document.hidden || !document.hasFocus();
+let isAway = document.hidden;      // what the events last said (a blur's after its moment). Not hasFocus() at load: a page opened behind another window is not away until it is left
+function tellAway() { if (!seated() || spec() || !welcomed) { toldAway = null; return; } if (isAway !== toldAway) { toldAway = isAway; game.send({ type: 'status', away: isAway }); } }
+for (const ev of ['blur', 'focus', 'visibilitychange']) addEventListener(ev, () => { clearTimeout(awayT); const now = tabAway(); if (now && !document.hidden) awayT = setTimeout(() => { isAway = tabAway(); tellAway(); }, 400); else { isAway = now; tellAway(); } });
 let toldCal = null, welcomed = false;      // toldCal: what this seat last said, null = nothing yet. welcomed: the seat's 'welcome' is in (nothing before it: profile's hello goes first, docs/ACCOUNTS.md 3.1)
 const onCourt = () => phase === 'play' && !ui.currentScreen();
-function tellCal() { if (!seated() || spec() || !welcomed) { toldCal = null; return; } const cal = !onCourt(); if (cal !== toldCal) { toldCal = cal; game.send({ type: 'status', cal }); } }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
+function tellCal() { tellAway(); if (!seated() || spec() || !welcomed) { toldCal = null; return; } const cal = !onCourt(); if (cal !== toldCal) { toldCal = cal; game.send({ type: 'status', cal }); } }      // the others see 'Calibrating' on my character, and the next serve waits for me (docs/NEXT.md 14a)
 function play() {                                  // leave the title for the lobby. A shared link (?room=CODE) joins at once, or watches (&watch=1).
   if (phase !== 'title') return;
   uiSfx('select');                                 // a click anywhere or any key: the press that starts it all gets the select sound (the button itself never sees the click: the lobby is up by then)
@@ -676,7 +684,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'closed') { if (room) toLobby(tourKind && ['round', 'tourstart', 'tourend', 'empty'].includes(m.reason) ? '' : m.reason === 'norematch' ? (votedNo ? '' : 'No rematch') : 'Court closed'); return; }      // everyone goes back to the lobby; the one who pressed Leave needs no telling. A tournament's court closing is the thing moving on: its screen says the rest
   if (m.type === 'full') { if (!LOBBY) ui.showOverlay('game-full'); return; }
   if (!seated()) return;                                         // THE GUARD (docs/API-NEXT.md 4.2): no room joined = no side, court, score, names, ball, banner, result, toast or sound, whatever the server sends
-  if (m.type === 'welcome') { toldCal = null; welcomed = true;      // a new seat, or the old one on a new socket: say again where I am (tellCal, after profile's hello below)
+  if (m.type === 'welcome') { toldCal = toldAway = null; welcomed = true;      // a new seat, or the old one on a new socket: say again where I am (tellCal, after profile's hello below)
     ms = null; side = m.side === 1 ? 1 : 0; if (LOBBY && m.role) role = m.role === 'spectator' ? 'spectator' : 'player'; names = cleanNames(m.names); regs = cleanRegs(m.reg); ranks = cleanRanks(m.rank); holding = false; dressSeats();      // rank: each seat's emblem, on any court (docs/TROPHIES.md 3, item 9)
     if (LOBBY && room && !spec()) profile.seated();              // a seat of my own: the device id is made now if there is none, and its hello goes at once (docs/ACCOUNTS.md 3.1)
     tellCal();
@@ -716,7 +724,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side]; players = o ? 2 : 1;
     scene.updatePaddle(1 - side, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null);
-    if (frozen && !holding && !cardOpen() && performance.now() > healAt) { healAt = performance.now() + 1000; game.send({ type: 'pause', on: false }); }      // paused with the panel shut (a lost 'pause off', a reload): nobody could ever resume it
+    if (frozen && !holding && !cardOpen() && !isAway && performance.now() > healAt) { healAt = performance.now() + 1000; game.send({ type: 'pause', on: false }); }      // paused with the panel shut (a lost 'pause off', a reload): nobody could ever resume it
     return;
   }
   if (m.type === 'botinfo') {

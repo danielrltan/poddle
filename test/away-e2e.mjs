@@ -1,13 +1,12 @@
-// The emote bar (NOTES 205): real server/game.js, fake AirPods, real Chromes. Ann and Ben play, Cat watches.
-// Everyone on the court gets the small bar bottom-right: GG and nine emoji, keys 1 to 0 under them, the player's key strip above it, nothing
-// overlapping. A key sends one to the whole court (a pop with the sender's name streaming up, gone in about five seconds, NOTES 221); the bar then rests a
-// second (dimmed; a second key does nothing). The spectator emotes too, and V steps through the views (1-4 did, before they were emotes).
-// EMOTEBAR_PORT=<base> moves the block (base .. base+2). Screenshots: test/ui-shots/emotes-*.png. LOOK at them.
+// Away (NOTES 220), in real Chromes on a real server: a player whose tab goes hidden, or whose window loses focus, shows Away over their
+// character and under their name to the opponent and the stands; back, it goes. Against Matt it is a pause instead: Paused, the court
+// frozen, and coming back plays on. A blur that comes straight back (under 0.4 s) says nothing.
+// AWAY_PORT=<base> moves the block (base .. base+2). Screenshots: test/ui-shots/away-*.png
 import { spawn } from 'child_process'; import fs from 'fs';
 import { WebSocketServer } from 'ws';
 import puppeteer from 'puppeteer-core';
 import { makeSynth, CALIBRATE, SESSION_LOOP } from './fake-bridge.mjs';
-const root = new URL('..', import.meta.url).pathname, SHOTS = root + 'test/ui-shots/', sleep = ms => new Promise(r => setTimeout(r, ms)), P0 = +process.env.EMOTEBAR_PORT || 8490;
+const root = new URL('..', import.meta.url).pathname, SHOTS = root + 'test/ui-shots/', sleep = ms => new Promise(r => setTimeout(r, ms)), P0 = +process.env.AWAY_PORT || 8940;
 if ([8080, 8787, 3000].some(p => p >= P0 && p <= P0 + 2)) { console.log("refusing: that port range holds the player's own game"); process.exit(2); }
 const out = [], errs = [];                                  // one tally across the three sessions
 function rig(env = {}) {
@@ -69,69 +68,35 @@ function rig(env = {}) {
 }
 
 setTimeout(() => { console.log('EMOTEBAR E2E FAIL (timeout)'); process.exit(2); }, 6 * 60000);
+setTimeout(() => { console.log('AWAY E2E FAIL (timeout)'); process.exit(2); }, 5 * 60000);
 fs.mkdirSync(SHOTS, { recursive: true });
-const R = rig({ WIN_AT: '11' }), { ok, done, until, open, shot, type, play, toLobby, toCourt, boxes, overlaps } = R; let s; const J = JSON.stringify;
+const R = rig({ WIN_AT: '11' }), { ok, done, until, open, type, toLobby, toCourt, play, st } = R; let s;
+// hide / show the tab, or blur / focus the window, as the browser would say it
+const hide = (pg, on) => pg.evaluate(on => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => on }); Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => on ? 'hidden' : 'visible' }); document.dispatchEvent(new Event('visibilitychange', { bubbles: true })); }, on);
+const blur = (pg, on) => pg.evaluate(on => { document.hasFocus = () => !on; dispatchEvent(new Event(on ? 'blur' : 'focus')); }, on);
 const a = await open('a', 'Ann'), b = await open('b', 'Ben');
 await toLobby(a); await a.click('#btn-courts'); await sleep(300); await a.click('#btn-create'); await sleep(300); await a.click('#seg [data-public="0"]'); await a.click('#btn-create-go'); s = await until(a, s => s.lview === 'share' && s.share.length === 4, 3000, 'share view'); const CODE = s.share;
 await toLobby(b); await b.click('#btn-courts'); await sleep(300); await b.click('#code-boxes input'); await type(b, CODE); await b.keyboard.press('Enter'); await a.click('#btn-share-go');
 await Promise.all([toCourt(a), toCourt(b)]);
 const c = await open('c', 'Cat', `&court=${CODE}&watch=1`); await play(c); await until(c, s => s.phase === 'watch', 6000, 'c watches');
-const bar = pg => pg.evaluate(() => { const box = document.getElementById('emotes'), r = box.getBoundingClientRect(), cs = getComputedStyle(box);
-  return { shown: cs.display !== 'none' && +cs.opacity > 0.9 && r.width > 0, right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom), w: Math.round(r.width), h: Math.round(r.height), cool: box.classList.contains('is-cool'),
-    keys: [...box.querySelectorAll('.emote-key')].map(k => getComputedStyle(k).display === 'none' ? '' : k.textContent).join(''), first: box.firstElementChild?.textContent.replace(/\d/g, ''), n: box.childElementCount,
-    pops: [...document.querySelectorAll('#emote-layer .emote-pop, #emote-layer .emote-bub')].map(p => (p.querySelector('img')?.alt || p.querySelector('.emote-gg')?.textContent) + ':' + (p.classList.contains('emote-bub') ? '@' + (p.classList.contains('is-me') ? 'me' : 'them') : p.querySelector('span')?.textContent || '')) }; });
-// a player's bubble: where it sits against its scoreboard tab, the corner's pills and the insets (NOTES 207)
-const bub = pg => pg.evaluate(() => { const b = document.querySelector('#emote-layer .emote-bub'); if (!b) return null; const r = b.getBoundingClientRect(), tab = document.querySelector(`#board .score-tab.${b.classList.contains('is-me') ? 'is-me' : 'is-them'}`).getBoundingClientRect();
-  const hit = [...document.querySelectorAll('#corner > *, #board, #camwrap, #podwrap')].filter(e => !e.hidden && e.getBoundingClientRect().width).some(e => { const q = e.getBoundingClientRect(); return r.left < q.right - 1 && q.left < r.right - 1 && r.top < q.bottom - 1 && q.top < r.bottom - 1; });
-  return { where: b.classList.contains('is-side') ? 'side' : 'below', next: b.classList.contains('is-side') ? (b.classList.contains('is-me') ? Math.round(tab.left - r.right) : Math.round(r.left - tab.right)) : Math.round(r.top - tab.bottom), hit, inside: r.left >= 0 && r.right <= innerWidth }; });
-const SIZES = [[1280, 720], [900, 700], [700, 900], [390, 844]];
-for (const [pg, who] of [[a, 'player'], [c, 'spectator']]) for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(600); await pg.mouse.move(w / 2, h / 2 + 3); await sleep(300); await pg.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);      // a toast (Your serve) hides the bar a moment
-  s = await bar(pg); const bx = await boxes(pg, ['emotes', 'keys', 'views', 'btn-ask', 'toast']), hit = overlaps(bx);
-  ok(s.shown && s.n === 10 && s.first === 'GG' && s.keys === '1234567890' && s.right >= 8 && s.bottom >= 8 && s.w <= 340, `${who} ${w}x${h}: the bar shows, GG first, keys 1-0, ${s.w}x${s.h} px, ${s.right}/${s.bottom} px off the corner`);
-  ok(!hit.length, `${who} ${w}x${h}: nothing overlaps the bar (${hit.join(', ') || 'clear'})`);
-  await pg.screenshot({ path: `${SHOTS}emotes-${who}-${w}x${h}.png` }); }
-for (const [w, h] of SIZES) { for (const pg of [a, b]) { await pg.setViewport({ width: w, height: h }); } await sleep(1200);
-  await a.keyboard.press('Digit3'); await sleep(450); const mine = await bub(a), theirs = await bub(b);
-  for (const [k, v] of [['Ann (her own, left)', mine], ['Ben (Ann\'s, right)', theirs]]) ok(v && !v.hit && v.inside && v.next >= 4 && v.next <= 14, `${w}x${h} ${k}: the bubble sits ${v?.where} its tab (${v?.next} px off), clear of the board, the corner and the insets`);
-  await a.screenshot({ path: `${SHOTS}emotes-bubble-me-${w}x${h}.png` }); await b.screenshot({ path: `${SHOTS}emotes-bubble-them-${w}x${h}.png` }); await sleep(2400); }
-for (const pg of [a, b, c]) { await pg.setViewport({ width: 1280, height: 720 }); } await sleep(600);
-await a.keyboard.press('Digit1'); await sleep(250);
-for (const [pg, who, at] of [[a, 'Ann', '@me'], [b, 'Ben', '@them'], [c, 'Cat', '@me']]) { s = await bar(pg); ok(J(s.pops) === J(['GG' + ':' + at]), `${who} sees Ann's GG in a bubble out of her tab, the ${at === '@me' ? 'left' : 'right'} one (${s.pops})`); }
-s = await bar(a); ok(s.cool, 'the bar rests after a pick');
-await a.keyboard.press('Digit2'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['GG:@them']), `a second key inside the second does nothing (${s.pops})`);
-await a.screenshot({ path: `${SHOTS}emotes-pop-player-1280x720.png` }); await c.screenshot({ path: `${SHOTS}emotes-pop-spectator-1280x720.png` });
-await sleep(1000); s = await bar(a); ok(!s.cool, 'the bar is back after a second');
-await a.keyboard.press('Digit0'); await sleep(300); s = await bar(b); ok(J(s.pops) === J(['😢:@them']), `0 is the tenth, 😢, and it replaces her last bubble (${s.pops})`);
-await c.keyboard.press('Digit3'); await sleep(150); await c.keyboard.press('Digit4'); await sleep(300); s = await bar(a); ok(s.pops.includes('💚:Cat') && s.pops.includes('😂:Cat'), `the spectator's 3 reaches the player, and the 4 right after it: no cooldown in the stands, NOTES 213 (${s.pops})`);
-ok(!(await bar(c)).cool, 'the spectator\'s bar never dims');
-// NOTES 221: the stands' pops are 50% bigger (54 px), live about 4.5 s and stream 70% of the way up before they fade; 24 at once, not 5
-const popAt = pg => pg.evaluate(() => [...document.querySelectorAll('#emote-layer .emote-pop')].map(p => { const f = p.querySelector('img, .emote-gg').getBoundingClientRect(), r = p.getBoundingClientRect(); return { w: +(f.width / parseFloat(getComputedStyle(document.documentElement).fontSize)).toFixed(2), up: +((innerHeight - r.top) / innerHeight).toFixed(2), op: +getComputedStyle(p).opacity, aim: +((innerHeight - p.offsetTop + parseFloat(p.style.getPropertyValue('--rise'))) / innerHeight).toFixed(2) }; }));      // w in rem (the root is not always 16 px)
-await sleep(2900); { const p = await popAt(a); ok(p.length === 2 && p.every(x => x.w >= 3.3 && x.op > 0.9 && x.up > 0.45 && x.aim >= 0.66 && x.aim <= 0.74), `3 s in, the stands' two pops are 3.375 rem (2.25 before), still solid and past halfway, bound for 70% of the way up (${JSON.stringify(p)})`); }
-await a.screenshot({ path: `${SHOTS}emotes-stream-player-1280x720.png` });
-await sleep(2700); s = await bar(b); ok(s.pops.length === 0, `the pops are gone within about five and a half seconds (${s.pops})`);
-for (let i = 0; i < 30; i++) { await c.keyboard.press(`Digit${i % 10}`); await sleep(75); }
-await sleep(250); { const p = await popAt(a); ok(p.length === 24, `a flood from the stands: 24 on screen at once, the oldest go first (${p.length})`); }
-await a.screenshot({ path: `${SHOTS}emotes-flood-player-1280x720.png` }); await c.screenshot({ path: `${SHOTS}emotes-flood-spectator-1280x720.png` });
-await sleep(5600);
-const v = pg => pg.evaluate(() => { const x = window.__scene._dbg.view(); return x.name + (x.name === 'pov' ? x.side : ''); });
-const seen = []; for (let i = 0; i < 5; i++) { await c.keyboard.press('KeyV'); await sleep(250); seen.push(await v(c)); }
-ok(seen.join(' ') === 'split pov0 pov1 free broadcast', `V steps through the views: ${seen.join(' ')}`);
-s = await bar(c); ok(s.pops.length === 0, 'V sends no emote');
-await c.keyboard.press('Digit2'); await sleep(250); ok((await v(c)) === 'broadcast', 'a number no longer changes the view');
-// the stands see a player's emote in every view (the owner, 2026-10-05: "make sure spectators can see player's emotes"): Ann's bubble out of her tab
-for (let i = 0; i < 5; i++) { if (i) { await c.keyboard.press('KeyV'); await sleep(400); } await a.keyboard.press('Digit3'); await sleep(400);
-  const vw = await v(c), on = await c.evaluate(() => { const b = document.querySelector('#emote-layer .emote-bub.is-me'), r = b?.getBoundingClientRect(); return !!r && r.width > 20 && r.top >= 0 && r.bottom <= innerHeight && +getComputedStyle(b).opacity > 0.5 && +getComputedStyle(document.getElementById('emote-layer')).opacity > 0.5; });
-  ok(on, `${vw}: Cat sees Ann's emote, a bubble out of her tab`); await sleep(1100); }
-await c.keyboard.press('KeyV'); await sleep(400);
-// against Matt: his difficulty row has the bottom-left corner (NOTES 204), the bar the bottom-right; they never meet, however narrow
-const d = await open('d', 'Dot'); await toLobby(d); await d.click('#btn-bot'); await sleep(300); await d.click('#btn-bot-1'); await toCourt(d); await until(d, s => s.them === 'Matt', 6000, 'Matt sits down');
-for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); await sleep(600); await d.mouse.move(w / 2, h / 2 + 3); await d.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);
-  const bx = await boxes(d, ['emotes', '#keys li', '#key-bot', 'bot-pick']), hit = overlaps(bx); ok(bx.emotes && bx['bot-pick'] && !hit.length, `against Matt ${w}x${h}: the bar and the difficulty row both show, apart (${hit.join(', ') || JSON.stringify(bx)})`);
-  await d.screenshot({ path: `${SHOTS}emotes-matt-${w}x${h}.png` }); }
-// a toast (the longest: a mid-match level change) never moves Matt's row, and never lands on it (NOTES 206)
-for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); await sleep(500); const at = async () => (await boxes(d, ['bot-pick']))['bot-pick'];
-  const was = await at(); await d.evaluate(() => window.__ui.toast('Matt · Rookie · counts as Pro · Rookie again restarts at 0-0', 4000)); await sleep(700);
-  const now = await at(), bx = await boxes(d, ['bot-pick', 'toast']), hit = overlaps(bx);
-  ok(JSON.stringify(was) === JSON.stringify(now) && !hit.length, `toast up ${w}x${h}: the difficulty row stays put (${was} -> ${now}) and clear of the toast (${hit.join(', ') || JSON.stringify(bx.toast)})`);
-  await d.screenshot({ path: `${SHOTS}emotes-matt-toast-${w}x${h}.png` }); await d.evaluate(() => window.__ui.toastOff()); await sleep(300); }
+await sleep(800);
+// ---- two people: Away over Ann, the rally plays on ----
+await hide(a, true);
+s = await until(b, s => s.themSub === 'Away' && s.tags.includes('afk'), 3000, 'Ben sees Away over Ann');
+ok(s.themSub === 'Away' && !s.scene.frozen, `Ann hides her tab: Ben sees Away under her name and over her character, nothing stops (${s.themSub}, tags ${s.tags}, frozen ${s.scene.frozen})`);
+s = await until(c, s => s.meSub === 'Away', 3000, 'Cat sees Away on Ann'); ok(s.meSub === 'Away' && s.tags.includes('afk'), `the stands see it too (${s.meSub}, ${s.tags})`);
+await b.screenshot({ path: `${SHOTS}away-ben-sees-ann.png` });
+await hide(a, false); s = await until(b, s => s.themSub !== 'Away', 3000, 'Ann back'); ok(s.themSub !== 'Away', `back: the tag goes (${s.themSub})`);
+await blur(a, true); await sleep(150); await blur(a, false); await sleep(900); s = await st(b); ok(s.themSub !== 'Away', `a blur that comes straight back says nothing (${s.themSub})`);
+await blur(a, true); s = await until(b, s => s.themSub === 'Away', 3000, 'blur -> Away'); ok(s.themSub === 'Away', `the window loses focus: Away (${s.themSub})`);
+await blur(a, false); s = await until(b, s => s.themSub !== 'Away', 3000, 'focus -> back'); ok(s.themSub !== 'Away', 'focus again: back');
+// ---- against Matt: a pause ----
+const d = await open('d', 'Dot'); await toLobby(d); await d.click('#btn-bot'); await sleep(300); await d.click('#btn-bot-1'); await toCourt(d); await until(d, s => s.them === 'Matt', 6000, 'Matt sits down'); await sleep(1500);
+await hide(d, true); await sleep(600); s = await st(d);
+ok(s.paused && s.scene.frozen, `against Matt, a hidden tab pauses the court (paused ${s.paused}, frozen ${s.scene.frozen})`);
+await sleep(2200); s = await st(d); ok(s.paused && s.scene.frozen, `and stays paused while hidden: no heal resumes it behind her back (paused ${s.paused})`);
+await hide(d, false); s = await until(d, s => !s.paused && !s.scene.frozen, 3000, 'Dot back: Matt plays on'); ok(!s.paused && !s.scene.frozen, 'back: it plays on');
+await blur(d, true); await sleep(900); s = await st(d); ok(s.paused && s.pausedTag, `the window loses focus: paused too, the Paused tag up (${s.paused}, ${s.pausedTag})`);
+await d.screenshot({ path: `${SHOTS}away-matt-paused.png` });
+await blur(d, false); s = await until(d, s => !s.paused, 3000, 'focus -> plays on'); ok(!s.paused, 'focus again: plays on');
 await done();
