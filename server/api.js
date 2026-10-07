@@ -8,12 +8,12 @@
 // Public, no sign-in: GET /api/leaderboard (NOTES 126), GET /api/leaderboard/player?u=<name> (a listed player's profile card, NOTES 140) and GET /api/player?name=
 // (the same card's rank, places and friend row, docs/SOCIAL.md 8: rank + places only when not hidden or to a friend, st only to a friend).
 const crypto = require('node:crypto');
-const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share');
+const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic');
 let names = null; try { names = require('./usernames'); } catch { /* usernames need sign-in, which then answers 503 */ }
 
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, BODY_MAX = 8192, BODY_MS = 5000;
 const OLD_HOSTS = new Set(['poddle.fly.dev', 'www.poddleball.com']);   // the cookie is scoped to poddleball.com: never a redirect here (8.1)
-let verifier = null, clientId = null, limiter = null, salt = crypto.randomBytes(32), saltAt = Date.now(), hosted = false, renameDays = 30;
+let statsKey = '', verifier = null, clientId = null, limiter = null, salt = crypto.randomBytes(32), saltAt = Date.now(), hosted = false, renameDays = 30;
 const logged = new Map();                                        // failure class -> last log time
 const NONCE_MS = 600e3, NONCES_MAX = 50000;                      // the nonce cookie's Max-Age (auth.nonceCookie); a bound on the map
 const nonces = new Map();                                        // SHA-256 of each nonce this process issued -> expiry, memory only. Single use: a sign-in takes it out
@@ -22,7 +22,7 @@ const nonces = new Map();                                        // SHA-256 of e
 // social (game.js, docs/SOCIAL.md 4): { status: accountId -> 'off'|'menu'|..., changed: (push ids, invalidate ids) }: the presence it keeps in memory,
 // and the hook that drops its friend-list caches and pushes fresh 'social' snapshots. Without it (the in-process tests) everyone is 'off' and nothing is pushed
 function init({ env = process.env, social: so = null } = {}) {
-  hosted = !!env.FLY_APP_NAME;
+  hosted = !!env.FLY_APP_NAME; statsKey = String(env.STATS_KEY || '').trim();
   verifier = auth.verifierFromEnv(env);                          // logs 'auth: GOOGLE_JWKS_FILE ignored in production' when it applies
   clientId = verifier ? String(env.GOOGLE_CLIENT_ID).trim() : null;
   limiter = auth.createRateLimiter(); salt = crypto.randomBytes(32); saltAt = Date.now(); nonces.clear(); boardsChanged();
@@ -285,6 +285,26 @@ const ROUTES = {
   '/api/leaderboard/player': { GET: [playerRoute, 60, MIN, false, true] },   // one player's profile card from the board (NOTES 140): public, 60 a minute, its own bucket (never starves the list)
 };
 
+// GET /api/traffic?days=N (NOTES 231): traffic.report() for the owner's stats panel at danielrltan.com/stats, with Authorization: Bearer STATS_KEY
+// (a Fly secret; unset = 404, a wrong key = 401). The one route that answers a CORS preflight, for the panel's origins and localhost only. It
+// never reads a cookie and never sends Allow-Credentials: the key is the only way in. Counts of pages and sources only, no person in them
+const PANEL = new Set(['https://danielrltan.com', 'https://www.danielrltan.com']);
+const sha = s => crypto.createHash('sha256').update(String(s)).digest();
+function trafficRoute(req, res) {
+  if (!statsKey) return fail(res, 404, 'not_found');
+  const origin = String(req.headers.origin || ''), cors = { Vary: 'Origin' };
+  if (PANEL.has(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d{1,5}$/.test(origin)) cors['Access-Control-Allow-Origin'] = origin;
+  if (req.method === 'OPTIONS') { res.writeHead(204, { ...cors, 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Authorization', 'Access-Control-Max-Age': '86400' }); return void res.end(); }
+  if (req.method !== 'GET') return fail(res, 405, 'method', { Allow: 'GET, OPTIONS', ...cors });
+  const addr = auth.clientAddr(req).addr, wait = limiter.take('/api/traffic', nodeKey(addr), 30, MIN, wideKey(addr));
+  if (wait) return fail(res, 429, 'rate', { 'Retry-After': String(wait), ...cors }, { retryAfter: wait });
+  const m = /^Bearer (\S{1,200})$/.exec(String(req.headers.authorization || ''));
+  if (!m || !crypto.timingSafeEqual(sha(m[1]), sha(statsKey))) return fail(res, 401, 'key', cors);
+  if (!db.isOpen()) return fail(res, 503, 'db_unavailable', cors);
+  const q = new URLSearchParams(String(req.url).split('?')[1] || ''), days = Math.min(400, Math.max(1, Math.floor(Number(q.get('days'))) || 30));
+  send(res, 200, { site: 'poddleball.com', days: traffic.report(days) }, { ...cors, 'Cross-Origin-Resource-Policy': 'cross-origin' });
+}
+
 // handle(req, res) -> Promise that never rejects. game.js: api.handle(req, res).catch(() => {})
 async function handle(req, res) {
   req.on('error', () => {}); res.on('error', () => {});
@@ -292,6 +312,7 @@ async function handle(req, res) {
     if (!limiter) init();
     const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
     if (OLD_HOSTS.has(host)) return fail(res, 404, 'wrong_host');
+    if (String(req.url || '').split('?')[0] === '/api/traffic') return trafficRoute(req, res);
     const route = ROUTES[String(req.url || '').split('?')[0]];
     if (!route) return fail(res, 404, 'not_found');
     const r = route[req.method]; if (!r) return fail(res, 405, 'method', { Allow: Object.keys(route).join(', ') });

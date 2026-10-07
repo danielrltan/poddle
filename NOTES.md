@@ -4764,3 +4764,16 @@ and change the duration to like 2 seconds".
   Reduced motion keeps the fill (progress is information).
 - test/emotebar-e2e.mjs: a tap changes the level with no bar; held 1 s the bar is up and about half full; held 2 s the match restarts
   (server log) at the level on and the key up changes nothing; let go at 0.9 s: no restart, next level. Shot: emotes-bhold-1280x720.png.
+
+## 231. The page-view counts can be read from the owner's stats panel on danielrltan.com
+The owner (2026-10-07): "can u use umami on my poddleball.com project? if no prior data history transfers, then, build a custom panel".
+Umami was not added: the privacy page promises "no cookie, no script and no third party" for page views, and the traffic table's daily
+totals cannot be imported into Umami's per-visit events. Instead a panel at danielrltan.com/stats reads this table (and Umami's API for
+danielrltan.com, which already uses Umami).
+- `GET /api/traffic?days=N` (server/api.js trafficRoute; N 1..400, default 30): `{ site, days: traffic.report(N) }`, the same report
+  admin.js traffic prints. `Authorization: Bearer <STATS_KEY>`; STATS_KEY is a Fly secret; unset = 404, wrong = 401. 30 a minute.
+- The only route that answers a CORS preflight: Allow-Origin for https://danielrltan.com, www., and http://localhost/127.0.0.1 (the
+  panel in dev). No Allow-Credentials and no cookie read: the key is the only way in. Day totals still include bots (source 'bot');
+  the panel subtracts that row for its headline numbers.
+- test/traffic.test.mjs: no key = 404, preflight from the panel's origin vs another, 401 without/with a wrong key, 200 with the report.
+- Nothing new is collected, so the privacy page is unchanged.

@@ -50,6 +50,26 @@ for (let i = 0; i < 230; i++) hitUrl('/index.html', { referer: `https://host${i}
 d = traffic.report(1)[0]; const other = d.sources.find(s => s.source === 'other');
 ok(d.sources.length <= 203 && other && other.views === 230 - (200 - 1), `distinct sources a day are capped at 200, the rest are other: ${d.sources.length} sources, other ${other && other.views}`);
 ok(!JSON.stringify(db.trafficReport('2026-10-06')).includes('203.0.113') && !JSON.stringify(db.trafficReport('2026-10-06')).includes('10.0.0'), 'no address in the table');
+console.log('the panel route');
+const api = require('../server/api.js');
+const call = (method, url, headers = {}) => new Promise(done => {
+  const res = { headersSent: false, writableEnded: false, on() {}, setHeader() {}, writeHead(s, h) { this.status = s; this.head = h; this.headersSent = true; }, end(b) { this.writableEnded = true; done({ status: this.status, head: this.head, body: b ? JSON.parse(b) : null }); } };
+  api.handle({ method, url, headers: { host: 'localhost:8080', ...headers }, socket: { remoteAddress: '203.0.113.50' }, on() {} }, res);
+});
+api.init({ env: {} });
+ok((await call('GET', '/api/traffic', { authorization: 'Bearer k' })).status === 404, 'no STATS_KEY: the route does not exist');
+api.init({ env: { STATS_KEY: 'sekret-key' } });
+let a = await call('OPTIONS', '/api/traffic', { origin: 'https://danielrltan.com', 'access-control-request-headers': 'authorization' });
+ok(a.status === 204 && a.head['Access-Control-Allow-Origin'] === 'https://danielrltan.com' && /Authorization/.test(a.head['Access-Control-Allow-Headers']) && !a.head['Access-Control-Allow-Credentials'], 'the preflight from danielrltan.com is answered, never with credentials');
+a = await call('OPTIONS', '/api/traffic', { origin: 'https://evil.example' });
+ok(a.status === 204 && !a.head['Access-Control-Allow-Origin'] && a.head.Vary === 'Origin', 'another origin gets no Allow-Origin');
+ok((await call('GET', '/api/traffic', { origin: 'https://danielrltan.com' })).status === 401, 'no key: 401');
+a = await call('GET', '/api/traffic', { origin: 'https://danielrltan.com', authorization: 'Bearer wrong' });
+ok(a.status === 401 && a.head['Access-Control-Allow-Origin'] === 'https://danielrltan.com', 'a wrong key: 401, readable by the panel');
+a = await call('GET', '/api/traffic?days=2', { origin: 'https://danielrltan.com', authorization: 'Bearer sekret-key' });
+ok(a.status === 200 && a.body.site === 'poddleball.com' && a.body.days.length === 2 && a.body.days[0].day === '2026-10-07' && a.body.days[1].views === 8 && a.head['Access-Control-Allow-Origin'] === 'https://danielrltan.com', `the key: the report: ${a.status} ${a.body && a.body.days.map(d => d.day + ':' + d.views)}`);
+ok((await call('POST', '/api/traffic', { authorization: 'Bearer sekret-key' })).status === 405, 'GET only');
+api.init({ env: {} });
 traffic.stop(); db.close();
 console.log(fails ? `${fails} FAILURES` : 'TRAFFIC PASS');
 process.exit(fails ? 1 : 0);
