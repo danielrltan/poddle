@@ -1,7 +1,8 @@
 // Operator CLI for the stats database (docs/ACCOUNTS.md 11.7). Never reachable over HTTP: nothing requires it, it has no routes, and
 // requiring it does nothing. Run on the machine: fly ssh console -C "node server/admin.js <cmd>" (PODDLE_DB is set there by fly.toml).
 //   counts                      rows per table (numbers only; friends and friend_reqs included, docs/SOCIAL.md 2)
-//   rename <username> <new>     operator rename of an offensive name; clears renamed_at so the player may choose their own at once
+//   rename <username> <new> [--reserved]  operator rename of an offensive name; clears renamed_at so the player may choose their own at once.
+//                               --reserved: the new name may be a reserved one (e.g. poddler1, NOTES 229); every other rule still applies
 //   release <username>          drop a name hold
 //   reset-stats <username>      the account's own stats, Matt record and trophy ladder back to zero (the owner's request); the account stays
 //   delete-account <username>   OPERATOR-initiated only: an under-13 report (6.5) or a Terms breach. Never on an e-mailed username alone (8.1)
@@ -15,7 +16,7 @@
 const fs = require('node:fs'), path = require('node:path');
 const db = require('./db');
 
-const USAGE = 'usage: node server/admin.js counts | rename <username> <new> | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username> | traffic [days]';
+const USAGE = 'usage: node server/admin.js counts | rename <username> <new> [--reserved] | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username> | traffic [days]';
 function names() {                                               // usernames.js (7.1-7.2) is loaded only by the commands that need it
   try { return require('./usernames'); } catch { throw new Error('server/usernames.js is not available'); }
 }
@@ -30,7 +31,7 @@ const slugIn = s => { const m = /(?:^|\/c\/)([A-Za-z0-9]{10})(?:\.png)?(?:[?#].*
 const stamp = d => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);   // YYYYMMDD-HHMM, UTC
 
 async function main(argv) {
-  const [cmd, a1, a2] = argv;
+  const [cmd, a1, a2, a3] = argv;
   if (!cmd || !['counts', 'rename', 'release', 'reset-stats', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user', 'traffic'].includes(cmd)) throw new Error(USAGE);
   if (cmd === 'backup' && a1 === '--clean') {                    // needs no database: deletes the /tmp copies after they were downloaded
     let k = 0; for (const f of fs.readdirSync('/tmp')) if (/^poddle-backup-[0-9-]+\.db$/.test(f)) { const p = path.join('/tmp', f); if (fs.lstatSync(p).isFile()) { fs.unlinkSync(p); k++; } }
@@ -74,7 +75,8 @@ async function main(argv) {
     }
     if (cmd === 'rename') {
       if (!a2) throw new Error(USAGE);
-      const v = names().validate(a2); if (!v || !v.ok) throw new Error('invalid new name (' + (v && v.reason) + ')');
+      if (a3 !== undefined && a3 !== '--reserved') throw new Error(USAGE);
+      const v = names().validate(a2, { allowReserved: a3 === '--reserved' }); if (!v || !v.ok) throw new Error('invalid new name (' + (v && v.reason) + ')');
       const a = find(a1), r = db.adminRename(a.id, v.name, v.key, now);
       if (r !== 'ok') throw new Error('rename refused (' + r + ')');
       return console.log('renamed (the old name is held for 30 days; the player may choose another name at once)');

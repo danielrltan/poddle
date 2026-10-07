@@ -4746,3 +4746,9 @@ parent first."). Now (web/index.html, web/ui.css):
   username that is offensive"), this only spells it out.
 - The rename itself is the operator's: `fly ssh console -a poddle -C "node server/admin.js rename <username> <new>"`. poddler1 is refused
   (names starting with poddle are reserved, usernames.js RES_PREFIX). admin rename clears renamed_at, so the player can choose again at once.
+
+## 229. The operator can rename to a reserved name
+- The owner (2026-10-06) wanted the obscene #1 trophy account renamed to poddler1, which usernames.js reserves (names starting poddle).
+- admin.js `rename <username> <new> --reserved` passes `allowReserved` to usernames.validate(): only the reserved / impersonation check is
+  skipped; length, characters, letters, underscores and profanity still apply, and the name must be free (db.adminRename). The player's own
+  claim (api.js) never passes it, so a player still cannot pick a reserved name.

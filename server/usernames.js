@@ -38,7 +38,7 @@ const profaneTokens = v => tokens(v).some(t => { const k = fold(skeleton(t)); re
 const profaneName = v => { const k = imp(v); return !!k && (profane(k) || profaneTokens(stripBadges(String(v).slice(0, MAX_IN)).normalize('NFKC').normalize('NFKD').replace(/\p{M}/gu, '').replace(LOOK_RE, c => LOOK[c]))); };   // -> a guest name (any script) that is profane: it shows as Player 1 / 2 (guestShown)
 
 // validate(name) -> { ok: true, name, key } | { ok: false, reason }. reason: length | chars | letter | underscore | reserved | profanity (7.1).
-function validate(v) {
+function validate(v, { allowReserved = false } = {}) {      // allowReserved: the operator's own rename only (admin.js rename --reserved, NOTES 229); a player never passes it
   if (typeof v !== 'string') return { ok: false, reason: 'chars' };
   if (v.length > MAX_IN) return { ok: false, reason: 'length' };
   const name = v.normalize('NFKC').trim();
@@ -48,7 +48,7 @@ function validate(v) {
   if (!/[A-Za-z]/.test(name)) return { ok: false, reason: 'letter' };
   if (name[0] === '_' || name[name.length - 1] === '_' || name.includes('__')) return { ok: false, reason: 'underscore' };
   const key = skeleton(name);
-  if (reserved(key) || impersonates(name)) return { ok: false, reason: 'reserved' };   // impersonates: ProMatt, TourMatt, Matt_Tour... would pass as the bot WITH the registered badge
+  if (!allowReserved && (reserved(key) || impersonates(name))) return { ok: false, reason: 'reserved' };   // impersonates: ProMatt, TourMatt, Matt_Tour... would pass as the bot WITH the registered badge
   if (profane(key) || profaneTokens(name)) return { ok: false, reason: 'profanity' };
   return { ok: true, name, key };
 }
