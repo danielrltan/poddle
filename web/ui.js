@@ -240,6 +240,14 @@ export function toast(text, ms = 1200, cup = false) {      // cup: the words are
   clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('on'); b.classList.remove('has-toast'); }, ms);
 }
 export function toastOff() { clearTimeout(toastT); $('toast').classList.remove('on'); document.body.classList.remove('has-toast'); }     // the screen it spoke about is gone
+let bholdT;
+export function bhold(ms) {      // B held against Matt (NOTES 230): ms > 0 fills the bar over ms, 'done' shows it full a moment, 0 puts it away
+  const el = $('bhold'), b = document.body; if (!el) return; clearTimeout(bholdT);
+  if (ms === 'done') { el.classList.remove('is-filling'); el.classList.add('is-done'); bholdT = setTimeout(() => bhold(0), 350); return; }
+  if (!ms) { el.classList.remove('on'); b.classList.remove('has-bhold'); return; }      // fades as it stands: the bar does not snap back on its way out
+  el.style.setProperty('--hold', `${ms}ms`); el.classList.remove('is-filling', 'is-done'); void el.offsetWidth;      // the bar starts empty every time
+  el.classList.add('on', 'is-filling'); b.classList.add('has-bhold');
+}
 export function confettiOff() { for (const c of document.querySelectorAll('.confetti')) c.remove(); }      // the court it fell over is gone
 export function confetti(colors, n = 46) {
   if (reduced() || slots.menu) return;                                               // nothing of a game shows over a menu

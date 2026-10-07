@@ -4752,3 +4752,15 @@ parent first."). Now (web/index.html, web/ui.css):
 - admin.js `rename <username> <new> --reserved` passes `allowReserved` to usernames.validate(): only the reserved / impersonation check is
   skipped; length, characters, letters, underscores and profanity still apply, and the name must be free (db.adminRename). The player's own
   claim (api.js) never passes it, so a player still cannot pick a reserved name.
+
+## 230. Hold B for two seconds to restart against Matt, with a bar that fills while you hold
+The owner (2026-10-06): "make the hold b to restart difficulty have a progress thing to show that your b holding is getting registered,
+and change the duration to like 2 seconds".
+- B_HOLD_MS 3000 -> 2000 (main.js). Tutorial keys card, the browser-game landing page, docs/ACCOUNTS.md and the server comment say 2 s.
+- `#bhold` (index.html), a pill in the toast's place and shape (class `toast bhold`, so every bottom rule that moves the toast moves it):
+  keycap B, Restart, a bar filling linearly over the hold (`--hold`). It shows once B has been down 180 ms (B_SHOW_MS), so a tap for the
+  next level never flashes it, and only when a hold can restart (canRestart: on court vs Matt, not watching, not a tournament match).
+  Fired: the bar shows full a moment and goes; let go early or the tab blurs: it fades. While it is up the toast underneath is hidden.
+  Reduced motion keeps the fill (progress is information).
+- test/emotebar-e2e.mjs: a tap changes the level with no bar; held 1 s the bar is up and about half full; held 2 s the match restarts
+  (server log) at the level on and the key up changes nothing; let go at 0.9 s: no restart, next level. Shot: emotes-bhold-1280x720.png.

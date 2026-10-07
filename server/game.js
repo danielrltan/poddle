@@ -822,7 +822,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (over) return;                                            // a match is being voted on: nothing starts behind the result screen
     if (MATCH) return send(from, { ...botInfo(), reason: 'tournament' });   // a tournament match: Matt stays at Tour, and nobody calls him in
     if (humans().length > 1) return send(from, { type: 'botinfo', active: false, level: botLevel, name: BOTS[botLevel].name, reason: 'two players are connected' });
-    if (restart) {                                               // B held 3 s (NOTES 207): the match against Matt restarts at 0-0 and counts at the level on. The one under way is dropped, like leaving it (no record against Matt). Nothing to restart before the first strike
+    if (restart) {                                               // B held 2 s (NOTES 207, 230): the match against Matt restarts at 0-0 and counts at the level on. The one under way is dropped, like leaving it (no record against Matt). Nothing to restart before the first strike
       if (!theBot() || !(started || resumed)) return;
       console.log(`[${code}] Matt match restarted at ${BOTS[botLevel].name}`);
       startMatch(humans()[0].side); broadcast({ ...botInfo(), reset: true }); return; }

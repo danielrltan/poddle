@@ -53,8 +53,8 @@ let side = 0, role = 'player', names = [null, null], state = null, players = 0, 
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
 let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', wantWatch = LOBBY && qs.get('watch') === '1', pending = null, leaveAt = 0;   // room: the court I am seated in (the wire still says 'room'). wantRoom / wantWatch: from a shared link ?court=CODE (?room= is the old spelling and still works) or a reload. pending: the lobby request still waiting for its answer
-let botWant = null, botLevel = '', bHold = null, bHeld = false, holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
-const B_HOLD_MS = 3000;      // B held this long restarts the match against Matt (NOTES 207); bHold: the timer, bHeld: it fired, so the key up is not a press
+let botWant = null, botLevel = '', bHold = null, bShow = null, bHeld = false, holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
+const B_HOLD_MS = 2000, B_SHOW_MS = 180;      // B held this long restarts the match against Matt (NOTES 207; 3 s until NOTES 230). The hold's bar shows once B has been down B_SHOW_MS, so a tap for the next level never flashes it; bHold: the timer, bHeld: it fired, so the key up is not a press
 const link = { m: false, g: false }, airpodLive = () => performance.now() - lastSample < 1000;
 const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverlay();      // the court is what the player is looking at
 // The two gates of docs/API-NEXT.md 4.2. seated: nothing from the game gets past the lobby messages while no room is joined
@@ -288,6 +288,7 @@ function redialDue() { if (redialWait) { redialWait = false; game.drop(); } }   
 function openStats() { if (room) { say('Leave the court to see your stats', null, 2400); return; } ui.settings(false); if (phase === 'title') play(); if (phase === 'lobby') ui.lobbyView('profile'); }      // Settings > You > Your stats
 function playBot(level) { if (pending) return; botWant = [0, 1, 2, 3].includes(level) ? level : 1; request({ type: 'create', public: false }); }      // Play a bot = a private room, then 'bot' right after the welcome. No protocol of its own
 // Opening the panel pauses a match against Matt (or an empty court); against a human it is only a card over a live rally.
+const canRestart = () => { const o = state && state.paddles[1 - side]; return !!(room && live() && !spec() && tourKind !== 'match' && o && o.bot); };      // a held B can restart: on court against Matt, never in a tournament match (NOTES 230)
 const vsHuman = () => { const o = state && state.paddles[1 - side]; return !!o && !o.bot; };
 const forfeits = () => LOBBY && !spec() && ui.currentOverlay() !== 'match' && (tourKind === 'match' || vsHuman() && !holding && (struck || !!state && state.score[0] + state.score[1] > 0));      // a tournament match: leaving is a forfeit from the first moment, against Matt too      // leaving now is a forfeit (docs/SPECTATE.md): the Leave button and the Q toast say so. struck: a ball has been hit in this match
 function pause(on) {
@@ -882,10 +883,11 @@ addEventListener('keydown', e => {
   if (k === 'p') resetPeaks();
   if (k === 'v') setPod(!showPod);
   if (k === '[' || k === ']') sens(k === ']' ? 1 : -1);          // [ = less sensitive, ] = more (the settings panel's - / +)
-  if (k === 'b' && !e.repeat) { clearTimeout(bHold); bHeld = false; bHold = setTimeout(() => { bHeld = true; if (room && live() && !spec()) game.send({ type: 'bot', restart: true }); }, B_HOLD_MS); }      // B pressed: the hold timer starts. Held 3 s: the match restarts at 0-0 at the level on (NOTES 207). Let go before that: the next difficulty (keyup below). Alone: Matt joins now
+  if (k === 'b' && !e.repeat) { clearTimeout(bHold); clearTimeout(bShow); bHeld = false; bHold = setTimeout(() => { bHeld = true; if (canRestart()) { game.send({ type: 'bot', restart: true }); ui.bhold('done'); } else ui.bhold(0); }, B_HOLD_MS);
+    bShow = setTimeout(() => { if (canRestart()) ui.bhold(B_HOLD_MS - B_SHOW_MS); }, B_SHOW_MS); }      // B pressed: the hold timer starts. Held 2 s: the match restarts at 0-0 at the level on (NOTES 207, 230), the bar filling meanwhile. Let go before that: the next difficulty (keyup below). Alone: Matt joins now
 });
-addEventListener('keyup', e => { if (e.key.toLowerCase() !== 'b' || !bHold) return; clearTimeout(bHold); bHold = null; if (bHeld) { bHeld = false; return; } if (e.target.tagName === 'INPUT' || profile.cardOpen() || spec()) return; game.send({ type: 'bot' }); });      // a short B: next difficulty (Rookie, Club, Tour, Pro, round again), or Matt now when alone. After a hold's restart the key up does nothing. 1-4 were the levels until they became emotes (NOTES 205)
-addEventListener('blur', () => { clearTimeout(bHold); bHold = null; bHeld = false; });      // the tab lost the key up: no restart from a key held into another window
+addEventListener('keyup', e => { if (e.key.toLowerCase() !== 'b' || !bHold) return; clearTimeout(bHold); clearTimeout(bShow); bHold = null; if (!bHeld) ui.bhold(0); if (bHeld) { bHeld = false; return; } if (e.target.tagName === 'INPUT' || profile.cardOpen() || spec()) return; game.send({ type: 'bot' }); });      // a short B: next difficulty (Rookie, Club, Tour, Pro, round again), or Matt now when alone. After a hold's restart the key up does nothing. 1-4 were the levels until they became emotes (NOTES 205)
+addEventListener('blur', () => { clearTimeout(bHold); clearTimeout(bShow); bHold = null; bHeld = false; ui.bhold(0); });      // the tab lost the key up: no restart from a key held into another window
 addEventListener('resize', () => scene.resize());
 
 // ---------- render loop: local paddle straight from the model every frame ----------

@@ -76,7 +76,7 @@ function cards() {
         + '<li>A rally ends on a double bounce, a ball out, or one that gets past you.</li><li>Volley from anywhere. No kitchen faults here.</li></ul>' },
   ];
   if (!phone) list.push({ title: 'Handy keys', cls: 'is-keys',
-    body: '<ul class="tut-keys">' + key('Esc', 'Pause against Matt') + key('B', 'Matt’s level. Hold 3 s to restart') + key('V', 'Change the camera') + key('F', 'Full screen')
+    body: '<ul class="tut-keys">' + key('Esc', 'Pause against Matt') + key('B', 'Matt’s level. Hold 2 s to restart') + key('V', 'Change the camera') + key('F', 'Full screen')
       + key('C', 'Calibrate again') + key('R', 'Recenter') + key('1 to 0', 'Emotes') + key('Y / N', 'Answer a watcher who asks to play') + '</ul>',
     more: 'Everything else is in <a href="/how-to-play.html" target="_blank" rel="noopener">How to play</a>.' });
   return list;

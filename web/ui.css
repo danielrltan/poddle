@@ -1280,6 +1280,13 @@ button.set-row > span{transition:translate var(--d-fast) var(--ease-bounce)} but
 .keyhints .keycap.ov-press,.views .keycap.ov-press{animation:ov-key-press 240ms var(--ease-out)}      /* the key you pressed dips on screen too */
 /* toast: new words in one that is already up bump it, not a silent swap (scale: its transform does the centring) */
 .toast.ov-bump{animation:ov-bump 360ms var(--ease-bounce)}
+.bhold{gap:.625rem;padding:0 1.25rem 0 .75rem}      /* B held against Matt: a toast-shaped pill whose bar fills while the key is down (NOTES 230) */
+.bhold-bar{width:8rem;height:.5rem;margin-left:.25rem;border-radius:var(--r-pill);background:var(--sky-3);overflow:hidden}
+.bhold-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--line-soft),var(--line));transform-origin:0 50%;transform:scaleX(0)}
+.bhold.is-filling .bhold-bar i{transform:scaleX(1);transition:transform var(--hold,2000ms) linear}
+.bhold.is-done .bhold-bar i{transform:scaleX(1);transition:none;background:var(--line)}
+body.has-bhold #toast{opacity:0}      /* the hold speaks over whatever toast was up */
+@media (prefers-reduced-motion: reduce){ .bhold.is-filling .bhold-bar i{transition-duration:var(--hold,2000ms)!important} }      /* progress is information, not decoration */
 /* seat hold: springs up over the frozen court, shrinks away when they are back; the seconds hop */
 .hold-card{transition:opacity 200ms var(--ease-soft), scale 200ms var(--ease-soft), display 200ms allow-discrete}
 .hold-card:not([hidden]){transition:opacity 240ms var(--ease-soft), scale 420ms var(--ease-bounce), display 0s allow-discrete}

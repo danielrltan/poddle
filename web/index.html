@@ -167,6 +167,8 @@
 <div class="inset inset-cam" id="camwrap" data-fit hidden><video id="camv" playsinline muted hidden></video><canvas id="camc" width="240" height="135"></canvas></div>
 <div class="inset inset-pod" id="podwrap" data-fit><div id="pod"></div></div>
 <div class="toast" id="toast" data-fit role="status"></div>
+<!-- B held against Matt: the bar fills over the 2 s it takes to restart the match (B_HOLD_MS, main.js) -->
+<div class="toast bhold" id="bhold" data-fit aria-hidden="true"><span class="keycap">B</span>Restart<span class="bhold-bar"><i></i></span></div>
 <!-- a spectator asks to take Matt's seat: a small corner card for 10 s. Never takes focus, never swallows a key; Y / N answer it (docs/COURTS-TOURNEY.md 2.8) -->
 <div class="ask-card" id="ask-card" role="group" aria-labelledby="ask-q" data-fit hidden>
   <p class="ask-q" id="ask-q"><b id="ask-name"></b> wants to play<small>Takes Matt’s place.</small></p>

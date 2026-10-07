@@ -134,4 +134,17 @@ for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); awai
   const now = await at(), bx = await boxes(d, ['bot-pick', 'toast']), hit = overlaps(bx);
   ok(JSON.stringify(was) === JSON.stringify(now) && !hit.length, `toast up ${w}x${h}: the difficulty row stays put (${was} -> ${now}) and clear of the toast (${hit.join(', ') || JSON.stringify(bx.toast)})`);
   await d.screenshot({ path: `${SHOTS}emotes-matt-toast-${w}x${h}.png` }); await d.evaluate(() => window.__ui.toastOff()); await sleep(300); }
+// hold B against Matt (NOTES 230): 2 s restarts the match, a bar fills meanwhile; a tap is the next level and never shows the bar
+{ await d.setViewport({ width: 1280, height: 720 }); await sleep(400); await d.mouse.move(640, 363);
+  const restarts = () => R.slog.join('').split('Matt match restarted').length - 1, bar = () => d.evaluate(() => { const e = document.getElementById('bhold'), i = e.querySelector('.bhold-bar i'), m = getComputedStyle(i).transform;
+    return { on: e.classList.contains('on') && +getComputedStyle(e).opacity > 0.3, p: m === 'none' ? 1 : +(m.match(/matrix\(([^,]+)/) || [])[1] }; });
+  await until(d, s => s.hits > 0 || s.scMe + s.scThem > 0, 20000, 'the first strike against Matt');
+  const lv0 = (await R.st(d)).themSub; let seen = false; await d.keyboard.down('KeyB'); for (let i = 0; i < 3; i++) { await sleep(40); seen ||= (await bar()).on; } await d.keyboard.up('KeyB'); await sleep(500);
+  const lv1 = (await R.st(d)).themSub; ok(!seen && lv1 !== lv0 && !(await bar()).on, `a tap of B: the next level (${lv0} -> ${lv1}), no hold bar`);
+  const r0 = restarts(); await d.keyboard.down('KeyB'); await sleep(1000); const mid = await bar(); await d.screenshot({ path: `${SHOTS}emotes-bhold-1280x720.png` });
+  ok(mid.on && mid.p > 0.25 && mid.p < 0.75, `B held 1 s: the bar is up and half full (${mid.p.toFixed(2)})`);
+  await sleep(1300); const fired = restarts() === r0 + 1; await d.keyboard.up('KeyB'); await sleep(600);
+  ok(fired && (await R.st(d)).themSub === lv1 && !(await bar()).on, `B held 2 s: the match restarts at ${lv1}, the key up changes nothing, the bar goes`);
+  await sleep(4500); await d.keyboard.down('KeyB'); await sleep(900); await d.keyboard.up('KeyB'); await sleep(1800);
+  ok(restarts() === r0 + 1 && !(await bar()).on && (await R.st(d)).themSub !== lv1, 'B let go at 0.9 s: no restart, the next level, the bar goes'); }
 await done();

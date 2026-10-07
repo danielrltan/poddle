@@ -603,7 +603,7 @@ points are server-decided). Display units: hit as 0-100 ("Hardest hit 92"), spee
 - `mattBack()` (:1015) after a revive: the match is revived anyway (unranked).
 - Recorded level: `BOT_ORDER[match.rank]`, flag `level_changed` when it moved.
 - Since NOTES 202 `botinfo` carries `counted` (= `BOT_ORDER[match.rank]`) once the level moved after the first strike; the court's toast
-  says what the match counts as and that holding B restarts it. `{type:'bot', restart:true}` (B held 3 s, NOTES 207) restarts a match
+  says what the match counts as and that holding B restarts it. `{type:'bot', restart:true}` (B held 2 s, NOTES 207, 230) restarts a match
   under way against Matt (`startMatch`: 0-0, a fresh match at the level on; the old one is dropped unrecorded, as leaving Matt is) with
   `reset: true` on the botinfo; before the first strike it does nothing.
 
