@@ -329,6 +329,7 @@ function prepare() {                                             // every statem
     perfList: q('SELECT id, page, at, ua, ttfb, fcp, lcp, dcl, onload, inp, cls, block, prof FROM perf_views WHERE site = ? AND at >= ? ORDER BY at DESC LIMIT ?'),
     perfGet: q('SELECT id, site, page, at, ua, ttfb, fcp, lcp, dcl, onload, inp, cls, block, prof, load, fin FROM perf_views WHERE id = ?'),
     perfProfGet: q('SELECT body FROM perf_profiles WHERE id = ?'),
+    perfFins: q('SELECT fin FROM perf_views WHERE site = ? AND at >= ? AND fin IS NOT NULL ORDER BY at DESC LIMIT ?'),
     perfProfIds: q('SELECT p.id FROM perf_profiles p JOIN perf_views v ON v.id = p.id WHERE v.site = ? AND v.page = ? AND v.at >= ? ORDER BY v.at DESC LIMIT ?'),
     perfSwOld: q(`DELETE FROM perf_views WHERE rowid IN (SELECT rowid FROM perf_views WHERE at < ? LIMIT ${BATCH})`),
     perfSwOver: q(`DELETE FROM perf_views WHERE rowid IN (SELECT rowid FROM perf_views ORDER BY at DESC LIMIT ${BATCH} OFFSET ?)`),
@@ -976,6 +977,7 @@ const perfFin = guard(false, (v, cap) => tx(() => { if (S.perfDay.get(v.site, v.
 const perfProfile = guard(false, (id, site, at, body) => tx(() => Number(S.perfProfIns.run(at, body, id, site).changes) > 0 && Number(S.perfProfMark.run(id, id).changes) > 0));
 const perfList = guard(null, (site, from, limit) => S.perfList.all(site, from, limit));
 const perfGet = guard(null, id => S.perfGet.get(id) || null);
+const perfFins = guard(null, (site, from, limit) => S.perfFins.all(site, from, limit).map(r => r.fin));
 const perfProfileGet = guard(null, id => { const r = S.perfProfGet.get(id); return r ? r.body : null; });
 const perfProfileIds = guard(null, (site, page, from, limit) => S.perfProfIds.all(site, page, from, limit).map(r => r.id));
 // the views older than `days`, then everything past the newest `views` views and `profiles` profiles; one short transaction per batch
@@ -995,4 +997,4 @@ module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
   leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey, trafficAdd, trafficReport,
-  perfPut, perfFin, perfProfile, perfList, perfGet, perfProfileGet, perfProfileIds, perfSweep };
+  perfPut, perfFin, perfProfile, perfList, perfGet, perfProfileGet, perfProfileIds, perfFins, perfSweep };

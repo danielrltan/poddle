@@ -41,6 +41,8 @@ ok(r.status === 204 && perf.viewOf(id1).prof === 1 && back.resources[0] === '/ma
 ok(perf.profile({ origin: PH, ua: CHROME_UA, id: id1, body: Buffer.from(JSON.stringify(trace)) }).status === 409, 'one profile per view');
 ok(perf.profile({ origin: PH, ua: CHROME_UA, id: 'bbbbbbbbbbbbbbbb', body: Buffer.from(JSON.stringify(trace)) }).status === 409, 'no view, no profile');
 ok(JSON.stringify(perf.profileIds('poddleball.com', '/pad.html', 7)) === JSON.stringify([id1]), 'profile ids by page');
+const ck = perf.clicksOf('danielrltan.com', 7), cp = perf.clicksOf('poddleball.com', 7);
+ok(JSON.stringify(ck.targets) === '[{"target":"a#resume","n":1},{"target":"bx/b","n":1}]' && cp.targets.length === 0 && cp.slow[0].target === 'button#play' && cp.slow[0].p75 === 180, 'clicks and interaction latency over the range: ' + JSON.stringify(cp.slow));
 
 console.log('caps and sweep');
 for (let i = 0; i < perf.LIMITS.dayCap + 5; i++) perf.beacon({ origin: DR, ua: CHROME_UA, body: load('1' + String(i).padStart(15, '0')) });

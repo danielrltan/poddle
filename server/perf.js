@@ -148,4 +148,18 @@ function viewOf(id) {
 const profileOf = id => (typeof id === 'string' && /^[0-9a-f]{16}$/.test(id) ? db.perfProfileGet(id) : null);   // the stored gzip, sent as is
 const profileIds = (site, page, days, now = Date.now()) => db.perfProfileIds(site, String(page || '/').slice(0, 64), now - Math.min(30, Math.max(1, days | 0)) * DAY, 30) || [];
 
-module.exports = { init, sweep, beacon, profile, listOf, viewOf, profileOf, profileIds, siteOf, uaOf, url, LIMITS };
+// clicks and interaction latency over the range, from the newest 2000 fin parts: { targets: [{ target, n }], slow: [{ target, n, p75, max }] }.
+// poddleball.com's fin parts carry no click targets, and their interactions name an element tag only
+function clicksOf(site, days, now = Date.now()) {
+  const fins = db.perfFins(NAMES.has(site) || site === 'localhost' ? site : 'poddleball.com', now - Math.min(30, Math.max(1, days | 0)) * DAY, 2000) || [];
+  const targets = new Map(), lat = new Map();
+  for (const b of fins) {
+    const f = unzip(b); if (!f) continue;
+    for (const c of f.clicks || []) targets.set(c[0], (targets.get(c[0]) || 0) + 1);
+    for (const e of f.ev || []) { const k = (/^key/.test(e[0]) ? 'key · ' : '') + (e[1] || e[0]); if (!lat.has(k)) lat.set(k, []); lat.get(k).push(e[3] || 0); }
+  }
+  const slow = [...lat].map(([target, v]) => { v.sort((a, b) => a - b); return { target, n: v.length, p75: v[Math.min(v.length - 1, Math.floor(0.75 * v.length))], max: v[v.length - 1] }; });
+  return { targets: [...targets].map(([target, n]) => ({ target, n })).sort((a, b) => b.n - a.n).slice(0, 50), slow: slow.sort((a, b) => b.p75 - a.p75).slice(0, 50) };
+}
+
+module.exports = { clicksOf, init, sweep, beacon, profile, listOf, viewOf, profileOf, profileIds, siteOf, uaOf, url, LIMITS };

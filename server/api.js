@@ -315,7 +315,7 @@ function trafficRoute(req, res) {
 // sendBeacon) and POST /api/perf/profile?v=<id> (its JS profile, gzipped). Both are CORS "simple" requests: no preflight, and no Access-Control
 // header in the answer (the page never reads it). The Origin header names the site and must be poddleball.com or danielrltan.com; no cookie
 // is read. Reads, behind the panel's key: GET /api/perf?site=&days= (the list), /api/perf/view?id= (one view), /api/perf/profile?id= (its
-// profile, the stored gzip), /api/perf/profiles?site=&page=&days= (the newest 30 profile ids of a page, for the merged flame graph)
+// profile, the stored gzip), /api/perf/profiles?site=&page=&days= (the newest 30 profile ids of a page, for the merged flame graph), /api/perf/clicks?site=&days=
 function readRaw(req, max) {                                      // -> Buffer, or throws { status, error }
   return new Promise((resolve, reject) => {
     let n = 0, done = false; const parts = [];
@@ -345,6 +345,7 @@ async function perfRoute(req, res, p) {
   const cors = panelGate(req, res, '/api/perf/read'); if (!cors) return;
   if (p === '/api/perf') return send(res, 200, { site: q.get('site') || 'poddleball.com', views: perf.listOf(q.get('site'), Number(q.get('days')) || 7) || [] }, cors);
   if (p === '/api/perf/view') { const v = perf.viewOf(q.get('id')); return v ? send(res, 200, v, cors) : fail(res, 404, 'not_found', cors); }
+  if (p === '/api/perf/clicks') return send(res, 200, perf.clicksOf(q.get('site'), Number(q.get('days')) || 7), cors);
   if (p === '/api/perf/profiles') return send(res, 200, { ids: perf.profileIds(q.get('site'), q.get('page'), Number(q.get('days')) || 7) }, cors);
   if (p === '/api/perf/profile') {
     const gz = perf.profileOf(q.get('id')); if (!gz) return fail(res, 404, 'not_found', cors);
