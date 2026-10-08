@@ -23,7 +23,7 @@
 // whether or not GLWRAP's wrappers sit between; the trace stops 3 s after the load event), self time in web/scenery/*.js, scene.js canvasTex inclusive;
 // the exact time spent blocked in getProgramInfoLog / getShaderInfoLog / LINK_STATUS / COMPILE_STATUS (GLWRAP); renderer.info.programs
 // after settle (through ?uitest=1's window.__scene); requests, bytes, 304s, emoji requests. Program links per phase (GLWRAP): home (the load),
-// lobby (the settled clicks; in the match pass: Play to the Matt pick), join (the pick to the court: welcome, setCourt, calibration), match
+// lobby (the settled clicks, which never join a court: no row = no links; in the match pass: Play to the Matt pick), join (the pick to the court: welcome, setCourt, calibration), match
 // (the first PERF_LOAD_MATCH_MS on court): made, sync (the main thread waited at the program's first use: COMPLETION_STATUS never said done
 // before it) with blocking ms, async (polled done first), del (released); the scene's own context only, every other one (podview, MediaPipe)
 // summed under 'other'. Timing marks the page itself makes (gl:first-frame, gl:ready, scenery:reveal: what rum.js uploads live). Interactions: Event Timing (>= 16 ms only:
