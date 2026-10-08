@@ -98,15 +98,19 @@ function shapeFin(b, origin, clicks) {
 const blockOf = loaf => Math.round(loaf.reduce((a, f) => a + (f[2] || 0), 0) * 10) / 10;
 
 // a beacon body (text/plain JSON, either part) -> { ok, status }
-function beacon({ origin, ua, body, now = Date.now() }) {
+function beacon({ origin, ua, body, req = null, now = Date.now() }) {
   const b0 = (() => { try { return JSON.parse(body); } catch { return null; } })(), b = obj(b0);
   const site = siteOf(origin, b.site);
   if (!site) return { status: 403 };
   if (isBot(ua)) return { status: 204 };
   const id = typeof b.id === 'string' && /^[0-9a-f]{16}$/.test(b.id) ? b.id : null;
   if (!id || (b.kind !== 'load' && b.kind !== 'fin')) return { status: 400 };
+  const page = pageOf(b.page, origin);
+  // another site's page view and named events (NOTES 233: danielrltan.com's in-house counts, in place of Umami); poddleball.com counts its own as served
+  if (b.kind === 'load') traffic.view(site, { page, ua, tag: str(b.tag, 40), referer: str(b.ref, 200), req });
+  else for (const e of arr(b.evs, 50)) { const x = arr(e, 2); traffic.event(site, str(x[0], 32), str(x[1], 80)); }
   if (db.nearFull()) return { status: 204 };                         // player stats come first
-  const page = pageOf(b.page, origin), base = { id, site, page, at: now, ua: uaOf(ua) };
+  const base = { id, site, page, at: now, ua: uaOf(ua) };
   if (b.kind === 'load') {
     const L = shapeLoad(b, origin, site === 'poddleball.com'), n = L.nav;
     const v = { ...base, ttfb: n.ps, fcp: L.fcp, lcp: L.lcp.t, dcl: n.dl, onload: n.le, inp: null, cls: null, block: blockOf(L.loaf), load: zlib.gzipSync(JSON.stringify(L)) };

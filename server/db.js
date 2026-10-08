@@ -185,6 +185,23 @@ CREATE TABLE IF NOT EXISTS traffic (
   people  INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, page, source)
 );
+CREATE TABLE IF NOT EXISTS site_traffic (
+  site    TEXT    NOT NULL,
+  day     TEXT    NOT NULL CHECK (length(day) = 10),
+  page    TEXT    NOT NULL,
+  source  TEXT    NOT NULL,
+  views   INTEGER NOT NULL DEFAULT 0,
+  people  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (site, day, page, source)
+);
+CREATE TABLE IF NOT EXISTS site_events (
+  site    TEXT    NOT NULL,
+  day     TEXT    NOT NULL CHECK (length(day) = 10),
+  name    TEXT    NOT NULL,
+  detail  TEXT    NOT NULL,
+  n       INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (site, day, name, detail)
+);
 CREATE TABLE IF NOT EXISTS perf_views (
   id      TEXT    PRIMARY KEY CHECK (length(id) = 16),
   site    TEXT    NOT NULL,
@@ -201,7 +218,7 @@ CREATE TABLE IF NOT EXISTS perf_profiles (
   id      TEXT    PRIMARY KEY REFERENCES perf_views(id) ON DELETE CASCADE,
   at      INTEGER NOT NULL,
   body    BLOB    NOT NULL
-);`;   // traffic (server/traffic.js, NOTES 219): page views as daily totals, page '' = every page, source '' = every source; no person in it. perf_views / perf_profiles (server/perf.js, NOTES 232): one page load's timings (gzipped JSON) and, for a sample, its gzipped JS profile; no address, no identifier, swept to 30 days and fixed row caps   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
+);`;   // traffic (server/traffic.js, NOTES 219): page views as daily totals, page '' = every page, source '' = every source; no person in it. site_traffic / site_events (traffic.js view/event, NOTES 233): the same daily totals for danielrltan.com, and its named events per day. perf_views / perf_profiles (server/perf.js, NOTES 232): one page load's timings (gzipped JSON) and, for a sample, its gzipped JS profile; no address, no identifier, swept to 30 days and fixed row caps   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
 // a request from -> to (the PK indexes from_id, friend_reqs_to the other side: an account's cascade never scans). sent 0 = a row its from side never sent
 // (a removal's block, or a declined request its sender cancelled): it still blocks re-requests until it expires, but nobody is ever shown it. created_at is
 // the from side's clock (expiry, the 'at' its sender sees; a blocked re-add restarts it as a real request would); asked_at is the to side's and never moves
@@ -317,6 +334,10 @@ function prepare() {                                             // every statem
     pageCount: q('PRAGMA page_count'), freePages: q('PRAGMA freelist_count'),
     trafAdd: q('INSERT INTO traffic (day, page, source, views, people) VALUES (?, ?, ?, ?, ?) ON CONFLICT(day, page, source) DO UPDATE SET views = views + excluded.views, people = people + excluded.people'),
     trafFrom: q('SELECT day, page, source, views, people FROM traffic WHERE day >= ? ORDER BY day DESC'),
+    siteTrafAdd: q('INSERT INTO site_traffic (site, day, page, source, views, people) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(site, day, page, source) DO UPDATE SET views = views + excluded.views, people = people + excluded.people'),
+    siteTrafFrom: q('SELECT day, page, source, views, people FROM site_traffic WHERE site = ? AND day >= ? ORDER BY day DESC'),
+    siteEvAdd: q('INSERT INTO site_events (site, day, name, detail, n) VALUES (?, ?, ?, ?, ?) ON CONFLICT(site, day, name, detail) DO UPDATE SET n = n + excluded.n'),
+    siteEvFrom: q('SELECT day, name, detail, n FROM site_events WHERE site = ? AND day >= ? ORDER BY day DESC, n DESC'),
     // perf (server/perf.js): a view is inserted by its load beacon (or its end beacon, if that came first) and updated by the other; a profile hangs off its view
     perfIns: q(`INSERT INTO perf_views (id, site, page, at, ua, ttfb, fcp, lcp, dcl, onload, inp, cls, block, load) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET ttfb = excluded.ttfb, fcp = excluded.fcp, lcp = coalesce(perf_views.lcp, excluded.lcp), dcl = excluded.dcl, onload = excluded.onload, block = excluded.block, load = excluded.load
@@ -965,10 +986,15 @@ function cleanBackups(now, dir) {                                // 11.6: /tmp/p
 }
 
 // Operator helpers for admin.js (additions, never reachable over HTTP).
-const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs', 'traffic', 'perf_views', 'perf_profiles'];
+const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs', 'traffic', 'site_traffic', 'site_events', 'perf_views', 'perf_profiles'];
 // traffic.js's flush (deltas, one transaction) and report (every row from a day on). Rows are counts of pages and sources: never swept, never in an export
 const trafficAdd = guard(false, rows => { tx(() => { for (const r of rows) if (/^\d{4}-\d{2}-\d{2}$/.test(r.day) && typeof r.page === 'string' && typeof r.source === 'string') S.trafAdd.run(r.day, r.page.slice(0, 64), r.source.slice(0, 32), Math.max(0, r.views | 0), Math.max(0, r.people | 0)); }); return true; });
 const trafficReport = guard(null, from => /^\d{4}-\d{2}-\d{2}$/.test(from) ? S.trafFrom.all(from) : null);
+const DAYRE = /^\d{4}-\d{2}-\d{2}$/, SITERE = /^[a-z0-9.-]{1,64}$/;
+const siteTrafficAdd = guard(false, rows => { tx(() => { for (const r of rows) if (SITERE.test(r.site) && DAYRE.test(r.day) && typeof r.page === 'string' && typeof r.source === 'string') S.siteTrafAdd.run(r.site, r.day, r.page.slice(0, 64), r.source.slice(0, 32), Math.max(0, r.views | 0), Math.max(0, r.people | 0)); }); return true; });
+const siteTrafficReport = guard(null, (site, from) => SITERE.test(site) && DAYRE.test(from) ? S.siteTrafFrom.all(site, from) : null);
+const siteEventsAdd = guard(false, rows => { tx(() => { for (const r of rows) if (SITERE.test(r.site) && DAYRE.test(r.day) && typeof r.name === 'string' && typeof r.detail === 'string') S.siteEvAdd.run(r.site, r.day, r.name.slice(0, 32), r.detail.slice(0, 80), Math.max(0, r.n | 0)); }); return true; });
+const siteEventsReport = guard(null, (site, from) => SITERE.test(site) && DAYRE.test(from) ? S.siteEvFrom.all(site, from) : null);
 // perf.js (NOTES 232): rows it already checked and shaped. The day cap is per site; a view whose site does not match is never touched by another's beacon
 const perfPut = guard(false, (v, cap) => tx(() => { if (S.perfDay.get(v.site, v.at - DAY).n >= cap) return false;
   S.perfIns.run(v.id, v.site, v.page, v.at, v.ua, v.ttfb, v.fcp, v.lcp, v.dcl, v.onload, v.inp, v.cls, v.block, v.load); return true; }));
@@ -996,5 +1022,5 @@ const ladderRecomputed = () => recomputed;                       // rows the las
 module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
-  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey, trafficAdd, trafficReport,
+  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey, trafficAdd, trafficReport, siteTrafficAdd, siteTrafficReport, siteEventsAdd, siteEventsReport,
   perfPut, perfFin, perfProfile, perfList, perfGet, perfProfileGet, perfProfileIds, perfFins, perfSweep };

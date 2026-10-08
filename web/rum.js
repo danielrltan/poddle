@@ -5,6 +5,9 @@
 // also records a JS Self-Profiling trace from here to 3 s after load (the page must be served with Document-Policy: js-profiling) and uploads it gzipped.
 // Nothing is stored in the browser; the id is random per load. URLs leave without their query string or fragment. data-clicks="targets" adds which
 // element was clicked (by data-rum, id or class, never its text); without it a click is described by its tag alone.
+// The load part also names where the visit came from (the referrer's origin only, and a ?ref= / ?utm_source= tag): the collector counts other sites'
+// page views from it (NOTES 233). Named events: the page pushes [name, { props }] onto window.rumEvents (danielrltan.com's src/analytics.ts track());
+// each fin part carries the ones not sent yet, as [name, detail], detail = the props' values in key order, URLs without query.
 // <script async src="/rum.js" data-endpoint="https://poddleball.com/api/perf" data-profile="0.5" data-clicks="targets"></script>
 (function () {
   'use strict';
@@ -19,6 +22,14 @@
   var page = location.pathname;
   var r1 = function (v) { return typeof v === 'number' && isFinite(v) ? Math.round(v * 10) / 10 : null; };
   var bare = function (u) { if (!u) return ''; var i = u.search(/[?#]/); return i < 0 ? u : u.slice(0, i); };
+  var qs = (function () { try { var p = new URLSearchParams(location.search); return (p.get('ref') || p.get('utm_source') || '').slice(0, 40); } catch (e) { return ''; } })();
+  var from = (function () { try { return document.referrer ? new URL(document.referrer).origin : ''; } catch (e) { return ''; } })();
+  var evq = window.rumEvents = window.rumEvents || [], evSent = 0;
+  function detail(d) {
+    if (!d || typeof d !== 'object') return '';
+    return Object.keys(d).sort().map(function (k) { var v = d[k]; return typeof v === 'string' ? (/^https?:/.test(v) ? bare(v) : v) : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; })
+      .filter(Boolean).join(' · ').slice(0, 80);
+  }
 
   // ---- the profiler: a sample of loads, Chromium only ----
   var prof = null, profErr = '';
@@ -82,7 +93,7 @@
     });
     var marks = P.getEntriesByType('mark').concat(P.getEntriesByType('measure')).slice(0, 40).map(function (m) { return [m.name, r1(m.startTime), r1(m.duration)]; });
     var c = navigator.connection || {};
-    post({ id: id, kind: 'load', site: SITE, page: page, nav: navPart(), fp: paint['first-paint'], fcp: paint['first-contentful-paint'], lcp: lcp || {}, res: res,
+    post({ id: id, kind: 'load', site: SITE, page: page, tag: qs, ref: from, nav: navPart(), fp: paint['first-paint'], fcp: paint['first-contentful-paint'], lcp: lcp || {}, res: res,
       loaf: loafLoad.slice(0, 40), marks: marks, prof: !!prof, profErr: profErr,
       env: { w: innerWidth, h: innerHeight, dpr: window.devicePixelRatio || 1, mem: navigator.deviceMemory, cpu: navigator.hardwareConcurrency, net: c.effectiveType, save: c.saveData === true } });
   }
@@ -90,8 +101,9 @@
     var rows = Object.keys(ev).map(function (k) { return ev[k]; }), inp = 0;
     rows.forEach(function (r) { if (r[3] > inp) inp = r[3]; });
     rows.sort(function (a, b) { return b[3] - a[3]; });
+    var evs = evq.slice(evSent, evSent + 50).map(function (e) { return [String(e[0]).slice(0, 32), detail(e[1])]; }); evSent += evs.length;
     post({ id: id, kind: 'fin', site: SITE, page: page, lcp: lcp || {}, cls: Math.round(cls * 1e4) / 1e4, inp: rows.length ? inp : null, dur: r1(P.now()),
-      ev: rows.slice(0, 30), loaf: loafLater.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 30), clicks: clicks });
+      ev: rows.slice(0, 30), evs: evs, loaf: loafLater.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 30), clicks: clicks });
   }
   function stopProfile() {
     if (!prof) return; var p = prof; prof = null;

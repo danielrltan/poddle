@@ -118,6 +118,8 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   UA reduced to "Chrome 141 · macOS"; and for ~50% of Chromium loads a JS Self-Profiling trace (HTML is served with Document-Policy: js-profiling). Per load a random
   id, no address/cookie/device id/account, nothing stored in the browser, bots dropped. perf_views / perf_profiles tables: 30 d, 400 views/site/day, 8000 views + 200 profiles total.
   The same collector takes danielrltan.com's beacons (Origin-checked; that site may send click targets). Read on danielrltan.com/stats with STATS_KEY.
+  Since NOTES 233 it also counts danielrltan.com's page views (site_traffic: daily views/people per page and source, from the referrer ORIGIN and ?ref= tag)
+  and its named events (site_events: name + detail per day), replacing Umami there. That is the owner's other site's visitors, not Poddle players.
 - Poddle Helper (Mac, MIT, ~/poddle-helper): AirPod motion over localhost only; accepts poddleball.com,
   www.poddleball.com, poddle.fly.dev, localhost pages.
 

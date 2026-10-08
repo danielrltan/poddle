@@ -4805,3 +4805,17 @@ never which button was pressed (the privacy page promises consent before analyti
   whose load, fin and profile reach the panel reads.
 - Privacy 2 (a new row), 5 (nothing stored in the browser), 7 (30 days), 8 (legitimate interest), summary; Last updated 2026-10-07,
   dateModified, sitemap lastmod. No home-page notice (CLAUDE.md: ask the owner first). CLAUDE.md data-flow inventory updated.
+
+## 233. danielrltan.com's page views, sources and events are counted here, in place of Umami
+The owner (2026-10-07): "stop using umami on danielrltan.com and just build it in house so we can have more visibility and customization".
+- traffic.js now counts per site. poddleball.com is unchanged (counted as served, the `traffic` table). Other sites are counted from
+  rum.js's load beacon (perf.js calls `traffic.view`): the same daily views/people per page and source, people = the network address
+  keyed with the day's in-memory salt (now salted with the site too), never stored; into `site_traffic (site, day, page, source, ...)`.
+  The source comes from the beacon's `tag` (?ref= / ?utm_source=) and `ref` (the referrer's ORIGIN only; rum.js never sends its path),
+  our own host = 'site'; bots dropped. A poddleball.com beacon never counts a view (it would count twice).
+- Named events: the page pushes `[name, props]` onto `window.rumEvents` (danielrltan.com's src/analytics.ts `track()`, formerly
+  Umami's); each fin beacon carries the unsent ones as `[name, detail]` (detail = props' values in key order, URLs without query, 80
+  chars). `traffic.event` counts them per site and UTC day into `site_events`; names must be `[a-z][a-z0-9_]{0,31}`; 500 distinct
+  name+detail a site a day, then detail 'other'.
+- `GET /api/traffic?site=danielrltan.com&days=N`: the same report shape plus `events: [{ name, detail, n }]` per day.
+- test/perf.test.mjs: views/people/sources/events from beacons, a crawler and a poddleball.com beacon not counted, no address stored.

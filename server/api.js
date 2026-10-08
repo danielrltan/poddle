@@ -305,10 +305,12 @@ function panelGate(req, res, bucket) {
   if (!db.isOpen()) { fail(res, 503, 'db_unavailable', cors); return null; }
   return { ...cors, 'Cross-Origin-Resource-Policy': 'cross-origin' };
 }
+// ?site=danielrltan.com (NOTES 233): that site's counts from its beacons, with its named events per day
 function trafficRoute(req, res) {
   const cors = panelGate(req, res, '/api/traffic'); if (!cors) return;
   const q = new URLSearchParams(String(req.url).split('?')[1] || ''), days = Math.min(400, Math.max(1, Math.floor(Number(q.get('days'))) || 30));
-  send(res, 200, { site: 'poddleball.com', days: traffic.report(days) }, cors);
+  const site = q.get('site') === 'danielrltan.com' ? 'danielrltan.com' : 'poddleball.com';
+  send(res, 200, { site, days: traffic.report(days, site) }, cors);
 }
 
 // Page-load diagnostics (server/perf.js, NOTES 232). Writes: POST /api/perf (a view's load or fin part, text/plain JSON from web/rum.js's
@@ -339,7 +341,7 @@ async function perfRoute(req, res, p) {
     let body; try { body = await readRaw(req, p === '/api/perf' ? perf.LIMITS.beacon : perf.LIMITS.profileGz); } catch (e) {
       if (!e || !e.status) return; if (e.status === 413) res.setHeader('Connection', 'close'); return fail(res, e.status, e.error); }
     const ua = String(req.headers['user-agent'] || '');
-    const r = p === '/api/perf' ? perf.beacon({ origin, ua, body: body.toString('utf8') }) : perf.profile({ origin, ua, id: q.get('v'), hint: q.get('s'), body });
+    const r = p === '/api/perf' ? perf.beacon({ origin, ua, body: body.toString('utf8'), req }) : perf.profile({ origin, ua, id: q.get('v'), hint: q.get('s'), body });
     return r.status === 204 ? send(res, 204) : fail(res, r.status, 'perf_' + r.status);
   }
   const cors = panelGate(req, res, '/api/perf/read'); if (!cors) return;

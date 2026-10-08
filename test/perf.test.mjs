@@ -3,7 +3,7 @@
 // return them behind the key. PERF_PORT=<port> moves the server (default 8970). Last line: PERF PASS or N FAILURES.
 import { createRequire } from 'module'; import { spawn } from 'child_process'; import zlib from 'zlib';
 const require = createRequire(import.meta.url);
-const db = require('../server/db.js'), perf = require('../server/perf.js');
+const db = require('../server/db.js'), perf = require('../server/perf.js'), traffic = require('../server/traffic.js');
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
@@ -12,6 +12,7 @@ const quiet = f => { const e = console.error; console.error = () => {}; try { re
 
 console.log('shaping');
 quiet(() => db.open(':memory:')); perf.init({ hosted: true });
+traffic.init({ db, site: 'poddleball.com', addrOf: r => r && r.socket ? r.socket.remoteAddress : 'bad', flushMs: 3600e3, log: () => {} });   // as game.js: no request, no address, no count
 ok(perf.siteOf(PH) === 'poddleball.com' && perf.siteOf('https://www.danielrltan.com') === 'danielrltan.com' && perf.siteOf('https://evil.example') === null && perf.siteOf('http://localhost:5173', 'danielrltan.com') === null, 'sites by Origin; on Fly a localhost origin is refused');
 ok(perf.url('https://poddleball.com/pad.html?k=ABCD#x', PH) === '/pad.html' && perf.url('https://poddleball.com/c/s3cr3tslug', PH) === '/c/*' && perf.url('https://cdn.example/a.js?token=1', PH) === 'https://cdn.example/a.js' && perf.url('blob:https://poddleball.com/1', PH) === 'blob', 'URLs lose query, fragment and share slugs; other origins keep host + path');
 ok(perf.uaOf(CHROME_UA) === 'Chrome 141 · macOS' && perf.uaOf('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1') === 'Safari 18 · iOS · mobile', 'the user agent becomes family, major version, platform');
@@ -41,6 +42,20 @@ ok(perf.beacon({ origin: DR, ua: CHROME_UA, body: JSON.stringify({ id: id1, kind
 perf.beacon({ origin: DR, ua: CHROME_UA, body: JSON.stringify({ id: 'aaaaaaaaaaaaaaaa', kind: 'fin', page: '/', clicks: [['a#resume', 10], ['<b>x</b>', 11]] }) });
 ok(JSON.stringify(perf.viewOf('aaaaaaaaaaaaaaaa').fin.clicks) === '[["a#resume",10],["bx/b",11]]', 'danielrltan.com keeps click targets, characters limited');
 
+console.log("another site's page views and events (NOTES 233)");
+const rq = a => ({ headers: {}, socket: { remoteAddress: a } });
+const dv = (id, a, extra = {}) => perf.beacon({ origin: DR, ua: CHROME_UA, req: rq(a), body: JSON.stringify({ id, kind: 'load', page: '/?ref=x', ...extra }) });
+dv('d000000000000001', '203.0.113.1', { tag: 'LinkedIn' }); dv('d000000000000002', '203.0.113.1', { ref: 'https://www.google.com' }); dv('d000000000000003', '203.0.113.2', { ref: 'https://danielrltan.com' });
+perf.beacon({ origin: DR, ua: 'Mozilla/5.0 (compatible; Googlebot/2.1)', req: rq('203.0.113.3'), body: JSON.stringify({ id: 'd000000000000004', kind: 'load', page: '/' }) });
+perf.beacon({ origin: PH, ua: CHROME_UA, req: rq('203.0.113.4'), body: load('d000000000000005') });
+perf.beacon({ origin: DR, ua: CHROME_UA, req: rq('203.0.113.1'), body: JSON.stringify({ id: 'd000000000000001', kind: 'fin', evs: [['section_view', 'work'], ['section_view', 'work'], ['outbound_link', 'about · https://github.com/x'], ['Bad Name', 'x']] }) });
+let tr = traffic.report(1, 'danielrltan.com')[0];
+ok(tr && tr.views === 3 && tr.people === 2 && tr.pages[0].page === '/', 'three loads of / from two addresses: 3 views, 2 people (the crawler not counted): ' + JSON.stringify(tr && { v: tr.views, p: tr.people, pages: tr.pages }));
+ok(tr && JSON.stringify(tr.sources.map(x => x.source).sort()) === '["google.com","linkedin","site"]', 'sources: the ?ref= tag, the referrer host, our own host as site: ' + JSON.stringify(tr && tr.sources));
+ok(tr && JSON.stringify(tr.events.map(e => [e.name, e.detail, e.n])) === '[["section_view","work",2],["outbound_link","about · https://github.com/x",1]]', 'named events counted per day, bad names dropped: ' + JSON.stringify(tr && tr.events));
+ok(!(traffic.report(1)[0] || { views: 0 }).views && !JSON.stringify(db.siteTrafficReport('danielrltan.com', '2000-01-01')).includes('203.0'), "poddleball.com's beacons never count a view (it counts as it serves), and no address is stored");
+traffic.stop();
+
 console.log('profiles');
 const trace = { resources: ['https://poddleball.com/main.js?v=1'], frames: [{ name: 'boot', resourceId: 0, line: 1, column: 2 }, { name: 'tick', resourceId: 9 }], stacks: [{ frameId: 0 }, { frameId: 1, parentId: 0 }], samples: [{ timestamp: 10, stackId: 1 }, { timestamp: 20 }] };
 r = perf.profile({ origin: PH, ua: CHROME_UA, id: id1, body: zlib.gzipSync(JSON.stringify(trace)) });
@@ -55,7 +70,7 @@ ok(JSON.stringify(ck.targets) === '[{"target":"a#resume","n":1},{"target":"bx/b"
 console.log('caps and sweep');
 for (let i = 0; i < perf.LIMITS.dayCap + 5; i++) perf.beacon({ origin: DR, ua: CHROME_UA, body: load('1' + String(i).padStart(15, '0')) });
 ok(perf.listOf('danielrltan.com', 1).length === perf.LIMITS.dayCap, `a site's day cap holds: ${perf.listOf('danielrltan.com', 1).length}`);
-ok(perf.listOf('poddleball.com', 1).length === 2, 'and does not touch the other site');
+ok(perf.listOf('poddleball.com', 1).length === 3, 'and does not touch the other site');
 db.perfSweep(Date.now(), 30, 10, 0);
 ok(perf.listOf('danielrltan.com', 30).length + perf.listOf('poddleball.com', 30).length === 10 && !perf.profileOf(id1), 'the sweep keeps the newest views and profiles');
 db.perfSweep(Date.now() + 31 * 86400e3, 30, 8000, 200);
