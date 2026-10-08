@@ -26,6 +26,11 @@ function phBadge() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.mp4': 'video/mp4',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml; charset=utf-8', '.ico': 'image/x-icon', '.zip': 'application/zip' };
+// Our own brotli (q11, made when the image is built: server/precompress.js) for text: fly's proxy compresses at about q1 (651 KB of text per home load vs 471).
+// Sent only when the request accepts br (q > 0; '*' is not taken as br) AND <file>.br exists and is as new as its source; anything else is today's response.
+const BR_EXT = new Set(['.js', '.mjs', '.css', '.html', '.svg', '.json', '.webmanifest', '.txt', '.xml']);       // server/precompress.js EXT: the same list
+const takesBr = ae => String(ae || '').split(',').some(t => { const [k, ...p] = t.trim().toLowerCase().split(';'); const q = p.map(x => x.trim()).find(x => x.startsWith('q='));
+  return k.trim() === 'br' && (!q || +q.slice(2) > 0); });
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico', '.m4a', '.mp3', '.mp4']);                // the share card is busted by ?v=, icons rarely change, a new track is a new file name: a week
 const MENU_PATHS = new Set(['/play', '/courts', '/create', '/bot', '/stats', '/ranks', '/leaderboard', '/friends']);      // the game's menu views (web/main.js VIEW_PATH): each is index.html, so a reload stays on its view
 const MOVED = { '/how-to-play': '/how-to-play.html', '/how-to-play/': '/how-to-play.html', '/pickleball-browser-game': '/pickleball-browser-game.html', '/phone-paddle': '/phone-paddle.html', '/pickleball-no-download': '/pickleball-no-download.html', '/pad': '/pad.html', '/pad/': '/pad.html', '/phone': '/pad.html', '/play/': '/play', '/courts/': '/courts', '/create/': '/create', '/bot/': '/bot', '/stats/': '/stats',
@@ -59,33 +64,45 @@ const httpServer = http.createServer((req, res) => {
   if (MENU_PATHS.has(rel)) rel = '/index.html';
   const file = path.join(WEB, path.normalize(rel.endsWith('/') ? rel + 'index.html' : rel));
   if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }      // no climbing out of web/
+  if (file.toLowerCase().endsWith('.br')) return notFound(req, res);                                                  // the precompressed copies are not pages of their own (a 404, as before they existed)
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return notFound(req, res);
-    const ext = path.extname(file).toLowerCase(), mtime = Math.floor(st.mtimeMs / 1000) * 1000;
-    if (ext === '.html') traffic.hit(req, rel);                     // a page someone opened (GET only, found): counted, never who
-    if (ext === '.html') res.setHeader('Document-Policy', 'js-profiling');   // lets web/rum.js profile a sample of loads (NOTES 232); without it the Profiler constructor throws
-    // Validators make 'no-cache' cheap: a reload is a handful of 304s, not 300 KB of JS and CSS again. The tag is weak because the proxy in front (fly) compresses the body.
-    const head = { 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : IMAGE.has(ext) ? 'public, max-age=604800' : 'no-cache',     // vendor/ is 18 MB and never changes
-      ETag: `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`, 'Last-Modified': new Date(mtime).toUTCString() };
-    if (file.startsWith(path.join(WEB, 'download') + path.sep)) { head['Cache-Control'] = 'no-cache'; head['Content-Disposition'] = `attachment; filename="${path.basename(file)}"`; }      // web/download/: Poddle Helper, saved not shown, and a new build is picked up at once (NOTES 36)
-    const inm = req.headers['if-none-match'], ims = Date.parse(req.headers['if-modified-since']);
-    const same = inm ? inm.split(',').some(t => t.trim() === '*' || t.trim().replace(/^W\//, '') === head.ETag.slice(2)) : ims >= mtime;
-    if (same) { res.writeHead(304, head); return res.end(); }
-    // Byte ranges for video only (the no-JavaScript teaser, web/video/): Safari will not play a <video> whose server answers a range with the whole file
-    const rg = ext === '.mp4' && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
-    if (ext === '.mp4') head['Accept-Ranges'] = 'bytes';
-    if (rg && (rg[1] || rg[2])) {
-      const from = rg[1] === '' ? Math.max(0, st.size - +rg[2]) : +rg[1], to = rg[1] === '' || rg[2] === '' ? st.size - 1 : Math.min(+rg[2], st.size - 1);
-      if (from > to || from >= st.size) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}`, ...head }); return res.end(); }
-      res.writeHead(206, { 'Content-Type': MIME[ext], 'Content-Length': to - from + 1, 'Content-Range': `bytes ${from}-${to}/${st.size}`, ...head });
-      if (req.method === 'HEAD') return res.end();
-      return void fs.createReadStream(file, { start: from, end: to }).on('error', () => res.destroy()).pipe(res);
-    }
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': st.size, ...head });
-    if (req.method === 'HEAD') return res.end();
-    fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);   // a file that went away after the stat must not be an uncaught 'error'
+    const ext = path.extname(file).toLowerCase();
+    if (!BR_EXT.has(ext)) return serveFile(req, res, rel, file, st, ext, null);
+    fs.stat(file + '.br', (e2, bst) => serveFile(req, res, rel, file, st, ext, !e2 && bst.isFile() && bst.mtimeMs + 1 >= st.mtimeMs ? bst : null));   // no .br, a directory, or older than the file (edited since): identity. +1 ms: utimes rounding
   });
 });
+// One found file under web/. br: the stat of a fresh <file>.br, or null (none, stale, not a text type). With a .br the response depends on
+// Accept-Encoding (Vary, also on the 304), and each encoding has its own validator: the br copy's ETag ends in -br, so a cache holding one
+// encoding never revalidates into the other's body. Without one, every header and byte is what it was before the .br files existed.
+function serveFile(req, res, rel, file, st, ext, br) {
+  const mtime = Math.floor(st.mtimeMs / 1000) * 1000;
+  if (ext === '.html') traffic.hit(req, rel);                     // a page someone opened (GET only, found): counted, never who
+  if (ext === '.html') res.setHeader('Document-Policy', 'js-profiling');   // lets web/rum.js profile a sample of loads (NOTES 232); without it the Profiler constructor throws
+  // Validators make 'no-cache' cheap: a reload is a handful of 304s, not 300 KB of JS and CSS again. The tag is weak because the proxy in front (fly) compresses what we send as identity.
+  const enc = br && takesBr(req.headers['accept-encoding']) ? 'br' : null;
+  const head = { 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=86400' : IMAGE.has(ext) ? 'public, max-age=604800' : 'no-cache',     // vendor/ is 18 MB and never changes
+    ETag: `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}${enc ? '-br' : ''}"`, 'Last-Modified': new Date(mtime).toUTCString() };
+  if (br) head.Vary = 'Accept-Encoding';
+  if (file.startsWith(path.join(WEB, 'download') + path.sep)) { head['Cache-Control'] = 'no-cache'; head['Content-Disposition'] = `attachment; filename="${path.basename(file)}"`; }      // web/download/: Poddle Helper, saved not shown, and a new build is picked up at once (NOTES 36)
+  const inm = req.headers['if-none-match'], ims = Date.parse(req.headers['if-modified-since']);
+  const same = inm ? inm.split(',').some(t => t.trim() === '*' || t.trim().replace(/^W\//, '') === head.ETag.slice(2)) : ims >= mtime;
+  if (same) { res.writeHead(304, head); return res.end(); }
+  // Byte ranges for video only (the no-JavaScript teaser, web/video/): Safari will not play a <video> whose server answers a range with the whole file
+  const rg = ext === '.mp4' && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  if (ext === '.mp4') head['Accept-Ranges'] = 'bytes';
+  if (rg && (rg[1] || rg[2])) {
+    const from = rg[1] === '' ? Math.max(0, st.size - +rg[2]) : +rg[1], to = rg[1] === '' || rg[2] === '' ? st.size - 1 : Math.min(+rg[2], st.size - 1);
+    if (from > to || from >= st.size) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}`, ...head }); return res.end(); }
+    res.writeHead(206, { 'Content-Type': MIME[ext], 'Content-Length': to - from + 1, 'Content-Range': `bytes ${from}-${to}/${st.size}`, ...head });
+    if (req.method === 'HEAD') return res.end();
+    return void fs.createReadStream(file, { start: from, end: to }).on('error', () => res.destroy()).pipe(res);
+  }
+  if (enc) head['Content-Encoding'] = 'br';                         // never with a range: those are mp4 only, which has no .br
+  res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': enc ? br.size : st.size, ...head });
+  if (req.method === 'HEAD') return res.end();
+  fs.createReadStream(enc ? file + '.br' : file).on('error', () => res.destroy()).pipe(res);   // a file that went away after the stat must not be an uncaught 'error'
+}
 const wss = new WebSocketServer({ server: httpServer, maxPayload: 4096 });   // our biggest message is a few hundred bytes; a huge one is an attack (deep nesting overflows the stack) and closes that socket
 try {                                                            // docs/ACCOUNTS.md 11.3: the stats database before the first socket; a failure is one log line and the game plays as before
   db.open(process.env.PODDLE_DB || ':memory:'); db.sweep(Date.now()); setInterval(() => { try { db.sweep(Date.now()); } catch { /* next day */ } }, 24 * 3600e3).unref();

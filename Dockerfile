@@ -7,6 +7,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server ./server
 COPY web ./web
+# brotli q11 beside every text file (server/precompress.js, ~2 MB of text, a few seconds once per build): game.js sends it to browsers that take br
+RUN node server/precompress.js
 ENV PORT=8080
 EXPOSE 8080
 # node:sqlite (player stats) is still marked experimental in Node 24: its one-time warning is silenced, nothing else changes
