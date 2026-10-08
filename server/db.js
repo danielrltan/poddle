@@ -184,7 +184,24 @@ CREATE TABLE IF NOT EXISTS traffic (
   views   INTEGER NOT NULL DEFAULT 0,
   people  INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, page, source)
-);`;   // traffic (server/traffic.js, NOTES 219): page views as daily totals, page '' = every page, source '' = every source; no person in it   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
+);
+CREATE TABLE IF NOT EXISTS perf_views (
+  id      TEXT    PRIMARY KEY CHECK (length(id) = 16),
+  site    TEXT    NOT NULL,
+  page    TEXT    NOT NULL,
+  at      INTEGER NOT NULL,
+  ua      TEXT    NOT NULL,
+  ttfb    REAL, fcp REAL, lcp REAL, dcl REAL, onload REAL, inp REAL, cls REAL, block REAL,
+  prof    INTEGER NOT NULL DEFAULT 0,
+  load    BLOB,
+  fin     BLOB
+);
+CREATE INDEX IF NOT EXISTS perf_views_at ON perf_views(site, at);
+CREATE TABLE IF NOT EXISTS perf_profiles (
+  id      TEXT    PRIMARY KEY REFERENCES perf_views(id) ON DELETE CASCADE,
+  at      INTEGER NOT NULL,
+  body    BLOB    NOT NULL
+);`;   // traffic (server/traffic.js, NOTES 219): page views as daily totals, page '' = every page, source '' = every source; no person in it. perf_views / perf_profiles (server/perf.js, NOTES 232): one page load's timings (gzipped JSON) and, for a sample, its gzipped JS profile; no address, no identifier, swept to 30 days and fixed row caps   // the global leaderboards (NOTES 126): each board reads one column, highest first. friends / friend_reqs (docs/SOCIAL.md 2): one row per pair (a < b);
 // a request from -> to (the PK indexes from_id, friend_reqs_to the other side: an account's cascade never scans). sent 0 = a row its from side never sent
 // (a removal's block, or a declined request its sender cancelled): it still blocks re-requests until it expires, but nobody is ever shown it. created_at is
 // the from side's clock (expiry, the 'at' its sender sees; a blocked re-add restarts it as a real request would); asked_at is the to side's and never moves
@@ -300,6 +317,23 @@ function prepare() {                                             // every statem
     pageCount: q('PRAGMA page_count'), freePages: q('PRAGMA freelist_count'),
     trafAdd: q('INSERT INTO traffic (day, page, source, views, people) VALUES (?, ?, ?, ?, ?) ON CONFLICT(day, page, source) DO UPDATE SET views = views + excluded.views, people = people + excluded.people'),
     trafFrom: q('SELECT day, page, source, views, people FROM traffic WHERE day >= ? ORDER BY day DESC'),
+    // perf (server/perf.js): a view is inserted by its load beacon (or its end beacon, if that came first) and updated by the other; a profile hangs off its view
+    perfIns: q(`INSERT INTO perf_views (id, site, page, at, ua, ttfb, fcp, lcp, dcl, onload, inp, cls, block, load) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET ttfb = excluded.ttfb, fcp = excluded.fcp, lcp = coalesce(perf_views.lcp, excluded.lcp), dcl = excluded.dcl, onload = excluded.onload, block = excluded.block, load = excluded.load
+      WHERE perf_views.site = excluded.site AND perf_views.load IS NULL`),
+    perfFin: q(`INSERT INTO perf_views (id, site, page, at, ua, lcp, inp, cls, fin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET lcp = coalesce(excluded.lcp, perf_views.lcp), inp = excluded.inp, cls = excluded.cls, fin = excluded.fin WHERE perf_views.site = excluded.site AND perf_views.at > ?`),
+    perfProfIns: q('INSERT OR IGNORE INTO perf_profiles (id, at, body) SELECT id, ?, ? FROM perf_views WHERE id = ? AND site = ? AND prof = 0'),
+    perfProfMark: q('UPDATE perf_views SET prof = 1 WHERE id = ? AND EXISTS (SELECT 1 FROM perf_profiles WHERE id = ?)'),
+    perfDay: q('SELECT count(*) AS n FROM perf_views WHERE site = ? AND at >= ?'),
+    perfList: q('SELECT id, page, at, ua, ttfb, fcp, lcp, dcl, onload, inp, cls, block, prof FROM perf_views WHERE site = ? AND at >= ? ORDER BY at DESC LIMIT ?'),
+    perfGet: q('SELECT id, site, page, at, ua, ttfb, fcp, lcp, dcl, onload, inp, cls, block, prof, load, fin FROM perf_views WHERE id = ?'),
+    perfProfGet: q('SELECT body FROM perf_profiles WHERE id = ?'),
+    perfProfIds: q('SELECT p.id FROM perf_profiles p JOIN perf_views v ON v.id = p.id WHERE v.site = ? AND v.page = ? AND v.at >= ? ORDER BY v.at DESC LIMIT ?'),
+    perfSwOld: q(`DELETE FROM perf_views WHERE rowid IN (SELECT rowid FROM perf_views WHERE at < ? LIMIT ${BATCH})`),
+    perfSwOver: q(`DELETE FROM perf_views WHERE rowid IN (SELECT rowid FROM perf_views ORDER BY at DESC LIMIT ${BATCH} OFFSET ?)`),
+    perfSwProf: q(`DELETE FROM perf_profiles WHERE rowid IN (SELECT rowid FROM perf_profiles ORDER BY at DESC LIMIT ${BATCH} OFFSET ?)`),
+    perfUnmark: q('UPDATE perf_views SET prof = 0 WHERE prof = 1 AND NOT EXISTS (SELECT 1 FROM perf_profiles p WHERE p.id = perf_views.id)'),
     devByHash: q('SELECT id, owner_id, account_id FROM devices WHERE dev_hash = ?'),
     ownerIns: q('INSERT INTO owners (kind, created_at, touched_at) VALUES (?, ?, ?)'),
     ownerGet: q('SELECT id, kind, created_at, touched_at FROM owners WHERE id = ?'),
@@ -930,10 +964,29 @@ function cleanBackups(now, dir) {                                // 11.6: /tmp/p
 }
 
 // Operator helpers for admin.js (additions, never reachable over HTTP).
-const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs', 'traffic'];
+const TABLES = ['owners', 'devices', 'accounts', 'sessions', 'name_holds', 'profile', 'bot_record', 'match_log', 'ladder', 'share', 'friends', 'friend_reqs', 'traffic', 'perf_views', 'perf_profiles'];
 // traffic.js's flush (deltas, one transaction) and report (every row from a day on). Rows are counts of pages and sources: never swept, never in an export
 const trafficAdd = guard(false, rows => { tx(() => { for (const r of rows) if (/^\d{4}-\d{2}-\d{2}$/.test(r.day) && typeof r.page === 'string' && typeof r.source === 'string') S.trafAdd.run(r.day, r.page.slice(0, 64), r.source.slice(0, 32), Math.max(0, r.views | 0), Math.max(0, r.people | 0)); }); return true; });
 const trafficReport = guard(null, from => /^\d{4}-\d{2}-\d{2}$/.test(from) ? S.trafFrom.all(from) : null);
+// perf.js (NOTES 232): rows it already checked and shaped. The day cap is per site; a view whose site does not match is never touched by another's beacon
+const perfPut = guard(false, (v, cap) => tx(() => { if (S.perfDay.get(v.site, v.at - DAY).n >= cap) return false;
+  S.perfIns.run(v.id, v.site, v.page, v.at, v.ua, v.ttfb, v.fcp, v.lcp, v.dcl, v.onload, v.inp, v.cls, v.block, v.load); return true; }));
+const perfFin = guard(false, (v, cap) => tx(() => { if (S.perfDay.get(v.site, v.at - DAY).n >= cap && !S.perfGet.get(v.id)) return false;
+  return Number(S.perfFin.run(v.id, v.site, v.page, v.at, v.ua, v.lcp, v.inp, v.cls, v.fin, v.at - HOUR).changes) > 0; }));
+const perfProfile = guard(false, (id, site, at, body) => tx(() => Number(S.perfProfIns.run(at, body, id, site).changes) > 0 && Number(S.perfProfMark.run(id, id).changes) > 0));
+const perfList = guard(null, (site, from, limit) => S.perfList.all(site, from, limit));
+const perfGet = guard(null, id => S.perfGet.get(id) || null);
+const perfProfileGet = guard(null, id => { const r = S.perfProfGet.get(id); return r ? r.body : null; });
+const perfProfileIds = guard(null, (site, page, from, limit) => S.perfProfIds.all(site, page, from, limit).map(r => r.id));
+// the views older than `days`, then everything past the newest `views` views and `profiles` profiles; one short transaction per batch
+const perfSweep = guard(null, (now, days, views, profiles) => {
+  let n = 0, k;
+  do { k = tx(() => Number(S.perfSwOld.run(now - days * DAY).changes)); n += k; } while (k === BATCH);
+  do { k = tx(() => Number(S.perfSwOver.run(views).changes)); n += k; } while (k === BATCH);
+  do { k = tx(() => Number(S.perfSwProf.run(profiles).changes)); n += k; } while (k === BATCH);
+  tx(() => S.perfUnmark.run());
+  return n;
+});
 const counts = guard(null, () => Object.fromEntries(TABLES.map(t => [t, D.prepare('SELECT count(*) AS n FROM ' + t).get().n])));   // table names are literals from TABLES
 const vacuumInto = guard(false, out => { if (typeof out !== 'string' || !/^\/tmp\/poddle-backup-\d{8}-\d{4}\.db$/.test(out)) return false; D.prepare('VACUUM INTO ?').run(out); return true; });
 
@@ -941,4 +994,5 @@ const ladderRecomputed = () => recomputed;                       // rows the las
 module.exports = { resetStats, open, close, isOpen, ok, nearFull, ownerForDevice, guestOwner, accountByDevice, accountBySub, accountById, accountByKey, createAccount, mergeDevice,
   session, recordMatch, addTitle, profileOf, exportOf, deleteOwner, claimUsername, adminRename, releaseHold, recentPairs, recentLosses, recentWins, oneWay,
   established, ownerExists, deviceCount, sweep, counts, vacuumInto, hash: sha256, LEVEL_NAME, ladderOf, ladderTier, ladderApply, shareOf, shareOwner, shareMake, shareDrop, usernameOf,
-  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey, trafficAdd, trafficReport };
+  leaderboard, leaderPlaces, leaderHide, leaderOwnerByKey, BOARDS: Object.keys(BOARDS), ladderRecomputed, friendOp, friendsOf, friendIds, friendPeers, friendRel, friendSearch, accountFresh, playerByKey, trafficAdd, trafficReport,
+  perfPut, perfFin, perfProfile, perfList, perfGet, perfProfileGet, perfProfileIds, perfSweep };

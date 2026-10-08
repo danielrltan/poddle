@@ -112,7 +112,12 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   token carries email/name/picture, which the server discards, keeping only `sub`; Google sets its own cookies / FedCM
   in its window). No ads, no third-party analytics. Page views (server/traffic.js, NOTES 219): per UTC day, page and source (?ref= tag, referring
   host, direct, bot) two totals in the traffic table, views and people; "people" keys the network address with a per-day in-memory salt and
-  keeps the key in memory for the day only, never on disk. Adding a page kind or a new query field that reaches the count is a Privacy 2/7 change.
+  keeps the key in memory for the day only, never on disk. Adding a page kind or a new query field that reaches the count is a Privacy 2/7 change. Page-load diagnostics (server/perf.js + web/rum.js, NOTES 232): on index, pad and how-to-play
+  (never the no-JS landing pages: seo.test), rum.js sends navigation/paint/resource timings (URLs without query or fragment; /c/<slug> -> /c/*), long frames with
+  script URL + function names, click/key latency by element TAG only (never which button: owner's choice, privacy 2), window size, cores, memory, network class,
+  UA reduced to "Chrome 141 · macOS"; and for ~50% of Chromium loads a JS Self-Profiling trace (HTML is served with Document-Policy: js-profiling). Per load a random
+  id, no address/cookie/device id/account, nothing stored in the browser, bots dropped. perf_views / perf_profiles tables: 30 d, 400 views/site/day, 8000 views + 200 profiles total.
+  The same collector takes danielrltan.com's beacons (Origin-checked; that site may send click targets). Read on danielrltan.com/stats with STATS_KEY.
 - Poddle Helper (Mac, MIT, ~/poddle-helper): AirPod motion over localhost only; accepts poddleball.com,
   www.poddleball.com, poddle.fly.dev, localhost pages.
 

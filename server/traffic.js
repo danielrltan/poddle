@@ -90,4 +90,4 @@ function report(days = 7) {
   for (const d of list) { d.sources.sort((a, b) => b.people - a.people || b.views - a.views || a.source.localeCompare(b.source)); d.pages.sort((a, b) => b.views - a.views); }
   return list;
 }
-module.exports = { init, stop, hit, flush, report, sourceOf, pageOf };
+module.exports = { init, stop, hit, flush, report, sourceOf, pageOf, BOT };   // BOT: perf.js drops the same crawlers

@@ -4777,3 +4777,27 @@ danielrltan.com, which already uses Umami).
   the panel subtracts that row for its headline numbers.
 - test/traffic.test.mjs: no key = 404, preflight from the panel's origin vs another, 401 without/with a wrong key, 200 with the report.
 - Nothing new is collected, so the privacy page is unchanged.
+
+## 232. Page-load diagnostics: load timings, long frames and a sampled JS profile (flame graph), for Poddle and danielrltan.com
+The owner (2026-10-07): "setup this for tracking website interactions on danielrltan.com and poddleball.com ... flame graph to diagnose
+loading latency", then "both should be in house" (no Sentry/PostHog), and for Poddle "latency only": click/key latency by element tag,
+never which button was pressed (the privacy page promises consent before analytics).
+- web/rum.js (`<script async>` first in `<head>` of index, pad and how-to-play; NOT the three no-JS landing pages, seo.test forbids
+  scripts there). It sends two text/plain beacons to /api/perf: `load` 3 s after onload (navigation phases, FP/FCP/LCP, the 150 slowest
+  resources, long animation frames with their scripts' URL/function/invoker, performance marks, window/cores/memory/network) and `fin`
+  when the tab is hidden or left (LCP, CLS, INP and the 30 slowest interactions, later long frames; danielrltan.com also click targets).
+  For `data-profile` of loads (0.5) it runs a JS Self-Profiling `Profiler` (10 ms, from the script to onload + 3 s) and POSTs the trace
+  gzipped to /api/perf/profile?v=<id>. Every HTML response now carries `Document-Policy: js-profiling` (game.js), or the constructor
+  throws. Skipped for navigator.webdriver and localhost unless a test sets `window.__rumForce` (`__rumProfile` forces the sample).
+- server/perf.js shapes every field (no unknown key survives), strips query + fragment from every URL and /c/<slug> to /c/*, reduces the
+  UA to "Chrome 141 · macOS", drops traffic.js's BOT list, takes the site from the Origin header only (poddleball.com, danielrltan.com,
+  www.; localhost only off Fly). Tables perf_views (gzipped load/fin JSON + metric columns) and perf_profiles (gzipped trace), swept
+  hourly: 30 days, 8000 views, 200 profiles; 400 views a site a day; nothing written when db.nearFull(). Worst case ~60 MB of the
+  256 MB cap. Writes are CORS simple requests (no preflight, no Access-Control header back); 40 beacons / 6 profiles a minute per address.
+- Reads for the owner's panel (danielrltan.com/stats), behind STATS_KEY with /api/traffic's gate (now panelGate, shared): GET
+  /api/perf?site=&days= (list), /api/perf/view?id=, /api/perf/profile?id= (the stored gzip), /api/perf/profiles?site=&page=&days=.
+- A headless Chrome sends its unload beacon with its own UA even after setUserAgent, and HeadlessChrome is a bot: perf.test launches
+  Chrome with --user-agent. test/perf.test.mjs (in deploy.sh): shaping, privacy strips, caps, sweep, and a real home-page load in Chrome
+  whose load, fin and profile reach the panel reads.
+- Privacy 2 (a new row), 5 (nothing stored in the browser), 7 (30 days), 8 (legitimate interest), summary; Last updated 2026-10-07,
+  dateModified, sitemap lastmod. No home-page notice (CLAUDE.md: ask the owner first). CLAUDE.md data-flow inventory updated.

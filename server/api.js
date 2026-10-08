@@ -8,7 +8,7 @@
 // Public, no sign-in: GET /api/leaderboard (NOTES 126), GET /api/leaderboard/player?u=<name> (a listed player's profile card, NOTES 140) and GET /api/player?name=
 // (the same card's rank, places and friend row, docs/SOCIAL.md 8: rank + places only when not hidden or to a friend, st only to a friend).
 const crypto = require('node:crypto');
-const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic');
+const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic'), perf = require('./perf');
 let names = null; try { names = require('./usernames'); } catch { /* usernames need sign-in, which then answers 503 */ }
 
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, BODY_MAX = 8192, BODY_MS = 5000;
@@ -290,19 +290,68 @@ const ROUTES = {
 // never reads a cookie and never sends Allow-Credentials: the key is the only way in. Counts of pages and sources only, no person in them
 const PANEL = new Set(['https://danielrltan.com', 'https://www.danielrltan.com']);
 const sha = s => crypto.createHash('sha256').update(String(s)).digest();
-function trafficRoute(req, res) {
-  if (!statsKey) return fail(res, 404, 'not_found');
+// the panel's gate, shared by /api/traffic and the perf reads: CORS for the panel's origins, the preflight, GET only, 30 a minute, the key, the database.
+// -> the CORS headers to answer with, or null once it has answered
+function panelGate(req, res, bucket) {
+  if (!statsKey) { fail(res, 404, 'not_found'); return null; }
   const origin = String(req.headers.origin || ''), cors = { Vary: 'Origin' };
   if (PANEL.has(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d{1,5}$/.test(origin)) cors['Access-Control-Allow-Origin'] = origin;
-  if (req.method === 'OPTIONS') { res.writeHead(204, { ...cors, 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Authorization', 'Access-Control-Max-Age': '86400' }); return void res.end(); }
-  if (req.method !== 'GET') return fail(res, 405, 'method', { Allow: 'GET, OPTIONS', ...cors });
-  const addr = auth.clientAddr(req).addr, wait = limiter.take('/api/traffic', nodeKey(addr), 30, MIN, wideKey(addr));
-  if (wait) return fail(res, 429, 'rate', { 'Retry-After': String(wait), ...cors }, { retryAfter: wait });
+  if (req.method === 'OPTIONS') { res.writeHead(204, { ...cors, 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Authorization', 'Access-Control-Max-Age': '86400' }); res.end(); return null; }
+  if (req.method !== 'GET') { fail(res, 405, 'method', { Allow: 'GET, OPTIONS', ...cors }); return null; }
+  const addr = auth.clientAddr(req).addr, wait = limiter.take(bucket, nodeKey(addr), bucket === '/api/traffic' ? 30 : 120, MIN, wideKey(addr));
+  if (wait) { fail(res, 429, 'rate', { 'Retry-After': String(wait), ...cors }, { retryAfter: wait }); return null; }
   const m = /^Bearer (\S{1,200})$/.exec(String(req.headers.authorization || ''));
-  if (!m || !crypto.timingSafeEqual(sha(m[1]), sha(statsKey))) return fail(res, 401, 'key', cors);
-  if (!db.isOpen()) return fail(res, 503, 'db_unavailable', cors);
+  if (!m || !crypto.timingSafeEqual(sha(m[1]), sha(statsKey))) { fail(res, 401, 'key', cors); return null; }
+  if (!db.isOpen()) { fail(res, 503, 'db_unavailable', cors); return null; }
+  return { ...cors, 'Cross-Origin-Resource-Policy': 'cross-origin' };
+}
+function trafficRoute(req, res) {
+  const cors = panelGate(req, res, '/api/traffic'); if (!cors) return;
   const q = new URLSearchParams(String(req.url).split('?')[1] || ''), days = Math.min(400, Math.max(1, Math.floor(Number(q.get('days'))) || 30));
-  send(res, 200, { site: 'poddleball.com', days: traffic.report(days) }, { ...cors, 'Cross-Origin-Resource-Policy': 'cross-origin' });
+  send(res, 200, { site: 'poddleball.com', days: traffic.report(days) }, cors);
+}
+
+// Page-load diagnostics (server/perf.js, NOTES 232). Writes: POST /api/perf (a view's load or fin part, text/plain JSON from web/rum.js's
+// sendBeacon) and POST /api/perf/profile?v=<id> (its JS profile, gzipped). Both are CORS "simple" requests: no preflight, and no Access-Control
+// header in the answer (the page never reads it). The Origin header names the site and must be poddleball.com or danielrltan.com; no cookie
+// is read. Reads, behind the panel's key: GET /api/perf?site=&days= (the list), /api/perf/view?id= (one view), /api/perf/profile?id= (its
+// profile, the stored gzip), /api/perf/profiles?site=&page=&days= (the newest 30 profile ids of a page, for the merged flame graph)
+function readRaw(req, max) {                                      // -> Buffer, or throws { status, error }
+  return new Promise((resolve, reject) => {
+    let n = 0, done = false; const parts = [];
+    const end = (err, v) => { if (done) return; done = true; clearTimeout(timer); req.removeListener('data', onData); err ? reject(err) : resolve(v); };
+    const timer = setTimeout(() => end({ status: 408, error: 'timeout' }), BODY_MS);
+    const onData = c => { n += c.length; if (n > max) return end({ status: 413, error: 'too_large' }); parts.push(c); };
+    req.on('data', onData); req.on('end', () => end(null, Buffer.concat(parts)));
+    req.on('aborted', () => end({ status: 0, error: 'aborted' })); req.on('close', () => end({ status: 0, error: 'aborted' }));
+  });
+}
+async function perfRoute(req, res, p) {
+  const q = new URLSearchParams(String(req.url).split('?')[1] || '');
+  if (req.method === 'POST' && (p === '/api/perf' || p === '/api/perf/profile')) {
+    const origin = String(req.headers.origin || '');
+    if (!perf.siteOf(origin, q.get('s'))) return fail(res, 403, 'origin');
+    const ct = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    if (ct !== 'text/plain' && ct !== 'application/json') return fail(res, 415, 'content_type');
+    const addr = auth.clientAddr(req).addr, wait = limiter.take(p, nodeKey(addr), p === '/api/perf' ? 40 : 6, MIN, wideKey(addr));
+    if (wait) return fail(res, 429, 'rate', { 'Retry-After': String(wait) }, { retryAfter: wait });
+    if (!db.isOpen()) return fail(res, 503, 'db_unavailable');
+    let body; try { body = await readRaw(req, p === '/api/perf' ? perf.LIMITS.beacon : perf.LIMITS.profileGz); } catch (e) {
+      if (!e || !e.status) return; if (e.status === 413) res.setHeader('Connection', 'close'); return fail(res, e.status, e.error); }
+    const ua = String(req.headers['user-agent'] || '');
+    const r = p === '/api/perf' ? perf.beacon({ origin, ua, body: body.toString('utf8') }) : perf.profile({ origin, ua, id: q.get('v'), hint: q.get('s'), body });
+    return r.status === 204 ? send(res, 204) : fail(res, r.status, 'perf_' + r.status);
+  }
+  const cors = panelGate(req, res, '/api/perf/read'); if (!cors) return;
+  if (p === '/api/perf') return send(res, 200, { site: q.get('site') || 'poddleball.com', views: perf.listOf(q.get('site'), Number(q.get('days')) || 7) || [] }, cors);
+  if (p === '/api/perf/view') { const v = perf.viewOf(q.get('id')); return v ? send(res, 200, v, cors) : fail(res, 404, 'not_found', cors); }
+  if (p === '/api/perf/profiles') return send(res, 200, { ids: perf.profileIds(q.get('site'), q.get('page'), Number(q.get('days')) || 7) }, cors);
+  if (p === '/api/perf/profile') {
+    const gz = perf.profileOf(q.get('id')); if (!gz) return fail(res, 404, 'not_found', cors);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip', 'Content-Length': gz.length, 'Cache-Control': 'private, max-age=86400', 'X-Robots-Tag': 'noindex', ...cors });
+    return res.end(gz);
+  }
+  fail(res, 404, 'not_found', cors);
 }
 
 // handle(req, res) -> Promise that never rejects. game.js: api.handle(req, res).catch(() => {})
@@ -313,6 +362,8 @@ async function handle(req, res) {
     const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
     if (OLD_HOSTS.has(host)) return fail(res, 404, 'wrong_host');
     if (String(req.url || '').split('?')[0] === '/api/traffic') return trafficRoute(req, res);
+    const p = String(req.url || '').split('?')[0];
+    if (p === '/api/perf' || p.startsWith('/api/perf/')) return await perfRoute(req, res, p);
     const route = ROUTES[String(req.url || '').split('?')[0]];
     if (!route) return fail(res, 404, 'not_found');
     const r = route[req.method]; if (!r) return fail(res, 405, 'method', { Allow: Object.keys(route).join(', ') });
