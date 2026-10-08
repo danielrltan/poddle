@@ -56,6 +56,7 @@ export function createScenery(THREE, ctx) {
     // go once this venue's sky has built; scene.js's lollipop trees, which stand exactly in the calm band, go once flora.js has (update()).
     for (const o of ctx.plainSky) o.visible = !v.sky; if (v.sky) ctx.fog.color.set(pal.fog);
     if (typeof window !== 'undefined') window.__scenery = handle;
+    if (typeof ctx.onShown === 'function') ctx.onShown(name);                     // scene.js: its next drawn frame is the reveal (scenery:reveal, sceneryReady)
   };
   const hide = () => { shown = null; for (const k in V) V[k].root.visible = false; for (const o of ctx.plainSky) o.visible = true; };   // between venues: scene.js's plain look (it has just set that venue's sky/fog/lights)
 

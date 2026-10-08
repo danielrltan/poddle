@@ -479,8 +479,24 @@ export function createScene(containerEl) {
 
   // ---------- everything beyond the fences lives in web/scenery/ (docs/SCENERY.md). Missing or broken: the plain sky above stays. ----------
   let scenery = null;
-  import('./scenery/index.js').then(m => { scenery = m.createScenery(THREE, { scene, renderer, camera, sun, hemi, fog: scene.fog, plainSky, court: () => court, side: () => localSide, venue: () => venue }); })
-    .catch(e => { if (!/Failed to fetch|Cannot find module|404/i.test(String(e && e.message))) console.error('scenery:', e); });
+  // Timing marks, read live (rum.js uploads the page's marks and measures with its load part): gl:first-frame, the first frame drawn (start,
+  // duration: three links every program it meets there); gl:ready, when the scene's programs are linked (for now the end of that frame:
+  // three has just linked them all, synchronously); scenery:reveal, the frame that swaps web/scenery/ in (start, duration: its programs'
+  // first use). Each once a load. Always performance.now(): render() may be handed a virtual clock (test/perf-load.mjs's screenshots).
+  const stamp = (name, t0, t1) => { try { if (t1 == null) performance.mark(name, { startTime: t0 }); else performance.measure(name, { start: t0, end: t1 }); } catch (e) { /* an engine without the options forms */ } };
+  let firstDrawn = false, glMarked = false, revealing = false, revealed = false, sceneryDone = null;
+  const markGlReady = t => { if (glMarked) return; glMarked = true; stamp('gl:ready', t); };
+  // sceneryReady: true once the frame that swapped the scenery in has been DRAWN (its heavy first use done; a hidden tab waits until it is
+  // seen); false if web/scenery/ never came (missing, broken). What other code waits on instead of window.__scenery (a test handle).
+  const sceneryReady = new Promise(r => { sceneryDone = r; });
+  const onShown = () => { if (!revealed) revealing = true; };                     // web/scenery/index.js show(): the swap is in the scene graph; the next drawn frame is its reveal
+  const framed = t0 => {                                   // after a frame was drawn: the marks above
+    if (firstDrawn && !revealing) return; const t1 = performance.now();
+    if (!firstDrawn) { firstDrawn = true; stamp('gl:first-frame', t0, t1); markGlReady(t1); }
+    if (revealing) { revealing = false; revealed = true; stamp('scenery:reveal', t0, t1); sceneryDone(true); }
+  };
+  import('./scenery/index.js').then(m => { scenery = m.createScenery(THREE, { scene, renderer, camera, sun, hemi, fog: scene.fog, plainSky, court: () => court, side: () => localSide, venue: () => venue, onShown }); })
+    .catch(e => { sceneryDone(false); if (!/Failed to fetch|Cannot find module|404/i.test(String(e && e.message))) console.error('scenery:', e); });
 
   // ---------- court (rebuilt by setCourt) ----------
   let courtGroup = null;
@@ -1569,6 +1585,7 @@ export function createScene(containerEl) {
     if (document.visibilityState === 'hidden') return false;                                        // nobody is looking: draw nothing, menu or not
     if ((menu || dim) && !force && lastMs && now >= lastMs && now - lastMs < 30) return false;      // a menu (or a pause behind the blur) runs at 30 fps. dt below is between DRAWN frames
     const dt = lastMs ? clamp((now - lastMs) / 1000, 0, 0.05) : 1 / 60; lastMs = now; timeS += dt; force = false; drawn++;
+    const t0 = firstDrawn && !revealing ? 0 : performance.now();                    // a frame the marks time (framed)
     if (at.on) attractStep(dt);
     trophy.visible = vicOn() && pads[vic.side].has; if (!trophy.visible) vicLight.intensity = 0;
     updateBallVis(now, dt); updatePads(dt); if (!menu) updateFx(dt);
@@ -1580,7 +1597,7 @@ export function createScene(containerEl) {
         vpW = ww; vpH = hh; playPose(i, povSt[i], ww / hh, false, dt); dress(i, i, -1); drawTrail(); faceFx();                // trail and rings are rebuilt for each camera
         if (!i && scenery) scenery.update(dt, timeS, camera);                                           // once a frame, with the first camera
         renderer.setViewport(x, y, ww, hh); renderer.setScissor(x, y, ww, hh); renderer.render(scene, camera); }
-      renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h);
+      renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); framed(t0);
       return true;
     }
     vpW = w; vpH = h; updateCamera(dt, w / h); drawTrail(); faceFx(); if (scenery) scenery.update(dt, timeS, camera);
@@ -1588,6 +1605,7 @@ export function createScene(containerEl) {
     if (hold) { for (const o of casters) o.castShadow = false; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true; }
     renderer.render(scene, camera);
     if (hold) { for (const o of casters) o.castShadow = true; for (const pd of pads) if (pd.self) pd.avatar.traverse(m => { if (m.isMesh) m.castShadow = false; }); renderer.shadowMap.autoUpdate = false; shadowHold = 2; }      // your own see-through body still casts none
+    framed(t0);
     return true;
   }
 
@@ -1598,7 +1616,7 @@ export function createScene(containerEl) {
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
-    updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize,
+    updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize, sceneryReady,
     jingle(kind) { if (['win', 'lose', 'watch', 'forfeit', 'champ'].includes(kind)) sfx.jingle(kind); else if (['rankup', 'divup'].includes(kind)) sfx.rankJingle(kind); },      // the result card's sting: main.js showOver / showChamp only; the trophy row's rank-up / division-up (docs/TROPHIES.md 4)
     cue(kind) { if (kind === 'tick' || kind === 'tom') sfx.cue(kind); },      // small cues: the trophy count's clicks (main.js, the trophy ceremony)
     // Sound. setSink takes a deviceId ('' = the system default) and resolves false when that device is gone, so the panel
