@@ -169,7 +169,7 @@ async function readLoad(pg, navT) {
   const ts = traceStats(d.trace); delete d.trace;
   const net = { requests: inWin.length, bytes: inWin.reduce((a, r) => a + (r.bytes || 0), 0), n304: inWin.filter(r => r.wire === 304 || r.status === 304).length, cached: inWin.filter(r => r.cached).length,
     emoji: inWin.filter(r => /\/emoji\//.test(r.url)).length, emojiBytes: inWin.filter(r => /\/emoji\//.test(r.url)).reduce((a, r) => a + (r.bytes || 0), 0),
-    big: inWin.sort((a, b) => b.bytes - a.bytes).slice(0, 6).map(r => [r.url, r.status, r.bytes]) };
+    big: inWin.sort((a, b) => b.bytes - a.bytes).slice(0, 6).map(r => [r.url, r.wire || r.status, r.bytes]) };
   return { settled: !!s, ...d, net, trace: ts, errs: pg.errs.slice(0, 10) };
 }
 
