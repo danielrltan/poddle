@@ -1,6 +1,18 @@
 // The ground and the built things between the fences and the distance (contract: docs/SCENERY.md, layout: the lead's FINAL SPEC).
 // Six draws: ground overlay, stucco boxes, merged props, see-through chainlink/nets, shade sails, painted shadows. Everything is
 // static except the sails (S.sway), so update() is empty. Compass: -z north, +x east (street, stucco), -x west (courts, sand, sea).
+
+// The ground overlay's grain, and the mean linear value of its red channel (the material's colour is 1 / that, so the grain never darkens the
+// average). That mean used to be measured at load with getImageData, which on a GPU canvas waits for everything queued in the GPU process
+// (busy on a cold load: live traces 5-560 ms). GRAIN_LIN is that measurement in Chrome (GPU canvas: the very same double); other rasterisers
+// land within 0.15 % (Chrome's own CPU canvas: 0.89617), a tenth of a level on the ground. test/scenery-consts.mjs pins the drawing below
+// (a hash of every fillStyle and fillRect) and re-measures it in Chrome: change the grain and it fails until GRAIN_LIN is re-measured.
+export const GRAIN_LIN = 0.8948572571503565;
+export function drawGrain(c, w, h, r) {                                   // r: rng(3)
+  c.fillStyle = '#f4f4f4'; c.fillRect(0, 0, w, h);
+  for (let i = 0; i < 5200; i++) { c.fillStyle = r() < 0.4 ? `rgba(255,255,255,${0.2 + r() * 0.5})` : `rgba(0,0,0,${0.03 + r() * 0.08})`; c.fillRect(r() * w, r() * h, 1.5, 1.5); }
+}
+
 export function create(THREE, S) {
   const pal = S.pal, group = new THREE.Group(), hi = !S.low, sh = S.shadowPerM, col = S.color, PI = Math.PI;
   const mix = (a, b, t) => new THREE.Color().lerpColors(col(a), col(b), t);
@@ -83,9 +95,7 @@ export function create(THREE, S) {
     const n = GP.length / 3, uv = new Float32Array(n * 2), nor = new Float32Array(n * 3); for (let i = 0; i < n; i++) { uv[i * 2] = GP[i * 3] / 3; uv[i * 2 + 1] = GP[i * 3 + 2] / 3; nor[i * 3 + 1] = 1; }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(GP, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(GC, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    let lin = 0; const grain = S.tex(256, 256, (c, w, h) => { c.fillStyle = '#f4f4f4'; c.fillRect(0, 0, w, h); const r = S.rng(3);   // fine grain only: nothing big enough to show its 3 m tiling
-      for (let i = 0; i < 5200; i++) { c.fillStyle = r() < 0.4 ? `rgba(255,255,255,${0.2 + r() * 0.5})` : `rgba(0,0,0,${0.03 + r() * 0.08})`; c.fillRect(r() * w, r() * h, 1.5, 1.5); }
-      const d = c.getImageData(0, 0, w, h).data; for (let i = 0; i < d.length; i += 4) lin += Math.pow(d[i] / 255, 2.2); lin /= w * h; }, { repeat: [1, 1], aniso: 8 });
+    const lin = GRAIN_LIN, grain = S.tex(256, 256, (c, w, h) => drawGrain(c, w, h, S.rng(3)), { repeat: [1, 1], aniso: 8 });   // fine grain only: nothing big enough to show its 3 m tiling
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: grain, roughness: 0.92, metalness: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     m.color.setScalar(1 / lin);                                           // the grain must not darken the average, or blob rims would show against the slab
     const mesh = new THREE.Mesh(g, m); mesh.name = 'ground'; mesh.renderOrder = 0.5; mesh.frustumCulled = false; group.add(mesh);   // after the slab and every other opaque thing (they still hide it: depth test stays on)

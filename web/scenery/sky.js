@@ -7,6 +7,8 @@ import { WIND } from './shared.js';   // the PREVAILING heading: clouds ride it,
 
 const DITHER = /* glsl */`c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;`;   // 8-bit output bands a slow gradient; +-half a level of noise hides it
 
+export const SUN_STOPS = [[0, 'sunDisc', 1], [0.085, 'sunDisc', 1], [0.105, 'sunHalo', 0.6], [0.2, 'sunHalo', 0.3], [0.45, 'sunGlow', 0.1], [1, 'sunGlow', 0]];   // the halo: [offset, palette key, alpha] from the centre out
+
 export function create(THREE, S) {
   const group = new THREE.Group(), pal = S.pal, D = Math.PI / 180, TAU = Math.PI * 2, col = S.color, tmp = new THREE.Color();
   const sunAz = Math.atan2(S.sunDir.x, -S.sunDir.z), sunH = new THREE.Vector2(S.sunDir.x, S.sunDir.z).normalize();
@@ -163,9 +165,18 @@ export function create(THREE, S) {
   // ---- sun: disc + halo sprite along S.sunDir, 54 deg up: only the menu, portrait windows and debug cameras ever look that high
   let sun = null;
   if (!S.low) {
-    const t = S.tex(256, 256, (g, w) => { const h = w / 2, rnd = S.rng(9), gr = g.createRadialGradient(h, h, 0, h, h, h), st = (o, hex, al) => gr.addColorStop(o, `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${al})`);
-      st(0, pal.sunDisc, 1); st(0.085, pal.sunDisc, 1); st(0.105, pal.sunHalo, 0.6); st(0.2, pal.sunHalo, 0.3); st(0.45, pal.sunGlow, 0.1); st(1, pal.sunGlow, 0); g.fillStyle = gr; g.fillRect(0, 0, w, w);
-      const im = g.getImageData(0, 0, w, w), d = im.data; for (let i = 3; i < d.length; i += 4) if (d[i] > 0 && d[i] < 250) d[i] = S.clamp(d[i] + (rnd() * 2 - 1) * 1.2, 0, 255); g.putImageData(im, 0, 0); });   // dithered alpha: a 300 px halo out of 8 bits would ring
+    // the halo is computed here, not drawn and read back: getImageData on a GPU canvas waits for everything queued in the GPU process, which
+    // is busy on a cold load (live traces: 1-1400 ms in this one call). Chrome's own gradient rule, so the alpha (and so the dither below)
+    // comes out the same to the bit: stops rounded to 8 bits, linear in between by the pixel centre's distance, rounded; colour unpremultiplied, without
+    // the +-1 level dither Chrome adds to a gradient's colour (test/scenery-consts.mjs draws SUN_STOPS as Chrome's gradient and compares).
+    const t = S.tex(256, 256, (g, w) => { const h = w / 2, rnd = S.rng(9), im = g.createImageData(w, w), d = im.data, rgb = hex => [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16));
+      const ST = SUN_STOPS.map(([o, key, al]) => [o, ...rgb(pal[key]), Math.round(al * 255)]);
+      const px = new Uint32Array(d.buffer), q = new Uint8Array(4), q32 = new Uint32Array(q.buffer);
+      const put = (x, y, v) => { const X = w - 1 - x, Y = w - 1 - y; px[y * w + x] = v; px[y * w + X] = v; px[Y * w + x] = v; px[Y * w + X] = v; };
+      for (let y = 0; y < h; y++) for (let x = 0; x <= y; x++) { const dx = x + 0.5 - h, dy = y + 0.5 - h, o = Math.min(1, Math.sqrt(dx * dx + dy * dy) / h); let k = 0; while (k < ST.length - 2 && o > ST[k + 1][0]) k++;
+        const A = ST[k], B = ST[k + 1], f = (o - A[0]) / (B[0] - A[0]); for (let c = 0; c < 4; c++) q[c] = Math.round(A[c + 1] + (B[c + 1] - A[c + 1]) * f);
+        put(x, y, q32[0]); put(y, x, q32[0]); }   // one octant, mirrored: every mirror has the same dx * dx + dy * dy, so the very same value
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0 && d[i] < 250) d[i] = S.clamp(d[i] + (rnd() * 2 - 1) * 1.2, 0, 255); g.putImageData(im, 0, 0); });   // dithered alpha: a 300 px halo out of 8 bits would ring
     sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, fog: false, depthWrite: false, transparent: true })); sun.scale.setScalar(300); sun.renderOrder = -9; sun.frustumCulled = false; group.add(sun);
   }
 
