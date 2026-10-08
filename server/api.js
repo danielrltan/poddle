@@ -8,7 +8,7 @@
 // Public, no sign-in: GET /api/leaderboard (NOTES 126), GET /api/leaderboard/player?u=<name> (a listed player's profile card, NOTES 140) and GET /api/player?name=
 // (the same card's rank, places and friend row, docs/SOCIAL.md 8: rank + places only when not hidden or to a friend, st only to a friend).
 const crypto = require('node:crypto');
-const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic'), perf = require('./perf');
+const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic'), perf = require('./perf'), sourcemaps = require('./sourcemaps');
 let names = null; try { names = require('./usernames'); } catch { /* usernames need sign-in, which then answers 503 */ }
 
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, BODY_MAX = 8192, BODY_MS = 5000;
@@ -318,11 +318,11 @@ function trafficRoute(req, res) {
 // header in the answer (the page never reads it). The Origin header names the site and must be poddleball.com or danielrltan.com; no cookie
 // is read. Reads, behind the panel's key: GET /api/perf?site=&days= (the list), /api/perf/view?id= (one view), /api/perf/profile?id= (its
 // profile, the stored gzip), /api/perf/profiles?site=&page=&days= (the newest 30 profile ids of a page, for the merged flame graph), /api/perf/clicks?site=&days=
-function readRaw(req, max) {                                      // -> Buffer, or throws { status, error }
+function readRaw(req, max, ms = BODY_MS) {                        // -> Buffer, or throws { status, error }
   return new Promise((resolve, reject) => {
     let n = 0, done = false; const parts = [];
     const end = (err, v) => { if (done) return; done = true; clearTimeout(timer); req.removeListener('data', onData); err ? reject(err) : resolve(v); };
-    const timer = setTimeout(() => end({ status: 408, error: 'timeout' }), BODY_MS);
+    const timer = setTimeout(() => end({ status: 408, error: 'timeout' }), ms);
     const onData = c => { n += c.length; if (n > max) return end({ status: 413, error: 'too_large' }); parts.push(c); };
     req.on('data', onData); req.on('end', () => end(null, Buffer.concat(parts)));
     req.on('aborted', () => end({ status: 0, error: 'aborted' })); req.on('close', () => end({ status: 0, error: 'aborted' }));
@@ -344,7 +344,24 @@ async function perfRoute(req, res, p) {
     const r = p === '/api/perf' ? perf.beacon({ origin, ua, body: body.toString('utf8'), req }) : perf.profile({ origin, ua, id: q.get('v'), hint: q.get('s'), body });
     return r.status === 204 ? send(res, 204) : fail(res, r.status, 'perf_' + r.status);
   }
+  // danielrltan.com's source maps (server/sourcemaps.js, NOTES 234): its build PUTs them with the key (no browser, no CORS); the panel reads them
+  if (req.method === 'PUT' && p === '/api/perf/sourcemap') {
+    if (!statsKey) return fail(res, 404, 'not_found');
+    const addr = auth.clientAddr(req).addr, wait = limiter.take(p, nodeKey(addr), 120, MIN, wideKey(addr));
+    if (wait) return fail(res, 429, 'rate', { 'Retry-After': String(wait) }, { retryAfter: wait });
+    const m = /^Bearer (\S{1,200})$/.exec(String(req.headers.authorization || ''));
+    if (!m || !crypto.timingSafeEqual(sha(m[1]), sha(statsKey))) return fail(res, 401, 'key');
+    let body; try { body = await readRaw(req, 16 << 20, 60e3); } catch (e) { if (!e || !e.status) return; if (e.status === 413) res.setHeader('Connection', 'close'); return fail(res, e.status, e.error); }
+    const r = sourcemaps.put(q.get('file'), body);
+    return r.status === 204 ? send(res, 204) : fail(res, r.status, 'sourcemap_' + r.status);
+  }
   const cors = panelGate(req, res, '/api/perf/read'); if (!cors) return;
+  if (p === '/api/perf/sourcemaps') return send(res, 200, { files: sourcemaps.list() }, cors);
+  if (p === '/api/perf/sourcemap') {
+    const gz = sourcemaps.get(q.get('file')); if (!gz) return fail(res, 404, 'not_found', cors);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip', 'Content-Length': gz.length, 'Cache-Control': 'private, max-age=604800, immutable', 'X-Robots-Tag': 'noindex', ...cors });
+    return res.end(gz);
+  }
   if (p === '/api/perf') return send(res, 200, { site: q.get('site') || 'poddleball.com', views: perf.listOf(q.get('site'), Number(q.get('days')) || 7) || [] }, cors);
   if (p === '/api/perf/view') { const v = perf.viewOf(q.get('id')); return v ? send(res, 200, v, cors) : fail(res, 404, 'not_found', cors); }
   if (p === '/api/perf/clicks') return send(res, 200, perf.clicksOf(q.get('site'), Number(q.get('days')) || 7), cors);

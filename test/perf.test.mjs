@@ -1,7 +1,7 @@
 // Page-load diagnostics (server/perf.js, web/rum.js, NOTES 232). Part 1 in process (':memory:'): what a beacon may say and what is kept.
 // Part 2 on a real server in a real Chrome: the home page's load and fin parts and its profile reach the database, and the panel's reads
 // return them behind the key. PERF_PORT=<port> moves the server (default 8970). Last line: PERF PASS or N FAILURES.
-import { createRequire } from 'module'; import { spawn } from 'child_process'; import zlib from 'zlib';
+import { createRequire } from 'module'; import { spawn } from 'child_process'; import zlib from 'zlib'; import fs from 'fs'; import os from 'os'; import path from 'path';
 const require = createRequire(import.meta.url);
 const db = require('../server/db.js'), perf = require('../server/perf.js'), traffic = require('../server/traffic.js');
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
@@ -79,10 +79,21 @@ db.close();
 
 console.log('a real page in Chrome');
 const PORT = +process.env.PERF_PORT || 8970, KEY = 'perf-test-key', base = `http://localhost:${PORT}`;
-const server = spawn('node', ['server/game.js'], { cwd: new URL('..', import.meta.url).pathname, env: { ...process.env, PORT, STATS_KEY: KEY, FLY_APP_NAME: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const SMDIR = fs.mkdtempSync(path.join(os.tmpdir(), 'perf-sm-'));
+const server = spawn('node', ['server/game.js'], { cwd: new URL('..', import.meta.url).pathname, env: { ...process.env, PORT, STATS_KEY: KEY, FLY_APP_NAME: '', SOURCEMAP_DIR: SMDIR }, stdio: ['ignore', 'pipe', 'pipe'] });
 let browser;
 try {
   for (let i = 0; i < 50; i++) { try { await fetch(base + '/status.json'); break; } catch { await sleep(200); } }
+  console.log('source maps (NOTES 234)');
+  const map = JSON.stringify({ version: 3, sources: ['../../src/a.ts'], names: ['realName'], mappings: 'AAAAA' });
+  const putMap = (file, body, key = KEY) => fetch(base + '/api/perf/sourcemap?file=' + file, { method: 'PUT', body, headers: key ? { authorization: 'Bearer ' + key } : {} });
+  ok((await putMap('main-abc.js.map', map, '')).status === 401 && (await putMap('main-abc.js.map', map, 'wrong')).status === 401, 'a map upload needs the key');
+  ok((await putMap('../x.js.map', map)).status === 400 && (await putMap('main.js', map)).status === 400 && (await putMap('main-abc.js.map', '{"version":2}')).status === 400, 'a bad name or a non-map body: 400');
+  ok((await putMap('main-abc.js.map', zlib.gzipSync(map))).status === 204 && fs.existsSync(path.join(SMDIR, 'main-abc.js.map.gz')), 'a gzipped map is kept as a file, beside the database, never under web/');
+  const lst = await (await fetch(base + '/api/perf/sourcemaps', { headers: { authorization: 'Bearer ' + KEY } })).json();
+  const got = await (await fetch(base + '/api/perf/sourcemap?file=main-abc.js.map', { headers: { authorization: 'Bearer ' + KEY } })).json();
+  ok(JSON.stringify(lst.files) === '["main-abc.js.map"]' && got.names[0] === 'realName', 'the list and the map read back with the key');
+  ok((await fetch(base + '/api/perf/sourcemap?file=main-abc.js.map')).status === 401 && (await fetch(base + '/main-abc.js.map')).status === 404, 'and never without it');
   const head = await fetch(base + '/how-to-play.html');
   ok(head.headers.get('document-policy') === 'js-profiling', 'pages are served with Document-Policy: js-profiling');
   const puppeteer = (await import('puppeteer-core')).default;
@@ -108,6 +119,6 @@ try {
   const tr = pr && pr.ok && await pr.json();
   ok(tr && tr.samples.length > 10 && tr.frames.length > 10 && tr.resources.includes('/main.js'), `the profile reads back: ${tr && tr.samples.length} samples, ${tr && tr.frames.length} frames`);
 } catch (e) { ok(false, 'threw: ' + (e && e.stack)); }
-finally { if (browser) await browser.close(); server.kill(); }
+finally { if (browser) await browser.close(); server.kill(); fs.rmSync(SMDIR, { recursive: true, force: true }); }
 console.log(fails ? `${fails} FAILURES` : 'PERF PASS');
 process.exit(fails ? 1 : 0);

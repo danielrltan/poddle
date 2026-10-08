@@ -4819,3 +4819,17 @@ The owner (2026-10-07): "stop using umami on danielrltan.com and just build it i
   name+detail a site a day, then detail 'other'.
 - `GET /api/traffic?site=danielrltan.com&days=N`: the same report shape plus `events: [{ name, detail, n }]` per day.
 - test/perf.test.mjs: views/people/sources/events from beacons, a crawler and a poddleball.com beacon not counted, no address stored.
+
+## 234. danielrltan.com's source maps live here, privately, so its flame graphs show real names
+The owner (2026-10-08) said yes to symbolicating danielrltan.com's minified profiles without publishing its source.
+- server/sourcemaps.js: gzipped files in `dirname(PODDLE_DB)/sourcemaps` (on Fly: /data/sourcemaps on the volume; SOURCEMAP_DIR
+  overrides, tests use a temp dir), never in SQLite, never under web/. 200 MB cap, least recently written first. Not visitor data.
+- `PUT /api/perf/sourcemap?file=<chunk>.js.map` with `Authorization: Bearer STATS_KEY` (the site's Vercel build, env
+  PODDLE_STATS_KEY; body gzipped or plain, a version 3 map, 16 MB, 60 s, 120 a minute). `GET /api/perf/sourcemaps` (names) and
+  `GET /api/perf/sourcemap?file=` (the stored gzip) behind the panel's gate. A content-hashed chunk name never changes content, so
+  the build uploads only the names missing from the list.
+- The site's build makes "hidden" maps (no sourceMappingURL), uploads, then deletes every .map from dist: nothing public.
+- Measured on the profiler (2026-10-08): JS Self-Profiling frames give 1-based line and column of the function's `(`. The map at
+  (line-1, column-1) gives the original file/line and, for a renamed `function x(`, the real name; for `x=(...)=>` the name sits on
+  the identifier at column-1-len(x)-1. The panel (danielrltan src/stats/perf.ts) does both, then merges frames by ORIGINAL position, so
+  profiles from different deploys merge too.

@@ -91,6 +91,7 @@ try {                                                            // docs/ACCOUNT
   db.open(process.env.PODDLE_DB || ':memory:'); db.sweep(Date.now()); setInterval(() => { try { db.sweep(Date.now()); } catch { /* next day */ } }, 24 * 3600e3).unref();
 } catch { /* db logs its own code */ }
 perf.init({ hosted: HOSTED }); setTimeout(() => perf.sweep(Date.now()), 60e3).unref();   // page-load diagnostics (NOTES 232): an hourly sweep to 30 days and the row caps
+require('./sourcemaps').init();                                    // danielrltan.com's private source maps beside the database (NOTES 234)
 traffic.init({ db, site: SITE, addrOf: req => abuse.computerKey(auth.clientAddr(req).addr), flushMs: Number(process.env.TRAFFIC_FLUSH_MS) || 60e3 });   // page views as daily totals (NOTES 219): the keyed address stays in memory for the day, never on disk
 api.init({ env: process.env, social: { status: id => socialStatus(id), changed: (push, drop) => socialChanged(push, drop) } });   // friends (docs/SOCIAL.md 4): the API reads presence and pushes snapshots through these; they run only after boot
 stats.init({ db, env: process.env, signinEnabled: api.signinOn(), sockets: () => wss.clients, detached: ws => socialDetached(ws), kin: list => kin(list) });
