@@ -10,6 +10,7 @@ const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fai
 const pending = m => { if (STRICT) return ok(false, m); console.log('  WAIT ' + m); waiting++; };
 const req = (p, { method = 'GET', headers = {} } = {}) => new Promise((res, rej) => { const r = http.request({ port: PORT, path: p, method, headers }, x => { const b = []; x.on('data', d => b.push(d)); x.on('end', () => res({ status: x.statusCode, h: x.headers, body: Buffer.concat(b) })); }); r.on('error', rej); r.end(); });
 const has = f => fs.existsSync(path.join(WEB, f));
+const unversioned = b => Buffer.from(b.toString().replace(/<script type="importmap">[^<]*<\/script>\n/, '').replace(/\?v=[0-9a-f]{10}"/g, '"'));   // a page as served (server/versioned.js) minus its import map and ?v= hashes: the file, byte for byte
 for (let i = 0; i < 40; i++) { try { await req('/robots.txt'); break; } catch { await wait(100); } }
 
 try {
@@ -23,7 +24,7 @@ try {
     ['/main.js', 'text/javascript; charset=utf-8', NOCACHE, 'main.js'], ['/ui.css', 'text/css; charset=utf-8', NOCACHE, 'ui.css'], ['/vendor/three.min.js', 'text/javascript; charset=utf-8', 'public, max-age=86400', 'vendor/three.min.js']]) {
     if (!has(file)) { pending(`${p}: web/${file} is not yet rendered`); continue; }
     const r = await req(p);
-    ok(r.status === 200 && r.h['content-type'] === type && (cache == null || r.h['cache-control'] === cache) && !!r.h.etag && !!r.h['last-modified'] && r.h['x-content-type-options'] === 'nosniff' && r.body.length === fs.statSync(path.join(WEB, file)).size,
+    ok(r.status === 200 && r.h['content-type'] === type && (cache == null || r.h['cache-control'] === cache) && !!r.h.etag && !!r.h['last-modified'] && r.h['x-content-type-options'] === 'nosniff' && (file.endsWith('.html') ? unversioned(r.body).equals(fs.readFileSync(path.join(WEB, file))) : r.body.length === fs.statSync(path.join(WEB, file)).size),
       `${p}: ${r.status} ${r.h['content-type']} | ${r.h['cache-control']} | etag ${r.h.etag} | ${r.body.length} B`);
   }
 

@@ -56,9 +56,9 @@ try {
   { fs.rmSync(fresh + '.br'); const r = await req(P + '.js', BR); ok(r.status === 200 && !r.h['content-encoding'] && r.body.equals(src), `the .br removed while serving: ${r.status} identity at once`); brBeside(fresh); }
 
   console.log('pages');
-  { const html = fs.readFileSync(INDEX);
+  { const html = (await req('/')).body;                              // the page as served without br: index.html, rewritten with ?v= hashes (server/versioned.js)
     for (const p of ['/', '/index.html', '/play', '/leaderboard']) { const r = await req(p, BR);
-      ok(r.status === 200 && r.h['content-encoding'] === 'br' && r.h['document-policy'] === 'js-profiling' && r.h['content-type'] === 'text/html; charset=utf-8' && unbr(r.body).equals(html), `${p} with br: ${r.status} ${r.h['content-encoding']}, Document-Policy ${r.h['document-policy']}, decodes to index.html`); }
+      ok(r.status === 200 && r.h['content-encoding'] === 'br' && r.h['document-policy'] === 'js-profiling' && r.h['content-type'] === 'text/html; charset=utf-8' && unbr(r.body).equals(html), `${p} with br: ${r.status} ${r.h['content-encoding']}, Document-Policy ${r.h['document-policy']}, decodes to the identity page`); }
     const mv = await req('/how-to-play', BR); ok(mv.status === 301 && mv.h.location === '/how-to-play.html' && !mv.h['content-encoding'], `a MOVED path: ${mv.status} -> ${mv.h.location}`);
     for (const p of [P + '.js.br', '/index.html.br', '/main.js.BR']) { const r = await req(p, BR); ok(r.status === 404 && r.h['content-type'] === 'text/html; charset=utf-8' && !r.h['content-encoding'], `${p}: ${r.status} (a .br is not a URL of its own)`); }
     if (fs.existsSync(path.join(WEB, 'video/teaser.mp4'))) { const r = await req('/video/teaser.mp4', { ...BR, Range: 'bytes=0-99' });
