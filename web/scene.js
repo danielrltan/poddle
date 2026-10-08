@@ -1587,7 +1587,7 @@ export function createScene(containerEl) {
 
   resize();
   return {
-    setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { court = { ...court, ...c }; buildCourt(); } },
+    setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { const same = ['halfW', 'halfL', 'kitchen', 'net'].every(k => c[k] === court[k]); court = { ...court, ...c }; if (!same) buildCourt(); } },      // every welcome sends the court (the server's is always DEFAULT_COURT): rebuilding the same one disposed its materials, so each join re-linked 2 programs in its first frame. Nothing else lives on the group (fences are re-shown every frame, the scenery prunes a group once, the menu's shadow map of the same court still holds)
     setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen, setVictory, podium,
     // where the player is relative to where they calibrated: -1..1, + = THEIR right / up (same for both sides).
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
