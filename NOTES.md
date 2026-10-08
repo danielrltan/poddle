@@ -4794,6 +4794,9 @@ never which button was pressed (the privacy page promises consent before analyti
   www.; localhost only off Fly). Tables perf_views (gzipped load/fin JSON + metric columns) and perf_profiles (gzipped trace), swept
   hourly: 30 days, 8000 views, 200 profiles; 400 views a site a day; nothing written when db.nearFull(). Worst case ~60 MB of the
   256 MB cap. Writes are CORS simple requests (no preflight, no Access-Control header back); 40 beacons / 6 profiles a minute per address.
+- Poddle keeps the TAG only wherever the browser names an element (server-side, whatever rum.js sent): interaction targets, the LCP
+  element, and long-frame invokers (Chrome writes `BUTTON#friend-accept.onclick` -> `BUTTON.onclick`); a `[src=...]` part is dropped on
+  both sites (an IMG onload's src can be a share link).
 - Reads for the owner's panel (danielrltan.com/stats), behind STATS_KEY with /api/traffic's gate (now panelGate, shared): GET
   /api/perf?site=&days= (list), /api/perf/view?id=, /api/perf/profile?id= (the stored gzip), /api/perf/profiles?site=&page=&days=, /api/perf/clicks?site=&days=
   (click targets and p75 interaction latency per target over the newest 2000 fin parts).

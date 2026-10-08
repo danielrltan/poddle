@@ -59,31 +59,38 @@ function url(u, origin) {
 }
 const pageOf = (p, origin) => { const u = url(p, origin); return u.startsWith('/') ? u.slice(0, 64) : '/'; };
 // an element as the page described it: 'button', 'button#play', or a data-rum label. Site-authored names only, never text
-const target = v => str(v, 48).replace(/[^\w#.:\-\s/]/g, '');
-// a LoAF invoker can be a URL ('https://x/main.js') or 'BUTTON#id.onclick': URLs are stripped like any other
-const invoker = (v, origin) => { const s = str(v, 200); return /^https?:\/\//.test(s) ? url(s, origin) : s.slice(0, 80); };
+// poddleball.com (tagOnly): the tag alone, whatever the page sent (privacy 2: latency only, never which button)
+const target = (v, tagOnly) => { const t = str(v, 48).replace(/[^\w#.:\-\s/]/g, ''); return tagOnly ? t.replace(/[#.:\s].*$/, '') : t; };
+// a LoAF invoker can be a URL ('https://x/main.js') or 'BUTTON#id.onclick' / 'IMG[src=https://x/c/slug.png?v=1].onload': URLs are stripped like any
+// other, an attribute part always goes, and for poddleball.com the #id too (BUTTON.onclick)
+const invoker = (v, origin, tagOnly) => {
+  let s = str(v, 200); if (/^https?:\/\//.test(s)) return url(s, origin);
+  s = s.replace(/\[[^\]]*\]?/g, ''); if (tagOnly) s = s.replace(/#[^.\s]*/g, '');
+  return s.slice(0, 80);
+};
 
-function shapeLoad(b, origin) {
+function shapeLoad(b, origin, tagOnly) {
   const n = obj(b.nav), env = obj(b.env);
   const nav = {}; for (const k of ['rs', 'ws', 'fs', 'ds', 'de', 'cs', 'ss', 'ce', 'qs', 'ps', 'pe', 'di', 'dc', 'dl', 'ls', 'le']) nav[k] = num(n[k]);
   nav.ty = str(n.ty, 12); nav.pr = str(n.pr, 8); nav.z = num(n.z, 0, 1e9); nav.eb = num(n.eb, 0, 1e9); nav.st = num(n.st, 0, 999);
   const res = arr(b.res, 150).map(r => { r = arr(r, 10); return [url(r[0], origin), str(r[1], 16), num(r[2]), num(r[3]), num(r[4], 0, 1e9), num(r[5], 0, 1e9), num(r[6]), str(r[7], 16), num(r[8], 0, 999)]; }).filter(r => r[0]);
-  const loaf = arr(b.loaf, 40).map(shapeLoaf(origin));
+  const loaf = arr(b.loaf, 40).map(shapeLoaf(origin, tagOnly));
   const marks = arr(b.marks, 40).map(m => { m = arr(m, 3); return [str(m[0], 48), num(m[1]), num(m[2])]; }).filter(m => m[0]);
   return {
-    nav, fp: num(b.fp), fcp: num(b.fcp), lcp: shapeLcp(b.lcp, origin), res, loaf, marks,
+    nav, fp: num(b.fp), fcp: num(b.fcp), lcp: shapeLcp(b.lcp, origin, tagOnly), res, loaf, marks,
     env: { w: num(env.w, 0, 20000), h: num(env.h, 0, 20000), dpr: num(env.dpr, 0, 10), mem: num(env.mem, 0, 1024), cpu: num(env.cpu, 0, 1024), net: str(env.net, 8), save: env.save === true },
     prof: b.prof === true, profErr: str(b.profErr, 60),
   };
 }
-const shapeLcp = (l, origin) => { l = obj(l); return { t: num(l.t), el: target(l.el), u: url(l.u, origin), z: num(l.z, 0, 1e8) }; };
-const shapeLoaf = origin => f => { f = arr(f, 6); return [num(f[0]), num(f[1]), num(f[2]), num(f[3]), num(f[4]),
-  arr(f[5], 8).map(s => { s = arr(s, 8); return [url(s[0], origin) || str(s[0], 0), str(s[1], 80), invoker(s[2], origin), str(s[3], 24), num(s[4]), num(s[5]), num(s[6]), num(s[7], -1, 1e7)]; })]; };
+const shapeLcp = (l, origin, tagOnly) => { l = obj(l); return { t: num(l.t), el: target(l.el, tagOnly), u: url(l.u, origin), z: num(l.z, 0, 1e8) }; };
+const shapeLoaf = (origin, tagOnly) => f => { f = arr(f, 6); return [num(f[0]), num(f[1]), num(f[2]), num(f[3]), num(f[4]),
+  arr(f[5], 8).map(s => { s = arr(s, 8); return [url(s[0], origin) || str(s[0], 0), str(s[1], 80), invoker(s[2], origin, tagOnly), str(s[3], 24), num(s[4]), num(s[5]), num(s[6]), num(s[7], -1, 1e7)]; })]; };
 function shapeFin(b, origin, clicks) {
+  const tagOnly = !clicks;
   return {
-    lcp: shapeLcp(b.lcp, origin), cls: typeof b.cls === 'number' && Number.isFinite(b.cls) ? Math.round(Math.min(100, Math.max(0, b.cls)) * 1e4) / 1e4 : null, inp: num(b.inp, 0, 60e3), dur: num(b.dur, 0, 864e5),
-    ev: arr(b.ev, 30).map(e => { e = arr(e, 7); return [str(e[0], 16), target(e[1]), num(e[2], 0, 864e5), num(e[3], 0, 60e3), num(e[4], 0, 60e3), num(e[5], 0, 60e3), num(e[6], 0, 60e3)]; }),
-    loaf: arr(b.loaf, 30).map(shapeLoaf(origin)),
+    lcp: shapeLcp(b.lcp, origin, tagOnly), cls: typeof b.cls === 'number' && Number.isFinite(b.cls) ? Math.round(Math.min(100, Math.max(0, b.cls)) * 1e4) / 1e4 : null, inp: num(b.inp, 0, 60e3), dur: num(b.dur, 0, 864e5),
+    ev: arr(b.ev, 30).map(e => { e = arr(e, 7); return [str(e[0], 16), target(e[1], tagOnly), num(e[2], 0, 864e5), num(e[3], 0, 60e3), num(e[4], 0, 60e3), num(e[5], 0, 60e3), num(e[6], 0, 60e3)]; }),
+    loaf: arr(b.loaf, 30).map(shapeLoaf(origin, tagOnly)),
     clicks: clicks ? arr(b.clicks, 200).map(c => { c = arr(c, 2); return [target(c[0]), num(c[1], 0, 864e5)]; }).filter(c => c[0]) : [],   // poddleball.com never sends targets (privacy 2: latency only)
   };
 }
@@ -101,7 +108,7 @@ function beacon({ origin, ua, body, now = Date.now() }) {
   if (db.nearFull()) return { status: 204 };                         // player stats come first
   const page = pageOf(b.page, origin), base = { id, site, page, at: now, ua: uaOf(ua) };
   if (b.kind === 'load') {
-    const L = shapeLoad(b, origin), n = L.nav;
+    const L = shapeLoad(b, origin, site === 'poddleball.com'), n = L.nav;
     const v = { ...base, ttfb: n.ps, fcp: L.fcp, lcp: L.lcp.t, dcl: n.dl, onload: n.le, inp: null, cls: null, block: blockOf(L.loaf), load: zlib.gzipSync(JSON.stringify(L)) };
     return { status: db.perfPut(v, LIMITS.dayCap) ? 204 : 429 };
   }

@@ -29,6 +29,14 @@ ok(perf.beacon({ origin: PH, ua: CHROME_UA, body: load('nothex') }).status === 4
 r = perf.beacon({ origin: PH, ua: CHROME_UA, body: JSON.stringify({ id: id1, kind: 'fin', page: '/pad.html', cls: 0.05, inp: 180, lcp: { t: 950 }, ev: [['click', 'button#play', 2000, 180, 20, 120, 40]], clicks: [['button#play', 2000]] }) });
 const v2 = perf.viewOf(id1);
 ok(r.status === 204 && v2.inp === 180 && v2.cls === 0.05 && v2.lcp === 950 && v2.fin.ev.length === 1 && v2.fin.clicks.length === 0, 'the fin part updates the view; poddleball.com keeps no click targets (latency only)');
+const id3 = '3333333333333333', inv = [[1, 120, 70, 0, 0, [['', '', 'BUTTON#friend-accept.onclick', 'event-listener', 1, 100, 0, 0], ['', '', 'IMG[src=https://poddleball.com/c/abc.png?v=1].onload', 'event-listener', 2, 10, 0, 0]]]];
+perf.beacon({ origin: PH, ua: CHROME_UA, body: load(id3, { loaf: inv, lcp: { t: 5, el: 'button#play' } }) });
+perf.beacon({ origin: PH, ua: CHROME_UA, body: JSON.stringify({ id: id3, kind: 'fin', ev: [['click', 'button#friend-accept', 1, 50, 1, 1, 1]], loaf: inv }) });
+const v3 = perf.viewOf(id3), s3 = JSON.stringify(v3);
+ok(v3.load.loaf[0][5][0][2] === 'BUTTON.onclick' && v3.load.loaf[0][5][1][2] === 'IMG.onload' && v3.fin.loaf[0][5][0][2] === 'BUTTON.onclick' && v3.fin.ev[0][1] === 'button' && v3.load.lcp.el === 'button' && !s3.includes('friend') && !s3.includes('abc') && !s3.includes('play'),
+  'poddleball.com: long-frame invokers, interaction targets and the LCP element keep the tag only (no #id, no [src=])');
+const id4 = '4444444444444444'; perf.beacon({ origin: DR, ua: CHROME_UA, body: load(id4, { loaf: inv }) });
+ok(perf.viewOf(id4).load.loaf[0][5][0][2] === 'BUTTON#friend-accept.onclick' && perf.viewOf(id4).load.loaf[0][5][1][2] === 'IMG.onload', 'danielrltan.com keeps the id, never the [src=] part');
 ok(perf.beacon({ origin: DR, ua: CHROME_UA, body: JSON.stringify({ id: id1, kind: 'fin', inp: 1 }) }).status === 429 && perf.viewOf(id1).inp === 180, "another site cannot touch a view");
 perf.beacon({ origin: DR, ua: CHROME_UA, body: JSON.stringify({ id: 'aaaaaaaaaaaaaaaa', kind: 'fin', page: '/', clicks: [['a#resume', 10], ['<b>x</b>', 11]] }) });
 ok(JSON.stringify(perf.viewOf('aaaaaaaaaaaaaaaa').fin.clicks) === '[["a#resume",10],["bx/b",11]]', 'danielrltan.com keeps click targets, characters limited');
@@ -42,12 +50,12 @@ ok(perf.profile({ origin: PH, ua: CHROME_UA, id: id1, body: Buffer.from(JSON.str
 ok(perf.profile({ origin: PH, ua: CHROME_UA, id: 'bbbbbbbbbbbbbbbb', body: Buffer.from(JSON.stringify(trace)) }).status === 409, 'no view, no profile');
 ok(JSON.stringify(perf.profileIds('poddleball.com', '/pad.html', 7)) === JSON.stringify([id1]), 'profile ids by page');
 const ck = perf.clicksOf('danielrltan.com', 7), cp = perf.clicksOf('poddleball.com', 7);
-ok(JSON.stringify(ck.targets) === '[{"target":"a#resume","n":1},{"target":"bx/b","n":1}]' && cp.targets.length === 0 && cp.slow[0].target === 'button#play' && cp.slow[0].p75 === 180, 'clicks and interaction latency over the range: ' + JSON.stringify(cp.slow));
+ok(JSON.stringify(ck.targets) === '[{"target":"a#resume","n":1},{"target":"bx/b","n":1}]' && cp.targets.length === 0 && cp.slow[0].target === 'button' && cp.slow[0].p75 === 180, 'clicks and interaction latency over the range: ' + JSON.stringify(cp.slow));
 
 console.log('caps and sweep');
 for (let i = 0; i < perf.LIMITS.dayCap + 5; i++) perf.beacon({ origin: DR, ua: CHROME_UA, body: load('1' + String(i).padStart(15, '0')) });
 ok(perf.listOf('danielrltan.com', 1).length === perf.LIMITS.dayCap, `a site's day cap holds: ${perf.listOf('danielrltan.com', 1).length}`);
-ok(perf.listOf('poddleball.com', 1).length === 1, 'and does not touch the other site');
+ok(perf.listOf('poddleball.com', 1).length === 2, 'and does not touch the other site');
 db.perfSweep(Date.now(), 30, 10, 0);
 ok(perf.listOf('danielrltan.com', 30).length + perf.listOf('poddleball.com', 30).length === 10 && !perf.profileOf(id1), 'the sweep keeps the newest views and profiles');
 db.perfSweep(Date.now() + 31 * 86400e3, 30, 8000, 200);
