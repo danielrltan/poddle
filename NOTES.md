@@ -4914,3 +4914,22 @@ build did exactly that in headless Chrome on localhost (test/e2e.mjs with the ca
   A lower PHONE_BUFFER was not tried on top of this (the wifi model already needs the 200 ms).
 - Not fixed, seen in the replay: a sample > 0.5 s late resets the clock offset (`o - off > 0.5`), and the drawn time jumps back ~0.7 s
   once (live-play-1 has it twice).
+
+## 238. A late swing's ball is put back to the paddle face, not to CONTACT in front of it: a shorter slide on the hitter's screen
+- Part of "high latency between swings even with low ping ~13ms ... I'm still seeing the hit recalculation" (2026-10-09, NOTES 236-237
+  are the same effort). Measured first (test/rewind.mjs): a swing that reaches the server after the ball passed CONTACT (0.25 m in
+  front of the paddle) was struck from the remembered point nearest CONTACT, at room time now. On the hitter's screen the ball, already
+  drawn past the paddle, slid back to that point: p50 0.62, p90 1.18, max 2.07 m for a late swinger (hand peak 100 ms after the ball
+  reaches the plane), 31% of hits rewound for a natural one (+30 ms). Seen by the opponent end-on from 18 m it is ~0.2 deg: the hitter's
+  problem only.
+- Now (server/game.js tryHit): a ball between the face and CONTACT is struck where it is; one past the face goes back to the nearest
+  remembered point at or in front of the face (the closest point behind it only if the ball was never seen in front inside the window).
+  It still never leaves from behind the paddle by more than one tick's travel, and the opponent gets the same or a little more time.
+- Measured after (3 servers x 200 s, 89 real swings, ALIGN -50 / +30 / +100 ms, 13 ms ping): rewound 31% -> 15% (natural), 78% -> 72%
+  (late); the late slide p50 0.62 -> 0.45, p90 1.18 -> 1.06, max 2.07 -> 1.70 m. Early swings are untouched (none rewound).
+- Options measured and dropped (test/rewind.mjs prints them): stamping the launch with the contact time doubles the slide and takes up
+  to 150 ms from the opponent; rewinding to behind the paddle or launching from now leaves from behind the player; holding the drawn
+  ball at the plane until the hit arrives applies to almost no rewound hit, because the swing is not known in time.
+- Tests: bend, bet, helium, curve, push, coast, badwifi, kitchen, deep, slice, serve, real, drawlob, bot, records, phone-jitter, jitter,
+  smooth pass as on main; lagcomp, feel, hitblend and motion-check fail the same lines as on main; stats.test passes alone (it flaked
+  under a parallel load on both trees).

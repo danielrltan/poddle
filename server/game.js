@@ -781,14 +781,18 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   function tryHit(pl) {
     const sw = pl.swing; if (!sw || !ball.live || ball.serving != null || ball.lastHit === pl.side) return false;
     const z = inZone(pl), s = z.s, r = pl.bot ? 0 : sw.n, q = 4 + pl.side * 3;
-    let grant = z.ok, best = z.ok ? Math.abs(z.ahead - CONTACT) : Infinity, at = -1;
-    if (!z.ok || z.ahead < CONTACT) for (let k = 1; k <= hLen; k++) {           // at or past the paddle: look back
+    // A late swing's ball is put back only as far as the paddle face (the nearest remembered point at or in front of it), not
+    // to CONTACT: a ball between the face and CONTACT leaves from where it is, and one past the face slides back less (NOTES 238).
+    let grant = z.ok, best = z.ok && z.ahead >= 0 ? z.ahead : Infinity, at = -1, behind = -Infinity, atB = -1;
+    if (!z.ok || z.ahead < 0) for (let k = 1; k <= hLen; k++) {                 // past the paddle (or not in the box now): look back
       const o = ((hHead - k + HN) % HN) * HF; if (!(hist[o] > now - LAG_MAX - DT / 2)) break;
-      const ahead = -(hist[o + 3] - hist[o + q + 2]) * s, d = Math.abs(ahead - CONTACT);
+      const ahead = -(hist[o + 3] - hist[o + q + 2]) * s;
       if (!(ahead > -ZONE.behind && ahead < ZONE.front && Math.abs(hist[o + 1] - hist[o + q]) < ZONE.x + REACH_X * r && Math.abs(hist[o + 2] - hist[o + q + 1]) < ZONE.y + REACH_Y * r)) continue;
       if (hist[o] >= sw.from) grant = true;
-      if (d < best) { best = d; at = o; }
+      if (ahead >= 0) { if (ahead < best) { best = ahead; at = o; } }
+      else if (ahead > behind) { behind = ahead; atB = o; }
     }
+    if (at < 0 && !(z.ok && z.ahead >= 0) && atB >= 0 && !(z.ok && z.ahead >= behind)) at = atB;   // only ever seen behind the face: the closest of those
     if (!grant) return false;
     if (at >= 0) { ball.p[0] = hist[at + 1]; ball.p[1] = hist[at + 2]; ball.p[2] = hist[at + 3]; }
     strike(pl, sw); return true;
