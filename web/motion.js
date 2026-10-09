@@ -5,7 +5,9 @@ const DEG = Math.PI / 180;
 export const DEFAULTS = {
   HOLD_GRACE: 2.5,                           // s after the hold screen appears before a movement is called out
   SETTLE_MS: 800, SETTLE_DEG: 10,            // after the tilt: rest this long within this wobble and that pose becomes neutral
-  BUFFER_PAD: 0.008, BUFFER_MIN: 0.025, BUFFER_MAX: 0.12,   // jitter buffer: render this far behind the newest sample (s)
+  BUFFER_MIN: 0.025, BUFFER_MAX: 0.12,      // jitter buffer: render this far behind the newest sample (s)
+  BUFFER_WIN: 3, BUFFER_DRY: 0.02,          // ...the least depth that would have run dry at most DRY of the time over the last WIN s of arrivals (coasting covers that; NOTES 237)
+  BUFFER_UP: 0.3, BUFFER_DOWN: 0.05,        // ...reached at most this fast, s per s however often pose() runs: playback 0.7x .. 1.05x, never a jump
   HOLD_MS: 5000, HOLD_DEG: 17,              // step 1: still within HOLD_DEG for HOLD_MS
   TILT_DEG: 25, TILT_MIN_HORIZ: 0.75,       // step 2: tip up; axis must be mostly horizontal
   TILT_REARM_DEG: 12,                       // after a rejected twist, come back inside this before retrying
@@ -45,6 +47,7 @@ export const DEFAULTS = {
   RENDER_DELAY: 0.010,                      // pose() shows the hand this long ago: halves how far we must extrapolate
   JITTER_GAIN: 1.5, JITTER_MAX: 0.03,       // ...plus this x the mean arrival lateness, for bursty links
   EXTRAP_MAX: 0.045, EXTRAP_ANGLE: 0.6,     // extrapolation limits, s and rad
+  COAST_RATE: 0.6,                          // rad/s: a dry jitter buffer coasts on a hand turning faster than this; slower, holding still shows nothing but gyro noise
   ACC_EXTRAP: 1.0,                          // how much of a speeding-up angular accel to trust
   BLEND_MIN: 0.012,                         // a new sample takes over from the old prediction over at least this, s
 };
@@ -100,7 +103,7 @@ export class MotionModel {
     this.off = null;                         // local clock (s) - sample clock (s), min-tracked
     this.jit = 0;                            // mean arrival lateness, s
     this.last = null;                        // last sample + derived state
-    this.snap = []; this.jmax = 0; this.D = 0.04;   // jitter buffer: per-sample snapshots, worst recent lateness, render delay
+    this.snap = []; this.D = 0.04;   // jitter buffer: per-sample snapshots (with their turn, to coast on), render delay
     this.startCalibration();
   }
 
@@ -146,7 +149,11 @@ export class MotionModel {
     if (this.off == null || o < this.off || o - this.off > 0.5) this.off = o;
     else this.off += Math.min(o - this.off, 2e-5);
     this.jit += (Math.min(o - this.off, 0.1) - this.jit) * 0.05;
-    this.jmax = Math.max(o - this.off, this.jmax - 1e-4);              // worst recent arrival lateness (decays 5 ms/s)
+    if (this.last) {                                                  // how deep the jitter buffer had to be to keep interpolating: how stale the newest sample was just before this one landed
+      const c = this.c, ts = o + s.t - this.off, W = this.need || (this.need = []);
+      W.push({ ts, v: clamp(ts - this.last.t, 0, c.BUFFER_MAX) }); while (W[0].ts < ts - c.BUFFER_WIN) W.shift();   // a spike past the cap underruns whatever the depth: it buys nothing to wait for it
+      this.depth = dryDepth(W, c.BUFFER_DRY * c.BUFFER_WIN);
+    }
     s.arr = s.t + (o - this.off);                                     // arrival, on the sample clock
 
     if (!this.calibrated) { this._calibrate(s, ev); return ev; }
@@ -470,8 +477,9 @@ export class MotionModel {
     { const u = clamp((rate - c.ARC_LO) / (c.ARC_HI - c.ARC_LO), 0, 1), on = u * u * (3 - 2 * u), w0 = this.armW || 0;
       this.armW = w0 + (on - w0) * (1 - Math.exp(-dt / (on > w0 ? 0.04 : 0.3))); }
     // Jitter buffer. Real AirPods deliver samples in PAIRS every ~40 ms (gaps up to ~80 ms), so rendering "now" means
-    // extrapolate-stall-snap. Instead pose() replays these snapshots a little in the past and only ever interpolates.
-    this.snap.push({ t, P, ref: this.hpRef, x: this.xy.to.x, y: this.xy.to.y, pu, w: this.armW });
+    // extrapolate-stall-snap. Instead pose() replays these snapshots a little in the past and interpolates, coasting along
+    // the newest one's turn for the odd moment a sample is later than the buffer is deep.
+    this.snap.push({ t, P, rP, aPar, rate, ref: this.hpRef, x: this.xy.to.x, y: this.xy.to.y, pu, w: this.armW });
     while (this.snap.length > 2 && this.snap[1].t < t - 0.4) this.snap.shift();
     this.prev = L; this.last = cur;
   }
@@ -529,12 +537,17 @@ export class MotionModel {
     const N = this.snap, n = N.length;
     let P, S, punch, ref, w = this.armW || 0;
     if (nowMs != null && n >= 2 && N[n - 1].t === this.last.t) {
-      const want = clamp(this.jmax + c.BUFFER_PAD, c.BUFFER_MIN, c.BUFFER_MAX);
-      this.D += clamp(want - this.D, -0.0004, 0.003);                  // ease the delay, never jump it
-      const tau = clamp(ts - this.D, N[0].t, N[n - 1].t);
+      // The delay follows the arrival timing actually seen lately, both ways (a late burst no longer keeps the paddle at the cap for a minute), and moves per
+      // SECOND, so a 120 Hz frame and the 20 Hz sender calling pose() together do not slow the hand down. Dry (a sample later than the budget allows):
+      // coast on the newest sample's own turn (_curve: at most EXTRAP_MAX, never past a stop) instead of freezing and then snapping when it lands.
+      // A hand turning slower than COAST_RATE just waits: nothing visible moves, and coasting on gyro noise would.
+      const want = clamp(this.depth == null ? c.BUFFER_MIN : this.depth, c.BUFFER_MIN, c.BUFFER_MAX);
+      const dT = clamp(ts - (this.tD == null ? ts : this.tD), 0, 0.05); this.tD = ts;
+      this.D += clamp(want - this.D, -c.BUFFER_DOWN * dT, c.BUFFER_UP * dT);
+      const tr = ts - this.D, tau = clamp(tr, N[0].t, N[n - 1].t);
       let i = n - 2; while (i > 0 && N[i].t > tau) i--;
       const a = N[i], b = N[i + 1], u = clamp((tau - a.t) / (b.t - a.t || 1), 0, 1);
-      P = qslerp(a.P, b.P, u); ref = qslerp(a.ref, b.ref, u);
+      P = tr > b.t && b.rate > c.COAST_RATE ? this._curve(b, tr) : qslerp(a.P, b.P, u); ref = qslerp(a.ref, b.ref, u);
       S = { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) }; punch = add(mul(a.pu, 1 - u), mul(b.pu, u)); w = lerp(a.w, b.w, u);
     } else { P = this._Pat(ts); S = this._xyAt(ts); punch = this._punchAt(ts); ref = this._refAt(ts); }
     // Arc from a COMPRESSED rotation: a real hand stays in front of the body, so however far the bud turns (a backhand
@@ -548,4 +561,11 @@ export class MotionModel {
 }
 
 const mul4 = (q, k) => [q[0] * k, q[1] * k, q[2] * k, q[3] * k];
+// The least buffer depth D that would have left the buffer dry for at most `budget` s in all, over arrivals W ({v}: the depth each one needed):
+// waiting for one that needed v runs it dry for about v - D.
+function dryDepth(W, budget) {
+  const v = W.map(e => e.v).sort((x, y) => y - x); let S = 0;
+  for (let k = 1; k <= v.length; k++) { S += v[k - 1]; const D = (S - budget) / k; if (k === v.length || D >= v[k]) return Math.max(D, 0); }
+  return 0;
+}
 function dot4(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; }

@@ -4862,3 +4862,55 @@ build did exactly that in headless Chrome on localhost (test/e2e.mjs with the ca
   + 150-400 ms stalls: old 40/59 windows poor, 116 s at 30 Hz; new 0 poor, never drops (both orders). Bad link (4% loss, 100-350 ms stalls),
   clean page: identical decisions window by window, drop at 4 s. Bad link + stalls: new still drops (8 s, 112 of 120 s at 30 Hz). Home wifi
   + stalls: old drops, new does not. Hidden tab, and good link clean page: identical decisions.
+
+## 237. The drawn paddle stops camping at the buffer cap: the delay follows the arrival timing seen lately, and coasts instead of freezing
+- "High latency between swings even with low ping." The drawn paddle lags the hand by the jitter buffer's delay D (NOTES 4, 35,
+  docs/jitter-diagnosis.md). D was `jmax + 8 ms`, jmax = the worst sample lateness, decaying 5 ms/s. The real play captures carry
+  BT spikes of 300-480 ms, so one late sample held the AirPod paddle at the 120 ms cap (a phone's at 200) for ~1 min: 41-47 % of
+  live-play-1/2 was drawn at the cap. Between spikes it was the other way: `jmax + 8` is lateness only, but interpolating needs the
+  sample AFTER the drawn time too (lateness + a sample period), so the buffer ran dry ~1.5 times a second and the paddle froze, then snapped.
+- New measure, `node test/buflag.mjs`: replays every real capture (real motion AND real arrival times; restore() calibrates it) the way
+  main.js drives the model (feed on arrival, pose() per 60/120 Hz frame plus the 20 Hz sender's pose()), and scores the drawn paddle
+  against the model's own snapshots interpolated offline: D p50/p90/at cap, D and the 'seen lag' while swinging (the moment of the real
+  hand the drawn paddle matches best), underruns and frozen frames, error vs the truth, playback warp, frame-to-frame angular-velocity
+  jumps, stalls/snaps. `--module`/`--opts` replay a copy of motion.js or other constants.
+- Change (web/motion.js): on each arrival, record how stale the newest sample was just before it (the depth the buffer needed; a spike
+  past the cap counts as the cap, since no depth may cover it). D aims at the least depth that, over the last 3 s, would have left the
+  buffer dry at most 2 % of the time (BUFFER_WIN, BUFFER_DRY), and slides per SECOND (0.7x..1.05x playback) rather than per pose() call.
+  When a sample is later than that, the paddle coasts on the newest sample's own turn (`_curve`, at most EXTRAP_MAX 45 ms, never past
+  a stop) instead of freezing; a hand turning slower than COAST_RATE (0.6 rad/s) just waits, since coasting on gyro noise is all
+  that would show. A phone gets BUFFER_DRY 0.01 (main.js PHONE_DRY): test/phone-jitter.mjs's bursty wifi needs it to stay
+  as smooth as before (0.02 there: roughness 8-11 % -> 10-13 %).
+- Before -> after, all captures, 120 Hz, AirPod (cap 120 ms):
+  | | before | after |
+  |---|---|---|
+  | D mean / p50 / p90 | 83 / 77 / 113 ms | 64 / 60 / 83 ms |
+  | frames drawn at the cap | 33 % | 1 % |
+  | while swinging: D p50 / p90 (seen lag p50 / p90) | 67 / 84 (68 / 85) ms | 67 / 81 (67 / 81) ms |
+  | underruns (frames with no newer sample) | 91 /min, 2.94 % | 98 /min, 3.13 % |
+  | frozen frames | 2.94 % | 0.83 % (spikes past the cap need more than it on 1.07 % of frames) |
+  | error vs truth p99 / max (in swings) | 0.18 / 30.6 deg (4.01 / 30.6) | 0.04 / 12.5 deg (0.56 / 12.5) |
+  | stalls / snaps while moving | 18.7 / 7.9 per min | 0.2 / 0.1 per min |
+  | angular-velocity jump p99.9 / max | 13.2 / 76.1 rad/s | 6.3 / 18.3 rad/s |
+  | paddle velocity jump p99.9 (the hand's own: 11.4) | 16.5 m/s | 15.6 m/s |
+  | playback outside 0.9..1.1x | 1.1 % | 1.1 % |
+  Per capture, D p50/p90 ms: live-play-1 74/120 -> 61/90, live-play-2 88/120 -> 56/76, live-play-3 70/97 -> 65/82, live-swings
+  63/81 -> 58/68, live2 60/72 -> 63/65. Phone proxy (same timing, cap 200 ms): D mean 107 -> 73, p90 171 -> 106, frozen 2.5 -> 0.5 %,
+  but the median while swinging 67 -> 73 ms (the old D sat under what the link needs and froze instead). At 60 Hz the same story
+  (underruns 65 -> 54 a minute).
+- The other tests: jitter.mjs stalled frames 19 -> 12, roughness 9.3 -> 6.9 %; phone-jitter passes, wifi roughness 8/5/5/8/11 % ->
+  9/5/5/8/11 % (quiet network still 25 ms); smooth.mjs (synthetic strokes on live2 timing) orientation wobble and jumps fall in every
+  scenario (zigzag 0.381 / 8.52 -> 0.110 / 1.73 deg), the freezes are gone, holding still is unchanged (0.17 deg max, thanks to
+  COAST_RATE; without it 0.44), but one single-frame maximum rises: forehand / backhand position wobble 35 / 38 -> 41 / 42 mm (rms
+  2.16 / 2.12 -> 2.05 / 1.94; it comes with coasting: 25 / 24 mm without it). Extrapolating the arc's reference and weight while
+  coasting made it worse (54 mm); a blend onto the late sample fixes it (31 / 33 mm) but triples the error vs the truth on the
+  real captures (p99 0.18 -> 0.41-0.64 deg), so it stays out. zigzag.mjs's 4 Hz row now
+  reads lag 340 ms: the same fit one period (250 ms) on, equal error; rom, bigswing, padmotion unchanged.
+- Tried and dropped: decaying jmax by time (half-life 0.5-3 s): D 47-58 ms but 2-5x the underruns, since lateness alone undersizes the
+  buffer. A recent p95 of the needed depth: as good on the AirPod, but on bursty phone wifi it ignores the bursts (roughness to 21 %).
+  Dropping D toward 40-55 ms while the hand swings fast: the swing lag falls 7-35 ms but playback warps 2.5-7x as often (1.3x through the
+  swing, 0.7x after) and the error in swings grows 6-20x. A blend from the coasted guess onto the late sample (20-40 ms): no gain.
+  A 2 or 5 s window, a slower up-slide, less trust in angular acceleration or a longer / shorter EXTRAP_MAX when coasting: no gain.
+  A lower PHONE_BUFFER was not tried on top of this (the wifi model already needs the 200 ms).
+- Not fixed, seen in the replay: a sample > 0.5 s late resets the clock offset (`o - off > 0.5`), and the drawn time jumps back ~0.7 s
+  once (live-play-1 has it twice).

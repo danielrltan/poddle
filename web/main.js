@@ -543,7 +543,7 @@ function connect(urls, el, onmsg, onopen) {
 // motion.js scales the phone's rotation rate by it for the effortless part of the score only (RATE_GAIN), and its speed part by the gain's square root, so a relaxed phone
 // stroke is a drive sooner but a smash still takes a hard swing (~19 rad/s, an AirPod ~23.4) (NOTES 82). pw() now scales only 'raw', which a serve reads.
 const PHONE_GAIN = Math.max(0.5, Math.min(3, +qs.get('padgain') || 1.5)), pw = v => src === 'phone' ? v * PHONE_GAIN : v;
-const AIRPOD_BUFFER = model.c.BUFFER_MAX, PHONE_BUFFER = 0.2;
+const AIRPOD_BUFFER = model.c.BUFFER_MAX, PHONE_BUFFER = 0.2, AIRPOD_DRY = model.c.BUFFER_DRY, PHONE_DRY = 0.01;      // phone wifi holds packets in bursts: its buffer may run dry half as often (test/phone-jitter.mjs, NOTES 237)
 let padOn = false, src = '', lastT = -1e9, bridge = null, useAirpod = !CAN_PHONE || qs.has('bridge') && qs.get('padtest') !== '1' || ls.get('poddle.airpod') === '1';
 // Someone who played here before phones could be paddles (a name is saved, no choice yet) may have the helper running: it is
 // tried quietly behind the phone's QR, and the first AirPod sample makes the AirPod the paddle, with no click and no change for them.
@@ -588,7 +588,7 @@ function onSample(sample, from) {
   if (!sample || !Array.isArray(sample.r)) return;
   // A phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: its replay may wait
   // longer when (only when) that happens (NOTES 35). The AirPod keeps its own limit.
-  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; model.c.RATE_GAIN = from === 'phone' ? PHONE_GAIN : 1; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
+  if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; model.c.BUFFER_DRY = from === 'phone' ? PHONE_DRY : AIRPOD_DRY; model.c.RATE_GAIN = from === 'phone' ? PHONE_GAIN : 1; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
     if (stats.calibrated) { stats.calibrated = false; if (phase === 'play' && !cachedCal()) startCal(); } else if (phase === 'calibrate' && !cachedCal()) startCal(); }      // the other paddle's kept calibration, if it has one
   if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if ((phase === 'play' || phase === 'calibrate') && !cachedCal()) startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero (a kept calibration re-aims itself)
   lastT = sample.t;

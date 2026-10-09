@@ -43,13 +43,13 @@ export function run({ naming = 'zxy', net = 'quiet', seed = 3, pad = new PadMoti
     if (out) sent.push({ s: JSON.parse(JSON.stringify(out)), t: e.t, n: pad.naming + pad.sign });
     if (pad.flush) for (const x of pad.flush()) sent.push({ s: x, t: e.t, n: pad.naming + pad.sign });
   }
-  // the model gets what main.js gives a phone (PHONE_BUFFER 0.2 s). The network: base 25 ms. wifi: power save holds packets for 40-220 ms every 150-500 ms, then lets them all through
+  // the model gets what main.js gives a phone (PHONE_BUFFER 0.2 s, PHONE_DRY 0.01). The network: base 25 ms. wifi: power save holds packets for 40-220 ms every 150-500 ms, then lets them all through
   let holdUntil = -1, nextHold = 0.3; const arr = [];
   for (const x of sent) { let a = x.t + 0.025 + rnd() * 0.004;
     if (net === 'wifi') { if (x.t > nextHold) { holdUntil = x.t + 0.04 + rnd() * 0.18; nextHold = holdUntil + 0.15 + rnd() * 0.35; } if (x.t < holdUntil) a = holdUntil + 0.025 + rnd() * 0.004; }
     arr.push({ a, s: x.s, n: x.n }); }
   for (let i = 1; i < arr.length; i++) arr[i].a = Math.max(arr[i].a, arr[i - 1].a);   // one TCP stream: in order
-  const m = new MotionModel({ BUFFER_MAX: 0.2 }); m.startCalibration(); let resets = 0; const st = m._start.bind(m); m._start = s => { if (m.calibrated && calAt != null) resets++; return st(s); };
+  const m = new MotionModel({ BUFFER_MAX: 0.2, BUFFER_DRY: 0.01 }); m.startCalibration(); let resets = 0; const st = m._start.bind(m); m._start = s => { if (m.calibrated && calAt != null) resets++; return st(s); };
   let k = 0, calAt = null, nAtCal = null, flips = 0, lastN = null, prev = null; const steps = [], tilts = []; let walks = 0;
   for (let f = 0; f < (T_END + 0.3) * 120; f++) {
     const now = f / 120;
