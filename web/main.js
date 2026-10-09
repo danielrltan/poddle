@@ -1,6 +1,7 @@
 // Glue: AirPod bridge -> MotionModel -> scene + game server.
 import { MotionModel, qrot } from './motion.js';
-import { linkJudge } from './netq.js';      // the link judge: the page's own stalls are not the link's (NOTES 236)
+import { linkJudge } from './netq.js';
+import { createRec } from './rec.js';         // ?rec=1: a capture of real play for tuning, handed back as a download (NOTES 239)      // the link judge: the page's own stalls are not the link's (NOTES 236)
 import { createScene, shownN, lookFor } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
@@ -63,6 +64,7 @@ const inPlay = () => phase === 'play' && !ui.currentScreen() && !ui.currentOverl
 // or heard over the court (toasts, banners, the result, the hold card) waits until the court is what is on screen.
 const seated = () => !LOBBY || !!room, live = () => phase === 'play' || phase === 'watch', spec = () => role === 'spectator';
 if (qs.get('uitest') === '1') { window.__ui = ui; window.__scene = scene; }      // test hooks: test/e2e.mjs forces UI states for screenshots, test/menu.mjs reads the scene's mode
+const rec = createRec(qs.get('rec') === '1', () => { try { return JSON.parse(localStorage.getItem('poddle.cal')); } catch { return null; } });
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window: nothing is kept */ } }, del(k) { try { localStorage.removeItem(k); } catch { /* same */ } } };
 const BADGE_OUT = /[\u221a\u2122\u2610-\u2612\u2705\u2713\u2714\u{1f5f8}\u{1f5f9}\u{1f197}][\ufe0e\ufe0f]?/gu;      // text imitations of the registered badge (docs/ACCOUNTS.md 7.3): √ ™ ☐☑☒ ✅ ✓ ✔ 🗸 🗹 🆗 and a selector after one. The badge itself is an element
 const cleanName = t => { const n = [...String(t == null ? '' : t).replace(BADGE_OUT, '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2028-\u202e\u2800\u3164\uffa0\ufff9-\ufffb\u{e0000}-\u{e0fff}<>]/gu, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').replace(/\s+/g, ' ').trim()].slice(0, 12).join('').trim(); return /[\p{L}\p{N}\p{S}\p{P}]/u.test(n) ? n : ''; };      // the server's rule (docs/SPECTATE.md Names); it cleans again anyway
@@ -472,6 +474,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardOpen: () => { pause(true); setDim(); },
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
+  rec.save();                                      // ?rec=1: the court's capture comes down as a file
   if (undo) { undo = null; ui.backLabel('Back'); }
   camAway = null; if (camOn) stopCam();      // off the court: the camera goes off (NOTES 190). The next seat turns it on again, without asking twice
   trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
@@ -533,7 +536,7 @@ function connect(urls, el, onmsg, onopen) {
     ws.onerror = () => {};
   };
   open();
-  return { send: m => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }, drop: () => { if (ws && ws.readyState === 1) ws.close(); } };      // drop: open again at once, with the address as it is now
+  return { send: m => { if (ws && ws.readyState === 1) { ws.send(JSON.stringify(m)); if (el === 'g') rec.sent(m); } }, drop: () => { if (ws && ws.readyState === 1) ws.close(); } };      // drop: open again at once, with the address as it is now
 }
 
 // ---------- the paddle: an AirPod (the helper on this Mac) or a phone (its page, by way of the game server) ----------
@@ -586,6 +589,7 @@ function onSample(sample, from) {
   if (from === 'airpod' && !useAirpod) { useAirpod = true; tryBridge = false; }      // a returning AirPod player's helper answered
   if (from === 'phone' && useAirpod) { if (chose || !CAN_PHONE) return; useAirpod = false; }      // a phone page that is still open took over: it is the paddle now, say so. Unless the AirPod was picked on purpose
   if (!sample || !Array.isArray(sample.r)) return;
+  rec.sample(sample, from);
   // A phone's samples cross the internet, and phone wifi holds packets back and lets them go in bursts: its replay may wait
   // longer when (only when) that happens (NOTES 35). The AirPod keeps its own limit.
   if (from !== src) { src = from; lastT = -1e9; model.c.BUFFER_MAX = from === 'phone' ? PHONE_BUFFER : AIRPOD_BUFFER; model.c.BUFFER_DRY = from === 'phone' ? PHONE_DRY : AIRPOD_DRY; model.c.RATE_GAIN = from === 'phone' ? PHONE_GAIN : 1; if (from === 'airpod') ls.set('poddle.airpod', '1'); showPair();      // the paddle changed hands: what was calibrated was the other one
@@ -645,6 +649,7 @@ const SCENE_EVENTS = ['serve', 'hit', 'swung', 'bounce', 'launch', 'whiff', 'poi
 const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.get('game') || 8080}`], 'g', m => {
   if (m.type === 'm') { onSample(m, 'phone'); return; }           // my phone's motion, passed on by the server: 60 a second, so before anything else
   stats.events[m.type] = (stats.events[m.type] || 0) + 1;
+  rec.got(m, side);
   if (m.type === 'pong') { net.pong(m); return; }
   if (m.type === 'padtaken') { newPad(); game.send({ type: 'padcode', code: PAD }); showPair(); return; }      // another live tab drew this code first: pick again (nothing was paired to it yet)
   if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)

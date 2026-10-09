@@ -101,6 +101,8 @@ twice. (It was one card opening on a skeleton and then growing into the full car
   The wire carries usernames only, never account/owner ids.
 - Browser only: webcam frames -> MediaPipe face/pose points -> one centre point (points discarded, never sent).
   The camera runs only while seated on a court with Move on Body; leaving the court, watching, Auto and a hidden tab turn it off (NOTES 190).
+  `?rec=1` only (NOTES 239, web/rec.js): the tab keeps the paddle samples it receives and the ball packets in memory and downloads them as a
+  .jsonl file to the player's own disk when they leave the court; never sent anywhere.
   Storage: poddle.name, poddle.settings {airpod, stats, reach, sound, body, cam (Show camera, NOTES 204), sink, music, menuSfx (0..10 volumes, NOTES 181)}, poddle.camPrimer (allow|skip), poddle.tutorial ('1' = the tutorial was shown or the browser was already a player's; sessionStorage if local is blocked, NOTES 217), poddle.cal ({phone, airpod}: a finished calibration's frame quaternions and axes + `at`, NOTES 187; never sent), poddle.view, poddle.airpod,
   poddle.courts, poddle.device (random device id, made at the first seat; rotated on sign-out and delete). Stats are recorded for
   every player, no off switch: poddle.stats.on (the old Save my stats key) is no longer used and profile.js deletes it at load (REMOVED 2026-09-28,

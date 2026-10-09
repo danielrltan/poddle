@@ -4933,3 +4933,20 @@ build did exactly that in headless Chrome on localhost (test/e2e.mjs with the ca
 - Tests: bend, bet, helium, curve, push, coast, badwifi, kitchen, deep, slice, serve, real, drawlob, bot, records, phone-jitter, jitter,
   smooth pass as on main; lagcomp, feel, hitblend and motion-check fail the same lines as on main; stats.test passes alone (it flaked
   under a parallel load on both trees).
+
+## 239. ?rec=1 records real play in this tab and hands it back as a file: the first phone captures
+- "wait why dont u have phone data ... yes build it" (2026-10-09). Every capture in data/ is an AirPod session recorded off the Helper's
+  localhost socket (test/record.mjs, Sept 19-22). A phone's motion goes phone -> server -> the paired tab and is kept nowhere, so every
+  phone figure in NOTES 236-238 (and R19's, NOTES 198) was the AirPod's timing resampled to 60 Hz with the phone gain: a proxy.
+- web/rec.js, only with `?rec=1` in the address: every paddle sample the tab receives (phone or AirPod) as `{t, q, r, a, at, src}`, the
+  shape test/record.mjs writes, so every harness that reads data/*.jsonl replays it unchanged (they keep lines with q, r and at); and,
+  interleaved as `ev` lines, the swing reports the tab sends and the server's ball (state packets cut to p, v, live, both paddles'
+  x y z; hit, launch, bounce, whiff, point, serve, swung), so each swing can be lined up against the ball it met (when the hand peaks
+  against when the ball reaches the paddle: the number strike-at-the-paddle, NOTES 240, depends on). A first `meta` line carries the
+  kept calibration (poddle.cal) and the user agent.
+- Leaving the court downloads poddle-capture-<time>-<n>.jsonl (or `__rec.save()` in the console) and frees the memory; at most 400k
+  lines (~25 min) are held. Without the flag nothing is created (`window.__rec` is undefined).
+- Privacy: nothing new leaves the browser or is stored by us. The file goes to the player's own disk only when they ask for it with
+  the flag. No legal page change; CLAUDE.md's browser-only flows say so.
+- Tests: new test/rec.test.mjs (the harness filter sees exactly the samples, only swing reports are kept from what is sent, state cut to
+  the ball and paddles, rows freed after a save, off = nothing). Headless Chrome: the home with and without ?rec=1, no page errors.
