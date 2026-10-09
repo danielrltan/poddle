@@ -1,5 +1,6 @@
 // Glue: AirPod bridge -> MotionModel -> scene + game server.
 import { MotionModel, qrot } from './motion.js';
+import { linkJudge } from './netq.js';      // the link judge: the page's own stalls are not the link's (NOTES 236)
 import { createScene, shownN, lookFor } from './scene.js';
 import { createPodView } from './podview.js';
 import { createBodyTracker } from './bodytrack.js';
@@ -716,8 +717,9 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   if (m.type === 'record') { if (!spec()) ui.recordNote?.(m.what, m.v); return; }      // a new personal best, at the end of the point that set it (NOTES 132), to my seat only      // someone started watching you (the server tells only the players)
   if (m.type === 'emote') { if (live() && Number.isInteger(m.e)) ui.emote(m.e, cleanName(m.name), m.side === 0 || m.side === 1 ? ((spec() ? m.side === 0 : m.side === side) ? 'me' : 'them') : null); return; }      // everyone on the court sees it. A player's comes out of their own scoreboard tab (the left one is mine, or seat 0 for a spectator); a spectator's pops in the corner (NOTES 208)
   if (m.type === 'state') {
+    if (m.paused || holding) net.idle(); else net.packet(+m.t);      // a stopped room is not a bad link. Timed before anything else here: the link's gap, not this handler's work
     state = m; frozen = !!m.paused; scene.setFrozen(frozen || holding);
-    scene.updateBall(m.p, m.v, m.live, undefined, m.spin, m); if (frozen || holding) net.idle(); else net.packet();      // a stopped room is not a bad link
+    scene.updateBall(m.p, m.v, m.live, undefined, m.spin, m);
     if ((m.watchers | 0) !== watchers) ui.setWatchers(watchers = m.watchers | 0);
     setPaused(frozen && !holding); drawNames();
     if (spec()) { askSync(); ui.setScore(m.score[0], m.score[1]); for (const i of [0, 1]) { const o = m.paddles[i]; scene.updatePaddle(i, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null); } return; }
@@ -781,24 +783,22 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
 // back-dated by the round trip, (2) a struggling link gets half the state packets: over TCP every lost packet stalls
 // everything behind it, so fewer packets means fewer stalls, and (3) the player is told it is the wifi, not the game.
 const net = (() => {
-  const rtts = []; let lastPacket = 0, gaps = 0, late = 0, worst = 0, hz = 60, bad = 0, good = 0, told = false;
+  const rtts = [], J = linkJudge();
   const floor = () => rtts.length ? Math.min(...rtts) : 0;
   setInterval(() => game.send({ type: 'ping', c: performance.now() }), 500);
-  setInterval(() => {                                                   // judged every 2 s
-    const lateShare = gaps ? late / gaps : 0, rtt = rtts.length ? rtts[rtts.length - 1] : 0, poor = link.g && gaps > 10 && (lateShare > 0.04 || worst > 250 || floor() > 140);
-    stats.net = { rtt: Math.round(rtt), floor: Math.round(floor()), late: +lateShare.toFixed(3), worst: Math.round(worst), hz };
-    ui.setStat('ping', link.g && rtts.length ? Math.round(rtt) + ' ms' : '-'); ui.setStat('netq', !link.g ? 'offline' : poor ? `weak (worst gap ${Math.round(worst)} ms)` : 'good'); ui.setStat('nethz', hz);
-    if (poor) { bad++; good = 0; } else { good++; bad = 0; }
-    if (bad >= 2 && hz === 60) { hz = 30; game.send({ type: 'net', hz }); }      // said nowhere: the player cannot do anything about it mid-rally; the ping bars show it
-    if (good >= 8 && hz === 30) { hz = 60; game.send({ type: 'net', hz }); }
-    gaps = late = worst = 0;
+  setInterval(() => {                                                   // judged every 2 s (web/netq.js: the gaps with the page's own stalls taken out)
+    const rtt = rtts.length ? rtts[rtts.length - 1] : 0, j = J.judge(link.g, floor()), poor = j.poor, hz = j.hz;
+    stats.net = { rtt: Math.round(rtt), floor: Math.round(floor()), late: +j.lateShare.toFixed(3), worst: Math.round(j.worst), page: Math.round(j.paged), hz };
+    ui.setStat('ping', link.g && rtts.length ? Math.round(rtt) + ' ms' : '-'); ui.setStat('netq', !link.g ? 'offline' : poor ? `weak (worst gap ${Math.round(j.worst)} ms)` : 'good'); ui.setStat('nethz', hz);
+    if (j.ask) game.send({ type: 'net', hz: j.ask });                   // said nowhere: the player cannot do anything about it mid-rally; the ping bars show it
   }, 2000);
   return {
-    packet() { const t = performance.now(), g = t - lastPacket; lastPacket = t; if (g > 1000) return; gaps++; if (g > worst) worst = g; if (g > 1000 / hz + 45) late++; },
+    packet(t) { J.packet(performance.now(), t, document.hidden); },     // the first thing a state packet's handler does: t, the server's time on it
+    frame() { J.frame(performance.now()); },                            // every animation frame: the page ran
     pong(m) { const r = performance.now() - m.c; if (r >= 0 && r < 5000) { rtts.push(r); if (rtts.length > 12) rtts.shift(); if (ui.setPing) ui.setPing((room || !LOBBY) && !spec() ? [...rtts].sort((a, b) => a - b)[rtts.length >> 1] : 0); } },      // the median of the last 6 s: a number that sits still
     lag: () => Math.round(floor()),                                     // the quietest recent round trip: queueing spikes are not the link's real delay
-    rejoined() { hz = 60; bad = good = 0; rtts.length = 0; },           // a new socket starts at the full rate on the server
-    idle() { lastPacket = 0; },                                         // paused or held: the gap to the next live packet is not the link's
+    rejoined() { J.rejoined(); rtts.length = 0; },                      // a new socket starts at the full rate on the server
+    idle() { J.idle(); },                                               // paused or held: the gap to the next live packet is not the link's
   };
 })();
 
@@ -894,6 +894,7 @@ addEventListener('resize', () => scene.resize());
 let lastPos = null;
 (function loop(now) {
   requestAnimationFrame(loop);
+  net.frame();                                                    // the page ran: a gap between packets that spans frames is the link's (web/netq.js)
   const p = model.pose(now);
   if (p.calibrated && seated() && !spec()) {                     // my own paddle: only with a seat of my own
     const mine = state && state.paddles[side];

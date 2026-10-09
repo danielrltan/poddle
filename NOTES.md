@@ -4841,3 +4841,24 @@ after scrolling past the hero: Safari keeps reporting LCP entries after the visi
   programmatic scroll such as scroll restoration does not end it). Compared by entry time, since buffered entries can arrive after
   the input. Same change in danielrltan.com's public/rum.js (27b8db3); the two copies stay identical.
 - Nothing new is collected. Rows already stored keep their old values.
+
+## 236. The 60 -> 30 Hz state downgrade judges the link, not the page's main thread
+The owner: "high latency between swings even with low ping ~13ms". web/main.js `net` timed the gaps between the state packets' message
+handlers. A long frame or a GC pause on a good link holds the packets in the page's queue and they run in a burst after it: that one long
+gap read as a lost packet, two such 2 s windows asked the server for 30 Hz, and the page stayed there for 16 s (8 good windows). The old
+build did exactly that in headless Chrome on localhost (test/e2e.mjs with the camera on: late 0.148, worst gap 155 ms, hz 30).
+- web/netq.js linkJudge() (pure, no DOM): the same windows, thresholds and hysteresis (late = gap > 1000/hz + 45 ms; poor = over 10 gaps and
+  late share > 4% or worst gap > 250 ms or RTT floor > 140 ms; 2 poor -> 30 Hz, 8 good -> 60), on gaps with the page's own stalls taken out.
+  The page demonstrably ran at every animation frame (net.frame() at the top of the render loop) and every packet handler; a stretch of over
+  STALL_MS = 50 ms with neither is the page's. Each state packet's server time t plus the least-delayed packet of the last ~2 s gives its
+  expected arrival; the part of its wait from then (never before the previous packet's) to its handler that fell inside a page stall is not
+  counted. A page that never stalls gets exactly the old gaps and decisions. A hidden tab draws no frames: there it judges the raw gaps (old
+  behaviour). idle() (pause / held seat) and rejoined() also reset the clock offset and the stall list (room time stands still in a pause).
+  The rate asked for and the server side ('net' -> ws.every) are unchanged.
+- net.packet(t) now runs first in the state branch, before scene.updateBall: the handler's own work is not in the gap.
+- stats.net gains `page` (ms the page did not run in the window), window.__stats only, never sent. No data flow or legal change.
+- test/netq.test.mjs: a modelled page (60 Hz display, frame work, long frames / GC stalls, frame before or after the queued messages after a
+  stall) and server (60 Hz, 30 Hz from when the ask lands) over badwifi.mjs's link model, 120 s a case, old judge as the reference. Good link
+  + 150-400 ms stalls: old 40/59 windows poor, 116 s at 30 Hz; new 0 poor, never drops (both orders). Bad link (4% loss, 100-350 ms stalls),
+  clean page: identical decisions window by window, drop at 4 s. Bad link + stalls: new still drops (8 s, 112 of 120 s at 30 Hz). Home wifi
+  + stalls: old drops, new does not. Hidden tab, and good link clean page: identical decisions.
