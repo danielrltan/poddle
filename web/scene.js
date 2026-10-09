@@ -1563,7 +1563,7 @@ export function createScene(containerEl) {
   function setMenu(on) {
     on = !!on; if (on === menu) return;
     if (!on) { easeFrom.p.copy(camera.position); easeFrom.q.copy(camera.quaternion); easeFrom.m.copy(camera.projectionMatrix); }      // the menu pose as last drawn (before resize() touches the lens)
-    menu = on; resize(); syncInput();
+    menu = on; resize(); syncInput(); if (!on && rest === 1) restNow();      // a join during the fade: warmRest now (above)
     if (on) { stopFx(); shadowHold = 1; easeT = 1; }
     else { renderer.shadowMap.autoUpdate = !dim; renderer.shadowMap.needsUpdate = true; shadowHold = 0;
       const split = spectator && vName === 'split'; easeT = split || !drawn ? 1 : 0;                   // two cameras cannot ease out of one: split is a cut
@@ -1654,13 +1654,13 @@ export function createScene(containerEl) {
   const glOpened = new Promise(r => { glGo = r; }), open = () => { if (glOpen) return; glOpen = true; glGo(); if (prewarm) markGlReady(performance.now()); };
   const drawable = () => { const l = []; scene.traverseVisible(o => { if (o.material) l.push(o); }); return { traverse: f => l.forEach(f), traverseVisible() {}, list: l }; };      // what a frame draws now, shaped as three's compile() walks it (traverse; the lights are the scene's)
   const first = p => { if (p) try { p.getUniforms(); touched.add(p); } catch (e) { /* released meanwhile: its material's next draw makes it again */ } };      // three's first use of a program (null: a texture's place in a batch)
-  function warm(compile, most = Infinity) {                // most: programs a batch may bind (warmRest: few, so a cold Metal cache's pipelines never hold the compositor long). -> Promise { ok: false = the deadline or a lost context (what is left links at its first draw, as before), n: programs + textures it had to do }
+  function warm(compile, { most = Infinity, hold = null, wait = GL_WAIT_MS } = {}) {      // most: programs a batch may bind; hold(): true while no batch may go (warmRest below). -> Promise { ok: false = the deadline or a lost context (what is left links at its first draw, as before), n: programs + textures it had to do }
     let mats; try { mats = compile(); } catch (e) { return Promise.resolve({ ok: false, n: 0 }); }
     const link = [], up = [], fences = [], touch = [];
     for (const m of mats) { const ps = renderer.properties.get(m).programs; if (ps) for (const p of ps.values()) if (!touched.has(p) && !link.includes(p)) link.push(p);      // every variant made for it (one material on a plain and an instanced mesh is two programs)
       const tex = t => { if (t && t.isTexture && !uploaded.has(t) && t.version > 0 && t.image && t.image.complete !== false && !t.isRenderTargetTexture) { uploaded.add(t); up.push(t); } };
       for (const k in m) tex(m[k]); if (m.uniforms) for (const k in m.uniforms) tex(m.uniforms[k] && m.uniforms[k].value); }
-    const n = link.length + up.length, end = performance.now() + GL_WAIT_MS;
+    const n = link.length + up.length, end = performance.now() + wait;
     return new Promise(done => {
       let bar = null;                                      // the barrier: a fence flushed behind everything queued so far, so a synchronous call made once it is back waits for nothing
       const signalled = f => gl.getSyncParameter(f, gl.SYNC_STATUS) === gl.SIGNALED, fence = () => { const f = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush(); return f; };
@@ -1677,14 +1677,14 @@ export function createScene(containerEl) {
           else if (signalled(bar.s)) { gl.deleteSync(bar.s); const b = bar; bar = null;
             if (!glQ && b.n === glN && (b.d === drawn || b.tries >= 3)) while (touch.length && performance.now() - t0 < 4) first(touch.shift());
             else bar = { s: fence(), n: glN, d: drawn, tries: b.tries + 1 }; }
-        } else if (!glQ && (link.length || up.length)) { const batch = [];      // one batch in flight at a time, all warm()s together
+        } else if (!glQ && (link.length || up.length) && !(hold && hold())) { const batch = [];      // one batch in flight at a time, all warm()s together
           for (let i = 0; i < link.length && batch.length < most;) if (link[i].isReady()) batch.push(link.splice(i, 1)[0]); else i++;
           for (const p of batch) renderer.state.useProgram(p.program);
           if (batch.length) renderer.state.useProgram(null);           // three's next draw binds its own program (and so sets all of its uniforms)
           while (up.length && (performance.now() - t0 < 4 || !batch.length)) { renderer.initTexture(up.shift()); batch.push(null); }
           if (batch.length) { glN++; if (FENCE) { fences.push({ s: fence(), ps: batch }); glQ++; } else touch.push(...batch); }
         }
-        if (!link.length && !up.length && !fences.length && !touch.length) { if (bar) gl.deleteSync(bar.s); done({ ok: true, n }); } else setTimeout(step, fences.length || bar || glQ ? 4 : touch.length || up.length ? 0 : 10);
+        if (!link.length && !up.length && !fences.length && !touch.length) { if (bar) gl.deleteSync(bar.s); done({ ok: true, n }); } else setTimeout(step, fences.length || bar || glQ ? 4 : touch.length || (up.length && !(hold && hold())) ? 0 : 10);
       };
       setTimeout(step, 0);
     });
@@ -1710,7 +1710,7 @@ export function createScene(containerEl) {
       scene.fog = null; renderer.setRenderTarget(rt); try { renderer.compile(fresh, camera, scene); } finally { renderer.setRenderTarget(prev); scene.fog = fog; rt.dispose(); } }
     return out;
   }
-  function warmRest() {                                    // once the court is up: every material in the graph, hidden or not (the rally's fx, the swooshes, both named looks, the trophy), and what three makes only later, through stand-ins (a program is shared by every material with the same key)
+  function warmRest(hold) {                                // once the court is up: every material in the graph, hidden or not (the rally's fx, the swooshes, both named looks, the trophy), and what three makes only later, through stand-ins (a program is shared by every material with the same key)
     warm(() => {
       const mats = renderer.compile(scene, camera), all = []; scene.traverse(o => all.push(o)); for (const x of shadows(all)) mats.add(x);
       const g = new THREE.Group();
@@ -1719,19 +1719,20 @@ export function createScene(containerEl) {
       const sw = makeSwoosh(0xffffff); scene.remove(sw.mesh); g.add(sw.mesh);      // a seat's swoosh is made at its first frame on court (updatePads): a seat that sits down after this pass still finds its program
       for (const m of renderer.compile(g, camera, scene)) { mats.add(m); glKeep.push(m); }
       return mats;
-    }, 2);
+    }, { most: 2, hold, wait: GL_WAIT_MS + REST_CAP_MS });
   }
-  // warmRest's links and their first binds load the GPU process (Metal makes pipelines there), and a frame presented behind them is late: started
-  // at the veil's lift, keys and clicks in the first ~1.5 s of a load took +6 ms on average to show (p75 64 -> 72 ms, measured). So only once the
-  // fade is over and no key or pointer has gone down for REST_QUIET_MS; REST_CAP_MS after the fade it goes anyway (a join is seconds away then)
-  const REST_QUIET_MS = 500, REST_CAP_MS = 3000; let lastInput = -1e9;
+  // warmRest's first binds load the GPU process (Metal makes each program's pipelines there), and a frame presented behind them is late: all at
+  // once at the veil's lift, keys and clicks in the first ~1.5 s of a load took +6 ms on average to show (p75 64 -> 72 ms, measured). So its links
+  // start once the fade is over (off the main thread), but its binds go two programs a batch and wait while a key or pointer went down in the
+  // last REST_QUIET_MS on a menu (at most REST_CAP_MS). Off the menu they go at once: a join's first frames (a calibrating seat's tag and ghost,
+  // the swoosh) find their programs linked (a join 2 s into a load, clicking all the way: 2 synchronous links in its first frame when the
+  // links waited for quiet input too, measured)
+  const REST_QUIET_MS = 500, REST_CAP_MS = 3000; let lastInput = -1e9, rest = 0;      // rest: 0 not yet, 1 the fade is on, 2 started
   if (prewarm) for (const ev of ['keydown', 'pointerdown']) addEventListener(ev, () => { lastInput = performance.now(); }, { capture: true, passive: true });
-  function restLater() {
-    const el = renderer.domElement; let faded = 0;
-    const quiet = () => { const t = performance.now(), q = t - lastInput;
-      if (q < REST_QUIET_MS && t - faded < REST_CAP_MS) { setTimeout(quiet, REST_QUIET_MS - q + 10); return; }
-      if (typeof requestIdleCallback === 'function') requestIdleCallback(warmRest, { timeout: 300 }); else setTimeout(warmRest, 0); };
-    const end = e => { if (faded || (e && e.target !== el)) return; faded = performance.now(); el.removeEventListener('transitionend', end); quiet(); };
+  function restNow() { if (rest === 2) return; rest = 2; const t = performance.now(); warmRest(() => menu && performance.now() - lastInput < REST_QUIET_MS && performance.now() - t < REST_CAP_MS); }
+  function restLater() {                                   // at the veil's lift: after the fade (or at once off the menu: setMenu)
+    if (!menu) { restNow(); return; } rest = 1; const el = renderer.domElement;
+    const end = e => { if (e && e.target !== el) return; el.removeEventListener('transitionend', end); restNow(); };
     el.addEventListener('transitionend', end); setTimeout(end, 700);      // --d-slow + a little: reduced motion (1 ms) or a transition that never ran
   }
   if (prewarm) warm(() => renderer.compile(drawable(), camera, scene));      // a head start for the court as built (the first frame's own pass, glCheck, adds the players and anything else the menu shows)
