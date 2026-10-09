@@ -1621,14 +1621,15 @@ export function createScene(containerEl) {
       for (let i = 0; i < 2; i++) { const x = tall || !i ? 0 : wl, ww = tall ? w : i ? w - wl : wl, y = tall && !i ? h - ht : 0, hh = tall ? (i ? h - ht : ht) : h;      // (GL's y runs up from the bottom)
         vpW = ww; vpH = hh; playPose(i, povSt[i], ww / hh, false, dt); dress(i, i, -1); drawTrail(); faceFx();                // trail and rings are rebuilt for each camera
         if (!i && scenery) scenery.update(dt, timeS, camera);                                           // once a frame, with the first camera
-        if (!i && !glOpen) glCheck(); if (!glOpen) continue;                                                   // the gate (below): everything moves, nothing is drawn
+        if (!i && !glOpen) glCheck(); if (!glOpen || gl.isContextLost()) continue;                             // the gate (below): everything moves, nothing is drawn
         renderer.setViewport(x, y, ww, hh); renderer.setScissor(x, y, ww, hh); renderer.render(scene, camera); }
-      renderer.setScissorTest(false); if (!glOpen) { drawn--; return false; }
+      renderer.setScissorTest(false); if (!glOpen || gl.isContextLost()) { drawn--; return false; }
       renderer.setViewport(0, 0, w, h); framed(t0);
       return true;
     }
     vpW = w; vpH = h; updateCamera(dt, w / h); drawTrail(); faceFx(); if (scenery) scenery.update(dt, timeS, camera);
     if (!glOpen) glCheck(); if (!glOpen) { drawn--; return false; }      // the gate: until the court's programs are linked (warm() below) the frame is simulated, not drawn, so the first one drawn is the same picture as ever
+    if (gl.isContextLost()) { drawn--; return false; }      // a lost context is lost here at once but reaches three (its own flag, which skips the draw) only with the webglcontextlost event, a task later: a frame between drew on a dead GL, and a program never used yet threw in three's first-use check (null info log) mid shadow pass, leaving the shadow map bound for good (a blank court)
     const hold = menu && shadowHold === 1;                 // a menu's shadow map is drawn ONCE, without the players (a moving avatar must not leave its shadow baked on the court)
     if (hold) { for (const o of casters) o.castShadow = false; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true; }
     renderer.render(scene, camera);
@@ -1691,9 +1692,9 @@ export function createScene(containerEl) {
   }
   function glCheck() {                                 // render(), while the gate is shut: warm what this frame draws; open once a pass finds nothing left to do
     if (!prewarm) { open(); return; }      // no prewarm: three links in the first frame, as ever: main.js's first rAF, before the page's first paint. Not a frame later: a serial linker's first draw then waits behind the compositor's work on the painted menu (blur, CSS animations; SwiftShader: 9.4 s against 2.4 s, measured)
-    if (glBusy) return; const t = performance.now(); if (!glT0) glT0 = t; if (t - glT0 > GL_WAIT_MS) { open(); return; }
+    if (glBusy || gl.isContextLost()) return; const t = performance.now(); if (!glT0) glT0 = t; if (t - glT0 > GL_WAIT_MS) { open(); return; }
     glBusy = true;
-    warm(() => { const d = drawable(), m = renderer.compile(d, camera, scene); for (const x of shadows(d.list)) m.add(x); return m; }).then(r => { glBusy = false; if (!r.ok || !r.n) open(); else glCheck(); });      // again at once: whatever became visible meanwhile
+    warm(() => { const d = drawable(), m = renderer.compile(d, camera, scene); for (const x of shadows(d.list)) m.add(x); return m; }).then(r => { glBusy = false; if (gl.isContextLost()) return; if (!r.ok || !r.n) open(); else glCheck(); });      // again at once: whatever became visible meanwhile. A lost context opens the gate from its event (below), once three knows
   }
   // the shadow pass draws each caster with ITS depth material variant (three's WebGLShadowMap: the caster's side flipped, its map, alpha test,
   // instancing), with no fog into a linear target: stand-ins compiled the same way, one per variant, kept (glKeep) so their programs stay
