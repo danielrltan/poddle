@@ -892,7 +892,7 @@ addEventListener('resize', () => scene.resize());
 
 // ---------- render loop: local paddle straight from the model every frame ----------
 let lastPos = null;
-(function loop(now) {
+function loop(now) {
   requestAnimationFrame(loop);
   const p = model.pose(now);
   if (p.calibrated && seated() && !spec()) {                     // my own paddle: only with a seat of my own
@@ -928,6 +928,7 @@ let lastPos = null;
     if (!champ && champLive) { champLive = false; scene.podium?.(null); }      // the champion screen is down (Back to courts, See bracket, Esc): the rally again
     scene.setVictory?.(v ? vicSide : null, v ? ui.resultPane?.() : null); }
   scene.render(now);
-})(performance.now());
+}
+requestAnimationFrame(loop);      // never a frame inside this module's evaluation (its long task held DOMContentLoaded and every script after it): with the prewarm the title paints first and scene.js draws the court once its shaders are linked off the frame
 
 addEventListener('error', () => stats.errors++);

@@ -32,8 +32,9 @@ export function createScenery(THREE, ctx) {
       root.traverse(o => { o.castShadow = false; o.receiveShadow = false; });   // the sun's shadow frustum is fitted to the court: ours are painted
       fanOut(v, 0, 0, ctx.camera);                                              // park.js paints its shadows on the first update (it needs flora's palms): do it before compiling
       root.traverse(o => { o.castShadow = false; o.receiveShadow = false; });
-      let p = null; try { if (typeof ctx.renderer.compileAsync === 'function') p = ctx.renderer.compileAsync(root, ctx.camera, ctx.scene); } catch (e) { p = null; }
-      if (p && typeof p.then === 'function') { p.then(ok, ok); setTimeout(ok, 4000); } else ok();   // a lost context must not leave the old look up for ever: after 4 s just show it
+      // ctx.warm (scene.js warm(), after the court's own): the links run off the main thread and three's synchronous first-use calls are made a few ms at a time, so the reveal frame has none left
+      let p = null; try { if (typeof ctx.warm === 'function') p = ctx.warm(root); else if (typeof ctx.renderer.compileAsync === 'function') p = ctx.renderer.compileAsync(root, ctx.camera, ctx.scene); } catch (e) { p = null; }
+      if (p && typeof p.then === 'function') { p.then(ok, ok); setTimeout(ok, ctx.warm ? 10000 : 4000); } else ok();   // a lost context must not leave the old look up for ever: after 4 s just show it (ctx.warm waits for the court's own programs first, and has its own deadlines)
     };
     const step = () => { build(mods[next++]); if (next < mods.length) setTimeout(step, 0); else finish(); };
     step(); return v;

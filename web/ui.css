@@ -85,6 +85,7 @@ body{color:var(--ink);font:500 var(--t-md)/1.5 var(--font);
 [hidden]{display:none!important}
 *,*::before,*::after{box-sizing:border-box}
 #stage{position:fixed;inset:0}
+#stage > canvas{transition:opacity var(--d-slow) var(--ease-soft)} #stage > canvas.gl-wait{opacity:0}      /* title first (scene.js): the court fades in under the menu once its shaders are linked and the scenery is in, never a blank or half-built frame */
 .caps{font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--ink-soft)}
 .t-title{font-size:var(--t-2xl);font-weight:700;line-height:1.15;letter-spacing:.02em;color:var(--ink-strong);margin:0}
 .t-lead{font-size:var(--t-lg);font-weight:500;line-height:1.5;letter-spacing:.01em;color:var(--ink);margin:0}

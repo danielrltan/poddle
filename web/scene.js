@@ -432,7 +432,14 @@ export function createScene(containerEl) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(pixelRatio());
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  if (/^(www\.)?poddleball\.com$/.test(location.hostname)) renderer.debug.checkShaderErrors = false;      // live only: three's first-use check is 4 more synchronous GPU round trips per program (info logs, LINK_STATUS). Kept on locally and in tests, where a broken shader must say so
   renderer.domElement.style.display = 'block';
+  // Shaders linked off the frame (warm(), at the end): only where links really run in parallel (KHR_parallel_shader_compile). A browser that
+  // links serially (Firefox; Chrome on SwiftShader) is left as it was: there the first wait for any link waits for every link queued before it,
+  // so prewarming only puts the hidden programs ahead of the visible ones (+600 ms measured on SwiftShader). ?noprewarm: the same, to compare live
+  const prewarm = typeof renderer.compile === 'function' && renderer.extensions.has('KHR_parallel_shader_compile') && !new URLSearchParams(location.search).has('noprewarm');
+  if (prewarm) renderer.domElement.classList.add('gl-wait');      // see-through until the court is ready to be seen (framed() below; ui.css fades it in). Without the prewarm the court is in the page's first paint, as ever
+  renderer.extensions.has('EXT_texture_filter_anisotropic'); renderer.capabilities.getMaxAnisotropy();      // three asks for these at its first texture or render target: synchronous round trips, which wait behind every link queued by then (365 and 346 ms measured, cold caches). Asked now, while the GPU process is idle
   containerEl.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -480,23 +487,30 @@ export function createScene(containerEl) {
   // ---------- everything beyond the fences lives in web/scenery/ (docs/SCENERY.md). Missing or broken: the plain sky above stays. ----------
   let scenery = null;
   // Timing marks, read live (rum.js uploads the page's marks and measures with its load part): gl:first-frame, the first frame drawn (start,
-  // duration: three links every program it meets there); gl:ready, when the scene's programs are linked (for now the end of that frame:
-  // three has just linked them all, synchronously); scenery:reveal, the frame that swaps web/scenery/ in (start, duration: its programs'
-  // first use). Each once a load. Always performance.now(): render() may be handed a virtual clock (test/perf-load.mjs's screenshots).
+  // duration: with the prewarm below every program it uses is linked and touched by then; without it (?noprewarm, a browser that links
+  // serially) three links them all inside it); gl:ready, when the court's programs are linked and touched (the gate opens; without the
+  // prewarm, the end of that first frame); scenery:reveal, the frame that swaps web/scenery/ in (start, duration: its first use).
+  // Each once a load. Always performance.now(): render() may be handed a virtual clock (test/perf-load.mjs's screenshots).
   const stamp = (name, t0, t1) => { try { if (t1 == null) performance.mark(name, { startTime: t0 }); else performance.measure(name, { start: t0, end: t1 }); } catch (e) { /* an engine without the options forms */ } };
-  let firstDrawn = false, glMarked = false, revealing = false, revealed = false, sceneryDone = null;
+  let firstDrawn = false, glMarked = false, revealing = false, revealed = false, sceneryDone = null, sceneryGone = false, veiled = prewarm, firstAt = 0;
   const markGlReady = t => { if (glMarked) return; glMarked = true; stamp('gl:ready', t); };
   // sceneryReady: true once the frame that swapped the scenery in has been DRAWN (its heavy first use done; a hidden tab waits until it is
   // seen); false if web/scenery/ never came (missing, broken). What other code waits on instead of window.__scenery (a test handle).
   const sceneryReady = new Promise(r => { sceneryDone = r; });
   const onShown = () => { if (!revealed) revealing = true; };                     // web/scenery/index.js show(): the swap is in the scene graph; the next drawn frame is its reveal
-  const framed = t0 => {                                   // after a frame was drawn: the marks above
-    if (firstDrawn && !revealing) return; const t1 = performance.now();
-    if (!firstDrawn) { firstDrawn = true; stamp('gl:first-frame', t0, t1); markGlReady(t1); }
+  // Title first (the owner's call, 2026-10-08): the canvas stays see-through (ui.css .gl-wait: the page's plain sky blue under the menu) until
+  // a frame has been drawn AND the scenery is in it, then fades in: never a blank frame, and no plain dome that the scenery then pops over.
+  // On a court (no menu) it shows at its first frame; a scenery that is missing, broken or slower than SCENERY_WAIT_MS gives up waiting.
+  // Only with the prewarm: without it (a serial linker) the court is drawn before the page's first paint, as ever (veiled false from the start).
+  const SCENERY_WAIT_MS = 3000;
+  const framed = t0 => {                                   // after a frame was drawn: the marks above, and the fade-in
+    if (firstDrawn && !revealing && !veiled) return; const t1 = performance.now();
+    if (!firstDrawn) { firstDrawn = true; firstAt = t1; stamp('gl:first-frame', t0, t1); markGlReady(t1); }
     if (revealing) { revealing = false; revealed = true; stamp('scenery:reveal', t0, t1); sceneryDone(true); }
+    if (veiled && (revealed || sceneryGone || !menu || t1 - firstAt > SCENERY_WAIT_MS)) { veiled = false; renderer.domElement.classList.remove('gl-wait'); if (prewarm) setTimeout(warmRest, 0); }
   };
-  import('./scenery/index.js').then(m => { scenery = m.createScenery(THREE, { scene, renderer, camera, sun, hemi, fog: scene.fog, plainSky, court: () => court, side: () => localSide, venue: () => venue, onShown }); })
-    .catch(e => { sceneryDone(false); if (!/Failed to fetch|Cannot find module|404/i.test(String(e && e.message))) console.error('scenery:', e); });
+  import('./scenery/index.js').then(m => { scenery = m.createScenery(THREE, { scene, renderer, camera, sun, hemi, fog: scene.fog, plainSky, court: () => court, side: () => localSide, venue: () => venue, onShown, warm: prewarm ? o => glOpened.then(() => warm(() => renderer.compile(o, camera, scene))) : null }); })      // its links queue behind the court's
+    .catch(e => { sceneryDone(false); sceneryGone = true; if (!/Failed to fetch|Cannot find module|404/i.test(String(e && e.message))) console.error('scenery:', e); });
 
   // ---------- court (rebuilt by setCourt) ----------
   let courtGroup = null;
@@ -1583,6 +1597,7 @@ export function createScene(containerEl) {
   function render(nowMs) {                                 // -> true when a frame was drawn
     const now = nowMs == null ? performance.now() : nowMs;
     if (document.visibilityState === 'hidden') return false;                                        // nobody is looking: draw nothing, menu or not
+    // (order: visibility, a slow GPU's backdrop freeze, the 30 fps cap, the simulation, the shader gate, the draw)
     if ((menu || dim) && !force && lastMs && now >= lastMs && now - lastMs < 30) return false;      // a menu (or a pause behind the blur) runs at 30 fps. dt below is between DRAWN frames
     const dt = lastMs ? clamp((now - lastMs) / 1000, 0, 0.05) : 1 / 60; lastMs = now; timeS += dt; force = false; drawn++;
     const t0 = firstDrawn && !revealing ? 0 : performance.now();                    // a frame the marks time (framed)
@@ -1596,11 +1611,14 @@ export function createScene(containerEl) {
       for (let i = 0; i < 2; i++) { const x = tall || !i ? 0 : wl, ww = tall ? w : i ? w - wl : wl, y = tall && !i ? h - ht : 0, hh = tall ? (i ? h - ht : ht) : h;      // (GL's y runs up from the bottom)
         vpW = ww; vpH = hh; playPose(i, povSt[i], ww / hh, false, dt); dress(i, i, -1); drawTrail(); faceFx();                // trail and rings are rebuilt for each camera
         if (!i && scenery) scenery.update(dt, timeS, camera);                                           // once a frame, with the first camera
+        if (!i && !glOpen) glCheck(); if (!glOpen) continue;                                                   // the gate (below): everything moves, nothing is drawn
         renderer.setViewport(x, y, ww, hh); renderer.setScissor(x, y, ww, hh); renderer.render(scene, camera); }
-      renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); framed(t0);
+      renderer.setScissorTest(false); if (!glOpen) { drawn--; return false; }
+      renderer.setViewport(0, 0, w, h); framed(t0);
       return true;
     }
     vpW = w; vpH = h; updateCamera(dt, w / h); drawTrail(); faceFx(); if (scenery) scenery.update(dt, timeS, camera);
+    if (!glOpen) glCheck(); if (!glOpen) { drawn--; return false; }      // the gate: until the court's programs are linked (warm() below) the frame is simulated, not drawn, so the first one drawn is the same picture as ever
     const hold = menu && shadowHold === 1;                 // a menu's shadow map is drawn ONCE, without the players (a moving avatar must not leave its shadow baked on the court)
     if (hold) { for (const o of casters) o.castShadow = false; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true; }
     renderer.render(scene, camera);
@@ -1610,6 +1628,91 @@ export function createScene(containerEl) {
   }
 
   resize();
+  // ---------- shaders linked off the frame ----------
+  // The first frame used to create and link every program it met (18), one after another, inside main.js's evaluation: 75 ms on an M4 with
+  // its shader caches warm, ~1.2 s with them cold (a first visit), a median ~850 ms and up to 3.3 s live, page frozen. Now render() draws
+  // nothing (glOpen) until every program the frame would use is linked and touched (glCheck), while everything still moves; warm() does it:
+  //   1. renderer.compile only STARTS each link (KHR_parallel_shader_compile runs it off the main thread); isReady() polls COMPLETION_STATUS
+  //   2. a linked program is bound once (useProgram) and each texture uploaded (initTexture): plain commands, which never wait. The GPU
+  //      process finishes the program there (a cold Metal cache compiles it then, 50-100 ms each, measured) and a fence says when it is through
+  //   3. then getUniforms: three's first-use check and its uniform/attribute tables, synchronous round trips that are quick now, ~4 ms a task,
+  //      made only with nothing queued ahead of them (step(): the barrier)
+  // Only what the frame draws gates it (a GPU process that compiles one program at a time does those first); the rest (the rally's fx,
+  // the shadow pass's other variants, the swoosh, ghosts, both named looks, the trophy) follows once the court is up (warmRest).
+  let glOpen = false, glBusy = false, glT0 = 0, glGo = null, glQ = 0, glN = 0;      // glQ: warm() batches in flight (their fences not yet back), glN: batches flushed, both over every warm()
+  const gl = renderer.getContext(), glKeep = [], GL_WAIT_MS = 4000, touched = new WeakSet(), uploaded = new WeakSet(), FENCE = typeof gl.fenceSync === 'function';
+  const glOpened = new Promise(r => { glGo = r; }), open = () => { if (glOpen) return; glOpen = true; glGo(); if (prewarm) markGlReady(performance.now()); };
+  const drawable = () => { const l = []; scene.traverseVisible(o => { if (o.material) l.push(o); }); return { traverse: f => l.forEach(f), traverseVisible() {}, list: l }; };      // what a frame draws now, shaped as three's compile() walks it (traverse; the lights are the scene's)
+  const first = p => { if (p) try { p.getUniforms(); touched.add(p); } catch (e) { /* released meanwhile: its material's next draw makes it again */ } };      // three's first use of a program (null: a texture's place in a batch)
+  function warm(compile) {                                 // -> Promise { ok: false = the deadline or a lost context (what is left links at its first draw, as before), n: programs + textures it had to do }
+    let mats; try { mats = compile(); } catch (e) { return Promise.resolve({ ok: false, n: 0 }); }
+    const link = [], up = [], fences = [], touch = [];
+    for (const m of mats) { const ps = renderer.properties.get(m).programs; if (ps) for (const p of ps.values()) if (!touched.has(p) && !link.includes(p)) link.push(p);      // every variant made for it (one material on a plain and an instanced mesh is two programs)
+      const tex = t => { if (t && t.isTexture && !uploaded.has(t) && t.version > 0 && t.image && t.image.complete !== false && !t.isRenderTargetTexture) { uploaded.add(t); up.push(t); } };
+      for (const k in m) tex(m[k]); if (m.uniforms) for (const k in m.uniforms) tex(m.uniforms[k] && m.uniforms[k].value); }
+    const n = link.length + up.length, end = performance.now() + GL_WAIT_MS;
+    return new Promise(done => {
+      let bar = null;                                      // the barrier: a fence flushed behind everything queued so far, so a synchronous call made once it is back waits for nothing
+      const signalled = f => gl.getSyncParameter(f, gl.SYNC_STATUS) === gl.SIGNALED, fence = () => { const f = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush(); return f; };
+      const step = () => {
+        const lost = gl.isContextLost();
+        if (lost || performance.now() > end) { for (const f of fences) { glQ--; if (!lost) gl.deleteSync(f.s); } if (bar && !lost) gl.deleteSync(bar.s); done({ ok: false, n }); return; }
+        const t0 = performance.now();
+        while (fences.length && signalled(fences[0].s)) { const f = fences.shift(); gl.deleteSync(f.s); glQ--; touch.push(...f.ps); }      // polled: never blocks
+        if (touch.length) {                                // three's first-use calls are synchronous, and wait behind every command flushed before them: behind the next batch's useProgram, or a
+          // frame's first draws (Metal makes its pipelines there: a getUniforms behind the court's first frame waited 150-190 ms, measured). So only with the barrier back, no
+          // batch of any warm() in flight, no batch and no frame since it was placed (after 3 tries a frame no longer counts: on a GPU slower than the menu's 30 fps it never would)
+          if (!FENCE) { while (touch.length && performance.now() - t0 < 4) first(touch.shift()); }
+          else if (!bar) bar = { s: fence(), n: glN, d: drawn, tries: 0 };
+          else if (signalled(bar.s)) { gl.deleteSync(bar.s); const b = bar; bar = null;
+            if (!glQ && b.n === glN && (b.d === drawn || b.tries >= 3)) while (touch.length && performance.now() - t0 < 4) first(touch.shift());
+            else bar = { s: fence(), n: glN, d: drawn, tries: b.tries + 1 }; }
+        } else if (!glQ && (link.length || up.length)) { const batch = [];      // one batch in flight at a time, all warm()s together
+          for (let i = 0; i < link.length;) if (link[i].isReady()) batch.push(link.splice(i, 1)[0]); else i++;
+          for (const p of batch) renderer.state.useProgram(p.program);
+          if (batch.length) renderer.state.useProgram(null);           // three's next draw binds its own program (and so sets all of its uniforms)
+          while (up.length && (performance.now() - t0 < 4 || !batch.length)) { renderer.initTexture(up.shift()); batch.push(null); }
+          if (batch.length) { glN++; if (FENCE) { fences.push({ s: fence(), ps: batch }); glQ++; } else touch.push(...batch); }
+        }
+        if (!link.length && !up.length && !fences.length && !touch.length) { if (bar) gl.deleteSync(bar.s); done({ ok: true, n }); } else setTimeout(step, fences.length || bar || glQ ? 4 : touch.length || up.length ? 0 : 10);
+      };
+      setTimeout(step, 0);
+    });
+  }
+  function glCheck() {                                 // render(), while the gate is shut: warm what this frame draws; open once a pass finds nothing left to do
+    if (!prewarm) { open(); return; }      // no prewarm: three links in the first frame, as ever: main.js's first rAF, before the page's first paint. Not a frame later: a serial linker's first draw then waits behind the compositor's work on the painted menu (blur, CSS animations; SwiftShader: 9.4 s against 2.4 s, measured)
+    if (glBusy) return; const t = performance.now(); if (!glT0) glT0 = t; if (t - glT0 > GL_WAIT_MS) { open(); return; }
+    glBusy = true;
+    warm(() => { const d = drawable(), m = renderer.compile(d, camera, scene); for (const x of shadows(d.list)) m.add(x); return m; }).then(r => { glBusy = false; if (!r.ok || !r.n) open(); else glCheck(); });      // again at once: whatever became visible meanwhile
+  }
+  // the shadow pass draws each caster with ITS depth material variant (three's WebGLShadowMap: the caster's side flipped, its map, alpha test,
+  // instancing), with no fog into a linear target: stand-ins compiled the same way, one per variant, kept (glKeep) so their programs stay
+  const FLIP = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide }, depthBy = new Map();
+  function shadows(objs) {                                 // -> the stand-ins' materials for these objects' casters
+    const out = new Set(), fresh = new THREE.Group();
+    for (const o of objs) { if (!o.isMesh || !o.castShadow) continue; const g = o.geometry, attrs = Object.keys(g.attributes).sort().join('.');
+      for (const m of [].concat(o.material)) { const side = m.shadowSide != null ? m.shadowSide : FLIP[m.side], k = [side, !!m.map, m.alphaTest > 0, !!m.alphaMap, !!o.isInstancedMesh, !!o.instanceColor, attrs, Object.keys(g.morphAttributes).length].join();
+        let s = depthBy.get(k);
+        if (!s) { const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side, map: m.map || null, alphaMap: m.alphaMap || null, alphaTest: m.alphaTest || 0 });
+          s = o.isInstancedMesh ? new THREE.InstancedMesh(g, d, 1) : new THREE.Mesh(g, d); if (o.instanceColor) s.instanceColor = o.instanceColor; depthBy.set(k, s); fresh.add(s); glKeep.push(d); }
+        out.add(s.material); } }
+    if (fresh.children.length) { const prev = renderer.getRenderTarget(), fog = scene.fog, rt = new THREE.WebGLRenderTarget(1, 1);
+      scene.fog = null; renderer.setRenderTarget(rt); try { renderer.compile(fresh, camera, scene); } finally { renderer.setRenderTarget(prev); scene.fog = fog; rt.dispose(); } }
+    return out;
+  }
+  function warmRest() {                                    // once the court is up: every material in the graph, hidden or not (the rally's fx, the swooshes, both named looks, the trophy), and what three makes only later, through stand-ins (a program is shared by every material with the same key)
+    warm(() => {
+      const mats = renderer.compile(scene, camera), all = []; scene.traverse(o => all.push(o)); for (const x of shadows(all)) mats.add(x);
+      const g = new THREE.Group();
+      const tagM = pads[0].tag.material.clone(); tagM.map = new THREE.Texture(); g.add(new THREE.Sprite(tagM));      // a status tag gets its word (a map) at the first calibrating / away
+      for (const pd of pads) for (const o of [pd.group, pd.hand]) o.traverse(x => { if (x.isMesh) for (const m of [].concat(x.material)) if (!m.transparent) { const c = m.clone(); c.transparent = true; g.add(new THREE.Mesh(x.geometry, c)); } });      // ghostify(): the paddle and hand turn see-through while that seat calibrates, pauses or is away
+      const sw = makeSwoosh(0xffffff); scene.remove(sw.mesh); g.add(sw.mesh);      // a seat's swoosh is made at its first frame on court (updatePads): a seat that sits down after this pass still finds its program
+      for (const m of renderer.compile(g, camera, scene)) { mats.add(m); glKeep.push(m); }
+      return mats;
+    });
+  }
+  if (prewarm) warm(() => renderer.compile(drawable(), camera, scene));      // a head start for the court as built (the first frame's own pass, glCheck, adds the players and anything else the menu shows)
+  renderer.domElement.addEventListener('webglcontextlost', open);      // three re-makes every program at the first frame after the restore (synchronously, as it always has)
   return {
     setCourt(c) { if (c && isFinite(c.halfW + c.halfL + c.kitchen + c.net)) { const same = ['halfW', 'halfL', 'kitchen', 'net'].every(k => c[k] === court[k]); court = { ...court, ...c }; if (!same) buildCourt(); } },      // every welcome sends the court (the server's is always DEFAULT_COURT): rebuilding the same one disposed its materials, so each join re-linked 2 programs in its first frame. Nothing else lives on the group (fences are re-shown every frame, the scenery prunes a group once, the menu's shadow map of the same court still holds)
     setSide, setView, getView, setMenu, setDim, startAttract, stopAttract, setFrozen, setVictory, podium,
@@ -1617,6 +1720,7 @@ export function createScene(containerEl) {
     // Call every frame while tracking is good; 500 ms without a call falls back to the local paddle position.
     setViewer(v) { if (v && isFinite(v.x) && isFinite(v.y) && !spectator && !menu) { view.inX = v.x; view.inY = v.y; view.at = timeS; } },
     updatePaddle, updateBall, hideBall, onEvent, unlockAudio, render, resize, sceneryReady,
+    ready() { if (!glOpen) glCheck(); return glOpened; },      // -> a promise: the court's programs are linked and the next render() draws (test/scene-preview.html waits for it before rendering a fixed number of frames in one task)
     jingle(kind) { if (['win', 'lose', 'watch', 'forfeit', 'champ'].includes(kind)) sfx.jingle(kind); else if (['rankup', 'divup'].includes(kind)) sfx.rankJingle(kind); },      // the result card's sting: main.js showOver / showChamp only; the trophy row's rank-up / division-up (docs/TROPHIES.md 4)
     cue(kind) { if (kind === 'tick' || kind === 'tom') sfx.cue(kind); },      // small cues: the trophy count's clicks (main.js, the trophy ceremony)
     // Sound. setSink takes a deviceId ('' = the system default) and resolves false when that device is gone, so the panel

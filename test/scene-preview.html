@@ -112,6 +112,7 @@ function push(ms) {
 let paused = false; window.__fake = { pause(on) { paused = !!on; scene.setFrozen(paused); }, step, push, ball, players };      // a paused server: time stands still, the same state keeps arriving
 
 const info = document.getElementById('info');
+await scene.ready();                                     // the court's shaders linked off the frame (scene.js): until then render() draws nothing
 if (FREEZE != null) {                                    // deterministic: fixed 60Hz steps to t, render each, leave the last frame up
   const N = Math.round(FREEZE * 60); for (let i = 1; i <= N; i++) { step(1 / 60); push(i * 1000 / 60); scene.render(i * 1000 / 60); }
   if (FROZEN) { __fake.pause(true); for (let i = N + 1; i <= N + 120; i++) { push(i * 1000 / 60); scene.render(i * 1000 / 60); } }
