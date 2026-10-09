@@ -4833,3 +4833,11 @@ The owner (2026-10-08) said yes to symbolicating danielrltan.com's minified prof
   (line-1, column-1) gives the original file/line and, for a renamed `function x(`, the real name; for `x=(...)=>` the name sits on
   the identifier at column-1-len(x)-1. The panel (danielrltan src/stats/perf.ts) does both, then merges frames by ORIGINAL position, so
   profiles from different deploys merge too.
+
+## 235. Page-load diagnostics: LCP stops at the visitor's first input, in every browser
+danielrltan.com's Loading card showed desktop Safari loads with a 3-3.75 s LCP on its About title, an element that only appears
+after scrolling past the hero: Safari keeps reporting LCP entries after the visitor scrolls, while Chromium stops on its own.
+- web/rum.js ignores LCP entries that start after the first wheel, touchstart, keydown or pointerdown (user input only: a
+  programmatic scroll such as scroll restoration does not end it). Compared by entry time, since buffered entries can arrive after
+  the input. Same change in danielrltan.com's public/rum.js (27b8db3); the two copies stay identical.
+- Nothing new is collected. Rows already stored keep their old values.

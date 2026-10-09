@@ -52,7 +52,11 @@
     var c = typeof el.className === 'string' && el.className.trim().split(/\s+/)[0];
     return c ? tag + '.' + c : tag;
   }
-  observe('largest-contentful-paint', function (e) { lcp = { t: r1(e.startTime), el: describe(e.element), u: bare(e.url), z: e.size }; });
+  // LCP stops at the first scroll or input, as Chromium does on its own: Safari keeps reporting, so a title scrolled into view seconds later became its "LCP"
+  // (user input only: a programmatic scroll such as scroll restoration does not end it). Compared by time, since buffered entries can arrive after the input.
+  var lcpEnd = Infinity, lcpStop = function () { if (lcpEnd === Infinity) lcpEnd = P.now(); };
+  ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (t) { addEventListener(t, lcpStop, { passive: true, capture: true }); });
+  observe('largest-contentful-paint', function (e) { if (e.startTime <= lcpEnd) lcp = { t: r1(e.startTime), el: describe(e.element), u: bare(e.url), z: e.size }; });
   observe('layout-shift', function (e) { if (!e.hadRecentInput) cls += e.value; });
   function loafRow(f) {
     var scripts = (f.scripts || []).slice().sort(function (a, b) { return b.duration - a.duration; }).slice(0, 8).map(function (s) {
