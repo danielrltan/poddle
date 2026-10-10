@@ -519,6 +519,8 @@ export function createScene(containerEl) {
       else { liftFence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush(); }      // behind this frame: a GPU still on an older one is late again
     }
   };
+  // its modules fetched at once, low: index.js's own imports were found only once this evaluation let go of the main thread to parse it (a round trip later)
+  for (const f of ['shared', 'sky', 'flora', 'park', 'wind']) { const l = document.createElement('link'); l.rel = 'modulepreload'; l.href = new URL(`./scenery/${f}.js`, import.meta.url).href; l.fetchPriority = 'low'; document.head.append(l); }
   import('./scenery/index.js').then(m => { scenery = m.createScenery(THREE, { scene, renderer, camera, sun, hemi, fog: scene.fog, plainSky, court: () => court, side: () => localSide, venue: () => venue, onShown, warm: prewarm ? o => glOpened.then(() => warm(() => renderer.compile(o, camera, scene))) : null }); })      // its links queue behind the court's
     .catch(e => { sceneryDone(false); sceneryGone = true; if (!/Failed to fetch|Cannot find module|404/i.test(String(e && e.message))) console.error('scenery:', e); });
 

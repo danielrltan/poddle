@@ -15,6 +15,8 @@
 //   PERF_LOAD_GLWRAP=1     time three's synchronous shader checks by wrapping 4 WebGL getters (0 = leave WebGL untouched)
 //   PERF_LOAD_MATCH=1      also screenshot the court in a match against Matt (fake bridge calibration, ~20 s), and count its links (below) up to
 //                          PERF_LOAD_MATCH_MS=8000 after it reaches the court (the screenshot stays at +4.5 s). Needs the screenshot pass
+//   PERF_LOAD_QUERY=       more query for the home page loads and the menu shots, e.g. '&padtest=1': the phone pairing the hosted page has (its QR), which localhost
+//                          otherwise leaves out
 //   PERF_LOAD_ROOT=<dir>   serve ANOTHER checkout's server/ and web/ with this harness (an A/B on one instrument: PERF_LOAD_ROOT=~/poddle-perf-base)
 // What is measured, per load: FCP, LCP, DCL, load, TTFB; long animation frames in the first PERF_LOAD_SETTLE ms (sum of blockingDuration,
 // sum of duration, count, max, top scripts); from the JS Self-Profiling trace web/rum.js records (window.__rumProfile = 1 forces it on every
@@ -48,7 +50,7 @@ const G = P0, BR = P0 + 1, DEAD = P0 + 2, MATCH_MS = +env.PERF_LOAD_MATCH_MS || 
 if ([8080, 8787, 3000].some(p => p >= P0 && p <= P0 + 2)) { console.log("refusing: that port range holds the player's own game"); process.exit(2); }
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const GPU_ARGS = GPU === 'swiftshader' ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
-const url = (q = '') => `http://localhost:${G}/?uitest=1&game=${G}&bridge=${DEAD}${q}`;
+const url = (q = '') => `http://localhost:${G}/?uitest=1&game=${G}&bridge=${DEAD}${env.PERF_LOAD_QUERY || ''}${q}`;      // PERF_LOAD_QUERY='&padtest=1': the hosted page's phone pairing (its QR) on localhost
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 
 // where three's shader check lives: 'function D(e){if(t.debug.checkShaderErrors)' on line 7 of the vendored build (profile columns are 1-based)
