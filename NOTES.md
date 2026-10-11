@@ -4950,3 +4950,24 @@ build did exactly that in headless Chrome on localhost (test/e2e.mjs with the ca
   the flag. No legal page change; CLAUDE.md's browser-only flows say so.
 - Tests: new test/rec.test.mjs (the harness filter sees exactly the samples, only swing reports are kept from what is sent, state cut to
   the ball and paddles, rows freed after a save, off = nothing). Headless Chrome: the home with and without ?rec=1, no page errors.
+
+## 240. The phone's X closes its tab: "Closing tab…", and the tab goes
+The owner (2026-10-11): the X said "You can close this tab now", which defeats its point; it is there to close the tab.
+- web/pad.js quit(): after hanging up (NOTES 59, unchanged) the done view says only "Closing tab…" (no "Start again"), and 400 ms later
+  window.close(). A browser lets a page close its tab when a script opened it, or when the tab's history is that one page: a scanned
+  code opens a fresh tab, and pad.html's replaceState adds no entry. Checked in Playwright WebKit and Chromium: a tab opened by
+  window.open closes; one with a page behind it is refused.
+- Refused (an in-app browser, a tab that came from elsewhere): 500 ms later the page leaves instead, back if there is history, else
+  Poddle's home (location.replace('/')). Forward onto it from the bfcache shows Start, not a dead "Closing tab…".
+- web/ui.js, the phone home's Go: opens pad.html with window.open, so its X can close it and land back on the home tab. Installed
+  (display-mode standalone) or a refused window.open: the same tab, as before. Pad sockets never count as a second tab (NOTES 214).
+- test/padquit.test.mjs: both cases (refused -> leaves; script-opened -> closes), the hang-up checks kept.
+
+## 241. Calibrating again against Matt pauses the court
+The owner (2026-10-11): recalibrating while playing Matt did not pause, so Matt played on against a player who could not see the court.
+- server/game.js: {type:'status', cal} goes through setCal; selfPause() is the one rule for Away (NOTES 220) and calibrating: with one
+  human and not a tournament match, either one pauses (paused.afk: it ends by itself once neither holds), so coming back from another
+  tab mid-calibration stays paused. Only mid-match (a ball struck, not over): before the first strike the serve waits for the seat anyway.
+- Every way in sends that status: the phone's Calibrate button, C on the computer, a reloaded pad. Two humans: unchanged (the serve
+  waits, CAL_S). Matt's seat and the stands see the player as Paused; it resumes when they are back on court.
+- test/away.test.mjs part 4.

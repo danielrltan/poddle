@@ -1127,7 +1127,11 @@ const copyOpen = (m, open) => { $(m).classList.toggle('is-open', open); $(COPY.f
   padIn?.addEventListener('input', () => { const c = padClean(padIn.value); if (padIn.value !== c) padIn.value = c; $('m-pad-go').disabled = c.length !== 4; $('m-pad-err').textContent = ''; });
   $('m-pad')?.addEventListener('submit', e => { e.preventDefault(); const c = padClean(padIn.value);
     if (c.length !== 4) { $('m-pad-err').textContent = 'Paddle codes are P- and 4 letters or numbers.'; restart($('m-pad-field'), 'is-error'); return; }
-    padIn.blur(); location.assign('/pad.html?k=' + c); });
+    padIn.blur();
+    // In a tab of its own, opened from here, so its X can close it and land back on this one (NOTES 240). Installed (standalone) a new tab
+    // would leave the app for the browser, so that stays in place, as does a refused window.open
+    const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if (app || !window.open('/pad.html?k=' + c, '_blank')) location.assign('/pad.html?k=' + c); });
   // arrows walk the three tiles (Tab works too)
   $('lobby-home').addEventListener('keydown', e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
     const nav = [...$('lobby-home').querySelectorAll('[data-nav]:not([hidden])')], i = nav.indexOf(document.activeElement); e.preventDefault(); nav[(i < 0 ? 0 : i + d + nav.length) % nav.length].focus(); });      // hidden tiles (Your stats on localhost) are not in the ring: focus() on one is a no-op

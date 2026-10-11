@@ -738,12 +738,16 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
   // Away (NOTES 220): the player's tab is hidden or the window lost focus ({type:'status', away}). Where a pause is allowed (one human, not a
   // tournament match) that IS a pause, and coming back ends it unless a card had paused it already. Elsewhere the seat only shows 'afk'
-  // (Away) to the others: the rally plays on, nothing waits for them, it is not calibrating
-  function setAway(me, on) {
-    if (!!me.afk === on) return; me.afk = on;
-    if (on && !paused && humans().length === 1 && !MATCH) { paused = { by: me.side, until: Date.now() + PAUSE_S * 1000, afk: true }; broadcast({ type: 'paused', on: true, by: me.side }); }
-    else if (!on && paused && paused.afk && paused.by === me.side) resume();
+  // (Away) to the others: the rally plays on, nothing waits for them, it is not calibrating.
+  // Calibrating again mid-match ({type:'status', cal}, from the phone's button, C or a reloaded pad) pauses the same way (NOTES 241): the
+  // player cannot see the court meanwhile, so Matt must not play on. paused.afk = a pause that ends by itself once neither holds.
+  function selfPause(me) {
+    const want = (me.afk || me.cal && started && !over) && humans().length === 1 && !MATCH;
+    if (want && !paused) { paused = { by: me.side, until: Date.now() + PAUSE_S * 1000, afk: true }; broadcast({ type: 'paused', on: true, by: me.side }); }
+    else if (!want && paused && paused.afk && paused.by === me.side) resume();
   }
+  function setAway(me, on) { if (!!me.afk === on) return; me.afk = on; selfPause(me); }
+  function setCal(me, on) { if (!!me.cal === on) return; me.cal = on; selfPause(me); }
 
   function point(winner, why) {
     stats.pointEnd(match, winner, why);                          // the rally's length and the play counters, before the score moves (docs/ACCOUNTS.md 4.4, docs/SHARE.md 1)
@@ -1040,7 +1044,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (m.type === 'rematch') return vote(me, m.yes);
     if (m.type === 'name') { if (!me.reg) me.name = cleanName(m.name) || (me.side ? 'Player 2' : 'Player 1'); return tellNames(); }   // changed in the settings panel. A registered seat keeps its username
     if (m.type === 'bot') return botRequest(me, m.level, m.restart === true);
-    if (m.type === 'status') { if (typeof m.cal === 'boolean') me.cal = m.cal; if (typeof m.away === 'boolean') setAway(me, m.away); return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. away: the tab is hidden / unfocused (NOTES 220). Booleans only
+    if (m.type === 'status') { if (typeof m.cal === 'boolean') setCal(me, m.cal); if (typeof m.away === 'boolean') setAway(me, m.away); return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. away: the tab is hidden / unfocused (NOTES 220). Booleans only
     if (m.type === 'emote') return emote(me.ws, m.e, me);        // before the pause gate too: a GG over the result panel or a paused court
     if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
     if (paused || hold) return;                                  // room time stands still: no paddle, no swing

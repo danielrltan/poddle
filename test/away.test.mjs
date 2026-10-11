@@ -2,6 +2,8 @@
 //  1. Against Matt (one human): away IS a pause (paused, by that seat; the tag says Paused), and coming back resumes it.
 //  2. A pause a card made is kept: away and back over it, or a card opened over an away pause, still paused after coming back.
 //  3. Two humans: no pause, the rally plays on; the others see 'afk' over that seat until it is back. Only booleans count.
+//  4. Calibrating again mid-match against Matt ({type:'status', cal}, NOTES 241) pauses too, and calibrated it resumes; away and back
+//     while still calibrating keeps it paused. Before the first strike it does not (the serve waits for the seat anyway).
 //  TEST_PORT=<port> node test/away.test.mjs
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
@@ -17,10 +19,11 @@ function player(name) {
     if (m.type === 'welcome') { P.side = m.side; ws.send(JSON.stringify({ type: 'name', name })); }
     if (m.type === 'paused' && !m.refused) P.paused = m.on;
     if (m.type !== 'state' || P.side == null) return;
-    P.pd = m.paddles; P.frozen = !!m.paused;
+    P.pd = m.paddles; P.frozen = !!m.paused; if (m.live && m.b > 0) P.struck = true;      // a bounce: a ball has been struck
+    if (P.cal) return;                                  // a calibrating client sends no paddle (main.js), as the real one
     ws.send(JSON.stringify({ type: 'paddle', x: 0, y: 1, z: P.side ? -6.5 : 6.5, q: [0, 0, 0, 1], r: 0 }));
   });
-  P.send = m => ws.send(JSON.stringify(m));
+  P.send = m => { if (typeof m.cal === 'boolean') P.cal = m.cal; ws.send(JSON.stringify(m)); };
   P.statusOf = side => P.pd && P.pd[side] ? P.pd[side].status || null : null;
   return P;
 }
@@ -42,6 +45,19 @@ A.send({ type: 'status', away: true }); await wait(200); A.send({ type: 'pause',
 ok(A.paused === true && A.frozen, `a card opened over an away pause keeps it after coming back (paused ${A.paused})`);
 A.send({ type: 'pause', on: false }); await wait(300);
 ok(A.paused === false && !A.frozen, 'closing the card resumes');
+
+// ---- 4 ----
+A.send({ type: 'status', cal: true }); await wait(300);
+ok(A.paused === false && !A.frozen, `calibrating before any strike: no pause (paused ${A.paused}, frozen ${A.frozen})`);
+A.send({ type: 'status', cal: false }); await wait(200);
+for (let i = 0; i < 75 && !A.struck; i++) await wait(200);
+ok(A.struck, 'Matt and Ann get a ball going');
+A.send({ type: 'status', cal: true }); await wait(300);
+ok(A.paused === true && A.frozen && A.statusOf(A.side) === 'paused', `calibrating again mid-match pauses Matt's court (paused ${A.paused}, frozen ${A.frozen}, tag ${A.statusOf(A.side)})`);
+A.send({ type: 'status', away: true }); await wait(200); A.send({ type: 'status', away: false }); await wait(300);
+ok(A.paused === true && A.frozen, `away and back while still calibrating: still paused (paused ${A.paused})`);
+A.send({ type: 'status', cal: false }); await wait(300);
+ok(A.paused === false && !A.frozen, `calibrated: it resumes (paused ${A.paused}, frozen ${A.frozen})`);
 
 // ---- 3 ----
 const B = player('Ben');

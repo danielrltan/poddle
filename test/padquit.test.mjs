@@ -1,7 +1,9 @@
 // The X on the phone (NOTES 59): held, it hangs the paddle up for good. The real pad.html in a real Chrome, the real
 // server, and a plain socket standing in for the computer's tab (?pad=CODE). What is checked: the phone reaches the live
-// view and is sending; a HELD X stops the samples, closes the socket (the computer is told its paddle has gone) and shows
-// the way out; a TAP does nothing; and "Start again" brings it all back.   Usage: node test/padquit.test.mjs
+// view and is sending; a TAP does nothing; a HELD X stops the samples, closes the socket (the computer is told its paddle has
+// gone), says 'Closing tab…' and closes the tab (NOTES 240). Twice: a tab with history behind it, which the browser will not let
+// a page close (it goes back instead), and a tab opened by a script, as the phone home's Go opens it, which really closes.
+// Usage: node test/padquit.test.mjs
 import { spawn } from 'child_process'; import fs from 'fs';
 import WebSocket from 'ws';
 import puppeteer from 'puppeteer-core';
@@ -27,11 +29,11 @@ await new Promise(r => host.on('open', r));
 
 // ---- the phone
 browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'] });
-const pg = await browser.newPage();
-await pg.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
-pg.on('pageerror', e => errs.push('pageerror: ' + e.message));
-pg.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
-await pg.goto(`http://localhost:${G}/pad.html?k=${CODE}`, { waitUntil: 'networkidle2' });
+const watch = pg => { pg.on('pageerror', e => errs.push('pageerror: ' + e.message)); pg.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); }); return pg; };
+const phone = async pg => { await pg.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 }); return watch(pg); };
+
+async function play(pg, how) {
+console.log(`-- ${how}`);
 
 // the phone has no sensors here: fire the two events a held phone would, at 60 Hz, until told to stop
 await pg.evaluate(() => {
@@ -59,26 +61,35 @@ await pg.mouse.move(xy.x, xy.y); await pg.mouse.down(); await sleep(200); await 
 await sleep(300);
 ok(await view() === 'live', `a tap on the X is ignored: view ${await view()}`);
 
-// ---- HOLD it: the paddle hangs up
-const before = samples;
+// ---- HOLD it: the paddle hangs up, says so, and the tab goes
+const before = samples, closed = new Promise(r => pg.once('close', () => r(true)));
 await pg.mouse.down(); await sleep(1000); await pg.mouse.up();
-for (let i = 0; i < 20 && await view() !== 'done'; i++) await sleep(100);
-ok(await view() === 'done', `held: the phone says it is done (view ${await view()})`);
-ok((await pg.$eval('#done-p', e => e.textContent)).includes('close this tab'), 'it says the tab can be closed (a page cannot close a tab it did not open)');
-await sleep(600);
+for (let i = 0; i < 20 && await view() !== 'done'; i++) await sleep(50);
+ok(await view() === 'done', `held: the phone shows the closing view (view ${await view()})`);
+ok((await pg.$eval('[data-name="done"] h2', e => e.textContent)) === 'Closing tab…', 'it says "Closing tab…"');
+ok(await pg.evaluate(() => !document.querySelector('[data-name="live"]').checkVisibility?.()), 'the paddle screen is gone');
+const gone = await Promise.race([closed, sleep(2500).then(() => false)]);
 ok(padOn[padOn.length - 1] === false, `the computer is told the paddle has gone: ${JSON.stringify(padOn)}`);
 const after = samples; await sleep(600);
 ok(samples === after, `nothing is sent any more (${samples - after} samples after the X, ${samples - before} in all since)`);
-ok(await pg.evaluate(() => !document.querySelector('[data-name="live"]').checkVisibility?.()), 'the paddle screen is gone');
+return gone;
+}
 
-// ---- and back again
-await pg.click('#again');
-for (let i = 0; i < 40 && await view() !== 'live'; i++) await sleep(150);
-ok(await view() === 'live', `"Start again" starts it over: view ${await view()}`);
-await sleep(800);
-const back = samples; await sleep(500);
-ok(samples > back, `it is sending again (${samples - back} samples in half a second)`);
-ok(padOn[padOn.length - 1] === true, `the computer has its paddle back: ${JSON.stringify(padOn)}`);
+// 1. A tab with a page behind it (puppeteer's about:blank): the browser refuses window.close(), so the page goes back instead
+const pg1 = await phone(await browser.newPage());
+await pg1.goto(`http://localhost:${G}/pad.html?k=${CODE}`, { waitUntil: 'networkidle2' });
+const closed1 = await play(pg1, 'a tab with history: close refused');
+ok(!closed1 && !pg1.url().includes('pad.html'), `refused: the tab leaves the paddle page instead (closed ${closed1}, now ${pg1.url()})`);
+await pg1.close();
+
+// 2. Opened by a script, as the phone home's Go does (ui.js): window.close() is allowed and the tab really closes
+const home = watch(await browser.newPage());
+await home.goto(`http://localhost:${G}/how-to-play.html`, { waitUntil: 'domcontentloaded' });
+const opened = new Promise(r => browser.once('targetcreated', t => r(t.page())));
+await home.evaluate(u => { window.open(u, '_blank'); }, `/pad.html?k=${CODE}`);
+const pg2 = await phone(await opened); await pg2.waitForSelector('#go', { visible: true });
+const closed2 = await play(pg2, 'a tab a script opened: it closes');
+ok(closed2, 'the tab closed itself');
 
 ok(errs.length === 0, `no page errors${errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''}`);
 console.log(fails ? fails + ' FAILURES' : 'PAD QUIT TESTS PASSED');

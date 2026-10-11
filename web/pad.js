@@ -93,8 +93,9 @@ for (const [id, k] of [['btn-cal', 'c'], ['btn-center', 'r']]) { const b = $(id)
 // ---------- done playing ----------
 // The X hangs up properly: the sensors are let go, the screen may sleep again and the socket is closed for good (started =
 // false, so onclose does not reconnect). The computer sees the paddle leave, as it would if the tab had gone.
-// A tab can only close itself when a script opened it, and this one was opened by hand or by scanning the code, so
-// window.close() is very likely refused: the 'done' view is shown first and says the last step out loud.
+// Then the tab closes itself (NOTES 240). A browser lets a page close its tab when a script opened it (the phone home's Go: ui.js
+// window.open) or when the tab's history is this one page (a scanned code: replaceState adds no entry). Anywhere it is refused (an
+// in-app browser, a tab that came from elsewhere) the page leaves instead: back where it came from, or Poddle's home.
 function quit() {
   started = false;
   window.removeEventListener('deviceorientation', onOrientation); window.removeEventListener('devicemotion', onMotion);
@@ -102,14 +103,14 @@ function quit() {
   if (ws) { const s = ws; ws = null; try { s.close(); } catch { /* already closing */ } }
   stats.open = stats.host = false;
   view('done');
-  window.close();
+  setTimeout(() => { window.close(); setTimeout(() => { if (history.length > 1) history.back(); else location.replace('/'); }, 500); }, 400);   // 'Closing tab…' gets painted first
 }
+addEventListener('pageshow', e => { if (e.persisted && document.body.dataset.view === 'done') { $('btn-quit').classList.remove('is-done'); view('start'); } });   // Forward back onto a page that had quit: ready to start again, not stuck on 'Closing tab…'
 { const b = $('btn-quit'); let t = 0;
   const off = () => { clearTimeout(t); b.classList.remove('is-held'); };
-  b.addEventListener('pointerdown', () => { off(); b.classList.add('is-held'); t = setTimeout(() => { off(); b.classList.add('is-done'); quit(); }, 700); });      // is-done closes the ring in green: window.close() is usually refused, so the button is still on screen behind the 'done' view
+  b.addEventListener('pointerdown', () => { off(); b.classList.add('is-held'); t = setTimeout(() => { off(); b.classList.add('is-done'); quit(); }, 700); });      // is-done closes the ring in green
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, off);
   b.addEventListener('contextmenu', e => e.preventDefault()); }
-$('again').addEventListener('click', start);      // changed their mind, or hit it by accident: straight back to playing
 
 // ---------- what the tab says back ----------
 // The screen flash on a hit (the whole screen, brightest at the edges), in the trail's colour for that power: scene.js trailHeat + trailRamp exactly (white -> yellow ->
