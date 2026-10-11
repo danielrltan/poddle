@@ -4971,3 +4971,10 @@ The owner (2026-10-11): recalibrating while playing Matt did not pause, so Matt 
 - Every way in sends that status: the phone's Calibrate button, C on the computer, a reloaded pad. Two humans: unchanged (the serve
   waits, CAL_S). Matt's seat and the stands see the player as Paused; it resumes when they are back on court.
 - test/away.test.mjs part 4.
+
+## 242. The trophies won leave Quick play from one spot, one after another
+The owner (2026-10-11): the cups need not be separate; spawn them in one spot, in sequence, not all at once.
+- web/profile.js landed(): through the haul's second ("+38") one cup hovers over the middle of Quick play, not up to 24 in a cluster. Each
+  cup is made at that spot the moment it leaves (the hovering one goes last) and removed as it lands, on the same rising arcs, timing,
+  shares, sounds and count as before (NOTES 203). No more 24 nodes up front each running an endless hover animation. chipFly.nodes
+  (written, never read) is gone.

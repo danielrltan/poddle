@@ -593,22 +593,22 @@ export function landed() {
     for (let i = 1; i <= N; i++) flyT.push(setTimeout(() => { draw(from + (up ? i : -i)); bump(); if (N <= 12 || i % 2 === 0) h.sfx?.('tick', up ? Math.round(10 * i / N) : Math.round(4 * (1 - i / N))); if (i === N) done(); }, 500 + T * Math.pow(i / N, 0.6)));
     return;
   }
-  // the haul shows itself first (the owner, 2026-10-04): the cups hover in a loose cluster over Quick play under a big "+38", for a second, so it can be
-  // read; the label fades, then the cups leave from where they hover, faster and faster (the gaps shrink by a fifth each: 150 ms down to 25)
-  const FLIGHT = 560, HOLD = 1000, cups = [], sr = src.getBoundingClientRect(), tag = mk('b', 'trophy-haul', `+${d.toLocaleString('en-US')}`); tag.setAttribute('aria-hidden', 'true');
-  tag.style.left = sr.left + sr.width / 2 + 'px'; tag.style.top = sr.top + 8 + 'px'; document.body.append(tag); chipFly.nodes = [tag];
-  for (let i = 0; i < n; i++) { const c = hoverCup(sr, i, n); if (c) { cups.push(c); chipFly.nodes.push(c); } }
+  // the haul shows itself first (the owner, 2026-10-04): one cup hovers over Quick play under a big "+38", for a second, so it can be read; the label
+  // fades, then the cups leave that one spot one after another, faster and faster (the gaps shrink by a fifth each: 150 ms down to 25). Each is made
+  // as it leaves, the hovering one goes last (NOTES 242, the owner: not a cluster of them all at once, one spot, in sequence)
+  const FLIGHT = 560, HOLD = 1000, sr = src.getBoundingClientRect(), x = sr.left + sr.width / 2, y = sr.top + sr.height * 0.46, tag = mk('b', 'trophy-haul', `+${d.toLocaleString('en-US')}`); tag.setAttribute('aria-hidden', 'true');
+  tag.style.left = x + 'px'; tag.style.top = sr.top + 8 + 'px'; document.body.append(tag);
+  const pile = cupAt(x, y, true);
   flyT.push(setTimeout(() => tag.classList.add('is-gone'), HOLD)); flyT.push(setTimeout(() => tag.remove(), HOLD + 400));
   let t = HOLD + 350, gap = 150;
   for (let i = 0; i < n; i++) {
-    const at = t; flyT.push(setTimeout(() => { launchCup(cups[i], nEl, i); h.sfx?.('lift', i); }, at));
+    const at = t; flyT.push(setTimeout(() => { launchCup(i === n - 1 ? pile : cupAt(x, y, false), nEl, i); h.sfx?.('lift', i); }, at));
     flyT.push(setTimeout(() => { chipFly.cur += share[i]; draw(chipFly.cur); bump(); h.sfx?.('arrive', Math.round(10 * (i + 1) / n)); if (i === n - 1) done(); }, at + FLIGHT));
     t += gap; gap = Math.max(25, gap * 0.8);
   }
 }
-function hoverCup(a, i, n) {      // one cup of the cluster over Quick play: a spot in a wide ellipse over the button, bobbing gently until it leaves
-  const cols = Math.min(n, 8), row = Math.floor(i / cols), col = i % cols, x = a.left + a.width * (0.18 + 0.64 * (cols === 1 ? 0.5 : col / (cols - 1))) + (Math.random() - 0.5) * 14, y = a.top + a.height * 0.46 + row * 36 + (Math.random() - 0.5) * 12;
-  const c = mk('i', 'trophy-fly is-hover'); c.innerHTML = h.cupSvg ? h.cupSvg() : ''; c.setAttribute('aria-hidden', 'true'); c.style.left = x + 'px'; c.style.top = y + 'px'; c.style.animationDelay = `${-(i * 137) % 900}ms`; document.body.append(c); return c;
+function cupAt(x, y, hover) {      // a cup over Quick play: the one that hovers (bobbing gently) through the haul's second, or one made the moment it leaves
+  const c = mk('i', hover ? 'trophy-fly is-hover' : 'trophy-fly'); c.innerHTML = h.cupSvg ? h.cupSvg() : ''; c.setAttribute('aria-hidden', 'true'); c.style.left = x + 'px'; c.style.top = y + 'px'; document.body.append(c); return c;
 }
 function launchCup(c, dst, i) {      // the cup leaves its hover for the card's count on a rising arc, gone as it lands
   if (!c || !c.isConnected) return; const b = dst.getBoundingClientRect(); if (!b.width) return;
