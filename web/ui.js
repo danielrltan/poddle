@@ -641,7 +641,7 @@ export function setSettings(o = {}) {
   if ('bodyOk' in o) { const b = $('move-seg')?.querySelector('[data-move="body"]'); if (b) b.disabled = !o.bodyOk; show('move-note', !o.bodyOk); }
   if ('bodyNote' in o) { const n = $('move-note'); if (n) { setText(n, o.bodyNote || 'Body needs a camera'); if (o.bodyNote) n.hidden = false; } }      // the camera is off but can be asked for: picking Body asks, and the row says so      // no camera: Body cannot be picked, and the row says why
   if ('spectator' in o) $('settings')?.classList.toggle('is-spectator', !!o.spectator);
-  if ('paddle' in o) { show('set-paddle', !!o.paddle); for (const b of $('paddle-seg2')?.children || []) b.setAttribute('aria-checked', String(b.dataset.paddle === o.paddle)); }      // null: only an AirPod can be the paddle here, nothing to pick
+  if ('paddle' in o) { show('set-paddle', !!o.paddle); show('btn-pair', o.paddle === 'phone'); for (const b of $('paddle-seg2')?.children || []) b.setAttribute('aria-checked', String(b.dataset.paddle === o.paddle)); }      // null: only an AirPod can be the paddle here, nothing to pick
 }
 // forfeit: mid-match against a person (or a tournament match), leaving is a forfeit and the button says so.
 // canPause false: the note says why (a tournament match, or any online game against a person)
@@ -673,7 +673,8 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('btn-find-sinks', 'click', () => call('findSinks'));
   on2('tog-full', 'click', () => fullscreen());
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
-  on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });      // phone <-> AirPod at any time, not only on the set-up screen
+  on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });
+  on2('btn-pair', 'click', () => call('pair'));      // the phone's QR again (NOTES 243): its page was closed, or it fell asleep      // phone <-> AirPod at any time, not only on the set-up screen
   on2('bot-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });
   on2('pick-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });      // the court's row: the same request as the settings row (main.js sends {type:'bot', level})
   on2('btn-recenter', 'click', e => { restart(e.currentTarget, 'ov-spin'); call('recenter'); }); on2('btn-leave-room', 'click', () => call('leave'));      // Recentre: the button spins its svg (restart() cannot replay an SVG itself: no offsetWidth)

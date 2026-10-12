@@ -54,6 +54,8 @@ let ranks = [null, null];                      // the rank { tier 1..8, div } in
 let side = 0, role = 'player', names = [null, null], state = null, players = 0, calibrating = true;      // role: 'player' | 'spectator' (docs/SPECTATE.md). names: the server's truth, null = empty seat
 // Flow: title -> lobby (pick a room) -> connect (only while there is no AirPod data) -> calibrate -> play. ?skiptitle=1 starts at connect.
 let phase = 'title', lastSample = -1e9, gameEver = false;
+let padLost = null, padOffAt = 0;      // the phone back (NOTES 243): padLost = { kept, fresh } while its set-up screen is up (fresh: a phone page opened since). padOffAt: when the phone's page went (0: it is there)
+const PAD_GONE_MS = 1500;      // a phone page reloaded, or a wifi blip, is back before this
 let room = null, wantRoom = LOBBY ? ui.cleanCode(qs.get('court') || qs.get('room')) : '', wantWatch = LOBBY && qs.get('watch') === '1', pending = null, leaveAt = 0;   // room: the court I am seated in (the wire still says 'room'). wantRoom / wantWatch: from a shared link ?court=CODE (?room= is the old spelling and still works) or a reload. pending: the lobby request still waiting for its answer
 let botWant = null, botLevel = '', bHold = null, bShow = null, bHeld = false, holding = false, frozen = false, pausedUi = false, watchers = 0, over = null, overAt = 0, votedNo = false, votedYes = false, lastOpp = '';   // botWant: 'Play a bot' level, sent after the welcome. over: a matchover nobody has seen yet
 const B_HOLD_MS = 2000, B_SHOW_MS = 180;      // B held this long restarts the match against Matt (NOTES 207; 3 s until NOTES 230). The hold's bar shows once B has been down B_SHOW_MS, so a tap for the next level never flashes it; bHold: the timer, bHeld: it fired, so the key up is not a press
@@ -475,7 +477,7 @@ ui.onTour({ create: () => request({ type: 'tcreate' }), open: () => tourScreen(t
   cardClose: () => { pause(false); setDim(); } });
 function toLobby(msg) {                            // out of a room, back to the choices. Calibration is kept. The menu's rally takes the court back.
   rec.save();                                      // ?rec=1: the court's capture comes down as a file
-  if (undo) { undo = null; ui.backLabel('Back'); }
+  if (undo) { undo = null; ui.backLabel('Back'); } padLost = null; padOffAt = 0;
   camAway = null; if (camOn) stopCam();      // off the court: the camera goes off (NOTES 190). The next seat turns it on again, without asking twice
   trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
   ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]); social.result([]);
@@ -492,6 +494,7 @@ function back() {                                  // Back button / Esc, whereve
   if (!LOBBY) return;
   if (phase === 'lobby') { const v = ui.lobbyView(); if (v === 'bracket' && tour && !tourOn() && !room) { tourCourts(); return; } if (room) { game.send({ type: 'leave' }); toLobby(); if (ui.viewParent(v)) ui.lobbyView(ui.viewParent(v)); } else if (v !== 'home') ui.lobbyView(ui.viewParent(v) || 'home'); else if (!MOBILE) { phase = 'title'; screen('title'); } }      // a phone's home is its top: no title behind it      // Create court and Your court go back to Courts
   else if (undo && (phase === 'camera' || phase === 'connect' || phase === 'calibrate')) cancelSwap();      // mid-game paddle swap: Back is Cancel, it never leaves the court (the help can come up there too, after a Turn on)
+  else if (padLost && phase === 'connect') padReturn();      // the phone back screen (NOTES 243): Back is the court, never out of it
   else if (phase === 'camera' || phase === 'connect' || phase === 'calibrate') { game.send({ type: 'leave' }); toLobby(); }      // the primer is a set-up screen like the others: Back leaves the court
 }
 function refreshStatus() {
@@ -499,7 +502,8 @@ function refreshStatus() {
   const cam = off || NO_CAM ? 'off' : !body ? (!camOn && ls.get(CAM_KEY) === 'skip' ? 'off' : 'wait') : body.ready ? 'ok' : 'off';      // Play without camera is 'off', not 'waiting' for an Allow nobody will press
   ui.setStatus({ airpod: off ? 'off' : airpodLive() ? 'ok' : setup ? 'wait' : 'bad', game: link.g ? 'ok' : setup && !gameEver ? 'wait' : 'bad', camera: cam });
   ui.show('btn-cam-on', cam === 'off' && !off && !NO_CAM && phase === 'connect');      // the Camera row's Turn on: changed their mind
-  if (phase === 'calibrate' && !airpodLive()) ui.calibrationReset();      // stream dropped mid-calibration: say so
+  if (phase === 'calibrate' && !airpodLive()) ui.calibrationReset();
+  if (padOffAt && !padOn && performance.now() - padOffAt > PAD_GONE_MS && padBack()) padOffAt = 0;      // the phone's page went mid-game (NOTES 243). Behind the result it waits for the court      // stream dropped mid-calibration: say so
   if (LOBBY) ui.lobbyLink(link.g || !gameEver && performance.now() < 2500);       // the lobby sits above the 'server down' card, so it says so itself (not in the first moments of a page load)
   const n = myName(); if (n !== polledName) { polledName = n; if (room) rename(n); }      // the name was changed in the settings panel while in a room
 }
@@ -559,7 +563,7 @@ const padPhase = () => padFx(phase === 'calibrate' || phase === 'camera' ? 'cal'
 function showPair() {                              // the set-up screen offers the phone first wherever a phone can be the paddle
   const phone = CAN_PHONE && !useAirpod, kind = phone ? 'phone' : 'airpod';      // the words and drawings follow the choice (a phone that scans in makes it the choice)
   ui.setPaddle(kind); pod.setKind(kind);
-  ui.padPair({ show: phone && !padOn, url: `${location.origin}/pad.html?k=${PAD}`, code: 'P-' + PAD, title: phone ? 'Connect your phone' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
+  ui.padPair({ show: phone && (!padOn || !!padLost), url: `${location.origin}/pad.html?k=${PAD}`, code: 'P-' + PAD, title: phone ? 'Connect your phone' : 'Connect your AirPod', choose: CAN_PHONE, mode: kind,
     foot: phone ? 'Nothing to install.' : 'Still waiting? Open Poddle Helper on this Mac.' });
   ui.setSettings({ paddle: CAN_PHONE ? kind : null });
 }
@@ -570,6 +574,7 @@ function pickPaddle(kind) {
   const want = kind === 'airpod'; if (want === useAirpod) return; if (undo && undo.airpod === want) return cancelSwap();      // the switch back to where it was = Cancel
   const mid = phase === 'play' || phase === 'calibrate';
   if (phase === 'play' && !undo) { undo = { airpod: useAirpod, kept: stats.calibrated }; ui.backLabel('Cancel'); }
+  if (padLost && !undo) { undo = { airpod: useAirpod, kept: padLost.kept }; padLost = null; ui.backLabel('Cancel'); }      // the phone back screen's switch: a swap like any other, Cancel puts the phone back
   setPaddleTo(want);
   if (mid) { stats.calibrated = false; calibrating = true; lastSample = -1e9; phase = 'connect'; ui.settings(false); screen('connect'); tellCal(); }
 }
@@ -579,6 +584,17 @@ function cancelSwap() {
   const u = undo; undo = null; ui.backLabel('Back'); if (!u) return; setPaddleTo(u.airpod); lastSample = performance.now();      // the old paddle was live a moment ago: no 'signal lost' flash while its next sample arrives
   if (u.kept) { stats.calibrated = true; calibrating = false; phase = 'play'; openCourt(); tellCal(); }
   else { stats.calibrated = false; phase = 'connect'; screen('connect'); }      // its next sample calibrates it again
+}
+// The phone back (NOTES 243): its page closed mid-game (the X, a swipe, a locked phone) or the player asks (Settings > Reconnect phone). The set-up
+// screen comes up with the same QR (PAD is kept for this tab: the same code pairs again) and the seat says it is calibrating, so Matt waits. The phone's
+// next page goes straight back to the court on the kept calibration (cachedCal) or calibrates; Back returns to the court. Never over the result.
+function padBack() {
+  if (padLost || undo || useAirpod || !CAN_PHONE || spec() || !seated() || (phase !== 'play' && phase !== 'calibrate') || ui.currentOverlay()) return false;
+  padLost = { kept: stats.calibrated, fresh: false }; stats.calibrated = false; calibrating = true; phase = 'connect'; ui.settings(false); showPair(); screen('connect'); tellCal(); padPhase(); return true;
+}
+function padReturn() {      // Back on that screen: the court again, on the calibration it had (or the kept one), else calibration
+  const p = padLost; padLost = null; if (!p) return; showPair();
+  if (p.kept) { stats.calibrated = true; calibrating = false; phase = 'play'; openCourt(); tellCal(); } else if (!cachedCal()) startCal();
 }
 ui.onPaddleSwap(pickPaddle);
 if (useAirpod || tryBridge) openBridge();
@@ -597,11 +613,12 @@ function onSample(sample, from) {
   if (sample.t < lastT - 0.5 && (stats.calibrated || phase === 'calibrate')) { stats.calibrated = false; if ((phase === 'play' || phase === 'calibrate') && !cachedCal()) startCal(); }      // the paddle's clock went back: the phone's page was reloaded, and its compass starts from a new zero (a kept calibration re-aims itself)
   lastT = sample.t;
   const power = Math.hypot(sample.r[0], sample.r[1], sample.r[2]);
+  if (padLost && phase === 'connect' && !padLost.fresh && performance.now() - lastSample < PAD_GONE_MS) { lastSample = performance.now(); return; }      // the phone back screen: only a phone page opened since, or one that wakes up, takes the seat back
   lastSample = performance.now();
   ui.setStat('pw', power.toFixed(1));
   if (phase === 'title') { if (power > 12) play(); return; }         // a swing presses Play. The model is not fed until calibration
   if (phase === 'lobby' || phase === 'watch' || phase === 'camera') return;      //  A spectator's AirPod is nobody's paddle. Behind the primer it only counts as live (airpodLive): its answer goes on to calibration
-  if (phase === 'connect' && !cachedCal()) startCal();              //  begins, so a bud lying on the desk cannot calibrate itself. Kept from before: the court (cachedCal)
+  if (phase === 'connect') { if (padLost) { padLost = null; showPair(); } if (!cachedCal()) startCal(); }              //  begins, so a bud lying on the desk cannot calibrate itself. Kept from before: the court (cachedCal)
   for (const e of model.feed(sample, performance.now())) {
     if (e.type === 'cal') showCal(e);
     else if (e.type === 'calibrated') { if (undo) { undo = null; ui.backLabel('Back'); } calibrating = false; stats.calibrated = true; phase = 'play'; if (body) body.center(); tellCal(); keepCal();
@@ -652,7 +669,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
   rec.got(m, side);
   if (m.type === 'pong') { net.pong(m); return; }
   if (m.type === 'padtaken') { newPad(); game.send({ type: 'padcode', code: PAD }); showPair(); return; }      // another live tab drew this code first: pick again (nothing was paired to it yet)
-  if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
+  if (m.type === 'pad') { padOn = !!m.on; stats.pad = padOn; padOffAt = padOn ? 0 : performance.now(); if (padOn && padLost) padLost.fresh = true; if (padOn) padPhase(); showPair(); return; }      // the phone's page opened (or closed)
   if (m.type === 'padkey') { if (seated() && !spec()) { if (m.k === 'c' && (phase === 'play' || phase === 'calibrate')) startCal(); else if (m.k === 'r' && phase === 'play') recenter(); } return; }      // Calibrate again / Recentre, pressed on the phone
   if (m.type === 'restart') { restartUntil = performance.now() + 15000; if (tour) say('Poddle is updating. The tournament will end.', null, 4000); else if (room) say('Poddle is updating. Back in a moment.', null, 4000); return; }      // the server is about to restart (a deploy): the court comes back with the reconnect; a tournament does not
   if (m.type === 'tourend') { clearTimeout(tourHang); if (tour) endTour(m.why); return; }      // before joinfail and closed (docs/COURTS-TOURNEY.md 4.5)
@@ -734,7 +751,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side]; players = o ? 2 : 1;
     scene.updatePaddle(1 - side, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null);
-    if (frozen && !holding && !cardOpen() && !isAway && performance.now() > healAt) { healAt = performance.now() + 1000; game.send({ type: 'pause', on: false }); }      // paused with the panel shut (a lost 'pause off', a reload): nobody could ever resume it
+    if (frozen && !holding && !cardOpen() && !isAway && onCourt() && performance.now() > healAt) { healAt = performance.now() + 1000; game.send({ type: 'pause', on: false }); }      // paused with the panel shut (a lost 'pause off', a reload): nobody could ever resume it. Not off the court: calibrating or the phone back screen is the server's own pause (NOTES 241, 243), it ends when the seat is back
     return;
   }
   if (m.type === 'botinfo') {
@@ -850,7 +867,7 @@ ui.onSettings({
   move: m => { if (!MODES.includes(m)) return;
     if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
     if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); if (m === 'auto' && camOn) stopCam(); },      // Auto turns the camera off (NOTES 190); Body turns it back on above. How you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
-  paddle: pickPaddle, sound: setSound, sink: pickSink, findSinks,
+  paddle: pickPaddle, pair: padBack, sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });      // the settings row and the row under Matt's tab
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
 ui.onView(name => setView(name, true));

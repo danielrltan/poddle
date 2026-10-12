@@ -92,8 +92,8 @@ await ph.screenshot({ path: `${root}test/ui-shots/pad-4-phone-live-390x844.png` 
 // ---- 4. the phone's buttons, and the phone going away and coming back
 await ph.click('#btn-cal'); await sleep(500); ok((await game(desk)).screen !== 'calibrate', 'a brush against the button does nothing'); await ph.click('#btn-cal', { delay: 900 }); s = await until(async () => { const v = await game(desk); return v.screen === 'calibrate' ? v : null; }, 3000, 'Calibrate again on the phone restarts calibration');
 ok(!!s, 'Calibrate again, pressed and held on the phone, works');
-await ph.close(); s = await until(async () => { const v = await game(desk); return !v.pad && /is-bad/.test(v.lamp) ? v : null; }, 5000, 'phone page closed -> the game knows');
-ok(!!s, 'a closed phone page shows as a lost paddle');
+await ph.close(); s = await until(async () => { const v = await game(desk); return !v.pad && v.screen === 'connect' && v.pair ? v : null; }, 5000, 'phone page closed -> the game knows');
+ok(!!s, 'a closed phone page brings the set-up screen and its QR back (NOTES 243)');
 const ph2 = (await (await launch()).pages())[0]; await ph2.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true }); watch(ph2, 'phone2');
 await ph2.goto(`http://localhost:${G}/pad.html?k=${CODE}`); await sleep(600); await ph2.evaluate(playPhone, phoneTrack(40)); await ph2.click('#go');
 s = await until(async () => { const v = await game(desk); return v.calibrated && v.phase === 'play' ? v : null; }, 30000, 'the phone comes back on a fresh page (its clock starts over) and calibrates again');
