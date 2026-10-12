@@ -847,6 +847,7 @@ button.set-row::before{content:"";position:absolute;inset:.0625rem 0 0;border-ra
 @media (hover:hover){ button.set-row:hover::before{opacity:.9} } button.set-row:active::before{opacity:1;transition-duration:60ms}
 .set-list > :first-child{border-top-left-radius:var(--r-md);border-top-right-radius:var(--r-md)} .set-list > :last-child{border-bottom-left-radius:var(--r-md);border-bottom-right-radius:var(--r-md)}
 button.set-row:focus-visible,.settings .btn:focus-visible{border-color:var(--line);box-shadow:var(--glow)}
+.set-action[aria-disabled="true"]{opacity:.55;cursor:default}      /* Ask to restart / forfeit while one is out (NOTES 245) */
 .set-action{color:var(--link)} .set-action svg{width:1.25rem;height:1.25rem;margin-right:.375rem;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}      /* Recentre camera: a row that does a thing, so it reads as a link, not a setting */
 .set-row .field{width:11.5rem;height:2.25rem;padding:0 .875rem;font-size:var(--t-md);border-width:.125rem}
 .set-name-end{display:flex;align-items:center;gap:.5rem;min-width:0} .set-name-end:has(> .btn:not([hidden])) .field{width:8.5rem;min-width:0}      /* a username: the read-only field and its Change button (docs/ACCOUNTS.md 9.5) */

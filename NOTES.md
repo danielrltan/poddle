@@ -5010,6 +5010,32 @@ The owner (2026-10-12): an easy way to reconnect / rescan the QR when the phone'
   drives the server). The heal now runs only on the court (onCourt()); that pause ends when the seat says it is back (cal false).
 - test/padback-e2e.mjs (new, PADBACK_PORT, default 8640); test/pad-e2e.mjs part 4 expects the set-up screen after the phone page closes.
 
+## 245. Ask to restart or to forfeit, from the settings card, by mutual vote
+The owner (2026-10-12): "make it so that you can ask to restart game / forfeit in settings", "and it has to be by mutual vote".
+- Settings > Match: two rows, shown only while a match is under way (a ball struck or a point scored), never in a tournament match,
+  never for a spectator. Against a person they read Ask to restart / Ask to forfeit; against Matt, who agrees to anything, Restart
+  (exactly holding B, NOTES 207) and Forfeit, both at once.
+- server/game.js endAsk / endOff / endAnswer: {type:'endask', what}. ONE request per court, END_S 15 s on the wall clock (a pause
+  does not stop it), silence is a no. The other seat gets the Ask to play card ({type:'askplay', id, name, left, what}: "Ann wants to
+  restart / Back to 0-0.", "Ann wants to forfeit / You win the match.") and answers with the same Y / N and {type:'answer'}. The
+  asker's row counts down (Waiting · 12s) from {type:'endstate', s, what, left}; a no or an expiry rests the asker END_COOL_S 20 s
+  (Again in 20s) and says so in a toast ("Ben said no", "No answer from Ben"), like Ask to play. Refused at once: before the first
+  strike (notyet), a tournament (tour), the other seat away from the tab, calibrating, dropped or held (away: "Ben is away"), a
+  different ask already out (busy: its card is on the asker's own screen). Both asking the same thing at once is a yes. Either seat
+  leaving or dropping, a match ending or a new one starting ends the request (gone, no rest charged). A reload brings the card or the
+  count back (greet).
+- A yes to restart: rematchon {restart: true} and startMatch from 0-0, the same first server. The match under way is dropped by
+  startMatch (stats.drop): nothing recorded, no trophies either way. That is only fair because the other seat said yes.
+- A yes to forfeit: endMatch(other side, forfeit, conceded). Recorded exactly as leaving mid-match is (ending 'forfeit', the asker
+  the loser: trophies 3.4, the abuse flags early_forfeit / leaver_ahead, a no-show void), but both seats are still there, so the
+  matchover carries conceded: true: the result has its title (VICTORY! / DEFEAT, STAMP_S on the vote's clock), the note "Ann
+  forfeited", the rematch vote and its clock. Against Matt it is recorded as a forfeit loss (bot_record losses, no trophies), as
+  quitting him is. A conceded forfeit can be farmed between two accounts no more than leaving and coming back already can.
+- Privacy section 2 (game information) names the asks and answers; Last updated October 12, 2026; sitemap lastmod.
+- test/endask.test.mjs (new, ENDASK_PORT, default 8660): refused before a strike, no + rest + wait, yes to restart (0-0, nothing
+  recorded), expiry, both at once, busy, away, gone on a drop, Matt's Restart and Forfeit. test/endask-e2e.mjs (new, ENDASK_E2E_PORT,
+  default 8670): the rows, the card's words, Y, VICTORY! / DEFEAT and "Ann forfeited", Matt's labels.
+
 ## 246. No zoom on a phone: double tap and pinch do nothing
 The owner (2026-10-12): a spectator on a phone could not tap emotes without the page zooming in on the double tap.
 - web/ui.css: `:where(*){touch-action:manipulation}`. touch-action is not inherited, so every element gets it; at zero specificity an

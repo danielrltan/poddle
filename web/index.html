@@ -172,7 +172,7 @@
 <div class="toast bhold" id="bhold" data-fit aria-hidden="true"><span class="keycap">B</span>Restart<span class="bhold-bar"><i></i></span></div>
 <!-- a spectator asks to take Matt's seat: a small corner card for 10 s. Never takes focus, never swallows a key; Y / N answer it (docs/COURTS-TOURNEY.md 2.8) -->
 <div class="ask-card" id="ask-card" role="group" aria-labelledby="ask-q" data-fit hidden>
-  <p class="ask-q" id="ask-q"><b id="ask-name"></b> wants to play<small>Takes Matt’s place.</small></p>
+  <p class="ask-q" id="ask-q"><b id="ask-name"></b> <span id="ask-what">wants to play</span><small id="ask-sub">Takes Matt’s place.</small></p>
   <p class="ask-btns"><button class="btn btn-sm is-tall ask-yes" id="btn-ask-yes" tabindex="-1" aria-keyshortcuts="Y"><span class="keycap">Y</span>Accept</button><button class="btn btn-sm is-tall ask-no" id="btn-ask-no" tabindex="-1" aria-keyshortcuts="N"><span class="keycap">N</span>Decline</button></p>
   <div class="rematch-bar ask-bar" aria-hidden="true"><i></i></div>
   <span class="vh" id="ask-live" aria-live="polite"></span>
@@ -206,6 +206,8 @@
   <section class="set-group" id="grp-match"><h3 class="set-label">Match</h3><div class="set-list">
     <div class="set-row set-pick" id="set-move"><span>Move</span><span class="seg seg-sm" id="move-seg" role="radiogroup" aria-label="Move"><button class="seg-opt" role="radio" aria-checked="true" data-move="body">Body</button><button class="seg-opt" role="radio" aria-checked="false" data-move="auto">Auto</button></span><small id="move-note" hidden>Body needs a camera</small><span id="mode" hidden>Body</span></div>
     <div class="set-row set-pick" id="set-bot" hidden><span>Difficulty</span><span class="seg seg-sm" id="bot-seg" role="radiogroup" aria-label="Difficulty"><button class="seg-opt" role="radio" aria-checked="false" data-level="0" data-name="Rookie">Rookie</button><button class="seg-opt" role="radio" aria-checked="true" data-level="1" data-name="Club">Club</button><button class="seg-opt" role="radio" aria-checked="false" data-level="3" data-name="Tour">Tour</button><button class="seg-opt" role="radio" aria-checked="false" data-level="2" data-name="Pro">Pro</button></span></div>
+    <button class="set-row set-action" id="btn-end-restart" hidden><span>Ask to restart</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg></button>
+    <button class="set-row set-action" id="btn-end-forfeit" hidden><span>Ask to forfeit</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4h11l-2.5 4L17 12H6"/></svg></button>
   </div></section>
   <section class="set-group" id="grp-sound"><h3 class="set-label">Sound</h3><div class="set-list">
     <button class="set-row set-switch" id="tog-sound" role="switch" aria-checked="true"><span>Sound</span><i></i></button>

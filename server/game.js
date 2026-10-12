@@ -214,6 +214,7 @@ const SMASH_IN = 0.875;
 const effort = n => n <= SMASH ? n : n <= SMASH_IN ? SMASH : SMASH + (n - SMASH_IN) * (1 - SMASH) / (1 - SMASH_IN);
 const SMASH_UP = [0.4, 0.55];                                  // lob (0..0.8) over which a hard swing stops being a smash: a smash comes DOWN or level through the ball. Recorded smashes send lob <= 0.27 (<= 0.45 with the reworked lob gate): called at 0.475, upward share 0.6
 const LOB_ARC = [0.25, 0.6];                                   // underhand() over which the flight turns from the drive's into the lob's: 0.8 of the way by 0.5, all of it by 0.6
+const END_S = +process.env.END_S || 15, END_COOL_S = process.env.END_COOL_S != null ? +process.env.END_COOL_S : 20;   // s on the wall clock (NOTES 245): a seat's ask to restart or to forfeit lives 15 s; a no or an expiry rests the asker 20 s
 const ASK_S = +process.env.ASK_S || 10, ASK_COOL_S = +process.env.ASK_COOL_S || 10, ASK_GAP_S = process.env.ASK_GAP_S != null ? +process.env.ASK_GAP_S : 3;   // s on the wall clock (docs/SPECTATE.md Asking to play): a request lives 10 s; a requester waits 10 s after it ENDS; a court rests 3 s between requests
 const STAMP_S = process.env.STAMP_S != null ? +process.env.STAMP_S : 2;   // s the title has the court to itself before the vote (web/ui.js STAMP_MS)
 const REMATCH_S = +process.env.REMATCH_S || 20, HOLD_S = +process.env.HOLD_S || 15, PAUSE_S = +process.env.PAUSE_S || 600, CAL_S = +process.env.CAL_S || 60;   // s on the WALL clock (room time stands still in two of them): the rematch vote, a dropped player's seat, the longest pause, the longest a match waits for a seat that says it is calibrating. Tests shorten them
@@ -367,6 +368,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   const spectators = new Set();             // sockets that watch: never seated, never counted by humans(), never keep the room alive (docs/SPECTATE.md)
   let now = clock;                          // ROOM time: state.t, hit.t and every timer in here. It stands still while paused or holding a seat, so serveBy, swing windows and the bot freeze for free
   let started = false, firstServe = 0;      // has a ball been struck in this match (before that a leaver just leaves); who served first (the next match alternates)
+  let endReq = null;                        // a seat asking the other to restart or to forfeit (NOTES 245): { id, side, what, until }
   let over = null, hold = null, paused = null, slow = null;   // over: { winner, forfeit, votes, until, names }  hold: { side, until, said }  paused: { by, until }  slow: { side, until, said } a seat calibrating mid-match   (until = wall clock ms)
   const ball = { spin: 0, kick: 0, curl: 0, bend: null, replan: null, rest: 0, serving: null, serveBy: 0, hang: [0, 1, 0], hv: [0, 0, 0], drag: [false, false, false], p: [0, 1, 0], v: [0, 0, 0], live: false, lastHit: 0, bounces: 0 };
   const score = [0, 0]; let revived = null, resumed = false;   // resumed: a Matt match brought back mid-way after a restart, or Matt back after a demote. It is under way before its first new strike (underway())
@@ -562,6 +564,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // a fresh pair (human+human or human+bot): clean score, first serve
   function startMatch(first) {
     score[0] = score[1] = 0; if (revived) { score[0] = revived[0]; score[1] = revived[1]; revived = null; } else resumed = false;      // a court brought back after a restart carries its score (and stays under way); any later match is a new one
+    if (endReq) endOff('gone', false);                          // a new match (a rematch, a restart): a request about the last one is moot
     server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
     counting = READY_S > 0 ? { until: Infinity, said: -1 } : null;   // armed: it starts counting once the room is whole and both seats are ready (countdown())
     if (!LEGACY) { stats.drop(match); lad = [bySide(0), bySide(1)].map(ladSeat); ladDone = false;   // trophies: each seat's eligibility and count, frozen now (docs/TROPHIES.md 3.1, 3.3)
@@ -634,14 +637,14 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
 
   // ---------- match end, rematch vote, closing (docs/SPECTATE.md). A finished match no longer restarts by itself ----------
-  const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, rematchBy: voteLeft(), names: over.names, reg: over.reg, rank: over.rank,   // names: as they were when it ended (a forfeit has emptied a seat by now). rank: the emblems as the hook left them. tour: a tournament match: no vote, back to the bracket in gap s
+  const overMsg = () => ({ type: 'matchover', winner: over.winner, score: [...score], forfeit: over.forfeit, conceded: over.conceded || undefined, rematchBy: voteLeft(), names: over.names, reg: over.reg, rank: over.rank,   // names: as they were when it ended (a forfeit has emptied a seat by now). rank: the emblems as the hook left them. tour: a tournament match: no vote, back to the bracket in gap s
     tour: MATCH ? { ...opts.info, gap: secsTo(over.until) } : undefined });
   const voteLeft = () => (MATCH || LEGACY ? secsTo(over.until) : Math.min(REMATCH_S, secsTo(over.until)));   // the vote is REMATCH_S long on the wire; the title's STAMP_S before it is not part of it
   const voteMsg = () => ({ type: 'rematch', votes: over.votes, left: voteLeft() });
-  function endMatch(winner, forfeit, nm) {
+  function endMatch(winner, forfeit, nm, conceded) {               // conceded: the loser asked to forfeit and was let (NOTES 245): a forfeit in the record, both seats still there, so a title and a vote
     const rec = record(winner, forfeit ? 'forfeit' : 'won');     // rows A-F: a win, a forfeit, a stall, a tournament result
     ball.live = false; ball.serving = null; serveAt = Infinity; counting = null; for (const pl of players) pl.swing = pl.servePending = null;
-    askEnd('gone');                                              // a result card is no time to swap seats
+    askEnd('gone'); endOff('gone', false);                       // a result card is no time to swap seats, or to ask about a match that is over
     if (MATCH) {                                                 // a tournament match: no vote, the bracket hears it once, the room closes after TOUR_GAP_S
       if (hold) { hold = null; broadcast({ type: 'holdoff' }); }
       const struck = started || score[0] + score[1] > 0;
@@ -651,7 +654,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (!reported) { reported = true; opts.onResult(winner, [...score], !!forfeit, { struck, score: [...score] }); }
       return;
     }
-    over = { winner, forfeit, names: nm || names(), reg: regs(), rank: [...seatTier], until: Date.now() + (LEGACY ? 5 : REMATCH_S + (forfeit ? 0 : STAMP_S)) * 1000,      // the vote's clock starts when the result panel comes in, after the VICTORY! / DEFEAT title (NOTES 167)
+    over = { winner, forfeit, names: nm || names(), reg: regs(), rank: [...seatTier], until: Date.now() + (LEGACY ? 5 : REMATCH_S + (forfeit && !conceded ? 0 : STAMP_S)) * 1000, conceded: !!conceded,      // the vote's clock starts when the result panel comes in, after the VICTORY! / DEFEAT title (NOTES 167)
       votes: [0, 1].map(sd => { const p = bySide(sd); return p ? (p.bot ? true : null) : false; }) };      // Matt always wants another; a seat that was forfeited cannot
     if (LEGACY) newMatchAt = now + 5;                            // LOCAL: a new match after 5 s whatever anyone says (test/e2e.mjs lives there)
     broadcast(overMsg()); tellProfiles(rec);
@@ -882,7 +885,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (hold) tell(ws, { type: 'hold', side: hold.side, left: secsTo(hold.until) });
     if (over) { tell(ws, overMsg()); if (!LEGACY && !MATCH) tell(ws, voteMsg()); }
     if (side != null && asking && humans()[0] && humans()[0].ws === ws) tell(ws, { type: 'askplay', id: asking.id, name: asking.name, left: secsTo(asking.until) });   // the player reloaded mid-request: the card comes back with the time left
-    if (side == null && coolLeft(ws) > 0) tell(ws, { type: 'askstate', s: 'wait', left: coolLeft(ws) });   // a spectator back after a reload: the button is right at once
+    if (side == null && coolLeft(ws) > 0) tell(ws, { type: 'askstate', s: 'wait', left: coolLeft(ws) });
+    if (side != null && endReq) { const pl = bySide(side); if (pl && endReq.side === side) endSay(pl, 'sent', endReq.what, secsTo(endReq.until)); else if (pl) tell(ws, { type: 'askplay', id: endReq.id, name: safeName((bySide(endReq.side) || {}).name, 'Your opponent'), left: secsTo(endReq.until), what: endReq.what }); }   // a reload mid-request: the card, or the asker's count, comes back   // a spectator back after a reload: the button is right at once
   }
   function identify(pl, ws) { try { stats.identify(match, pl, ws); } catch { /* stats never stop a seat */ } }   // join, retake, a hello on a seated socket
   function optOut(pl, ws) { try { stats.optOut(match, pl, ws); } catch { /* stats never stop a seat */ } }   // Save my stats switched off on a seated socket: the match under way records nothing for this seat
@@ -955,6 +959,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
   function answer(me, id, yes) {                                 // one message, so atomic: a double press or an answer after expiry finds nothing to answer
     if (!Number.isInteger(id) || typeof yes !== 'boolean') return;
+    if (endReq && endReq.id === id) return endAnswer(me, yes);   // the same Y / N card answers a seat's ask to restart or to forfeit
     if (!asking || asking.id !== id || humans().length !== 1 || humans()[0] !== me) return send(me, { type: 'askoff', id, why: 'late' });
     if (!yes) return askEnd('no');
     const w = asking.ws, lv = botLevel; asking = null; askRest = Date.now() + ASK_GAP_S * 1000;
@@ -965,6 +970,49 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     join(w);                                                     // resumes a pause, Matt goes, w sits in his seat, a new match from 0-0, names: the player's usual 'Sam joined to play'
     promo = { side: w.pl.side, until: Date.now() + PROMO_S * 1000, level: lv }; send(me, { type: 'askoff', id, why: 'yes' });
     console.log(`[${code}] a spectator took Matt's seat`); if (pub) lobbyChanged();
+  }
+  // ---------- asking to restart / to forfeit (NOTES 245): a seated player asks from the settings card, the other seat answers Y / N on the Ask to play card.
+  // ONE request per court, END_S on the wall clock, silence is a no; a no or an expiry rests the asker END_COOL_S. Against Matt there is nobody to ask: it happens at once.
+  // A restart drops the match under way unrecorded (startMatch: stats.drop), which is only fair because the other seat said yes; a forfeit is recorded as a forfeit,
+  // the asker the loser, exactly as leaving mid-match is (trophies 3.4, the abuse flags), but both seats stay for the title and the vote ----------
+  const endSay = (pl, s, what, left, extra) => { if (pl && pl.ws) send(pl, { type: 'endstate', s, what, left, ...extra }); };
+  function endAsk(me, what) {
+    if (what !== 'restart' && what !== 'forfeit') return;
+    if (LEGACY || MATCH) return endSay(me, 'refused', what, 0, { why: 'tour' });   // a tournament match is settled on the court or by leaving it
+    if (over || !(started || resumed)) return endSay(me, 'refused', what, 0, { why: 'notyet' });   // nothing under way: before the first strike there is nothing to restart or concede
+    const foe = bySide(1 - me.side);
+    if (foe && foe.bot) {                                          // Matt agrees to anything
+      if (what === 'restart') return botRequest(me, null, true);   // the same as holding B (NOTES 207)
+      console.log(`[${code}] side ${me.side} conceded to Matt`); return endMatch(foe.side, true, null, true);
+    }
+    if (!foe || !foe.ws || hold) return endSay(me, 'refused', what, 0, { why: 'away' });
+    if (endReq) {
+      if (endReq.side === me.side) return endSay(me, 'sent', endReq.what, secsTo(endReq.until));   // asked twice: still pending
+      if (endReq.what === what) return endAnswer(me, true);        // both asked for the same thing at once: that is a yes
+      return endSay(me, 'refused', what, 0, { why: 'busy' });      // they asked something else first: their card is up on this screen
+    }
+    const cool = secsTo(me.endCool || 0); if (cool > 0) return endSay(me, 'wait', what, cool);
+    if (foe.afk || foe.cal) return endSay(me, 'refused', what, 0, { why: 'away' });   // away from the tab or calibrating: they could not see the card
+    endReq = { id: ++askN, side: me.side, what, until: Date.now() + END_S * 1000 };
+    send(foe, { type: 'askplay', id: endReq.id, name: safeName(me.name, 'Your opponent'), left: END_S, what });
+    endSay(me, 'sent', what, END_S); console.log(`[${code}] side ${me.side} asked to ${what}`);
+  }
+  function endOff(why, charge = why === 'no' || why === 'expired', skip) {   // the one place a request ends. skip: a seat that is leaving (told nothing)
+    if (!endReq) return; const r = endReq; endReq = null;
+    const asker = bySide(r.side), foe = bySide(1 - r.side);
+    if (charge && asker) asker.endCool = Date.now() + END_COOL_S * 1000;
+    if (foe && !foe.bot && foe !== skip) send(foe, { type: 'askoff', id: r.id, why });
+    if (asker !== skip) endSay(asker, why, r.what, charge ? END_COOL_S : 0);
+  }
+  function endAnswer(me, yes) {
+    const r = endReq; if (!r || me.side === r.side) return;
+    if (!yes) return endOff('no');
+    endReq = null; const asker = bySide(r.side);
+    send(me, { type: 'askoff', id: r.id, why: 'yes' }); endSay(asker, 'yes', r.what, 0);
+    if (over || !asker) return;
+    console.log(`[${code}] both seats agreed to ${r.what}`);
+    if (r.what === 'restart') { broadcast({ type: 'rematchon', restart: true }); startMatch(firstServe); }   // from 0-0, the same server; the abandoned match is dropped unrecorded
+    else endMatch(1 - r.side, true, null, true);
   }
   function demote(p) {                                           // let in, never got a paddle ready: the court would wait for ever (the count waits on ready, slowSeat only runs once started)
     const ws = p.ws, nm = p.name, lv = promo.level; promo = null; coolSet(ws);   // the cooldown runs from this end too: no ask, accept, wait 60 s, ask again
@@ -981,6 +1029,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     const i = players.indexOf(me); if (i < 0) return;
     if (me.ws) me.ws.room = me.ws.pl = null;
     if (again) return void players.splice(i, 1);
+    endOff('gone', false, me);                                   // an ask to restart / forfeit dies with either seat going (a drop too: a held seat cannot answer)
     if (MATCH) {                                                 // a tournament match: every way out is a result, once
       if (over) { players.splice(i, 1); if (!humans().some(p => p.ws)) close('round'); return; }   // left the result card early
       if (dropped && !hold) return startHold(me);                // any drop is held (HOLD_S), before the first ball too
@@ -1046,6 +1095,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (m.type === 'bot') return botRequest(me, m.level, m.restart === true);
     if (m.type === 'status') { if (typeof m.cal === 'boolean') setCal(me, m.cal); if (typeof m.away === 'boolean') setAway(me, m.away); return; }   // calibrating again (C): the NEXT serve waits, a rally in flight plays on. away: the tab is hidden / unfocused (NOTES 220). Booleans only
     if (m.type === 'emote') return emote(me.ws, m.e, me);        // before the pause gate too: a GG over the result panel or a paused court
+    if (m.type === 'endask') return endAsk(me, m.what);         // ask to restart / to forfeit (NOTES 245), before the pause gate like the answer
     if (m.type === 'answer') return answer(me, m.id, m.yes);    // before the pause gate: a player with the settings panel open can still answer a request
     if (paused || hold) return;                                  // room time stands still: no paddle, no swing
     if (m.type === 'paddle') {
@@ -1116,6 +1166,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (hold) { if (ms >= hold.until) forfeitHeld(); else sayHold(); }
     if (paused && ms >= paused.until) resume();
     if (asking && ms >= asking.until) askEnd('expired');         // wall clock: a pause does not stop a request
+    if (endReq && ms >= endReq.until) endOff('expired');
     if (promo) { const p = bySide(promo.side); if (!p || p.bot || !p.ws || ready(p) || humans().length !== 2) promo = null; else if (ms >= promo.until) demote(p); }   // let in, never got their paddle ready: back to the stands, Matt back
     if (over && !LEGACY && ms >= over.until) return close(MATCH ? 'round' : 'norematch');   // a tournament match: back to the bracket
     slowSeat(ms);
