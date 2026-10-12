@@ -4992,3 +4992,20 @@ The owner (2026-10-12): when the bottom-centre notification showed, the emote ba
   the view chips and the key strip keep their places; keys, cooldown line and behaviour unchanged.
 - test/emotebar-e2e.mjs: at every size, player and spectator, a long toast leaves the bar shown and nothing overlapping it; the Matt toast case also
   checks the bar. 64 checks pass; test/emote.test.mjs passes.
+
+## 244. The phone back: its page closed mid-game brings the QR back, and Settings > Reconnect phone
+The owner (2026-10-12): an easy way to reconnect / rescan the QR when the phone's tab is closed by accident.
+- web/main.js: the phone's page going ({type:'pad', on:false}) mid-game (play or calibrate, a seat, phone mode) and not back within 1.5 s
+  (a reload or a wifi blip is) brings the set-up screen with the same QR and code (PAD is kept for this tab, so the same code pairs again).
+  It says the seat is calibrating (tellCal), so against Matt the court pauses (NOTES 241); against a person the serve waits, as before.
+  The next phone page on that code goes straight back to the court on the kept calibration (cachedCal, NOTES 187) or calibrates.
+- Back on that screen is the court on the calibration it had, never out of the court. The Phone | AirPod switch there is a swap like
+  NOTES 41's (Back reads Cancel). Behind the result panel it waits for the court (refreshStatus retries; never over an overlay). Off the court
+  (toLobby) it is forgotten.
+- Settings > Paddle > Reconnect phone (phone mode, on a court; hidden on the menu and for spectators): the same screen for a phone that
+  fell asleep with its page open. While that phone keeps streaming its samples do not bounce the screen away; a page opened since, or the
+  phone waking after 1.5 s of silence, takes the seat back. No toast, no new card.
+- Found on the way: main.js's pause heal (a frozen room with no card open sends pause off, for a lost 'pause off') resumed the server's
+  own off-court pause within a second, so NOTES 241's 'calibrating again against Matt pauses' never held in a real tab (away.test only
+  drives the server). The heal now runs only on the court (onCourt()); that pause ends when the seat says it is back (cal false).
+- test/padback-e2e.mjs (new, PADBACK_PORT, default 8640); test/pad-e2e.mjs part 4 expects the set-up screen after the phone page closes.

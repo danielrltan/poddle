@@ -881,7 +881,7 @@ body:not([data-screen="hud"]) .settings{--set-floor:4.75rem}
 .set-status b{font-weight:800} .set-status em{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .set-status .is-bad{background:#fff0f0;color:var(--bad-deep)} .set-status .is-wait{color:var(--warn-deep)}
 .set-note{margin:0;padding:.5rem .875rem;border-radius:var(--r-md);background:#fff6e0;border:.09375rem solid var(--warn);color:var(--warn-deep);font-size:var(--t-sm);font-weight:700;text-align:center}
-.settings.is-spectator #grp-you,.settings.is-spectator #grp-paddle,.settings.is-spectator #grp-match,.settings.is-spectator #set-move,.settings.is-spectator #set-paddle,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}      /* watching: Screen, and the Game light */
+.settings.is-spectator #grp-you,.settings.is-spectator #grp-paddle,.settings.is-spectator #grp-match,.settings.is-spectator #set-move,.settings.is-spectator #set-paddle,.settings.is-spectator #btn-pair,.settings.is-spectator #set-bot,.settings.is-spectator #set-name,.settings.is-spectator #set-sens,.settings.is-spectator #tog-airpod,.settings.is-spectator #btn-recenter,.settings.is-spectator #set-airpod,.settings.is-spectator #set-camera{display:none}      /* watching: Screen, and the Game light */
 
 /* ==========================================================================================================
    SPECTATORS: view chips bottom-left, the split-screen divider, no key hints and no insets. And the seat-hold card.
@@ -2269,7 +2269,7 @@ body::after{content:"";position:fixed;inset:0;z-index:calc(var(--z-screen) + 2);
   transition:opacity var(--d-med) var(--ease-soft),visibility 0s linear var(--d-med)}
 body[data-settings="menu"]::after{opacity:1;visibility:visible;transition-delay:0s}
 @media (prefers-reduced-motion:reduce){ body::after{transition:none} }
-.settings.is-menu .set-status,.settings.is-menu #btn-recenter,.settings.is-menu #set-bot,.settings.is-menu #grp-social,.settings.is-menu #set-foot{display:none}
+.settings.is-menu .set-status,.settings.is-menu #btn-recenter,.settings.is-menu #btn-pair,.settings.is-menu #set-bot,.settings.is-menu #grp-social,.settings.is-menu #set-foot{display:none}
 [data-mobile] .settings.is-menu #grp-paddle,[data-mobile] .settings.is-menu #grp-match,[data-mobile] .settings #set-music{display:none}      /* a phone's menu: it is the paddle, not the player's screen, and it plays no music */
 /* the Product Hunt badge's strip (NOTES 186): the menu pages' content stops above the badge, so a tall panel (Ranks, Courts on a phone) never runs under it */
 #screen-title .menu-body,#screen-lobby .menu-body{padding-bottom:calc(2.5rem + 2 * var(--s-3))}
