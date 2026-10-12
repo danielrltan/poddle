@@ -839,6 +839,7 @@ let unlocked = false;
 const unlock = () => { if (!unlocked) { unlocked = true; scene.unlockAudio(); scene.audio.setMute(!soundOn); if (!MOBILE) mau.prime(); if (sinkId) scene.audio.setSink(sinkId).then(ok => { if (!ok) forgetSink('That speaker was disconnected. Using the system default.'); }); } };
 scene.audio.onDevicesChanged(loadSinks);           // an AirPod connecting mid-match changes the list under the open card
 let setAtDown = false; addEventListener('pointerdown', () => { setAtDown = ui.settings(); }, true);      // before ui.js closes the card: that click only closes it
+for (const ev of ['gesturestart', 'gesturechange']) addEventListener(ev, e => e.preventDefault(), { passive: false });      // iOS Safari ignores user-scalable=no: its pinch zoom is stopped here (double-tap: ui.css touch-action, NOTES 246)
 addEventListener('pointerdown', e => { unlock(); if (!setAtDown && !e.target.closest?.('.menu-set, #settings')) play(); });      // the title's settings button and its card are not "anywhere to start"
 ui.onStart(() => { unlock(); ui.fullscreen(true); play(); });           // the big title button (a click is a user gesture: go full screen)
 ui.onLobby({ quick: () => request({ type: 'quick' }), create: pub => request({ type: 'create', public: !!pub }), join: code => request({ type: MOBILE || wantWatch && code === wantRoom ? 'watch' : 'join', code }),      // a phone's Enter in the code boxes, or a court row, watches      // the code screen of a watch link watches

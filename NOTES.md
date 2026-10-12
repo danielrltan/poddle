@@ -5009,3 +5009,11 @@ The owner (2026-10-12): an easy way to reconnect / rescan the QR when the phone'
   own off-court pause within a second, so NOTES 241's 'calibrating again against Matt pauses' never held in a real tab (away.test only
   drives the server). The heal now runs only on the court (onCourt()); that pause ends when the seat says it is back (cal false).
 - test/padback-e2e.mjs (new, PADBACK_PORT, default 8640); test/pad-e2e.mjs part 4 expects the set-up screen after the phone page closes.
+
+## 246. No zoom on a phone: double tap and pinch do nothing
+The owner (2026-10-12): a spectator on a phone could not tap emotes without the page zooming in on the double tap.
+- web/ui.css: `:where(*){touch-action:manipulation}`. touch-action is not inherited, so every element gets it; at zero specificity an
+  element's own touch-action (none on a drag surface) still wins. Taps also lose the 300 ms double-tap wait.
+- web/index.html: the viewport adds maximum-scale=1, user-scalable=no (Android Chrome honours it; pad.html already had it).
+- web/main.js: iOS Safari ignores user-scalable=no, so gesturestart / gesturechange are prevented: no pinch zoom there either.
+- Checked in headless Chrome emulating an iPhone: the meta, and touch-action manipulation on the body, the canvas and an emote button.
