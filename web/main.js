@@ -195,19 +195,20 @@ function showOver() {                              // the result card. A matchov
   ui.setServe(null); ui.hold(null); ui.settings(false);
   const rg = Array.isArray(m.reg) ? m.reg.map(x => x === true) : [false, false];      // as it was when it ended, like its names
   const W = m.winner === 1 ? 1 : 0, n = (sc[0] | 0) + (sc[1] | 0);
-  const mstats = ms && !m.forfeit && ms.sum === n ? (spec() ? { rally: ms.rally, smashes: ms.smash[0] + ms.smash[1], run: ms.best[W] }      // a spectator: both sides' smashes, the winner's best run
+  const fo = !!m.forfeit && !m.conceded;      // a forfeit by leaving. One conceded on a yes (NOTES 245) ends like a match played out: both seats are still here, title, clock and all
+  const mstats = ms && !fo && ms.sum === n ? (spec() ? { rally: ms.rally, smashes: ms.smash[0] + ms.smash[1], run: ms.best[W] }      // a spectator: both sides' smashes, the winner's best run
     : { rally: ms.rally, smashes: ms.smash[L], run: ms.best[L] }) : null; ms = null;      // every point seen from 0-0, or none at all (showOver runs once per matchover: it takes `over`)
   const endRanks = Array.isArray(m.rank) ? cleanRanks(m.rank) : ranks;      // the ranks as they were when it ended (docs/TROPHIES.md 3, item 9)
   overForfeit = !!m.forfeit && !spec();      // for the trophy row (drawTrophies): the stayer's win notes the forfeit
-  const wait = +ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: !!m.forfeit, role, vote, tour: T || undefined, reg: [rg[L], rg[1 - L]], rank: [endRanks[L], endRanks[1 - L]], stats: mstats }) || 0;      // ms the panel waits behind VICTORY! (0: it is in at once)
+  const wait = +ui.matchResult({ won, me: sc[L] | 0, them: sc[1 - L] | 0, nameMe: spec() ? nameOf(0) : meName(), nameThem: nameOf(1 - L), forfeit: fo, conceded: !!m.conceded, role, vote, tour: T || undefined, reg: [rg[L], rg[1 - L]], rank: [endRanks[L], endRanks[1 - L]], stats: mstats }) || 0;      // ms the panel waits behind VICTORY! (0: it is in at once)
   { const end = Array.isArray(m.names) ? cleanNames(m.names) : [], at = i => end[i] || nameOf(i), nm = [spec() ? at(0) : null, at(1 - L)], ids = ['tally-fr-me', 'tally-fr-them'];      // add a registered player as a friend from the result card (NOTES 226): the opponent, or either seat for a spectator. Never Matt, never a guest name
     social.result([0, 1].map(i => rg[i ? 1 - L : L] && nm[i] && nm[i] !== 'Matt' ? { el: document.getElementById(ids[i]), name: nm[i] } : null)); }
   vicSide = W; vicAt = performance.now() + wait;
-  const reveal = () => { if (ui.currentOverlay() !== 'match') return; if (vote) { const by = +m.rematchBy || 20; ui.rematch({ left: Math.max(0, Math.min(by, Math.round(by + (m.forfeit ? 0 : 2) - (performance.now() - overAt) / 1000))) }); }      // the vote's clock starts with the panel (the server gave the title its 2.6 s on top: STAMP_S)
+  const reveal = () => { if (ui.currentOverlay() !== 'match') return; if (vote) { const by = +m.rematchBy || 20; ui.rematch({ left: Math.max(0, Math.min(by, Math.round(by + (fo ? 0 : 2) - (performance.now() - overAt) / 1000))) }); }      // the vote's clock starts with the panel (the server gave the title its 2.6 s on top: STAMP_S)
     if (trophyParked) { const t = trophyParked; trophyParked = null; drawTrophies(t); }      // its trophies came first (the 'profile' message can land before the matchover, behind VICTORY!, or while a set-up screen was up): the row goes on the card as it comes in, so its roll and ceremony are seen
     if (won && !spec() && wait) ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); };      // the second burst belongs to the panel
   clearTimeout(revealT); if (wait) revealT = setTimeout(reveal, wait); else reveal();
-  scene.jingle(spec() ? (m.forfeit ? 'forfeit' : 'watch') : m.forfeit ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
+  scene.jingle(spec() ? (fo ? 'forfeit' : 'watch') : fo ? (won ? 'forfeit' : 'lose') : won ? 'win' : 'lose');      // the match point's sound: its chime was skipped (scene.js)
   if (vote) { if (!spec()) ui.rematch({ mine: null, theirs: null, name: nameOf(1 - L) }); }      // the clock is drawn by reveal(), with the panel
   else if (!T) setTimeout(() => { if (ui.currentOverlay() === 'match') ui.showOverlay(null); }, 6000 + wait);        // normally the next 'serve' closes it after 5 s. A tournament match: 'closed round' takes us to the bracket
   if (won && !spec()) { ui.confetti(['#3aa0ff', '#ffd34a', '#3ecf72', '#ffffff'], 120); clearTimeout(burstT); if (!wait) burstT = setTimeout(() => { if (ui.currentOverlay() === 'match') ui.confetti(['#3aa0ff', '#ffd34a', '#ffffff'], 80); }, 900); }      // the second burst belongs to the card (reveal, when it waits): a quick 'No rematch' had it falling over the lobby
@@ -399,7 +400,7 @@ function route() { if (!LOBBY || !routing) return; const p = room ? '/' : ui.cur
 function setUrl(code, watch) { const u = new URL(location.href), q = u.searchParams; q.delete('room'); if (code) q.set('court', code); else q.delete('court'); if (code && watch) q.set('watch', '1'); else q.delete('watch'); history.replaceState(null, '', u); route(); }   // the address bar is the invite, and a reload comes back to the same room, in the same role
 const shareLink = code => ['localhost', '127.0.0.1', ''].includes(location.hostname) ? '' : `${location.origin}/?court=${code}`;      // the root, never the menu path the address bar happens to show      // a localhost link is no use to a friend
 // ---------- asking to play (docs/SPECTATE.md Asking to play) ----------
-let askId = 0, askWho = '', askedFor = false, noBot = false;
+let askId = 0, askWho = '', askWhat = '', askedFor = false, noBot = false, endSig = '';      // askWhat: '' a spectator wants Matt's seat, 'restart' | 'forfeit' my opponent asks (NOTES 245). endSig: what the settings card's two rows were last told
 const CAN_PADDLE = CAN_PHONE || /Mac/.test(navigator.platform) && navigator.maxTouchPoints <= 1;      // this device can be a paddle (the inverse of the viewer-only note at the top): only then is there an Ask to play
 function askSync() { const pd = state && state.paddles || [], bots = pd.filter(p => p && p.bot).length, hum = pd.filter(p => p && !p.bot).length;      // a spectator, one human playing Matt
   ui.showAsk(LOBBY && spec() && phase === 'watch' && CAN_PADDLE && !MOBILE && bots === 1 && hum === 1); }
@@ -480,7 +481,7 @@ function toLobby(msg) {                            // out of a room, back to the
   if (undo) { undo = null; ui.backLabel('Back'); } padLost = null; padOffAt = 0;
   camAway = null; if (camOn) stopCam();      // off the court: the camera goes off (NOTES 190). The next seat turns it on again, without asking twice
   trophiesOff(); clearFar(); clearTimeout(burstT); clearTimeout(revealT); vicSide = null; ui.confettiOff(); ms = null; room = null; welcomed = false; role = 'player'; side = 0; names = [null, null]; regs = [false, false]; ranks = [null, null]; dressSeats(); wantRoom = ''; wantWatch = false; state = null; over = null; botWant = null; botLevel = ''; holding = frozen = votedNo = struck = false; watchers = 0; phase = 'lobby'; setUrl(null); settle();
-  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]); social.result([]);
+  ui.setSpectator(false); ui.emotesOff(); ui.notesOff(); ui.hold(null); ui.askCard(null); ui.askPlay(null); ui.endState(null); ui.endRows({ on: false }); endSig = ''; ui.showAsk(false); askedFor = noBot = false; setPaused(false); ui.settings(false); ui.setWatchers(0); syncSettings(); ui.setSettings({ canPause: true }); social.court([]); social.result([]);
   scene.setFrozen(false); scene.setSide(0); scene.startAttract();
   ui.setRoom(null); ui.showOverlay(null); screen('lobby'); ui.lobbyView('home'); profile.landed?.();      // the trophies the games earned fly into the corner card as the home comes in (NOTES 203)
   ui.setScore(0, 0); ui.setServe(null); ui.setNames({ me: meName(), ...alone(), reg: [meReg(), false] });
@@ -730,8 +731,10 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     for (const i of [0, 1]) if ((spec() || i !== side) && live() && names[i] && names[i] !== 'Matt' && (!was[i] || was[i] === 'Matt')) ui.joinBanner(names[i], spec() ? i === 1 : true);      // a human sat down: the centre banner names them (a changed name is not news)
     return;
   }
-  if (m.type === 'askplay') { if (!spec() && Number.isInteger(m.id)) { askId = m.id; askWho = cleanName(m.name) || 'Someone'; ui.askCard({ name: askWho, left: m.left | 0 }); } return; }      // a spectator asks for Matt's seat: the corner card, 10 s
-  if (m.type === 'askoff') { const had = ui.askShowing(); ui.askCard(null); if (m.why === 'gone' && had && live()) say(`${askWho} left`, null, 1800); return; }
+  if (m.type === 'askplay') { if (!spec() && Number.isInteger(m.id)) { askId = m.id; askWho = cleanName(m.name) || 'Someone'; askWhat = m.what === 'restart' || m.what === 'forfeit' ? m.what : ''; ui.askCard({ name: askWho, left: m.left | 0, what: askWhat }); } return; }      // what: my opponent asks to restart or to forfeit (NOTES 245): the same card, the same Y / N      // a spectator asks for Matt's seat: the corner card, 10 s
+  if (m.type === 'askoff') { const had = ui.askShowing(); ui.askCard(null); if (m.why === 'gone' && had && live() && !askWhat) say(`${askWho} left`, null, 1800); return; }      // a restart / forfeit ask ends 'gone' when the match does: nobody left
+  if (m.type === 'endstate') { if (spec()) return; ui.endState(m); const who = nameOf(1 - side);      // my own ask to restart / to forfeit (NOTES 245): the row counts, this says why it ended
+    if (m.s === 'no') say(`${who} said no`, null, 2600); else if (m.s === 'expired') say(`No answer from ${who}`, null, 2600); else if (m.s === 'refused' && m.why === 'away') say(`${who} is away`, null, 2600); return; }
   if (m.type === 'askstate') { if (!spec()) return; ui.askPlay(m); const who = names.find(n => n && n !== 'Matt') || 'The player';      // the button counts; this says why, with a name (the one human on the court)
     if (m.s === 'no') say(`${who} said no`, null, 2600); else if (m.s === 'expired') say(`No answer from ${who}`, null, 2600); else if (m.s === 'wait' && m.busy) say('Someone else asked first', null, 2600); return; }
   if (m.type === 'promoff') { if (live()) say(`${cleanName(m.name) || 'They'} wasn’t ready. Matt is back.`, null, 2600); return; }
@@ -747,6 +750,8 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     if (spec()) { askSync(); ui.setScore(m.score[0], m.score[1]); for (const i of [0, 1]) { const o = m.paddles[i]; scene.updatePaddle(i, o ? { x: o.x, y: o.y, z: o.z, q: o.q, offset: null, bot: !!o.bot, status: o.status } : null); } return; }
     if (ui.settings() && noPause !== vsHuman()) ui.setSettings({ canPause: !(noPause = vsHuman()) });      // somebody sat down (or left) while the panel was open: the note follows
     if (forfeits() !== saidForfeit) ui.setSettings({ forfeit: saidForfeit = forfeits() });      // the Leave button says what it costs
+    { const on = LOBBY && tourKind !== 'match' && !!m.paddles[1 - side] && ui.currentOverlay() !== 'match' && (struck || m.score[0] + m.score[1] > 0), sig = on ? (vsHuman() ? 'h' : 'm') : '';      // Restart / Forfeit in the settings card (NOTES 245): a match under way, not a tournament's
+      if (sig !== endSig) ui.endRows({ on, matt: sig === 'm' }); endSig = sig; }
     if (live() && !frozen && !holding) serveCoach(m); else svT = 0;      // no serve coaching over a set-up screen or a stopped room; its clock starts again afterwards
     ui.setScore(m.score[side], m.score[1 - side]);
     const o = m.paddles[1 - side]; players = o ? 2 : 1;
@@ -768,7 +773,7 @@ const game = connect(HOST === 'localhost' ? GAME : [GAME, `ws://localhost:${qs.g
     profile.matchover(!!m.tour); if (live()) showOver(); return; }      // 'match': a server from before docs/SPECTATE.md
   if (m.type === 'profile') { if (spec()) return; profile.result(m); if (m.trophies && typeof m.trophies === 'object') trophiesIn(m.trophies); return; }      // what this match did to my own stats: a line on the result card (docs/ACCOUNTS.md 9.3) and, when it carries `trophies`, the trophy row (docs/TROPHIES.md 4), to my seat only
   if (m.type === 'rematch') { const v = Array.isArray(m.votes) ? m.votes : []; ui.rematch(spec() ? { mine: v[0], theirs: v[1], left: m.left } : { mine: v[side], theirs: v[1 - side], left: m.left, name: nameOf(1 - side) }); return; }
-  if (m.type === 'rematchon') { over = null; struck = false; ms = null; trophiesOff(); redialDue(); if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
+  if (m.type === 'rematchon') { ui.endState(null); over = null; struck = false; ms = null; trophiesOff(); redialDue(); if (ui.currentOverlay() === 'match') ui.showOverlay(null); rally = 0; ui.setRally(0); return; }      // the scores follow in 'state'
   if (m.type === 'hold') { holding = true; scene.setFrozen(true); setPaused(false); if (live()) ui.hold(nameOf(m.side === 1 ? 1 : 0), m.left | 0); return; }      // their wifi dropped: the seat is held, the ball waits where it is
   if (m.type === 'holdoff') { holding = false; ui.hold(null); return; }                     // frozen follows the next 'state'
   if (m.type === 'paused') { if (m.refused) ui.setSettings({ canPause: false }); else { setPaused(!!m.on); scene.setFrozen(!!m.on || holding); } return; }
@@ -867,7 +872,8 @@ ui.onSettings({
   move: m => { if (!MODES.includes(m)) return;
     if (ui.currentScreen() && !room) { if (m === 'body' && NO_CAM) return; if (m === 'body' && ls.get(CAM_KEY) === 'skip') ls.del(CAM_KEY); setMode(m, true); return; }      // from the menu: only the choice. The camera (and its primer, if it was skipped) waits for a court
     if (m === 'body' && !(body && body.ready)) { if (camOn && !body) { if (m !== mode) setMode(m); return; } if (!NO_CAM) { camTurnOn(); if (camPerm !== 'granted' && camPerm !== 'denied') say('Press Allow when your browser asks', null, 2600); } return; } if (m !== mode) setMode(m); if (m === 'auto' && camOn) stopCam(); },      // Auto turns the camera off (NOTES 190); Body turns it back on above. How you move is chosen here now, not on the court. Body with no working camera (a No, or it failed) asks for it: Body once it is up. A camera already up (Auto was picked meanwhile) is just used, never asked for twice
-  paddle: pickPaddle, pair: padBack, sound: setSound, sink: pickSink, findSinks,
+  paddle: pickPaddle, pair: padBack, endask: what => { if (room && !spec()) game.send({ type: 'endask', what }); },      // ask to restart / to forfeit (NOTES 245): Matt agrees at once, a person answers on their card
+  sound: setSound, sink: pickSink, findSinks,
   bot: level => { if ([0, 1, 2, 3].includes(level) && !spec()) game.send({ type: 'bot', level }); } });      // the settings row and the row under Matt's tab
 ui.onFriends?.({ open: () => { pause(true); setDim(); social.card(true); }, close: over => { if (!over) pause(false); setDim(); social.card(false); } });      // the friends card (docs/SOCIAL.md 6): a card like settings. over: Settings takes its place and keeps the pause
 ui.onView(name => setView(name, true));

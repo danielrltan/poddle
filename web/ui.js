@@ -296,7 +296,7 @@ export function matchResult(o, me, them, name) {
   $('medal').className = 'medal ' + (lost ? 'is-silver' : 'is-gold');
   const winner = won ? nameMe : nameThem;
   $('result-title').textContent = watching ? `${winner} wins` : won ? 'You win' : `${nameThem} wins`;
-  setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : '');
+  setText($('result-note'), o.forfeit ? `${won ? nameThem : nameMe} left` : o.conceded ? `${won ? nameThem : nameMe} forfeited` : '');      // conceded: asked to forfeit and was let (NOTES 245)
   const L = o.me ?? 0, R = o.them ?? 0;
   $('tally-sc-me').textContent = L; $('tally-sc-them').textContent = R; setText($('tally-name-me'), nameMe); setText($('tally-name-them'), nameThem);
   $('tally-me').classList.toggle('is-winner', won); $('tally-them').classList.toggle('is-winner', !won);
@@ -674,6 +674,7 @@ export function setPaused(on) {                            // the rest is CSS: b
   on2('tog-full', 'click', () => fullscreen());
   on2('move-seg', 'click', e => { const o = e.target.closest('[data-move]'); if (o && !o.disabled) call('move', o.dataset.move); });      // main.js answers with setMode / setBot: the UI flips nothing itself
   on2('paddle-seg2', 'click', e => { const o = e.target.closest('[data-paddle]'); if (o) call('paddle', o.dataset.paddle); });
+  for (const what of ['restart', 'forfeit']) on2('btn-end-' + what, 'click', e => { if (e.currentTarget.getAttribute('aria-disabled') !== 'true') call('endask', what); });      // NOTES 245
   on2('btn-pair', 'click', () => call('pair'));      // the phone's QR again (NOTES 243): its page was closed, or it fell asleep      // phone <-> AirPod at any time, not only on the set-up screen
   on2('bot-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });
   on2('pick-seg', 'click', e => { const o = e.target.closest('[data-level]'); if (o) call('bot', +o.dataset.level); });      // the court's row: the same request as the settings row (main.js sends {type:'bot', level})
@@ -812,8 +813,10 @@ export function askCard(o) {
   clearTimeout(cardT); clearInterval(cardTick);
   if (!o) { if (!cardOn) { el.hidden = true; return; } cardOn = false; el.classList.remove('is-on'); setText($('ask-live'), ''); cardT = setTimeout(() => { el.hidden = true; }, reduced() ? 0 : 200); return; }
   const left = Math.max(1, Math.min(60, Math.round(+o.left || 10))), name = String(o.name || 'Someone'), bar = el.querySelector('.ask-bar i');
+  const what = o.what === 'restart' || o.what === 'forfeit' ? o.what : '';      // NOTES 245: my opponent asks to restart or to forfeit, on the same card
+  setText($('ask-what'), what === 'restart' ? 'wants to restart' : what === 'forfeit' ? 'wants to forfeit' : 'wants to play'); setText($('ask-sub'), what === 'restart' ? 'Back to 0-0.' : what === 'forfeit' ? 'You win the match.' : 'Takes Matt’s place.');
   setText($('ask-name'), name); cardOn = true; el.classList.remove('is-late'); el.hidden = false; void el.offsetWidth; el.classList.add('is-on'); restart($('ask-name'), 'lob-pop');      // the asker's name hops as the card lands
-  setText($('ask-live'), `${name} wants to play. They take Matt’s place and a new match starts. Press Y to accept or N to decline.`);
+  setText($('ask-live'), what === 'restart' ? `${name} wants to restart. The match starts again from 0-0. Press Y to accept or N to decline.` : what === 'forfeit' ? `${name} wants to forfeit. You win the match. Press Y to accept or N to decline.` : `${name} wants to play. They take Matt’s place and a new match starts. Press Y to accept or N to decline.`);
   let k = 0; const step = () => { k++; el.querySelector('.ask-bar')?.style.setProperty('--p', Math.max(0, (left - k) / left).toFixed(3)); el.classList.toggle('is-late', left - k <= 3); };      // the last 3 s pulse (ui.css)      // stepped once a second from the server's number, each step a 1 s linear slide: it reaches 0 at 'left'
   if (bar) { bar.style.transition = 'none'; el.querySelector('.ask-bar').style.setProperty('--p', '1'); void bar.offsetWidth; bar.style.transition = ''; }
   cardT = setTimeout(() => askCard(null), left * 1000 + 500);                         // the server's askoff closes it; this is the backstop
@@ -847,6 +850,25 @@ function drawAsk() {
   setText($('ask-label'), label); b.dataset.s = s; b.setAttribute('aria-disabled', String(s !== 'idle')); if (was && was !== s && !b.hidden) restart(b, 'ov-bump');      // Asked / Again: the button bumps as it changes
 }
 on2('btn-ask', 'click', e => { if (e.pointerType) e.currentTarget.blur(); if (askCan() && onAskFn) onAskFn(); });
+// ---------- asking to restart / to forfeit (NOTES 245): two rows in the settings card's Match group. endRows({ on, matt }) from main.js: shown while a match is
+// under way; against Matt they act at once (Restart, Forfeit), against a person they ask (Ask to restart, Ask to forfeit). endState(m) = the server's endstate
+// { s, what, left }: the asked row counts down (Waiting), then the asker rests (Again in); the other row waits with it. null: back to idle.
+let endOn = false, endMatt = false, endSt = { s: 'idle', what: '', left: 0 }, endT = 0;
+export function endRows(o) { endOn = !!(o && o.on); endMatt = !!(o && o.matt); drawEnd(); }
+export function endState(m) {
+  clearInterval(endT);
+  const s = m && typeof m === 'object' && ['sent', 'wait', 'no', 'expired'].includes(m.s) ? m.s : 'idle', left = m ? Math.max(0, Math.min(99, m.left | 0)) : 0;
+  endSt = s === 'sent' || left > 0 ? { s, what: m.what === 'forfeit' ? 'forfeit' : 'restart', left: Math.max(1, left) } : { s: 'idle', what: '', left: 0 };
+  if (endSt.s !== 'idle') endT = setInterval(() => { if (--endSt.left > 0) return drawEnd(); if (endSt.s === 'sent') endSt.left = 1; else { clearInterval(endT); endSt = { s: 'idle', what: '', left: 0 }; } drawEnd(); }, 1000);      // Waiting holds at 1 until the answer comes
+  drawEnd();
+}
+function drawEnd() {
+  for (const what of ['restart', 'forfeit']) { const b = $('btn-end-' + what); if (!b) continue;
+    b.hidden = !endOn; const busy = endSt.s !== 'idle', mine = busy && endSt.what === what;
+    const base = endMatt ? (what === 'restart' ? 'Restart' : 'Forfeit') : (what === 'restart' ? 'Ask to restart' : 'Ask to forfeit');
+    swapText(b.querySelector('span'), mine ? (endSt.s === 'sent' ? `Waiting · ${endSt.left}s` : `Again in ${endSt.left}s`) : base);
+    b.setAttribute('aria-disabled', String(busy)); }
+}
 
 on2('btn-rematch', 'click', () => { if (voted) return; lockVote(true); if (onVote) onVote(true); });
 on2('btn-leave', 'click', () => { if (resultRole === 'spectator') { if (onVote) onVote(false); return; } if (voted && !votedYes) return; lockVote(false); if (onVote) onVote(false); });      // also after Rematch: a change of mind
