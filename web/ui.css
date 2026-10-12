@@ -903,20 +903,25 @@ body[data-role="spectator"] #ping-pill{display:none}                           /
 /* emotes (NOTES 205): everyone on a court gets a small bar bottom-right, GG and nine Apple emoji, each with its key (1 to 0) under it.
    Everyone in the court sees each one rise a little from just above the bar and fade within two seconds, with the sender's name.
    After a player's pick the bar rests for a second: it dims, and a thin line along its foot runs out (never for a spectator, NOTES 213). */
-.emotes{display:flex;position:fixed;right:var(--edge);bottom:var(--edge);z-index:var(--z-hud);padding:.1875rem;border-radius:.875rem;background:rgba(255,255,255,.86);border:.09375rem solid #fff;box-shadow:var(--sh-hud);overflow:hidden;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
-.emote-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.0625rem;width:2rem;height:2.5rem;padding:0;border:0;border-radius:.625rem;background:none;cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce), opacity var(--d-fast)}
+.emotes{display:flex;gap:.125rem;position:fixed;right:var(--edge);bottom:var(--edge);z-index:var(--z-hud);padding:.25rem .25rem .375rem;border-radius:1rem;background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(238,246,250,.93));border:.09375rem solid #fff;box-shadow:var(--sh-hud);overflow:hidden;transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-out)}
+.emote-btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.0625rem;width:1.875rem;height:2.375rem;padding:0;border:.09375rem solid var(--sky-3);border-radius:.5625rem;background:linear-gradient(180deg,#ffffff 0%,#f7fbfd 47%,#e3eef4 53%,#edf5f9 100%);box-shadow:0 .125rem 0 var(--line-soft), var(--inner-hi);cursor:pointer;outline:0;-webkit-tap-highlight-color:transparent;transition:transform var(--d-fast) var(--ease-bounce), opacity var(--d-fast), border-color var(--d-fast), box-shadow var(--d-fast)}      /* a key cap like the HUD's .keycap, glossed like .btn: its foot is sky blue (hue shift), not grey (NOTES 243) */
 .emote-btn img{width:1.375rem;height:1.375rem;pointer-events:none;user-select:none}
-.emote-key{font-size:.625rem;font-weight:800;line-height:1;color:var(--ink-soft);font-variant-numeric:tabular-nums;pointer-events:none}
-.emote-gg{display:grid;place-items:center;height:1.375rem;font-size:.875rem;font-weight:900;font-style:normal;letter-spacing:-.02em;line-height:1;color:var(--line-deep);pointer-events:none;user-select:none}
-@media (hover:hover){ .emote-btn:hover{transform:scale(1.12);background:var(--sky-2)} } .emote-btn:active{transform:scale(.9)}      /* the grow is for a mouse: on a phone a tapped emote stayed swollen */ .emote-btn:focus-visible{box-shadow:var(--glow)}
-.emotes::after{content:"";position:absolute;left:.5rem;right:.5rem;bottom:.125rem;height:.125rem;border-radius:.0625rem;background:var(--line);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
+.emote-key{font-size:.625rem;font-weight:800;line-height:1;color:var(--me-ink);font-variant-numeric:tabular-nums;pointer-events:none}
+.emote-gg{display:grid;place-items:center;height:1.375rem;font-size:.9375rem;font-weight:900;font-style:normal;letter-spacing:-.02em;line-height:1;color:#fff;-webkit-text-stroke:.25rem var(--me);paint-order:stroke fill;pointer-events:none;user-select:none}
+@media (hover:hover){ .emote-btn:hover{transform:translateY(-.125rem);border-color:var(--line);box-shadow:0 .25rem 0 var(--line), var(--inner-hi)} } .emote-btn:active{transform:translateY(.125rem);box-shadow:0 0 0 var(--line), var(--inner-hi)}      /* pressed: the cap goes down onto its foot */      /* the grow is for a mouse: on a phone a tapped emote stayed swollen */ .emote-btn:focus-visible{box-shadow:var(--glow)}
+.emotes::after{content:"";position:absolute;left:.5rem;right:.5rem;bottom:.0625rem;height:.1875rem;border-radius:.0625rem;background:var(--line);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
 .emotes.is-cool .emote-btn{opacity:.45} .emotes.is-cool::after{animation:emote-cool 1s linear forwards}
 @keyframes emote-cool{from{transform:scaleX(1)} to{transform:scaleX(0)}}
-html[data-mobile] .emote-key{display:none} html[data-mobile] .emote-btn{height:2.125rem}      /* a phone has no number keys */
+html[data-mobile] .emote-key{display:none} html[data-mobile] .emote-btn{height:2rem}      /* a phone has no number keys */
 body:not([data-role="spectator"]) .keyhints{bottom:calc(var(--edge) + 3.375rem)}      /* a player's key strip sits just above the bar */
 @media (min-width:561px){ body:has(#bot-pick:not([hidden])) .toast{bottom:calc(var(--edge) + 3.375rem)} }      /* against Matt the toast sits just above his row's band: a long one (a mid-match level change) would cover the row, which never moves (NOTES 206) */
 @media (max-width:560px){ .bot-pick{bottom:calc(var(--edge) + 3.375rem)} body:has(#bot-pick:not([hidden])) .toast{bottom:calc(var(--edge) + 6rem)} }      /* narrow: Matt's difficulty row (bottom-left, NOTES 204) and the bar would meet, so the row sits above the bar's band, left of the key strip. A toast never moves it: here the toast goes above the row (NOTES 206) */
-body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none;transition-duration:140ms}
+/* a toast never hides the bar (NOTES 243): on the court it keeps out of the bar's way. Wide: centred between the bar and its mirror (20.5625rem + a gap
+   each side), a long one wraps. Narrower, or a spectator's Ask to play beside the bar: one band up, where the key strip was (it yields to a toast) */
+@media (min-width:1080px){ body[data-screen="hud"] .toast{max-width:calc(100vw - 2 * (var(--edge) + 21.25rem))} }
+@media (max-width:1079px){ body[data-screen="hud"]:not([data-role="spectator"]) .toast{bottom:calc(var(--edge) + 3.375rem)} }
+@media (min-width:701px) and (max-width:1079px){ body[data-screen="hud"][data-role="spectator"] .toast{bottom:calc(var(--edge) + 3.375rem)} }
+@media (min-width:701px){ body[data-screen="hud"][data-role="spectator"]:has(#btn-ask:not([hidden])) .toast{bottom:calc(var(--edge) + 3.375rem);max-width:min(46rem,calc(100vw - 4 * var(--edge)))} }
 .emote-layer{position:fixed;inset:0;z-index:var(--z-hud);pointer-events:none;overflow:hidden}
 .emote-pop{position:absolute;right:calc(var(--edge) + var(--x, 0rem));bottom:calc(var(--edge) + 3.25rem);display:flex;flex-direction:column;align-items:center;gap:.125rem;
   animation:emote-rise var(--dur, 2s) cubic-bezier(.3,.2,.6,1) forwards}
@@ -942,7 +947,7 @@ body.has-toast .emotes{opacity:0;transform:translateY(.5rem);pointer-events:none
 body:not([data-role="spectator"]) .emote-pop{bottom:calc(var(--edge) + 5.25rem)}      /* a player's are born above the key strip */
 @media (max-width: 700px){ body[data-role="spectator"] .emote-pop{bottom:calc(var(--edge) + 8rem)} }      /* a spectator's bar sits higher here (above the view chips) */
 @media (prefers-reduced-motion: reduce){ .emote-pop{animation:emote-fade var(--dur, 4.5s) linear forwards} .emote-pop > i,.emote-pop img,.emote-pop .emote-gg{animation:none} @keyframes emote-fade{0%,75%{opacity:1} 100%{opacity:0}} .emote-btn{transition:none} .emotes.is-cool::after{animation:none} }
-@media (max-width: 700px){ .emote-btn{width:1.875rem} body[data-role="spectator"] .emotes{bottom:calc(var(--edge) + 5.25rem)} }      /* the view chips wrap to two rows here: a spectator's bar sits above them (19.3125rem wide) */
+@media (max-width: 700px){ .emote-btn{width:1.75rem} body[data-role="spectator"] .emotes{bottom:calc(var(--edge) + 5.25rem)} }      /* the view chips wrap to two rows here: a spectator's bar sits above them (19.3125rem wide) */
 body[data-overlay] .emotes,body[data-overlay] .emote-layer{opacity:0;pointer-events:none}
 
 /* notices: a small card on the left edge, half way down, when someone starts watching you. It slides in from the left for a few seconds, then slides back out.
@@ -1171,7 +1176,7 @@ body[data-overlay] .ask-play{display:none!important}
 .ask-ring{position:absolute;left:0;right:0;bottom:0;height:.25rem;background:var(--line);transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
 .ask-play[data-s="sent"] .ask-ring{transform:scaleX(1)} .ask-play[data-s="sent"] .ask-ring.go{animation:ask-drain 10s linear forwards}
 @keyframes ask-drain{from{transform:scaleX(1)} to{transform:scaleX(0)}}
-@media (min-width:701px){ body.has-toast .ask-play{right:var(--edge)} body[data-role="spectator"]:has(#btn-ask:not([hidden])) .views{max-width:calc(100vw - 2 * var(--edge) - 37.625rem)} }      /* 20.5625rem: the emote bar's width here. A toast (bottom centre) hides the emotes, and the button takes their corner until it goes. The chip row never runs under the button */
+@media (min-width:701px){ body[data-role="spectator"]:has(#btn-ask:not([hidden])) .views{max-width:calc(100vw - 2 * var(--edge) - 37.625rem)} }      /* 20.5625rem: the emote bar's width here. A toast steps up above them both (NOTES 243). The chip row never runs under the button */
 @media (max-width:700px){ .ask-play{right:calc(var(--edge) + 19.3125rem + .375rem);bottom:calc(var(--edge) + 5.25rem - .5rem);width:min(16rem, calc(100vw - 2 * var(--edge) - 19.6875rem))} }      /* the emotes sit above the view chips here (19.3125rem wide): the button sits beside them on that row, never on the near baseline. Under 390 px it gives up width rather than run off the left edge */
 @media (prefers-reduced-motion: reduce){ .ask-card,.ask-card.is-on,.ask-card::before{transition:none} .ask-play[data-s="sent"] .ask-ring.go{animation:none} .court-row.is-skel::after{animation:none;display:none} }
 /* ---------- Courts, Create, Share, Play a bot, set-up: motion (ui.js adds the lob-* one-shots; its animationend listener takes them off again) ---------- */

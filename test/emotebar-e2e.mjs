@@ -85,11 +85,16 @@ const bub = pg => pg.evaluate(() => { const b = document.querySelector('#emote-l
   const hit = [...document.querySelectorAll('#corner > *, #board, #camwrap, #podwrap')].filter(e => !e.hidden && e.getBoundingClientRect().width).some(e => { const q = e.getBoundingClientRect(); return r.left < q.right - 1 && q.left < r.right - 1 && r.top < q.bottom - 1 && q.top < r.bottom - 1; });
   return { where: b.classList.contains('is-side') ? 'side' : 'below', next: b.classList.contains('is-side') ? (b.classList.contains('is-me') ? Math.round(tab.left - r.right) : Math.round(r.left - tab.right)) : Math.round(r.top - tab.bottom), hit, inside: r.left >= 0 && r.right <= innerWidth }; });
 const SIZES = [[1280, 720], [900, 700], [700, 900], [390, 844]];
-for (const [pg, who] of [[a, 'player'], [c, 'spectator']]) for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(600); await pg.mouse.move(w / 2, h / 2 + 3); await sleep(300); await pg.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);      // a toast (Your serve) hides the bar a moment
+for (const [pg, who] of [[a, 'player'], [c, 'spectator']]) for (const [w, h] of SIZES) { await pg.setViewport({ width: w, height: h }); await sleep(600); await pg.mouse.move(w / 2, h / 2 + 3); await sleep(300); await pg.waitForFunction(() => !document.body.classList.contains('has-toast'), { timeout: 8000 }).catch(() => {}); await sleep(600);      // a toast (Your serve) is let go first: the checks below are for the bar alone, then with a toast of our own
   s = await bar(pg); const bx = await boxes(pg, ['emotes', 'keys', 'views', 'btn-ask', 'toast']), hit = overlaps(bx);
   ok(s.shown && s.n === 10 && s.first === 'GG' && s.keys === '1234567890' && s.right >= 8 && s.bottom >= 8 && s.w <= 340, `${who} ${w}x${h}: the bar shows, GG first, keys 1-0, ${s.w}x${s.h} px, ${s.right}/${s.bottom} px off the corner`);
   ok(!hit.length, `${who} ${w}x${h}: nothing overlaps the bar (${hit.join(', ') || 'clear'})`);
-  await pg.screenshot({ path: `${SHOTS}emotes-${who}-${w}x${h}.png` }); }
+  await pg.screenshot({ path: `${SHOTS}emotes-${who}-${w}x${h}.png` });
+  // a toast (here the longest kind) never hides the bar any more (NOTES 243): the bar stays, and the toast keeps clear of it and the Ask to play button
+  await pg.evaluate(() => window.__ui.toast('Matt · Rookie · counts as Pro · Rookie again restarts at 0-0', 4000)); await sleep(700);
+  { const t = await bar(pg), tb = await boxes(pg, ['emotes', 'btn-ask', 'toast']), th = overlaps(tb);
+    ok(t.shown && tb.toast && !th.length, `${who} ${w}x${h}: with a toast up the bar still shows and nothing meets it (${th.join(', ') || 'clear'})`); }
+  await pg.screenshot({ path: `${SHOTS}emotes-${who}-toast-${w}x${h}.png` }); await pg.evaluate(() => window.__ui.toastOff()); await sleep(300); }
 for (const [w, h] of SIZES) { for (const pg of [a, b]) { await pg.setViewport({ width: w, height: h }); } await sleep(1200);
   await a.keyboard.press('Digit3'); await sleep(450); const mine = await bub(a), theirs = await bub(b);
   for (const [k, v] of [['Ann (her own, left)', mine], ['Ben (Ann\'s, right)', theirs]]) ok(v && !v.hit && v.inside && v.next >= 4 && v.next <= 14, `${w}x${h} ${k}: the bubble sits ${v?.where} its tab (${v?.next} px off), clear of the board, the corner and the insets`);
@@ -131,8 +136,8 @@ for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); awai
 // a toast (the longest: a mid-match level change) never moves Matt's row, and never lands on it (NOTES 206)
 for (const [w, h] of SIZES) { await d.setViewport({ width: w, height: h }); await sleep(500); const at = async () => (await boxes(d, ['bot-pick']))['bot-pick'];
   const was = await at(); await d.evaluate(() => window.__ui.toast('Matt · Rookie · counts as Pro · Rookie again restarts at 0-0', 4000)); await sleep(700);
-  const now = await at(), bx = await boxes(d, ['bot-pick', 'toast']), hit = overlaps(bx);
-  ok(JSON.stringify(was) === JSON.stringify(now) && !hit.length, `toast up ${w}x${h}: the difficulty row stays put (${was} -> ${now}) and clear of the toast (${hit.join(', ') || JSON.stringify(bx.toast)})`);
+  const now = await at(), bx = await boxes(d, ['bot-pick', 'toast', 'emotes']), hit = overlaps(bx);
+  ok(JSON.stringify(was) === JSON.stringify(now) && bx.emotes && !hit.length, `toast up ${w}x${h}: the difficulty row stays put (${was} -> ${now}) and clear of the toast (${hit.join(', ') || JSON.stringify(bx.toast)})`);
   await d.screenshot({ path: `${SHOTS}emotes-matt-toast-${w}x${h}.png` }); await d.evaluate(() => window.__ui.toastOff()); await sleep(300); }
 // hold B against Matt (NOTES 230): 2 s restarts the match, a bar fills meanwhile; a tap is the next level and never shows the bar
 { await d.setViewport({ width: 1280, height: 720 }); await sleep(400); await d.mouse.move(640, 363);

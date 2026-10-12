@@ -4978,3 +4978,17 @@ The owner (2026-10-11): the cups need not be separate; spawn them in one spot, i
   cup is made at that spot the moment it leaves (the hovering one goes last) and removed as it lands, on the same rising arcs, timing,
   shares, sounds and count as before (NOTES 203). No more 24 nodes up front each running an endless hover animation. chipFly.nodes
   (written, never read) is gone.
+
+## 243. A toast no longer hides the emote bar; the bar's keys are key caps like the rest of the HUD
+The owner (2026-10-12): when the bottom-centre notification showed, the emote bar on the right disappeared; and the bar did not look like the game.
+- The cause was deliberate: ui.css `body.has-toast .emotes{opacity:0}` (NOTES 205) gave the bottom band to a toast. Gone. The toast keeps out of the
+  bar's way instead: 1080 px and wider it stays in the bottom band, centred, its max-width leaving the bar's 20.5625rem (+ a gap) free on both sides
+  (a long one wraps); narrower, a player's toast sits one band up, where the key strip was (the strip still yields to a toast); a spectator's at
+  701-1079 px too, and wherever Ask to play stands beside the bar. A spectator at 700 px or less keeps it at the bottom: the bar is above the view chips there.
+  Against Matt nothing changes (NOTES 206: the toast was already above his row). `body.has-toast .ask-play{right:var(--edge)}` went with it: the bar keeps its corner.
+- The look: the tray is the scoreboard's white glass (same gradient and white rim); each emote is a key cap like the HUD's C / B keys (.keycap), glossed like
+  .btn, with a sky-blue foot (hue shift, not grey) that it presses down onto; hover lifts it with a cyan rim; the key numbers are the blue ink; GG is
+  white with a blue outline, like the result title's word art. Widths are unchanged (20.5625rem; 19.3125rem at 700 px or less), so Ask to play,
+  the view chips and the key strip keep their places; keys, cooldown line and behaviour unchanged.
+- test/emotebar-e2e.mjs: at every size, player and spectator, a long toast leaves the bar shown and nothing overlapping it; the Matt toast case also
+  checks the bar. 64 checks pass; test/emote.test.mjs passes.
