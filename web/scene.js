@@ -1210,7 +1210,7 @@ export function createScene(containerEl) {
   // Broadcast: side-on from beyond the +x net post, so side 0 (+z) is on screen LEFT, like the spectator scoreboard.
   function broadcastPose(aspect) {
     const X = court.halfW + 10, Y = 5.5; let fov = 38;
-    shaken(X, Y, still ? 0 : Math.sin(timeS / 6.1) * 0.3);
+    shaken(X, Y, 0); camera.position.z = 0;      // on the net's own plane, no drift or shake along the court: anywhere else the net leans and the court skews (NOTES 247)
     for (let i = 0; i < 2; i++) {                          // narrow window: widen until both players' run-off is in frame, and lift the gaze so the frame's foot stays on the apron
       const down = Math.min(Math.atan2(Y - 0.8, X), (40 - fov / 2) * D2R); camera.lookAt(vB.set(0, Y - Math.tan(down) * X, 0)); camera.updateMatrixWorld();      // (past 40 deg down it would stare into the planting under the lens)
       let need = 0; for (const z of [-1, 1]) { vA.set(court.halfW / 2, 1, z * (court.halfL + 2)).applyMatrix4(camera.matrixWorldInverse); need = Math.max(need, Math.abs(vA.x) / -vA.z); }

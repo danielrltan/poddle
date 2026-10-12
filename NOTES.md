@@ -5017,3 +5017,9 @@ The owner (2026-10-12): a spectator on a phone could not tap emotes without the 
 - web/index.html: the viewport adds maximum-scale=1, user-scalable=no (Android Chrome honours it; pad.html already had it).
 - web/main.js: iOS Safari ignores user-scalable=no, so gesturestart / gesturechange are prevented: no pinch zoom there either.
 - Checked in headless Chrome emulating an iPhone: the meta, and touch-action manipulation on the body, the canvas and an emote button.
+
+## 247. The broadcast camera stands on the net's plane: the net is upright and the court square
+The owner (2026-10-12): the spectators' broadcast view was not aligned. The camera drifted 0.3 m along the court (a slow sine) and shook
+along it too while looking at the court's centre: from off the net's plane the net leaned and the two halves came out different sizes.
+- web/scene.js broadcastPose(): the camera's z is 0 always (shaken()'s x/y shake kept). Looked at in headless Chrome at 1280x720,
+  1920x1080 and 844x390: the net is vertical, both baselines the same distance from the centre.
