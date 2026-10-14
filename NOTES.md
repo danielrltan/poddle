@@ -5049,3 +5049,28 @@ The owner (2026-10-12): the spectators' broadcast view was not aligned. The came
 along it too while looking at the court's centre: from off the net's plane the net leaned and the two halves came out different sizes.
 - web/scene.js broadcastPose(): the camera's z is 0 always (shaken()'s x/y shake kept). Looked at in headless Chrome at 1280x720,
   1920x1080 and 844x390: the net is vertical, both baselines the same distance from the centre.
+
+## 248. The game's sound leaves the AirPod by itself: Poddle Helper 1.1.0 moves the Mac's output to the speakers
+The owner (2026-10-12): "fix audio streaming to go out of any available speakers rather than airpod, if it is being used."
+The AirPod in the hand is the paddle, so the game played in it. NOTES 60/64's Sound > Output row could move it, but only after a
+microphone grant and a trip to Settings: nobody found it.
+- Measured first, on this Mac with AirPods Pro and the repo's motion/ tool: with the system output switched to the MacBook
+  speakers mid-stream, motion kept coming at 50 Hz (+401 samples in 8 s); started with the speakers already the output, it
+  streamed normally (299 in 6 s). Headphone motion needs the AirPods CONNECTED, not playing. So the move belongs in the helper,
+  at the OS level: no browser permission, and it works in every browser.
+- Poddle Helper (danielrltan/poddle-helper, Sources/Sound.swift): while a page is connected, if the default output is Apple
+  Bluetooth headphones (Bluetooth transport, model UID ending " 4c", Apple's vendor id: AirPods and Beats), it moves it to the
+  best other output: built-in, then USB, then HDMI/DisplayPort/Thunderbolt, then a non-Apple Bluetooth speaker. Never a
+  virtual/aggregate device (Zoom, BlackHole: plays to nobody) or AirPlay (delay). No other output: nothing changes.
+- When the last page leaves, on Quit, or when the menu's "Play sound through speakers" is unticked, the output goes back to
+  the AirPods, unless the player picked another output meanwhile (then it is left alone). AirPods that take the output back
+  mid-match (reconnecting) are moved off again. The menu item reads "Playing sound through <device>" while it is moved.
+- Gated by the helper having a page, which a page only opens when the AirPod is (or may be, tryBridge) the paddle: a phone-paddle
+  player listening on AirPods keeps them. Known edge: switching AirPod -> phone mid-visit leaves the bridge open, so the
+  sound stays on the speakers until the tab closes.
+- The page's own Output row still wins: a sink picked there is a specific device and does not follow the system default.
+- "Connect them as sound output" was wrong advice: the helper's not-found line, How to play's step and its FAQ now say connect.
+  How to play's "What Poddle Helper does" and Terms 8 describe the move (Terms dated 2026-10-12). Privacy unchanged: no data.
+- web/download/Poddle-Helper.zip is the same file as the v1.1.0 GitHub release asset (sha256 cd1ba0f0...5188).
+- Not verified live: the AirPods dropped off the Mac before the built app could be tested against them; the owner chose to ship.
+  Verified: the CoreAudio switch itself, motion through it, and the helper connecting/disconnecting with fake motion.
