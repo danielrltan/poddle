@@ -5074,3 +5074,10 @@ microphone grant and a trip to Settings: nobody found it.
 - web/download/Poddle-Helper.zip is the same file as the v1.1.0 GitHub release asset (sha256 cd1ba0f0...5188).
 - Not verified live: the AirPods dropped off the Mac before the built app could be tested against them; the owner chose to ship.
   Verified: the CoreAudio switch itself, motion through it, and the helper connecting/disconnecting with fake motion.
+
+## 249. The pointer no longer closes into a fist on a wheel
+The owner (2026-10-13): "get rid of the cursor scroll animation / state? its broke and is ugly." The is-roll state (NOTES 216)
+swapped the pointing glove for a grab fist for 220 ms per wheel tick and nudged it 2 px; on a real scroll it flickered between
+the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fist 0.37 on main).
+- Gone: cursor.js's wheel listener, the FIST drawing and is-roll; cursor.css's .cur-fist, .cur-thumb and is-roll rules. A wheel now
+  leaves the pointer exactly as it was. test/cursor-e2e.mjs asserts that instead (no fist in the DOM, no is-roll, hand opacity 1).

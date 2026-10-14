@@ -1,7 +1,7 @@
 // The Wii-style pointer (NOTES 216; web/cursor.js + cursor.css) against the real server/game.js.
 // Checks: the hand shows on the title under a mouse and the native cursor is hidden there; it lifts (is-ready) over Play and over a
 // lobby tile, pushes in on a press (is-down), springs back on release; it hides over the name field (is-off, the field keeps its
-// native text cursor); a wheel closes it into the fist and nudges it; the hot spot (the fingertip) is exactly the mouse point;
+// native text cursor); a wheel leaves it alone (NOTES 249); the hot spot (the fingertip) is exactly the mouse point;
 // the phone home never shows it (a coarse pointer never builds it: the media query is the first line of paddleCursor). Screenshots go to SHOTS=<dir> when set.
 // Usage: node test/cursor-e2e.mjs      CUR_PORT=<port> moves the server (default 8973)
 import { spawn } from 'child_process'; import fs from 'fs';
@@ -77,12 +77,11 @@ try {
   ok(await cursorAt(ir.x, ir.y) === 'text', 'and the field keeps its text cursor');
   await ev(() => document.activeElement.blur());
 
-  // a wheel: the hand closes into the fist and nudges the way the page goes
+  // a wheel changes nothing: no fist, the pointing glove stays (NOTES 249)
   await glide(720, 520);
   await pg.mouse.wheel({ deltaY: 120 }); await sleep(120);
-  const roll = await ev(() => ({ roll: window.__cur.state().roll, y: document.getElementById('cur').style.getPropertyValue('--roll-y'), hand: getComputedStyle(document.querySelector('#cur .cur-hand')).opacity, fist: getComputedStyle(document.querySelector('#cur .cur-fist')).opacity }));
-  ok(roll.roll && roll.y === '2px' && roll.hand === '0' && roll.fist === '1', `a wheel down shows the grab fist, nudged down (${JSON.stringify(roll)})`);
-  await sleep(300); ok(!(await st()).roll, 'the fist opens again when the wheel stops');
+  const roll = await ev(() => ({ fist: !!document.querySelector('#cur .cur-fist'), cls: document.getElementById('cur').className, hand: getComputedStyle(document.querySelector('#cur .cur-hand')).opacity }));
+  ok(!roll.fist && !/is-roll/.test(roll.cls) && roll.hand === '1', `a wheel leaves the hand as it is (${JSON.stringify(roll)})`);
 
   // out of the window: gone; back: shown
   await ev(() => document.dispatchEvent(new PointerEvent('pointerout', { pointerType: 'mouse', relatedTarget: null, bubbles: true })));

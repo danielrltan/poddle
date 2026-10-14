@@ -3,8 +3,8 @@
    mouse is a console menu's white pointing glove: fingertip as the hot spot, a soft shadow under it. cursor.js builds #cur, follows
    the mouse and sets the states; this file is every look and motion.
    Materials: the pill buttons' white with the signature outline blue as its line, a blue cuff. The hot spot NEVER moves: the hand
-   tilts around the fingertip (a rolled remote), lifts a hair over a button, pushes in on a press, closes into the grab fist while
-   a wheel turns. On the court (body[data-screen="hud"] with nothing over it) the native cursor is back.
+   tilts around the fingertip (a rolled remote), lifts a hair over a button, pushes in on a press.
+   On the court (body[data-screen="hud"] with nothing over it) the native cursor is back.
    Pointer:fine and hover:hover only; cursor.js never starts on a touch device.
    ========================================================================================================== */
 
@@ -22,9 +22,7 @@ html.has-cur, html.has-cur :where(*):not(input, textarea, select, [contenteditab
 .cur-body{filter:drop-shadow(0 .8px 0 rgba(90,150,185,.35)) drop-shadow(1.5px 2.5px 2px rgba(20,60,90,.28))}      /* the soft shadow a console pointer casts on the menu */
 .cur-glove{fill:url(#cur-skin-g);stroke:var(--line);stroke-width:2.4;stroke-linejoin:round}
 .cur-crease{fill:none;stroke:var(--line-soft);stroke-width:1.6;stroke-linecap:round}
-.cur-thumb{fill:url(#cur-skin-g);stroke:var(--line);stroke-width:2.2;stroke-linejoin:round}
 .cur-cuff{fill:url(#cur-cuff-g);stroke:#fff;stroke-width:1.4}
-.cur-fist{opacity:0}      /* the two hands swap: the pointing glove is the one you see, the fist only while a wheel turns */
 
 /* the halo: the pill buttons' glow as a soft blue disc under the fingertip, and the ripple a press sends out of it */
 .cur-fx{transform-origin:21.875% 6.25%}
@@ -47,8 +45,6 @@ html.has-cur, html.has-cur :where(*):not(input, textarea, select, [contenteditab
 #cur.is-hit .cur-pop{animation:cur-pop 380ms var(--ease-out) both}
 #cur.is-hit.is-plain .cur-pop{animation-duration:240ms;stroke-width:1.4}
 @keyframes cur-pop{0%{transform:scale(.4);opacity:1;stroke-width:3}55%{opacity:.75}100%{transform:scale(2.6);opacity:0;stroke-width:.4}}
-/* a wheel: the hand closes into the grab fist and nudges the way the page goes (--roll-y from cursor.js) */
-#cur.is-roll .cur-hand{opacity:0} #cur.is-roll .cur-fist{opacity:1;translate:0 var(--roll-y,0px)}
 
 @media (prefers-reduced-motion: reduce){
   .cur-box svg,.cur-halo{transition-duration:1ms}      /* the poses still change; they snap */
