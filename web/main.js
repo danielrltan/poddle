@@ -663,7 +663,7 @@ function onSample(sample, from) {
         const g = 1 - fade(e.final === false && e.pend && e.twist != null ? Math.min(rl, Math.abs(e.twist)) : rl), lob = e.lob * (1 - g);
         game.send({ type: 'swing', power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final, pk: e.raw || 0, src: src === 'phone' ? 'phone' : 'airpod' });      // pk, src: stats only (docs/ACCOUNTS.md 4.5), the UNGAINED peak rad/s (motion.js sw.peak) and which paddle made it. final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
         unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob: (e.lobRaw != null ? e.lobRaw : e.lob) * fade(rl), chop: e.chop, age: e.age, slice, pk: e.raw || 0, src: src === 'phone' ? 'phone' : 'airpod' };   // standing in for a settled report, the lob is the path as it was, not the look-ahead
-        if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
+        if (!fix) scene.onEvent({ type: 'swung', side, n: e.power });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);
       if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, pk: e.raw || unsettled.pk, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over
@@ -951,7 +951,7 @@ function loop(now) {
     const auto = autoNow() && mine;
     const wx = auto ? mine.x : bodyX * s(), wy = auto || (mine && mode === 'auto') ? mine.y : bodyY;      // not auto means Body sees you: the wrist never moves you
     if (auto && usingBody()) { bodyX = mine.x * s(); bodyY = mine.y; vX = vY = 0; }                 // hand back smoothly when the camera finds you again
-    scene.updatePaddle(side, { x: wx, y: wy, z, q: p.Pd, offset: p.offset, bot: false });   // Pd: the bud's real attitude
+    scene.updatePaddle(side, { x: wx, y: wy, z, q: p.Pd, offset: p.offset, bot: false, auto: !!auto, autoY: !!mine && mode === 'auto' });   // Pd: the bud's real attitude. auto/autoY: x / y are the server's runAuto (drawn like Matt's, NOTES 257)
     if (ui.isVisible('dev')) { ui.setStat('px', (wx * s()).toFixed(1)); ui.setStat('py', wy.toFixed(1)); }
     const pos = [p.x + p.offset[0], p.y + p.offset[1], p.offset[2]];
     if (lastPos && p.swinging) stats.paddlePath += Math.hypot(pos[0] - lastPos[0], pos[1] - lastPos[1], pos[2] - lastPos[2]);

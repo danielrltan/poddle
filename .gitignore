@@ -11,3 +11,4 @@ test/ui-shots/*/
 *.db-wal
 *.db-shm
 web/**/*.br
+test/sfx-ab/
