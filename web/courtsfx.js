@@ -96,6 +96,49 @@ export function room(sr, { seed = 1 } = {}) {        // -> [left, right]
   return out;
 }
 
+// The result card's jingles (NOTES 262) as scores scene.js plays through its tone() / noise() into the jingle bus, which also feeds the hall
+// below: ['t', type, f0, f1, glide s, gain, decay s, at s] and ['n', f0, f1, f2, Q, gain, dur s, attack s, at s]. Pure data, so test/jingle-ab.mjs
+// renders exactly what the game plays. The title slams in at ~110 ms (ui.css ov-victory): every kind lands something on it.
+//   win / watch / champ  a noise riser into the slam; on it a deep boom, a snap and a long crash; the G-C-E pickup as bells, a top G with a
+//                        shimmer, then a wide C major (sub to C6) and a sparkle run up over it; champ adds a second sparkle and crash
+//   lose                 a soft, heavy thud on DEFEAT, the A-G sigh doubled an octave down, onto a warm C major that rings out (never minor)
+//   forfeit              the pickup and the top G, a little sparkle (nobody was beaten)
+// Voices stay <= .12 (the chord's) so the DynamicsCompressor on master does not pump.
+export function jingleScore(kind) {
+  const S = [], t = (type, f0, f1, gl, g, dec, at) => S.push(['t', type, f0, f1, gl, g, dec, at]), nz = (f0, f1, f2, q, g, dur, att, at) => S.push(['n', f0, f1, f2, q, g, dur, att, at]);
+  const bell = (f, at, dur, g, type = 'triangle') => { t(type, f * 0.97, f, 0.025, g, dur, at); t('sine', 2 * f, 2 * f, 0.01, g * 0.22, dur * 0.6, at); t('triangle', 2 * f, 2 * f, 0.01, g * 0.08, 0.03, at); };
+  const pickup = g => { bell(392, 0.14, 0.2, g); bell(523.25, 0.23, 0.2, g); bell(659.25, 0.32, 0.22, g); };
+  if (kind === 'forfeit') { pickup(0.12); bell(783.99, 0.44, 0.5, 0.12); [1567.98, 2093].forEach((f, i) => t('sine', f, f, 0.01, 0.03, 0.5, 0.5 + i * 0.05)); return S; }
+  if (kind === 'lose') {
+    t('sine', 110, 38, 0.3, 0.32, 0.6, 0.11); t('triangle', 82, 70, 0.1, 0.12, 0.5, 0.11); nz(900, 520, 300, 0.7, 0.09, 0.32, 0.003, 0.11);      // the thud under DEFEAT
+    bell(440, 0.44, 0.5, 0.12); bell(220, 0.44, 0.5, 0.05); bell(392, 0.62, 0.6, 0.12); bell(196, 0.62, 0.6, 0.05);                        // the sigh, A -> G
+    t('sine', 130.81, 130.81, 0.01, 0.11, 2.0, 0.86); for (const f of [329.63, 392, 523.25]) bell(f, 0.86, 1.8, 0.085);                    // onto a warm C major
+    t('sine', 659.25, 659.25, 0.01, 0.03, 1.4, 0.95); return S;
+  }
+  nz(900, 2600, 6500, 1.1, 0.07, 0.13, 0.1, 0);                                                                                           // the riser into the slam
+  t('sine', 150, 42, 0.22, 0.42, 0.55, 0.11); t('sine', 120, 50, 0.12, 0.3, 0.3, 0.11);                                                   // the boom on it
+  nz(2400, 1600, 1000, 0.9, 0.14, 0.14, 0.002, 0.11); nz(7000, 5200, 3800, 0.6, 0.12, 1.1, 0.002, 0.11);                                // the snap, the crash
+  pickup(0.15); bell(783.99, 0.44, 0.7, 0.18); t('square', 783.99, 783.99, 0.01, 0.05, 0.5, 0.44);
+  t('sine', 130.81, 130.81, 0.01, 0.12, 1.9, 0.62); for (const f of [261.63, 329.63, 392, 523.25, 659.25, 783.99]) bell(f, 0.62, 1.7, f < 300 ? 0.09 : 0.075);
+  bell(1046.5, 0.62, 1.2, 0.05);
+  [1318.5, 1567.98, 2093, 2637, 3136].forEach((f, i) => t('sine', f, f, 0.01, 0.035, 0.7, 0.66 + i * 0.05));                             // the sparkle run
+  t('sine', 2093, 2093, 0.01, 0.02, 1.6, 0.7); t('sine', 2096.5, 2096.5, 0.01, 0.02, 1.6, 0.7);                                           // a slow shimmer (two beating sines)
+  if (kind === 'champ') { [[1318.5, 0.95], [1568, 1.02], [2093, 1.09], [2637, 1.16]].forEach(([f, at]) => t('sine', f, f, 0.01, 0.07, 0.6, at)); nz(7000, 5200, 3800, 0.6, 0.10, 0.9, 0.002, 0.95); }
+  return S;
+}
+// The hall the jingles ring in (the start sound's, web/menuaudio.js hallTail, NOTES 185): 2.6 s of stereo noise falling as (1 - t)^2.2, here
+// with a 15 ms pre-delay so the slam stays crisp, and darkening as it fades (a one-pole low-pass closing from ~9 kHz to ~2 kHz). -> [left, right]
+export function hall(sr, { seed = 1 } = {}) {
+  const n = Math.round(sr * 2.6), pre = Math.round(sr * 0.015), ch = [];
+  for (let c = 0; c < 2; c++) { const r = rng(seed * 911 + c * 313), d = new Float32Array(n); let lp = 0;
+    let k = 0, g = 0;
+    for (let i = pre; i < n; i++) { const u = (i - pre) / (n - pre);
+      if (((i - pre) & 63) === 0) { k = 1 - Math.exp(-TAU * 9000 * Math.pow(2000 / 9000, u) / sr); g = Math.pow(1 - u, 2.2); }      // per 64 samples: ~4k pow/exp, not 250k
+      lp += k * ((r() * 2 - 1) - lp); d[i] = lp * g; }
+    ch.push(norm(d, 0.5)); }
+  return ch;
+}
+
 // What scene.js builds, one job per idle slot: [bank key, () => Float32Array]. Variants are picked at random per play, so no two hits are
 // the same buffer twice running, and a played buffer is also nudged in rate (+-3 %).
 export function bankJobs(sr) {

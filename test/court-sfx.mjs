@@ -19,10 +19,11 @@ await page.evaluateOnNewDocument(() => { window.__sfxLog = []; window.__sfxVx = 
 await page.goto(`http://127.0.0.1:${port}/test/scene-preview.html?side=0&opp=human&clean=1&t=2`, { waitUntil: 'load' });
 await page.waitForFunction(() => document.title.startsWith('ready'), { timeout: 60000 });
 await page.evaluate(() => window.__scene.unlockAudio());
-await page.waitForFunction(() => { const s = window.__scene._dbg.sfx(); return s.bank && s.room && Object.values(s.bank).reduce((a, b) => a + b, 0) >= 30; }, { timeout: 20000 }).catch(() => {});
+await page.waitForFunction(() => { const s = window.__scene._dbg.sfx(); return s.bank && s.room && s.hall && Object.values(s.bank).reduce((a, b) => a + b, 0) >= 30; }, { timeout: 20000 }).catch(() => {});
 const st = await page.evaluate(() => window.__scene._dbg.sfx());
 ok(st.ac === 'running', `the AudioContext runs after the gesture (${st.ac})`);
 ok(st.room && st.bank && Object.values(st.bank).reduce((a, b) => a + b, 0) === 30, `the bank filled in idle: ${JSON.stringify(st.bank)}, room ${st.room}`);
+ok(st.hall && st.jingles, `the jingles' hall IR and scores are in (NOTES 262): hall ${st.hall}, scores ${st.jingles}`);
 
 // Drive side 0 (me) by hand: a list of [frames, vx m/s] legs; returns the squeaks fired and the drawn body's peak |vx|
 const drive = legs => page.evaluate(legs => {

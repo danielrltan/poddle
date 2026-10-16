@@ -1335,6 +1335,7 @@ export function createScene(containerEl) {
   // can be sent to the laptop's speakers instead. `muted` is kept here because master does not exist until the first gesture.
   let ac = null, master = null, noiseBuf = null, muted = false;
   let bank = null, wet = null, squeaks = 0;               // the court's sounds as buffers (web/courtsfx.js, NOTES 259) and its room; until a voice's buffers exist it plays the oscillators below
+  let csfx = null, hallIn = null, hallV = null;                         // courtsfx.js once loaded (the jingles' scores, NOTES 262) and the send into the jingles' hall
   const GAIN = 0.7, vS = new THREE.Vector3();
   const SQ_RUN = 2.2, SQ_BRAKE = 8;                       // squeakCheck: a run of at least 2.2 m/s, braked at more than 8 m/s/s (a plant from 5 m/s peaks ~11 on the drawn body)
   function unlockAudio() {
@@ -1354,12 +1355,13 @@ export function createScene(containerEl) {
   // convolver is made empty (silent) and gets its impulse response first.
   function courtBank() {
     wet = ac.createConvolver(); wet.connect(master);
+    hallV = ac.createConvolver(); hallIn = ac.createGain(); hallIn.gain.value = 0.45; hallIn.connect(hallV); hallV.connect(master);      // the jingles' hall (NOTES 262): silent until its IR is in
     import('./courtsfx.js').then(m => {
-      if (!ac) return; const sr = ac.sampleRate, jobs = [['room', () => m.room(sr)], ...m.bankJobs(sr)], b = {}; bank = b;
+      if (!ac) return; csfx = m; const sr = ac.sampleRate, jobs = [['room', () => m.room(sr)], ['hall', () => m.hall(sr)], ...m.bankJobs(sr)], b = {}; bank = b;
       const idle = window.requestIdleCallback || (f => setTimeout(f, 30));
       const step = () => { const [k, f] = jobs.shift();
         try { const d = f();
-          if (k === 'room') { const ir = ac.createBuffer(2, d[0].length, sr); ir.getChannelData(0).set(d[0]); ir.getChannelData(1).set(d[1]); wet.buffer = ir; }
+          if (k === 'room' || k === 'hall') { const ir = ac.createBuffer(2, d[0].length, sr); ir.getChannelData(0).set(d[0]); ir.getChannelData(1).set(d[1]); (k === 'room' ? wet : hallV).buffer = ir; }
           else { const buf = ac.createBuffer(1, d.length, sr); buf.getChannelData(0).set(d); (b[k] ||= []).push(buf); }
         } catch (e) { /* that voice keeps its oscillators */ }
         if (jobs.length) idle(step, { timeout: 1500 }); };
@@ -1414,7 +1416,7 @@ export function createScene(containerEl) {
   function jingleOut() {                                  // each jingle has its own gain; a new one cuts the old (a won final is followed at once by the champion card)
     const now = ac.currentTime;
     if (jingleBus) { const g = jingleBus.gain, old = jingleBus; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + 0.06); setTimeout(() => { try { old.disconnect(); } catch { /* already gone */ } }, 400); }
-    jingleBus = ac.createGain(); jingleBus.gain.value = 1; jingleBus.connect(out(0)); return jingleBus;      // out(0) -> master: mute and the chosen speaker apply
+    jingleBus = ac.createGain(); jingleBus.gain.value = 1; jingleBus.connect(out(0)); if (hallIn) jingleBus.connect(hallIn); return jingleBus;      // out(0) -> master: mute and the chosen speaker apply. The hall's tail of a cut jingle rings out on its own
   }
   const sfx = {
     pock(n, x, p) {                                       // the bank's pop (courtsfx.js pock); before it: hollow plastic, pitched body + low cavity + bright click
@@ -1431,11 +1433,12 @@ export function createScene(containerEl) {
       if (!ac) return; const d = out(0), ns = win ? [783.99, 1174.66] : [587.33, 440];
       ns.forEach((f, i) => { tone(d, 'sine', f, f, 0.01, 0.3, 0.7, i * 0.17); tone(d, 'triangle', f * 2, f * 2, 0.01, 0.07, 0.4, i * 0.17); });
     },
-    // The result card's sting (ui.css data-beat): win/watch = thump + crash on the GAME! stamp's impact (114 ms), a G-C-E pickup, a top G and a
+    // The result card's sting: courtsfx.js jingleScore (NOTES 262) into the hall. Until that module is in, the dry jingle below (NOTES 104..178): win/watch = thump + crash on the GAME! stamp's impact (114 ms), a G-C-E pickup, a top G and a
     // C major chord; champ adds a sparkle and a second crash; forfeit is the pickup alone (nobody was beaten); lose sighs A-G down onto a warm
     // C major, never minor and never silence. Chord voices stay <= .12 so the DynamicsCompressor on master does not pump.
     jingle(kind) {
       if (!ac) return; const d = jingleOut();
+      if (csfx) { for (const e of csfx.jingleScore(kind)) if (e[0] === 't') tone(d, e[1], e[2], e[3], e[4], e[5], e[6], e[7]); else noise(d, e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8]); return; }      // NOTES 262; below: the dry old jingle, until courtsfx.js is in
       const n = (f, at, dur, g, type = 'triangle') => { tone(d, type, f, f, 0.01, g, dur, at); tone(d, 'sine', 2 * f, 2 * f, 0.01, g * 0.25, dur * 0.6, at); };      // a note: its body + a soft octave on top
       const pickup = g => { n(392, 0.14, 0.16, g); n(523.25, 0.23, 0.16, g); n(659.25, 0.32, 0.16, g); };
       if (kind === 'forfeit') { pickup(0.12); n(783.99, 0.44, 0.16, 0.12); return; }
@@ -1820,6 +1823,6 @@ export function createScene(containerEl) {
     setLooks(a) { for (const pd of pads) { const k = Array.isArray(a) && LOOKS[a[pd.side]] ? a[pd.side] : null; if (k !== pd.look) { pd.look = k; paint(pd, pd.matt); } } },      // [side 0, side 1]: LOOKS keys (main.js, from lookFor(name, reg)) or null
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at, trophy, vic,               // test harness only
       view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }),
-      sfx: () => ({ ac: ac ? ac.state : null, bank: bank ? Object.fromEntries(Object.entries(bank).map(([k, v]) => [k, v.length])) : null, room: !!(wet && wet.buffer), squeaks }) },
+      sfx: () => ({ ac: ac ? ac.state : null, bank: bank ? Object.fromEntries(Object.entries(bank).map(([k, v]) => [k, v.length])) : null, room: !!(wet && wet.buffer), hall: !!(hallV && hallV.buffer), jingles: !!csfx, squeaks }) },
   };
 }

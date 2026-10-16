@@ -5227,3 +5227,24 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   pulse train at 1.3-1.8 kHz with +-6 % jitter and a 5 % creep, ringing two resonances (~2.4 and ~4.6 kHz), a flickering grip, a little
   scuff, softened above 3.4 kHz. No vibrato, no arc. Same trigger rule and level (peak -18.9 dBFS at 3 m, centroid 3.3 kHz).
 - test/sfx-ab.mjs re-renders both (WAVs in test/sfx-ab/, untracked); test/court-sfx.mjs passes.
+
+## 262. The result jingles ring in a hall with more sparkle, and VICTORY! lands with a burst
+- Owner (2026-10-16): the end-of-match sounds and the victory text were "really flat and boring... it needs more reverb and pizazz to it.
+  similar to when you press play" (Quick play's start sound, NOTES 185: a run up into a wide chord with a sparkle, all in a 2.6 s hall).
+- web/courtsfx.js `jingleScore(kind)`: the jingles as pure scores (scene.js plays them through its own tone() / noise()), and `hall(sr)`: the
+  start sound's 2.6 s hall ((1 - t)^2.2 noise), with a 15 ms pre-delay and a tail that darkens from ~9 to ~2 kHz. scene.js builds the hall's IR
+  as the second idle job after the first gesture (~8 ms) and sends the jingle bus into it at 0.45; a cut jingle's tail rings out on its own.
+  Until courtsfx.js is in, the old dry jingles play.
+  - win / watch / champ: a noise riser into the slam (~110 ms), then on it a deep boom (150 -> 42 Hz), a snap and a longer crash; the G-C-E
+    pickup and the top G as bells; a wide C major from a C3 sub to C6; a sparkle run up to G7 over it and a slow two-sine shimmer. Champ
+    keeps its second sparkle and crash.
+  - lose: a soft heavy thud on DEFEAT (it was silent for the first 0.44 s), the A-G sigh doubled an octave down, onto a warm C major that
+    rings out. Still major (never minor).
+  - forfeit: the pickup and the top G with a little sparkle. rankup / divup are unchanged but ring in the hall too (same bus).
+  - Rendered (test/jingle-ab.mjs, WAVs in test/sfx-ab/ old|new-win|lose|watch|forfeit|champ.wav, untracked): win peak -6.4 -> -4.3 dBFS,
+    RMS -29.0 -> -26.7, rings 1.31 -> 2.65 s; lose -10.8 -> -8.0 dBFS, rings 1.72 -> 2.91 s. No clipping after the compressor.
+- web/ui.css: VICTORY! (and a spectator's and the champion's title) slams in with a twist and a springy settle (2.6 -> .88 -> 1.08 -> .97
+  -> 1, -5 deg -> 0), standing still by 250 ms (NOTES 171: no pulse). On the impact a burst of light rays (gold for the champion) turns out
+  behind the word and a white shock ring spreads, both gone by ~1 s and hidden before it. DEFEAT drops in heavy and squashes, with a faint red
+  ring and no rays. Pseudo-elements on the title, only while it has .go, so the corner title has none.
+- test/court-sfx.mjs also checks the hall IR and the scores load. test/victory-e2e.mjs passes (24).
