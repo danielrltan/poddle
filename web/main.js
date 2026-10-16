@@ -47,6 +47,7 @@ const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(window.screen.width
 // ?mobile=1 | 0 forces it either way (the tests; nothing is stored)
 const MOBILE = LOBBY && (qs.get('mobile') === '1' || qs.get('mobile') !== '0' && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) < 600);
 ui.setMobile(MOBILE);
+ui.emoteFree(() => !!over && !spec());      // the result screen: no emote cooldown for the players (server/game.js does the same while its `over` is set)
 if (!MOBILE) ui.afterLoad(pod.idle);
 const SEATS = new Set(['quick', 'create', 'join', 'tcreate']);      // what a phone never asks for: each would seat it with no paddle
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen

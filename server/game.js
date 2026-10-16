@@ -981,7 +981,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
   function emote(ws, e, pl) {                                     // a reaction: everyone in the room (the sender too) sees it pop up in the corner, with the sender's name. pl: a seated player's own, under their court name
     if (!(pl ? pl.ws === ws : spectators.has(ws)) || !Number.isInteger(e) || e < 0 || e >= EMOTES) return;
-    const ms = Date.now(); if (ms - (ws.emoteAt || 0) < (pl ? EMOTE_GAP : EMOTE_FLOOD)) return; ws.emoteAt = ms;      // a player rests a second between two, a spectator never (NOTES 213)
+    const ms = Date.now(); if (ms - (ws.emoteAt || 0) < (pl && !over ? EMOTE_GAP : EMOTE_FLOOD)) return; ws.emoteAt = ms;      // a player rests a second between two, a spectator never (NOTES 213), nobody on the result screen (NOTES 261)
     broadcast({ type: 'emote', e, name: safeName(pl ? pl.name : ws.name, ''), side: pl ? pl.side : undefined });   // side: a player's, so the bubble comes out of their own tab on the scoreboard (NOTES 208)
   }
   // ---------- asking to play (docs/SPECTATE.md Asking to play): a spectator watching one human play Matt asks for Matt's seat. ONE request per court,

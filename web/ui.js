@@ -765,10 +765,12 @@ afterLoad(emoteFaces);
     k.className = 'emote-key'; k.textContent = String((i + 1) % 10); k.setAttribute('aria-hidden', 'true'); b.append(emoteImg(i, true), k); box.append(b); });
   on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (b) sendEmote(+b.dataset.e); }); }
 // a click or a key (main.js: 1-9, 0): the face squashes and springs as it goes, then (a player's) the bar rests for a second. false = resting, nothing sent
+let emoteFreeFn = () => false;      // main.js: true while a match's result is up (the win shot, the card): the players tap as freely as the stands then (NOTES 261)
+export function emoteFree(f) { emoteFreeFn = f; }
 export function sendEmote(i) {
-  const box = $('emotes'), t = performance.now(), spec = document.body.dataset.role === 'spectator'; if (!box || !EMOTES[i] || !onEmoteFn || (!spec && t < emoteCool)) return false;
+  const box = $('emotes'), t = performance.now(), free = document.body.dataset.role === 'spectator' || emoteFreeFn(); if (!box || !EMOTES[i] || !onEmoteFn || (!free && t < emoteCool)) return false;
   const b = box.children[i]; if (b) restart(b, 'ov-sent');
-  if (!spec) { emoteCool = t + EMOTE_COOL; restart(box, 'is-cool'); clearTimeout(emoteT); emoteT = setTimeout(() => box.classList.remove('is-cool'), EMOTE_COOL); }      // the stands never rest (NOTES 213)
+  if (!free) { emoteCool = t + EMOTE_COOL; restart(box, 'is-cool'); clearTimeout(emoteT); emoteT = setTimeout(() => box.classList.remove('is-cool'), EMOTE_COOL); }      // the stands never rest (NOTES 213)
   onEmoteFn(i); return true;
 }
 // one reaction arriving. A player's (tab = 'me' | 'them': the scoreboard tab it belongs to) is a speech bubble out of that tab, in the

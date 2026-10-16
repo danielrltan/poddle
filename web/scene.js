@@ -983,6 +983,8 @@ export function createScene(containerEl) {
       // 80 ms read as a late contact. Only the paddle eases: the ball, pop, burst and shake all start on the event's frame.
       const ts = (1 - pd.lunge) * 0.32, rk = pd.lunge > 0 ? ease(Math.min(1, ts / 0.05)) * (1 - ease(ts / 0.32)) : 0;
       w.x += pd.reachV.x * rk; w.y = Math.max(0.12, w.y + pd.reachV.y * rk);
+      if (won && !pd.bot && (local || podiumOn)) {      // my own win (on the champion podium a seat that is not canned is mine): the shot's camera faces me, so my hand is drawn as a mirror (NOTES 261): move or tip it right and the cup goes right on screen
+        w.x = 2 * px - w.x; const gq = pd.group.quaternion; gq.set(gq.x, -gq.y, -gq.z, gq.w); }      // the arm's sideways offset and the attitude reflected in the body's x (a calibrated rest has no offset, so the cup stays in the same hand)
       if (won) { w.y += 0.34 * ease(Math.min(1, vic.t / 0.5)); trophy.position.copy(w); trophy.quaternion.copy(pd.group.quaternion); }      // held up at the shoulder, turned by the hand that holds it
       pd.group.position.copy(w); pd.hand.position.copy(w);
       if (!pd.swoosh) pd.swoosh = makeSwoosh(local ? 0xfff1c9 : 0xffd0b8);

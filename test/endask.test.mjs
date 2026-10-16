@@ -5,6 +5,7 @@
 //  3. A yes to restart: rematchon (restart), 0-0, nothing recorded, the new match is not under way until its first strike.
 //  4. Silence: expired. Both asking the same thing at once is a yes: a forfeit, the asker the loser, both seats still there, a title's clock and a vote.
 //  5. Different asks at once: the second is refused (busy). Away: refused. The other seat dropping ends the request (gone).
+//     On that result screen a player's emotes have no cooldown (NOTES 261).
 //  6. Against Matt: Restart at once (botinfo reset), Forfeit at once (matchover conceded, Matt the winner). Tournaments refuse (the rule is in endAsk).
 //  ENDASK_PORT=<port> node test/endask.test.mjs
 import { spawn } from 'child_process';
@@ -81,6 +82,8 @@ ok(mo && mo.forfeit === true && mo.conceded === true && mo.winner === B.side, `b
 ok(mo.rematchBy === 6, `the vote's clock is a full one (the title has its STAMP_S): ${mo.rematchBy}`);
 await wait(300); ok(!A.got('rematch').some(m => m.votes.includes(false)) && !A.n('closed'), 'no seat was forfeited away: both may vote');
 ok(/side \d asked to forfeit/.test(slog.join('')) && /both seats agreed to forfeit/.test(slog.join('')), 'the log says who asked and that both agreed');
+{ const e0 = B.n('emote'); A.send({ type: 'emote', e: 1 }); await wait(150); A.send({ type: 'emote', e: 2 }); await wait(150); A.send({ type: 'emote', e: 3 }); await until(() => B.n('emote') >= e0 + 3, 1500);
+  ok(B.n('emote') === e0 + 3, `the result screen has no emote cooldown for a player (NOTES 261): 3 emotes 0.15 s apart all reach the other seat (${B.n('emote') - e0})`); }
 A.send({ type: 'rematch', yes: true }); B.send({ type: 'rematch', yes: true }); await until(() => A.n('rematchon') && B.n('rematchon'));
 ok(A.n('rematchon') && !A.last('rematchon').restart, 'a rematch after a conceded match');
 

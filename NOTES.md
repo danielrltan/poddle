@@ -5228,6 +5228,17 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   scuff, softened above 3.4 kHz. No vibrato, no arc. Same trigger rule and level (peak -18.9 dBFS at 3 m, centroid 3.3 kHz).
 - test/sfx-ab.mjs re-renders both (WAVs in test/sfx-ab/, untracked); test/court-sfx.mjs passes.
 
+## 261. The win shot mirrors your own hand, and nobody's emotes rest on the result screen
+- Owner (2026-10-16): on the win screen the trophy moved the opposite way to their hand; and no emote cooldown for the players then.
+- web/scene.js: the win shot's camera faces the winner, so their own hand was drawn as seen from the front: a move or a tip to the right
+  went left on screen. For my own win (and my own live champion podium, NOTES 178) the arm's sideways offset is reflected about the
+  paddle base's x and the attitude in the x plane (q -> x, -y, -z, w), so it moves like a mirror. A calibrated rest has no offset, so
+  the cup stays in the same hand; other viewers (the loser, spectators, Matt's canned pose) see it unmirrored, as before.
+- server/game.js `emote`: while the room's `over` is set (the result screen, the win shot) a player has the stands' 60 ms flood floor
+  instead of EMOTE_GAP. web/ui.js `emoteFree` (main.js passes `!!over && !spec()`): the bar does not rest after a pick then.
+- test/endask.test.mjs: 3 emotes 0.15 s apart from a player on a conceded match's result screen all reach the other seat (fails on
+  main: 1 of 3). test/menu.mjs's ui stub exports emoteFree. Not checked by eye: the mirrored trophy with a real paddle.
+
 ## 262. The result jingles ring in a hall with more sparkle, and VICTORY! lands with a burst
 - Owner (2026-10-16): the end-of-match sounds and the victory text were "really flat and boring... it needs more reverb and pizazz to it.
   similar to when you press play" (Quick play's start sound, NOTES 185: a run up into a wide chord with a sparkle, all in a 2.6 s hall).
