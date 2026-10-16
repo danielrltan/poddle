@@ -5096,3 +5096,46 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
 - Not changed: `new AudioContext()` in scene.js unlockAudio (46-190 ms on some Windows presses). Creating it suspended before the press would
   queue sounds and needs the Settings speaker choice applied before resume(); left for a separate change.
 - test/menu-audio.mjs: its settings-card checks fail identically on main (the title's settings button moved); the music check passes.
+
+## 251. Shaders link off the frame: the title paints first and the court fades in once its programs are ready
+- Field profiles (2026-10-09..15): three's synchronous WebGLProgram first-use check (getProgramInfoLog / LINK_STATUS) was in 76% of home-page
+  profiles, ~0.9 s a load, because the first WebGL frame was drawn inside main.js's module evaluation (18 programs linked one after another,
+  page frozen, FCP waiting on it). From the perf-fix branch (built 2026-10-08..10, merged now).
+- web/main.js: the render loop starts on the first requestAnimationFrame, never inside the module's evaluation.
+- web/scene.js `warm()` / `glCheck()`: where links really run in parallel (KHR_parallel_shader_compile), render() draws nothing until every
+  program the frame uses is linked (renderer.compile + isReady polling), bound once with a fence, and first-used a few ms at a time behind a
+  barrier. The canvas sits at opacity 0 (`gl-wait`, ui.css) and fades in once a fence comes back by the next frame. A 4 s deadline opens the
+  gate whatever happens, and a context lost before it opens no longer blanks the court. Browsers that link serially (Firefox, SwiftShader)
+  keep the old first-frame link. `?noprewarm` turns it off to compare live. `warmRest` links the rest (rally fx, shadow variants, swoosh,
+  ghosts, named looks, trophy) after the fade, holding its binds for quiet input, and at once off the menu.
+- web/scenery/index.js: the scenery's programs go through the same `warm()` after the court's, and `onShown` marks the reveal frame
+  (`scene.sceneryReady`). Timing marks `gl:first-frame`, `gl:ready`, `scenery:reveal` for rum.js.
+- A join no longer rebuilds an identical court (no disposed materials, no 2 programs re-linked in its first frame). The ball skin's pixel loop
+  makes the same bytes faster (cos/sin tables, pow once per pixel).
+- web/ui.js `afterLoad` / `idleAfter`: work no first screen shows waits for the load event and the scenery's reveal, then one job per idle
+  gap: the pairing QR (drawn at once if the set-up screen opens first), the emote bar's faces (at once on the way to a court), and the corner
+  AirPod's WebGL context (web/podview.js `warm()`: compileAsync, then one hidden frame), built lazily by main.js.
+- test/perf-load.mjs: a repeatable home-page load harness (FCP/LCP/long frames/three's shader check/links per phase/requests),
+  `PERF_LOAD_ROOT` for an A/B against another checkout.
+
+## 252. index.html modulepreloads the whole static module graph
+- emblems.js was found only after ui.js arrived and parsed: a third serial round trip before main.js could evaluate. index.html now lists
+  every module main.js and cursor.js reach statically, netq.js and rec.js included (added on main after the branch was cut).
+- test/modulepreload.test.mjs (in deploy.sh) reads the graph with V8's own module parser and fails, printing the right list, when it drifts.
+  Dynamic imports (scenery/, vendor/qrcode.mjs, MediaPipe) are left out on purpose.
+
+## 253. Brotli q11 for text, precompressed at image build
+- server/precompress.js runs in the Dockerfile (`RUN node server/precompress.js`) and writes a `.br` beside every text file in web/.
+  server/game.js sends it with `Content-Encoding: br`, `Vary: Accept-Encoding` and its own ETag to requests that accept br, identity
+  otherwise. `.br` files are ignored by git (`web/**/*.br`) and docker (`**/*.br`). test/brotli.test.mjs is in deploy.sh.
+
+## 254. Versioned immutable URLs without a build step
+- server/versioned.js rewrites each page as it is served: its own script/link URLs get `?v=<content hash>`, and an import map sends every
+  module those entries reach to its `?v=` URL, so no module source changes. A `?v=` matching the file's current hash is cached a year
+  (immutable); anything else gets the old no-cache response. A repeat visit revalidates the page alone (21 of 22 requests were 304s before).
+  test/versioned.test.mjs is in deploy.sh. server/perf.js already stores URLs without the query, so the flame graph is unaffected.
+
+## 255. Scenery: no getImageData readbacks on load
+- web/scenery/sky.js computes the sun halo in JS and web/scenery/park.js uses a pinned constant for the ground grain's mean, instead of
+  reading canvases back (each a synchronous GPU/canvas readback in the load). test/scenery-consts.mjs checks the constants still match
+  what the readback gave and shoots the sun.
