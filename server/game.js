@@ -613,7 +613,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     server = firstServe = first; ball.live = false; ball.serving = null; serveAt = now + 0.8; started = false; over = null; newMatchAt = Infinity;
     counting = READY_S > 0 ? { until: Infinity, said: -1 } : null;   // armed: it starts counting once the room is whole and both seats are ready (countdown())
     if (!LEGACY) { stats.drop(match); lad = [bySide(0), bySide(1)].map(ladSeat); ladDone = false;   // trophies: each seat's eligibility and count, frozen now (docs/TROPHIES.md 3.1, 3.3)
-      match = stats.newMatch({ revived: !!room.reviveTaint, rank: theBot() ? BOT_ORDER.indexOf(botLevel) : null, seats: [bySide(0), bySide(1)], mode: lad.some(x => x && !x.none) ? 'ladder' : 'casual' }); room.reviveTaint = false; }   // a court revive() rebuilt: its first match is unranked (R2), a rematch is clean. mode ladder: a seat can earn trophies (3.8)
+      match = stats.newMatch({ revived: !!room.reviveTaint, carry: room.reviveCarry || null, base: room.reviveTaint || room.reviveCarry ? [...score] : null, rank: theBot() ? BOT_ORDER.indexOf(botLevel) : null, seats: [bySide(0), bySide(1)], mode: lad.some(x => x && !x.none) ? 'ladder' : 'casual' }); room.reviveTaint = false; room.reviveCarry = null; }   // a court revive() rebuilt: its first match is unranked (R2), a rematch is clean. mode ladder: a seat can earn trophies (3.8)
     if (pub) lobbyChanged();
   }
   // Player stats (docs/ACCOUNTS.md 4.2): the one place a match is recorded, once (match.done). winner null: left or dropped against Matt.
@@ -654,16 +654,16 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     for (const i of [0, 1]) {
       const L = lad[i], msg = r.msgs[i], s = r.seats[i]; if (!L || !msg) continue;
       if (L.none) { msg.trophies = { none: L.none }; continue; }
-      const won = winner === i, counted = !!r.ranked;
+      const won = winner === i, counted = !!r.ranked, spared = flags.includes('revived') && !won;      // spared: a court the server could not vouch for after a restart: the loser loses nothing (NOTES 264)
       const t = { delta: 0, trophies: L.trophies, tier: L.tier, div: L.div, tierWas: L.tier, divWas: L.div, floorHeld: false, counted, saved: true, why: counted ? [] : [...msg.why], matt: bot };
       let delta = 0, write = false;
       if (bot) {                                                 // 3.3: a played-out counted game vs Matt; a leave or a drop is 0 and writes nothing
-        if (ending === 'won' && counted) { write = true;
+        if (ending === 'won' && counted && !spared) { write = true;
           if (won) { const need = LAD.mattLevel(L.tier), lvl = Number.isInteger(r.level) ? r.level : need, easy = BOT_ORDER.indexOf(lvl) < BOT_ORDER.indexOf(need);   // the level the game counted at (the easiest used, docs/ACCOUNTS.md 4.6) vs the rank's: an easier Matt is practice
             t.need = need; if (easy) t.limit = 'easy'; else { delta = LAD.mattDelta(L.tier); if (delta <= 0 || L.trophies >= LAD.MATT_CEILING) t.limit = 'ceiling'; } } }
       } else {                                                   // vs a person (human, tour), from both seats' counts at the start; an opponent without a row or not eligible: gap 0
         const me = L.trophies, them = lad[1 - i] && !lad[1 - i].none && lad[1 - i].row ? lad[1 - i].trophies : me, newOpp = flags.includes('new_opponent');   // 3.3: an opponent without a ladder row (eligible or not) is gap 0
-        if (!forfeit) { if (counted) { write = true; delta = LAD.humanDelta(me, them, won, false); if (won && newOpp) delta = LAD.halveWin(delta); } }
+        if (!forfeit) { if (counted && !spared) { write = true; delta = LAD.humanDelta(me, them, won, false); if (won && newOpp) delta = LAD.halveWin(delta); } }
         else if (!won) { if (!flags.some(f => f === 'revived' || f.startsWith('same_'))) { write = true; t.counted = true; t.why = []; delta = LAD.humanDelta(me, them, false, false); } }   // 3.4: the leaver pays the full loss whatever the verdict, except a court brought back after a restart (R2) or one person on both seats (R6: nobody to leave): 0, the verdict's words
         else if (!flags.some(f => BAD_FLAGS.has(f) && !FORFEIT_FLAGS.has(f))) { write = true; t.counted = true; t.why = []; delta = LAD.humanDelta(me, them, true, false); if (newOpp) delta = LAD.halveWin(delta); }   // the stayer wins when nothing beyond the forfeit's own flags is on the game
         else { t.counted = false; t.why = ['left_early']; }
@@ -676,6 +676,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
           if (s && s.pl) setTier(s.pl, res.tier, res.div); }     // the emblem follows the new rank (this seat's, on the scoreboard, the result card and the next game)
         else t.saved = false;                                    // the database is off, the write failed or the account is gone: 'Couldn't save trophies right now'
       }
+      if (spared) { t.counted = true; t.why = ['restart']; }      // the row: ±0 and why (the card's stats line leaves it to this row)
       msg.trophies = t; out.push((t.delta > 0 ? '+' : '') + t.delta);
     }
     return out.length ? ` (${out.join('/')})` : '';
@@ -1351,7 +1352,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   const drawnFree = cid => MATCH && !over && !room.dead && !!opts.sideOf && (sd => sd != null && !bySide(sd))(opts.sideOf(cid));   // a drawn member's own seat is empty: they sit down even while the other side's seat is held (free() says no then)
   const seatedSides = () => [0, 1].map(sd => !!bySide(sd));    // a seat is taken (Matt, a human, or a human's held seat)
   const unready = () => (started || over ? [] : [0, 1].filter(sd => { const p = bySide(sd); return p && !p.bot && !ready(p); }));   // seated but never got a paddle ready, before the first ball
-  const room = { code, pub, kind: opts.kind || null, only: opts.only || null, force, drawnFree, seatedSides, unready, revive: (sc, matt) => { revived = sc; resumed = !!matt && sc[0] + sc[1] > 0; }, mattBack: (pl, lv) => { if (humans().length !== 1 || theBot() || humans()[0] !== pl) return; if (revived && revived[0] + revived[1] > 0) resumed = true; botRequest(pl, lv); }, join, leave, retake, identify, optOut, heldBy, watch, unwatch, emote, ask, underway, askable, canWatch, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
+  const room = { snap: () => (opts.tour || LEGACY || over || !match ? null : (m => (m ? { score: [...score], bot: theBot() ? botLevel : null, m } : null))(stats.snapshot(match, Date.now()))),      // NOTES 264: what the restart saves of a match under way
+    code, pub, kind: opts.kind || null, only: opts.only || null, force, drawnFree, seatedSides, unready, revive: (sc, matt) => { revived = sc; resumed = !!matt && sc[0] + sc[1] > 0; }, mattBack: (pl, lv) => { if (humans().length !== 1 || theBot() || humans()[0] !== pl) return; if (revived && revived[0] + revived[1] > 0) resumed = true; botRequest(pl, lv); }, join, leave, retake, identify, optOut, heldBy, watch, unwatch, emote, ask, underway, askable, canWatch, free, close, info, onMessage, step, humans, time: () => now, idleAt: Date.now(), waitAt: 0, dead: false };
   return room;
 }
 
@@ -1452,15 +1454,34 @@ function joinCode(ws, code) {
 // Only a tab that WAS in that court sends back=1; a typed code that does not exist is still 'notfound'. The stakes are a
 // pickleball score, so a client's word is good enough.
 const BOOT = Date.now();
+// The server's own word on the courts it was running (NOTES 264): on SIGINT / SIGTERM (every deploy) each match under way is written beside the
+// database (score, Matt's level, time and contacts so far, each seat's account or device id: no names, no addresses), read back once at the
+// next start and deleted. A court that comes back with exactly that score is the same match, not the client's word, so it counts (stats.js
+// checks the seats at the end). No snapshot (a crash, a host lost) or a different score: R2 as before, but the loser is held harmless.
+const SNAP_FILE = process.env.REVIVE_SNAP || (process.env.PODDLE_DB && process.env.PODDLE_DB !== ':memory:' ? path.join(path.dirname(process.env.PODDLE_DB), 'revive.json') : null);
+const SNAP_MAX_MS = 15 * 60e3;                                    // a snapshot older than this (a machine stopped for good, started much later) is ignored
+const SNAPS = new Map();
+if (SNAP_FILE) try {
+  const j = JSON.parse(fs.readFileSync(SNAP_FILE, 'utf8')); fs.rmSync(SNAP_FILE, { force: true });
+  if (j && Date.now() - (+j.at || 0) < SNAP_MAX_MS && j.rooms && typeof j.rooms === 'object') for (const [c, v] of Object.entries(j.rooms)) if (v && Array.isArray(v.score) && v.m) SNAPS.set(c, v);
+  if (SNAPS.size) console.log(`restart snapshot: ${SNAPS.size} court${SNAPS.size === 1 ? '' : 's'} to vouch for`);
+} catch { /* none (the usual case), or unreadable: every court that comes back is R2 */ }
+function saveSnaps() {
+  if (!SNAP_FILE) return; const out = {};
+  for (const [c, r] of rooms) { try { const s = r.snap && r.snap(); if (s) out[c] = s; } catch { /* that court is R2 */ } }
+  try { if (Object.keys(out).length) fs.writeFileSync(SNAP_FILE, JSON.stringify({ at: Date.now(), rooms: out })); } catch (e) { console.log('restart snapshot not written: ' + e.message); }
+}
 function revive(ws, q) {
   const code = String(q.get('room') || '').trim().toUpperCase(), watch = q.get('watch') === '1';
   if (q.get('tour') || Date.now() - BOOT > REVIVE_S * 1000 || code.length !== 4 || [...code].some(c => !CODE_CHARS.includes(c)) || tourneys.has(code) || rooms.size + tourKeep() >= ROOM_CAP) return false;   // nothing of a tournament is ever revived
   const r = createRoom(code, q.get('pub') === '1'); r.by = ws.addr; rooms.set(code, r);
-  r.reviveTaint = true;                                            // score, side, bot and pub are the client's word: its first match counts for nothing (docs/ACCOUNTS.md R2)
   const m = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('score') || ''), a = m ? +m[1] : 0, b = m ? +m[2] : 0;
   const lv = q.get('bot'), matt = lv != null && lv !== '' && !watch;   // they were playing Matt (at this level)
+  const snap = SNAPS.get(code); SNAPS.delete(code);
+  if (snap && snap.score[0] === a && snap.score[1] === b && (watch || (snap.bot == null ? !matt : matt && snap.bot === +lv))) r.reviveCarry = snap.m;      // the server's own record of this match: it carries on (NOTES 264)
+  else r.reviveTaint = a + b > 0 && !(WIN_AT > 0 && Math.max(a, b) >= WIN_AT && Math.abs(a - b) >= WIN_BY);      // score, side, bot and pub are the client's word: its first match is R2 (docs/ACCOUNTS.md), the loser held harmless. Nothing brought back (0-0, or a finished score: start level) is a fresh match
   if (m && !(WIN_AT > 0 && Math.max(a, b) >= WIN_AT && Math.abs(a - b) >= WIN_BY)) r.revive([a, b], matt);      // a finished score is not brought back: start level. A Matt match with points on the board is under way at once: a stranger may not sit in Matt's seat while the host recalibrates (they watch and ask)
-  console.log(`[${code}] brought back after a restart by a ${watch ? 'spectator' : 'player'} (${a}-${b})`);
+  console.log(`[${code}] brought back after a restart by a ${watch ? 'spectator' : 'player'} (${a}-${b}${r.reviveCarry ? ', matches the snapshot' : ''})`);
   if (watch) { watchCode(ws, code); return true; }
   seat(ws, r);
   if (matt && ws.pl) r.onMessage(ws.pl, { type: 'bot', level: +lv });      // they were playing Matt at this level
@@ -1939,6 +1960,7 @@ console.log('game server on port ' + (+process.env.PORT || 8080));
 // reconnect to the new process and bring their courts back (revive() above).
 let going = false;
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (going) return; going = true;
+  saveSnaps();                                                    // before anyone is told: the courts as they stand (NOTES 264)
   for (const ws of wss.clients) { try { if (ws.readyState === 1) ws.send('{"type":"restart"}'); } catch { /* it is leaving anyway */ } }
   setTimeout(() => { try { db.close(); } catch { /* going anyway */ } process.exit(0); }, 50); });   // the stats database first (its writes are synchronous: every result that finished is on disk). The frames are handed to the kernel within a tick and it sends them after we are gone; any longer and a test that restarts on the same port finds it taken
 

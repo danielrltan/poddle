@@ -69,10 +69,22 @@ function seatAcc(pl) {
     hits: 0, returns: 0, chances: 0, winners: 0, aces: 0, smashes: 0, ptsWon: 0, ptsLost: 0, shot: null };   // play counters (docs/SHARE.md 1); shot: the last contact's pl.hit, its kind read once it can no longer change
 }
 // newMatch({ revived, rank, seats: [pl|null, pl|null] }) -> the match object a room keeps in `match` (4.1)
-function newMatch({ revived = false, rank = null, seats = [null, null], mode = 'casual', series = null } = {}) {   // mode 'ladder': a seat can earn trophies (docs/TROPHIES.md 3.8); series is history (always null now, the column stays)
-  const m = { id: ++seq, done: false, t0: 0, revived: !!revived, rank, levelChanged: false, rally: 0, mode: mode === 'ladder' ? 'ladder' : 'casual', series: Number.isSafeInteger(series) && series > 0 ? series : null, seats: [0, 1].map(i => seatAcc(seats[i] || null)) };
+// carry: what the server itself saved of this match before a restart (snapshot(), NOTES 264); base: the score a court came back with
+function newMatch({ revived = false, rank = null, seats = [null, null], mode = 'casual', series = null, carry = null, base = null } = {}) {   // mode 'ladder': a seat can earn trophies (docs/TROPHIES.md 3.8); series is history (always null now, the column stays)
+  const m = { id: ++seq, done: false, t0: 0, revived: !!revived, carry: carry && typeof carry === 'object' ? carry : null, base: Array.isArray(base) ? [base[0] | 0, base[1] | 0] : null, rank, levelChanged: false, rally: 0, mode: mode === 'ladder' ? 'ladder' : 'casual', series: Number.isSafeInteger(series) && series > 0 ? series : null, seats: [0, 1].map(i => seatAcc(seats[i] || null)) };
   live.add(m); return m;
 }
+// snapshot(m, now) -> what a restart must not lose of a match under way (NOTES 264): its time and contacts so far (R8 / R9 see the whole match),
+// each seat's identity (the court that comes back must hold the same people) and whether it was already an unverified revival. null: nothing struck yet
+function snapshot(m, now) {
+  if (!m || m.done || !m.t0) return null;
+  const c = m.carry;
+  return { secs: (c ? c.secs : 0) + Math.max(0, (now - m.t0) / 1000), contacts: m.seats.map((s, i) => (s && !s.bot ? s.contacts + (c ? c.contacts[i] | 0 : 0) : 0)),
+    seats: m.seats.map(s => (!s ? null : s.bot ? 'bot' : s.ident ? { accountId: s.ident.accountId != null ? s.ident.accountId : null, devHash: Buffer.isBuffer(s.ident.devHash) ? s.ident.devHash.toString('hex') : null } : null)),      // hex: the snapshot is JSON
+    rank: m.rank, revived: !!m.revived };
+}
+// a saved seat against the seat now: the same bot, or the same account / device (an anonymous seat never matches: nothing to compare)
+const sameSeat = (saved, s) => (!s ? saved == null : s.bot ? saved === 'bot' : !!(saved && saved !== 'bot' && s.ident && sameIdent(s.ident, { accountId: saved.accountId, devHash: typeof saved.devHash === 'string' ? Buffer.from(saved.devHash, 'hex') : null })));
 const drop = m => { if (m) live.delete(m); };                     // the room closed or a new match replaced it
 const accOf = (m, pl) => (m && !m.done && pl ? m.seats.find(s => s && s.pl === pl) || null : null);
 // seatFill(m, side, pl): a seat that fills after the match was built (join, 4.1)
@@ -255,11 +267,14 @@ function onEnd(m, e) {
     const keys = [...s.computers];
     return { ...o, keys, groups: L.groups(keys), established: o.owner != null && store ? !!store.established(o.owner, now) : false };
   });
-  const secs = m.t0 ? Math.max(0, Math.round((now - m.t0) / 1000)) : 0;
+  // A court back after a restart (NOTES 264): verified when the server's own snapshot of it holds these same seats, and then it is one match
+  // (its time and contacts carried); unverified (no snapshot, other people, or a revival of a revival) it stays revived: R2
+  const carried = m.carry && !m.carry.revived && m.seats.every((s, i) => sameSeat(m.carry.seats[i], s)) ? m.carry : null, revived = m.revived || (!!m.carry && !carried);
+  const secs = (m.t0 ? Math.max(0, Math.round((now - m.t0) / 1000)) : 0) + (carried ? Math.round(carried.secs) : 0);
   const level = human ? null : BOT_ORDER[m.rank != null ? m.rank : kind === 'tourbot' ? 2 : 1];
-  const facts = { now, kind, winner, ending: e.ending, score, secs, revived: m.revived, levelChanged: m.levelChanged,
+  const facts = { now, kind, winner, ending: e.ending, score, secs, revived, base: revived && m.base ? m.base : null, levelChanged: m.levelChanged,
     seats: m.seats.map((s, i) => !s ? null : s.bot ? { bot: true } : { bot: false, owner: info[i].owner, ident: s.ident, groups: info[i].groups,
-      computers: s.computers, cids: s.cids, gone: s.gone, contacts: s.contacts, held: s.held, swingBad: s.swingBad, identChanged: s.identChanged,
+      computers: s.computers, cids: s.cids, gone: s.gone, contacts: s.contacts + (carried ? carried.contacts[i] | 0 : 0), held: s.held, swingBad: s.swingBad, identChanged: s.identChanged,
       pendingAnon: s.pendingAnon, teleport: s.teleport, motionBad: s.motionBad, established: info[i].established }) };
   const history = {};
   if (human && winner != null && info[0] && info[1]) {
@@ -319,4 +334,4 @@ function forget({ tokenHash = null, accountId = null, devHash = null, deleted = 
 }
 
 module.exports = { init, config, linkMap, identOf, sameIdent, seen, seatAcc, newMatch, drop, accOf, seatFill, identify, member, optOut, launched, rallyReset, contact, pointEnd, records,
-  swingBest, fixRecords, level, sample, motion, swingSeen, onEnd, title, forget, SPEED_CAP, SPEED_BAD, _live: live };
+  swingBest, fixRecords, level, sample, motion, swingSeen, onEnd, title, forget, snapshot, SPEED_CAP, SPEED_BAD, _live: live };

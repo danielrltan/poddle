@@ -289,7 +289,7 @@ const B2 = await up(P2, { PODDLE_DB: DBA, ...BASE, REVIVE_S: '30' });
 {
   const c = tab({ port: P2, ...R, cid: rc.cid, q: `lobby=1&room=${code8}&back=1&side=${side8}&score=1-0&pub=0&bot=2` }); await until(() => c.side != null && c.got('botinfo', i => i.active && i.level === 2).length);
   lose(c); await over(c); const p1 = await prof(c);
-  ok(c.last('matchover').score.join() !== '0,2' && p1 && p1.saved && !p1.ranked && p1.why.includes('restart'), `8: the revived match (${c.last('matchover').score}) is saved but unranked: restart`);
+  ok(c.last('matchover').score.join() !== '0,2' && p1 && p1.saved && p1.why.includes('restart') && p1.bests.length === 0, `8: the revived match (${c.last('matchover').score}), its score the client's word, is lost to Matt: held harmless, why restart (NOTES 264)`);
   c.send({ type: 'rematch', yes: true }); await over(c, 2); const p2 = await prof(c, 2);
   ok(p2 && p2.ranked === true && p2.why.length === 0, '8: the rematch after it is ranked');
   bye(c, rc);
@@ -297,10 +297,26 @@ const B2 = await up(P2, { PODDLE_DB: DBA, ...BASE, REVIVE_S: '30' });
   ok(before && after && JSON.stringify(after) === JSON.stringify(before), '9: after the restart /api/stats returns the same totals: ' + JSON.stringify(after && after.human));
   const h = tab({ port: P2, addr: ip(), d: dev(), q: 'lobby=1&room=WXYZ&back=1&side=0&score=0-0&pub=0' }); await until(() => h.side != null);
   await until(() => h.got('botinfo', i => i.active).length, 8000); lose(h); await over(h); const ph = await prof(h);
-  ok(ph && !ph.ranked && ph.why.includes('restart') && ph.bests.length === 0, '19: a revived people court that falls back to Matt: the first match is unranked (restart), no bests');
+  ok(ph && ph.ranked === true && !ph.why.includes('restart'), `19: a people court back at 0-0 that falls back to Matt: nothing was brought back, so its first match is a fresh one and counts (NOTES 264; why ${JSON.stringify(ph && ph.why)})`);
   bye(h);
 }
-await stop(B2);
+console.log('20. a match the server itself saved at a restart is one match, and counts (NOTES 264)');
+{
+  const V = { addr: ip(), d: dev() }, vc = await vsMatt({ port: P2, ...V, level: 0, how: lose });
+  await until(() => vc.n('point') >= 1, 30000); still(vc);
+  const sc = vc.last('point').score, code20 = vc.room.code, side20 = vc.side;
+  await stop(B2);
+  ok(fs.existsSync(path.join(tmp, 'revive.json')), `SIGINT writes the snapshot beside the database (${sc})`);
+  const B3 = await up(P2, { PODDLE_DB: DBA, ...BASE, REVIVE_S: '30' }), out3 = logs.at(-1);
+  ok(!fs.existsSync(path.join(tmp, 'revive.json')), 'the next start reads it once and deletes it');
+  const c = tab({ port: P2, ...V, cid: vc.cid, q: `lobby=1&room=${code20}&back=1&side=${side20}&score=${sc[0]}-${sc[1]}&pub=0&bot=0` });
+  await until(() => c.side != null && c.got('botinfo', i => i.active).length);
+  lose(c); await over(c); const p = await prof(c);
+  ok(/matches the snapshot/.test(out3.out), 'the court came back with the score the server saved');
+  ok(p && p.saved && p.ranked === true && !p.why.includes('restart'), `20: the resumed match counts as one match: ranked, no restart reason (why ${JSON.stringify(p && p.why)})`);
+  bye(c, vc);
+  await stop(B3);
+}
 
 console.log('15. no database: the game plays exactly as before');
 {

@@ -5275,3 +5275,29 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   (an oscillator noise band) is darker too: 300 -> 1100 -> 450 Hz, Q 0.9 (was 420 -> 2100 -> 650, Q 1.3).
 - test/court-sfx.mjs: the bank is 31 buffers, no room, no squeak, and sprints/plants/cuts/a rally play no squeak. test/sfx-ab.mjs: dry
   chain, no squeak, plus swing-variety.wav (five swings in a row).
+
+## 264. A match cut by an update counts, and nobody loses anything for an update; its reason shows once
+- Owner (2026-10-16): the "matches don't count after a Poddle update" line appeared twice on the result card, and "there should be a
+  trophy compensation ... punishing a player for something they can't control".
+- Why it did not count (R2): after a restart the court is rebuilt from what the returning tab says (score, side, Matt's level), so its
+  first match counted for nothing for both seats, the win included.
+- server/game.js: on SIGINT / SIGTERM (every deploy) `saveSnaps()` writes each match under way to `revive.json` beside the database
+  (room.snap -> stats.snapshot: score, Matt's level, time and contacts so far, each seat's account id or device hash as hex; no names,
+  no IPs), before the tabs are told. The next start reads it once and deletes it (ignored after 15 min). `revive()`: a court that comes
+  back with exactly the saved score (and Matt level) carries the snapshot into its match; otherwise a nonzero, unfinished claimed score
+  is R2 as before. A claim of 0-0 or a finished score brings nothing back, so it is a fresh match and no longer R2.
+- server/stats.js `onEnd`: a carried match whose seats are the same accounts / devices as the snapshot's is one match (time and contacts
+  added, so R8 / R9 judge the whole of it): it counts fully, trophies, record and bests. Different people, or a revival of a revival:
+  revived (R2).
+- server/abuse.js: `revived` is no longer match-wide. The win counts (no bests); the loser is held harmless (no record, no loss) and only
+  the loser gets the `restart` reason. R8 / R9 use the points played after the restart (`base`). server/game.js `trophies()`: the
+  spared loser writes nothing (no trophies lost, no ladder loss, no Matt loss) and the row says ±0 with why `restart`; a forfeit stayer of
+  a revived court is paid like any stayer.
+- Shown once: web/profile.js leaves the reason to the trophy row when there is one (a guest, with no trophy row, still gets the line).
+  Wording: "Resumed after a Poddle update: no trophies lost" (trophy row) / "...: no loss counted" (guest line).
+- A host lost without SIGINT (the 2026-10-16 Fly outage) leaves no snapshot: those courts take the R2 path, the loser held harmless.
+- privacy.html (and docs/ropa.md): the one thing now written to disk at a restart; terms.html: a match in progress usually continues.
+  Both dated 2026-10-16.
+- Tests: accounts-unit R2 checks rewritten (+ R2/R8 with base); stats.test 8 (unverified, guest: held harmless), 19 (0-0: fresh, counts),
+  20 (new: snapshot written on SIGINT, read once and deleted, the court comes back verified, the match counts with no restart reason);
+  trophies.test 16 (new, its own games-to-2 server: unverified, the winner +30, the loser 100 -> 100 with why restart, no ladder loss).

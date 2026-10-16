@@ -72,7 +72,7 @@ export async function fetchProfile() {                      // -> the Profile of
 }
 
 // ---------- after a match: one line on the result card (9.3) ----------
-const WHY = { not_counted: 'This match doesn’t count toward your record', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count' };
+const WHY = { not_counted: 'This match doesn’t count toward your record', self: 'Matches against yourself don’t count', restart: 'Resumed after a Poddle update: no loss counted', too_short: 'Too short to count' };
 const BEST = { rally: v => `longest rally ${v}`, speed: v => `fastest swing ${degs(v)}°/s` };      // hit (power) is kept and exported but never shown: it is a unitless internal number
 let overTour = false, nudged = false;      // nudged: the sign-in nudge shows once a visit, and on every first win
 export function matchover(tour) { overTour = !!tour; show('result-save', false); }      // a new result: last match's line goes (result() fills it again for this one). tour: a tournament's card (the line, no nudge)
@@ -87,7 +87,7 @@ export function result(p) {                                 // the 'profile' mes
     if (p.first === true) line = lv ? `First win against ${lv} Matt` : 'Your first win';
     else if (bests.length) { const b = bests[0], prev = Number.isFinite(b.prev) && b.prev > 0 ? b.prev : 0; const shown = v => (b.what === 'speed' ? degs(v) + '°/s' : String(Math.round(v))), was = prev ? shown(prev) : ''; line = `New best: ${BEST[b.what](b.what === 'speed' ? b.v : Math.round(b.v))}` + (was && was !== shown(b.v) ? ` (was ${was})` : ''); }      // a gain below the rounding step would read '1330°/s (was 1330°/s)': the old value is left out then
     else if (num(p.streak) >= 2) line = `${num(p.streak)} wins in a row`;
-    else if (p.ranked === false) { const w = why.find(x => WHY[x]); if (w) line = WHY[w]; }
+    else if ((p.ranked === false || why.includes('restart')) && !(p.trophies && typeof p.trophies === 'object' && !p.trophies.none)) { const w = why.find(x => WHY[x]); if (w) line = WHY[w]; }      // the trophy row says why itself: never the same reason twice on one card (NOTES 264)
     else if (why.includes('level')) line = 'Counted at the easiest level you played';      // R13: a level changed mid-match
   }
   const notice = p.created === true, nudge = p.nudge === true && !tour && me.enabled && !me.account && (p.first === true || !nudged);      // a win only (the server decides), never for a signed-in player; not after every win

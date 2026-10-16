@@ -11,7 +11,7 @@ const HUMAN = new Set(['human', 'tour']), BOTK = new Set(['bot', 'tourbot']);
 // paddle_teleport, swing_motion) act only through each seat's `record`; level_changed and swing_implausible are informational.
 // same_computer (R5: both seats on one network address) is RETIRED (NOTES 153): the owner wants two people on one network to count, only one BROWSER
 // (R6 same_device / same_account / same_cid) is one person. Old match_log rows may still carry the id.
-const MATCH_WIDE = new Set(['legacy', 'revived', 'anon_opponent', 'same_device', 'same_account', 'same_cid',
+const MATCH_WIDE = new Set(['legacy', 'anon_opponent', 'same_device', 'same_account', 'same_cid',
   'early_forfeit', 'leaver_ahead', 'pair_cap', 'feeder', 'one_way', 'daily_cap']);
 
 // computerKey(addr) -> what "the same computer" means (3.5): IPv4 whole, IPv6 its /64 (first four hextets, canonical),
@@ -110,12 +110,15 @@ function judge(facts, history, cfg) {
   const score = Array.isArray(f.score) ? f.score : [0, 0], pts = num0(score[0]) + num0(score[1]);
   const W = w === null ? null : seats[w], L = seats[l];
   // Match-wide or per seat, every kind: R2, R6b, R8, R9, R18, R19.
-  if (f.revived) flag('revived');                                                 // R2
+  if (f.revived) flag('revived');                                                 // R2 (NOTES 264): no longer match-wide. The loser is held harmless below; the win counts
   const changed = seats.map(s => isHuman(s) && !!(s.identChanged || s.pendingAnon));
   if (changed.some(Boolean)) flag('ident_changed');                               // R6b
-  const tooFast = c.minPointS > 0 && num0(f.secs) < c.minPointS * pts;
+  // R8 / R9 on the points this process saw: an unverified revival (R2) brought its score back on the client's word, and its time and contacts
+  // start at the restart (a verified one carries them, stats.snapshot)
+  const ptsSeen = f.revived && Array.isArray(f.base) ? Math.max(0, pts - num0(f.base[0]) - num0(f.base[1])) : pts;
+  const tooFast = c.minPointS > 0 && num0(f.secs) < c.minPointS * ptsSeen;
   if (tooFast) flag('too_fast');                                                  // R8
-  const idle = seats.map(s => isHuman(s) && c.afkMin > 0 && num0(s.contacts) < Math.max(c.afkMin, Math.ceil(pts / 4)));
+  const idle = seats.map(s => isHuman(s) && c.afkMin > 0 && num0(s.contacts) < Math.max(c.afkMin, Math.ceil(ptsSeen / 4)));
   if (idle.some(Boolean)) flag('afk');                                            // R9
   const tele = seats.map(s => isHuman(s) && c.teleportMs > 0 && !!s.teleport);
   if (tele.some(Boolean)) flag('paddle_teleport');                                // R18
@@ -159,7 +162,7 @@ function judge(facts, history, cfg) {
   if (w !== null && live[w])
     out[w].record = !wide && !tooFast && !newOpp && !changed[w] && !tele[w] && !still[w] && !idle[0] && !idle[1];
   // Loser: withheld when the WINNER was idle and by every match-wide rule; kept for its own R9, R6b, R18, R19 and for R8 / R11c.
-  if (live[l]) out[l].record = !wide && !(w !== null && idle[w]);
+  if (live[l]) out[l].record = !wide && !(w !== null && idle[w]) && !f.revived;      // a court the server could not vouch for after a restart: no loss is recorded (the update was not theirs)
   // Bests: only with a record, never after R2 / R8 / R9 (whole match), nor own R6b / R18 / R19. R15 withholds hit/speed only.
   for (const i of [0, 1]) {
     out[i].bests = out[i].record && !f.revived && !tooFast && !idle[0] && !idle[1] && !changed[i] && !tele[i] && !still[i];
@@ -167,7 +170,7 @@ function judge(facts, history, cfg) {
     out[i].idle = idle[i];
   }
   const ranked = !flags.some(x => MATCH_WIDE.has(x) || x === 'anon' || x === 'pad' || x === 'origin_bad')
-    && [0, 1].every(i => !isHuman(seats[i]) || out[i].record);
+    && [0, 1].every(i => !isHuman(seats[i]) || out[i].record || (f.revived && i === l));      // R2: the held-harmless loser does not unrank the winner
   return { ranked, flags, seats: out };
 }
 
@@ -176,14 +179,14 @@ function judge(facts, history, cfg) {
 function why(verdict, facts, i) {
   const v = verdict || { flags: [] }, f = facts || {}, fl = new Set(v.flags || []), out = [];
   if (HUMAN.has(f.kind)) {
-    if (v.ranked) return out;
+    if (v.ranked) return fl.has('revived') && f.winner !== i ? ['restart'] : out;      // R2: the loser's line says why nothing was lost
     if (fl.has('same_device') || fl.has('same_account') || fl.has('same_cid')) return ['self'];
     if (fl.has('revived')) out.push('restart');
     if ((fl.has('too_fast') && f.winner === i) || (v.seats && v.seats[i] && v.seats[i].idle)) out.push('too_short');
     if (!out.length) out.push('not_counted');
     return out;
   }
-  if (fl.has('revived')) out.push('restart');
+  if (fl.has('revived') && f.winner !== i) out.push('restart');
   if (!v.ranked && (fl.has('too_fast') || fl.has('afk'))) out.push('too_short');
   if (!v.ranked && !out.length) out.push('not_counted');
   if (fl.has('level_changed')) out.push('level');

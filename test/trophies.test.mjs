@@ -17,7 +17,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const PORT = +process.env.TROPHIES_PORT || 9460, root = new URL('..', import.meta.url).pathname;
+let PORT = +process.env.TROPHIES_PORT || 9460; const root = new URL('..', import.meta.url).pathname;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'poddle-tro-')), FILE = path.join(tmp, 't.db');
 const MATT_DAY = 11;                                              // Bronze pays 10: the second win pays 1, the third 0 (limit day)
 const ENV = { PODDLE_DB: FILE, GOOGLE_CLIENT_ID: 'test.apps.googleusercontent.com', WIN_AT: '1', WIN_BY: '1', READY_S: '0', SWING_SERVE: '0', REMATCH_S: '5', HOLD_S: '2',
@@ -42,6 +42,7 @@ const RAW = {}, OWNER = {};
   mk('ron', 'Ron', 100); mk('sid', 'Sid', 100);                  // Ron in two tabs (refused, NOTES 214); Sid against an anonymous seat
   mk('oli', 'Oli'); mk('pia', 'Pia');                            // scenario 8's lobby sockets: their own accounts, since one account is one court at a time (NOTES 214) and Ann and Ben play in scenario 1
   mk('wes', 'Wes', 100); mk('xan', 'Xan', 100);                  // Xan deletes the account mid-game
+  mk('yan', 'Yan', 100); mk('zoe', 'Zoe', 100);                  // scenario 16: a court brought back after a restart on the clients' word
   mk('tia', 'Tia', 100); mk('uli', 'Uli', 100); mk('vera', 'Vera', 100); mk('wil', 'Wil', 100);   // a tournament of four, Bronze III all: gap 0 everywhere
   db.close(); console.error = quiet; }
 
@@ -269,6 +270,24 @@ report(await Promise.all([
     t.ok(/match recorded: tour ranked \((\+30\/-6|-6\/\+30)\)/.test(out), 'the log line: tour ranked (+30/-6)');
     bye(...ps);
   }),
+]));
+
+// 16 runs alone on a second server with games to 2 (a 1-0 claim is a match under way, not a finished score), on the same database file
+for (const p of procs) p.kill('SIGINT'); await until(() => procs.size === 0, 5000);
+PORT += 1; await up(PORT, { ...ENV, WIN_AT: '2', WIN_BY: '1' });
+report(await Promise.all([
+  sc('16. a court brought back after a restart with no snapshot (R2, NOTES 264): the win pays, the loser loses nothing and is told why', async t => {
+    const q = side => `lobby=1&room=YZ23&back=1&side=${side}&score=1-0&pub=0`;
+    const a = tab({ who: 'yan', q: q(0) }); await a.open(); await until(() => a.side != null);
+    const b = tab({ who: 'zoe', q: q(1) }); await b.open(); await until(() => b.side != null && a.got('names', m => m.names.every(Boolean)).length);
+    t.ok(/YZ23\] brought back after a restart by a player \(1-0\)/.test(out) && !/YZ23[^\n]*matches the snapshot/.test(out), 'the court came back on the client\'s word (no snapshot)');
+    hit(a); still(b); await over(a); await over(b); const pa = await prof(a), pb = await prof(b), ta = pa && pa.trophies, tb = pb && pb.trophies;
+    t.ok(ta && ta.delta > 0 && ta.counted === true && J(ta.why) === '[]', `Yan won: paid as any win: ${J(ta)}`);
+    t.ok(tb && tb.delta === 0 && tb.counted === true && J(tb.why) === '["restart"]' && tb.trophies === 100, `Zoe lost: nothing taken, the row says why: ${J(tb)}`);
+    const lb = await ladderOf('zoe');
+    t.ok(!lb || (lb.losses === 0 && lb.trophies === 100), `Zoe's ladder row has no loss: ${J(lb && [lb.trophies, lb.losses])}`);
+    bye(a, b);
+  })
 ]));
 
 console.log(`done in ${Math.round((Date.now() - T0) / 1000)} s`);

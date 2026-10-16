@@ -239,8 +239,13 @@ const has = (v, ...ids) => ids.every(i => v.flags.includes(i));
   v = J(human({}, {}, { pad: true })); ok(!v.ranked && has(v, 'pad') && !v.seats[1].record, 'R1 pad: that socket ignored');
   v = J(vsBot({}, { ident: null })); ok(!v.ranked && has(v, 'anon') && rec(v) === '-- --', 'R3 anon (bot): ignored for that seat');
   v = J(vsBot({}, { ident: null, originBad: true })); ok(has(v, 'origin_bad', 'anon') && !v.seats[0].record, 'R17 origin_bad: treated as anonymous');
-  v = J(vsBot({ revived: true })); ok(!v.ranked && has(v, 'revived') && rec(v) === '-- --', 'R2 revived bot win: unranked, no bests');
-  v = J(human({ revived: true })); ok(!v.ranked && has(v, 'revived') && rec(v) === '-- --', 'R2 revived human: unranked');
+  // R2 since NOTES 264: an unverified revival is not match-wide. The win counts (no bests), the loser is held harmless (no record), and
+  // the loser alone is told why ('restart'); R8 / R9 count only the points played after the restart (base)
+  v = J(vsBot({ revived: true })); ok(v.ranked && has(v, 'revived') && rec(v) === 'R- --', `R2 revived bot win: counts, no bests (${rec(v)})`);
+  v = J(vsBot({ revived: true, winner: 1 })); ok(has(v, 'revived') && rec(v) === '-- --' && eq(abuse.why(v, vsBot({ revived: true, winner: 1 }), 0), ['restart']), `R2 revived bot loss: no loss recorded, why restart (${rec(v)})`);
+  { const f = human({ revived: true }); v = J(f); ok(v.ranked && has(v, 'revived') && rec(v) === 'R- --' && eq(abuse.why(v, f, 0), []) && eq(abuse.why(v, f, 1), ['restart']), `R2 revived human: the win counts, the loser is held harmless and told why (${rec(v)})`); }
+  v = J(human({ revived: true, base: [10, 4], score: [11, 5], secs: 20 })); ok(v.ranked && !has(v, 'too_fast'), `R2 + R8: 2 points after the restart in 20 s is not too fast (${v.flags})`);
+  v = J(human({ revived: true, base: [0, 0], score: [11, 5], secs: 20 })); ok(!v.ranked && has(v, 'too_fast'), `R2 + R8: 16 points in 20 s still is (${v.flags})`);
   v = J(human({}, {}, { ident: null })); ok(!v.ranked && has(v, 'anon_opponent', 'anon') && rec(v) === '-- --', 'R4 anon_opponent: the winner over an anonymous seat gets nothing');
   v = J(human({}, {}, { gone: true })); ok(v.ranked && !has(v, 'anon_opponent'), 'R4 not triggered by gone (the frozen identity still judges)');
   v = J(human({}, {}, { pendingAnon: true })); ok(!has(v, 'anon_opponent') && has(v, 'ident_changed'), 'R4 not triggered by a mid-match downgrade (that is R6b)');
@@ -427,10 +432,10 @@ const S2 = (a, b, ra = true, rb = true) => [{ owner: a, record: ra, bests: ra },
   ok(P(g3).matt[0].wins === 0 && P(g3).played === 7 && P(g3).bests.rally.v === 9, 'record:false: played only, no bot row change, no bests');
   db.recordMatch(B({ now: T0 + 7, seats: [{ owner: g3, record: true, bests: true, swingBad: true, bestRally: 12, bestHit: 99, bestSpeed: 34 }, null] }));
   let bb = P(g3).bests; ok(bb.rally.v === 12 && bb.hit.v === 81 && bb.speed.v === 22.5, 'swingBad keeps the rally best, drops hit and speed');
-  // rally bests: a revived bot match with a 20-ball rally saves no best (judge bests:false is the only switch)
+  // rally bests: a revived bot match with a 20-ball rally saves no best (judge bests:false is the only switch); its win counts (NOTES 264)
   const fr = vsBot({ revived: true }, { owner: g3 }), vr = abuse.judge(fr, {}, CFG);
   db.recordMatch(B({ now: T0 + 8, ranked: vr.ranked, flags: vr.flags, seats: [{ owner: g3, record: vr.seats[0].record, bests: vr.seats[0].bests, bestRally: 20, bestHit: 100, bestSpeed: 30 }, null] }));
-  bb = P(g3).bests; ok(bb.rally.v === 12 && bb.hit.v === 81 && P(g3).matt[3].wins === 3, 'revived bot match with a 20-ball rally: no best, no win (judge -> db)');
+  bb = P(g3).bests; ok(bb.rally.v === 12 && bb.hit.v === 81 && P(g3).matt[3].wins === 4, `revived bot match with a 20-ball rally: no best, the win counts (judge -> db; wins ${P(g3).matt[3].wins})`);
   // owners missing
   const g4 = db.ownerForDevice(dev(4), T0, { create: true }); db.deleteOwner(g4, T0);
   const before = db.counts().match_log; r = db.recordMatch(H({ now: T0 + 9, seats: S2(g1, g4) }));

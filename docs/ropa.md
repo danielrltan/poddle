@@ -22,8 +22,10 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
 - Basis: contract (Art. 6(1)(b)): providing the game the visitor requests (as web/privacy.html states; whether
   legitimate interests suits 13-15-year-olds better is an open question for counsel, and both files change together).
 - Recipients: the other players and spectators on the court (names, moves); Fly.io.
-- Retention: memory only, until the match ends or the server restarts. Never written to disk.
-- Security: TLS; nothing persisted; logs carry court codes only (no names, IPs, cids).
+- Retention: memory only, until the match ends or the server restarts. One exception (NOTES 264, 2026-10-16): at a restart each match
+  under way (court code, score, time and shot counts, each seat's account id or device hash: no names, IPs or cids) is written to
+  `revive.json` beside the database on `poddle_data`, read once and deleted at the next start, ignored after 15 minutes.
+- Security: TLS; nothing else persisted; logs carry court codes only (no names, IPs, cids).
 
 ## 2. Abuse limits
 - Data: IP address (IPv4 whole, IPv6 first 64 bits), in memory; keyed hashes of it (key replaced daily) for API rate

@@ -1470,7 +1470,7 @@ function drawRanks() {
 // from the old one over it); the pill is the change as applied; a small line says why when nothing changed. A changed rank or division is the ceremony at 2100 ms.
 // none: 'signin' | 'username' draws one quiet line in the row's place (a reply to the game just played, not an announcement). The card gets .has-trophies for the room the row takes.
 const MATT_LV = ['Rookie', 'Club', 'Pro', 'Tour'], MATT_NEED = [0, 1, 1, 3, 3, 2, 2, 2];      // Matt's wire level -> name; per rank, the lowest level a win pays at: the server says it (t.need, server/ladder.js TIERS[].matt); the table is the fallback for an older server
-const TROPHY_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Matches resumed after a Poddle update don’t count', too_short: 'Too short to count', left_early: 'They left before the game finished' };
+const TROPHY_WHY = { not_counted: 'This match didn’t count', self: 'Matches against yourself don’t count', restart: 'Resumed after a Poddle update: no trophies lost', too_short: 'Too short to count', left_early: 'They left before the game finished' };
 const NONE_LINE = { signin: 'Sign in to earn trophies', username: 'Pick a username to earn trophies' };
 let upT = 0, rollT = [];
 const ROLL_AT = 1100;      // ms after the card: the row has popped (900) and the pill (1000); then the count climbs
