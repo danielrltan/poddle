@@ -30,7 +30,13 @@ if (!/^[A-HJ-NP-Z2-9]{4}$/.test(PAD)) newPad();      // 4 characters, shown as P
 
 const model = new MotionModel();
 const scene = createScene($('stage'));
-const pod = createPodView($('pod'));
+// the corner AirPod / phone: a second WebGL context only a court shows (25 ms live, in this evaluation before the first paint). Built after the load
+// (ui.afterLoad: once the scenery is revealed, in idle) and its programs linked there too (warm); a phone, which never sits down, only at a first update
+const pod = (() => {
+  let view = null, kind = null; const make = () => { if (!view) { view = createPodView($('pod')); if (kind) view.setKind(kind); } return view; };
+  return { setKind(k) { kind = k; if (view) view.setKind(k); }, update(P) { make().update(P); }, idle() { make().warm(); } };
+})();
+ui.idleAfter(scene.sceneryReady);
 ui.setServerAddress(GAME);
 // A phone can be the paddle wherever the page is served securely (its sensors need https, and it cannot open 'localhost'), so
 // the hosted game needs no helper and no Mac. ?padtest=1 lets the tests pair a fake phone on localhost.
@@ -41,6 +47,7 @@ const PHONE_SIZED = navigator.maxTouchPoints > 1 && Math.min(window.screen.width
 // ?mobile=1 | 0 forces it either way (the tests; nothing is stored)
 const MOBILE = LOBBY && (qs.get('mobile') === '1' || qs.get('mobile') !== '0' && matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) < 600);
 ui.setMobile(MOBILE);
+if (!MOBILE) ui.afterLoad(pod.idle);
 const SEATS = new Set(['quick', 'create', 'join', 'tcreate']);      // what a phone never asks for: each would seat it with no paddle
 if (CAN_PHONE && PHONE_SIZED) { $('title-note').textContent = 'Open poddleball.com on a computer to play. This phone becomes your paddle.'; $('title-note').classList.add('is-loud'); }      // the phone is the paddle, not the screen
 else if (!CAN_PHONE && (!/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1)) { $('title-note').textContent = 'To play, open poddleball.com on a computer, with your phone as the paddle. Here you can watch a match.'; $('title-note').classList.add('is-loud'); }      // no phone paddles here (a local copy), and no helper can run on Windows, a phone, an iPad
@@ -921,7 +928,7 @@ addEventListener('resize', () => scene.resize());
 
 // ---------- render loop: local paddle straight from the model every frame ----------
 let lastPos = null;
-(function loop(now) {
+function loop(now) {
   requestAnimationFrame(loop);
   net.frame();                                                    // the page ran: a gap between packets that spans frames is the link's (web/netq.js)
   const p = model.pose(now);
@@ -958,6 +965,7 @@ let lastPos = null;
     if (!champ && champLive) { champLive = false; scene.podium?.(null); }      // the champion screen is down (Back to courts, See bracket, Esc): the rally again
     scene.setVictory?.(v ? vicSide : null, v ? ui.resultPane?.() : null); }
   scene.render(now);
-})(performance.now());
+}
+requestAnimationFrame(loop);      // never a frame inside this module's evaluation (its long task held DOMContentLoaded and every script after it): with the prewarm the title paints first and scene.js draws the court once its shaders are linked off the frame
 
 addEventListener('error', () => stats.errors++);

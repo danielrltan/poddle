@@ -24,6 +24,17 @@ const swapText = (el, t, cls) => { if (!el) return false; const cup = el.hasAttr
   const done = e => { const c = OV[e.animationName], el = c && e.target.closest?.('.' + c); if (el && (e.type === 'animationend' || !el.getClientRects().length)) el.classList.remove(c); };      // a cancel: only when its card or the HUD was hidden mid-way (restart() itself cancels too)
   document.addEventListener('animationend', done); document.addEventListener('animationcancel', done); }
 const on2 = (id, type, fn) => { const el = $(id); if (el) el.addEventListener(type, fn); };      // every new element is optional (older markup, a test page)
+// ---------- after the load: work no first screen shows (the pairing QR, the emote bar's faces; main.js: the corner AirPod's own WebGL context) ----------
+// It waits for the load event AND the scenery's reveal (scene.sceneryReady, handed over by main.js: idleAfter), then for gaps in the main thread, one
+// job a gap: never in main.js's evaluation, the scenery's fetch or the court's links (20-50 ms each, live). Each still comes at once where it is first
+// needed (the set-up screen draws its QR, a court's screens set the faces, main.js builds the AirPod at its first update)
+const idleQ = []; let idleOpen = false, idleOn = false;
+const idleNext = () => { if (idleOn || !idleOpen || !idleQ.length) return; idleOn = true;
+  (window.requestIdleCallback || (f => setTimeout(f, 200)))(() => { idleOn = false; const f = idleQ.shift(); try { f(); } catch (e) { console.warn(e); } idleNext(); }, { timeout: 2000 }); };
+export function afterLoad(fn) { idleQ.push(fn); idleNext(); }
+export function idleAfter(ready) {      // main.js, once: ready = a promise of the scenery's reveal (false when it never comes: the queue runs then too)
+  const loaded = document.readyState === 'complete' ? null : new Promise(r => addEventListener('load', r, { once: true }));
+  Promise.all([ready, loaded]).then(() => { idleOpen = true; idleNext(); }); }
 import { RANKS, THRESHOLDS, DIV_W, hasDivs, romanOf, rankLabel, emblemEl, setEmblem, emblemCard, installSprite } from './emblems.js';      // the rank emblems (docs/RANKED.md 6): one sprite at the start of <body>, drawn here and nowhere else
 installSprite();
 
@@ -58,6 +69,8 @@ function swap(slot, name) {
   clearTimeout(hideT.hud);
   if (slots.menu) { if (!hud.hidden) hideT.hud = setTimeout(() => { hud.hidden = true; }, 360); }
   else if (hud.hidden) { hud.hidden = false; wake(); }
+  if (slot === 'menu' && name !== 'title' && name !== 'lobby') emoteFaces();      // on the way to a court (set-up, camera, calibration, the court itself): the bar's faces now if the idle set has not come, a screen or more before the HUD shows them
+  if (name === 'connect') drawQR();      // the set-up screen: its QR now, if the idle draw has not come yet
 }
 export function showScreen(name) { swap('menu', MENU.includes(name) ? name : null); }
 export function showOverlay(name) { swap('overlay', OVERLAY.includes(name) ? name : null); }
@@ -388,18 +401,23 @@ export function setPaddle(kind) {
 export const paddleKind = () => paddle;
 // The set-up screen's phone block: the QR (drawn here, no image fetched), the code to type instead, and the footer's way over
 // to the other paddle. o = { show, url, code, title, foot, choose, mode }.
-let qrFor = '';
+let qrFor = '', qrWant = '', qrIdle = false;      // qrFor: the url drawn (or on its way), qrWant: the url the set-up screen should show
+function drawQR() {
+  const url = qrWant; if (!url || qrFor === url) return; qrFor = url;
+  import('./vendor/qrcode.mjs').then(({ default: qrcode }) => {
+    if (qrWant !== url) return;      // a newer code came meanwhile: its own draw is on the way
+    const q = qrcode(0, 'H'); q.addData(url); q.make();                   // 'H', not 'M': the phone in the middle covers modules, and only H's 30 % recovery reads through that (NOTES 67)
+    $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }).replace('</svg>', phoneGlyph(q.getModuleCount() * 4) + '</svg>');
+    const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true');
+  }).catch(() => { if (qrFor === url) qrFor = ''; });
+}
 export function padPair(o) {
   const box = $('pad-pair'); if (!box) return;
   box.hidden = !o.show; helperCard(); setText($('connect-title'), o.title || '');
   const seg = $('paddle-seg'); if (seg) { seg.hidden = !o.choose; $('connect-title').hidden = !!o.choose;      // where a phone can pair, the switch is the heading
     for (const b of seg.querySelectorAll('[data-paddle]')) b.setAttribute('aria-checked', String(b.dataset.paddle === o.mode)); } setText($('pad-code'), o.code || ''); setText($('connect-foot-text'), o.foot || '');
-  if (o.show && o.url && qrFor !== o.url) { qrFor = o.url;
-    import('./vendor/qrcode.mjs').then(({ default: qrcode }) => {
-      const q = qrcode(0, 'H'); q.addData(o.url); q.make();                   // 'H', not 'M': the phone in the middle covers modules, and only H's 30 % recovery reads through that (NOTES 67)
-      $('pad-qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }).replace('</svg>', phoneGlyph(q.getModuleCount() * 4) + '</svg>');
-      const g = $('pad-qr').querySelector('svg'); if (g) g.setAttribute('aria-hidden', 'true');
-    }).catch(() => { qrFor = ''; }); }
+  if (o.show && o.url && qrFor !== o.url) { qrWant = o.url;      // drawn the moment the set-up screen is up, else after the load (afterLoad: no home page shows it); a phone never sits down, so it never draws one
+    if (slots.menu === 'connect') drawQR(); else if (!qrIdle && !mobile) { qrIdle = true; afterLoad(() => { qrIdle = false; drawQR(); }); } }
 }
 // The phone that sits in the middle of the pairing QR, so the code looks like what it is for. Sized from the REAL module
 // count (the URL's length moves it), never a fixed number. 28 % of the width is ~8 % of the area: well inside H's budget.
@@ -736,11 +754,15 @@ export const EMOTES = [['gg', 'GG', 'GG'], ['1fae1', '🫡', 'Salute'], ['1f49a'
 const EMOTE_COOL = 1000;
 let onEmoteFn = null, emoteCool = 0, emoteT = 0;
 export function onEmote(fn) { onEmoteFn = fn; }
-const emoteImg = i => { if (EMOTES[i][0] === 'gg') { const g = document.createElement('b'); g.className = 'emote-gg'; g.textContent = 'GG'; return g; }
-  const img = document.createElement('img'); img.src = new URL(`emoji/${EMOTES[i][0]}.png`, import.meta.url).href; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
+const emoteImg = (i, later = false) => { if (EMOTES[i][0] === 'gg') { const g = document.createElement('b'); g.className = 'emote-gg'; g.textContent = 'GG'; return g; }
+  const img = document.createElement('img'), src = new URL(`emoji/${EMOTES[i][0]}.png`, import.meta.url).href; if (later && emoteSrc) emoteSrc.push([img, src]); else img.src = src; img.alt = EMOTES[i][1]; img.draggable = false; img.decoding = 'async'; return img; };
+// the bar's faces: nine PNGs (~225 KB) only a court shows. Their src is set after the load (afterLoad), or on the way to a court (swap), whichever comes
+// first: not in the load, where they were fetched among the scenery's modules and held the load event back. A pop or bubble (a court) loads its own at once
+let emoteSrc = []; function emoteFaces() { if (!emoteSrc) return; const l = emoteSrc; emoteSrc = null; for (const [img, src] of l) img.src = src; }
+afterLoad(emoteFaces);
 { const box = $('emotes');
   if (box) EMOTES.forEach((em, i) => { const b = document.createElement('button'), k = document.createElement('span'); b.className = 'emote-btn'; b.dataset.e = String(i); b.setAttribute('aria-label', em[2]); b.setAttribute('aria-keyshortcuts', String((i + 1) % 10)); b.title = em[2];
-    k.className = 'emote-key'; k.textContent = String((i + 1) % 10); k.setAttribute('aria-hidden', 'true'); b.append(emoteImg(i), k); box.append(b); });
+    k.className = 'emote-key'; k.textContent = String((i + 1) % 10); k.setAttribute('aria-hidden', 'true'); b.append(emoteImg(i, true), k); box.append(b); });
   on2('emotes', 'click', e => { const b = e.target.closest('.emote-btn'); if (b) sendEmote(+b.dataset.e); }); }
 // a click or a key (main.js: 1-9, 0): the face squashes and springs as it goes, then (a player's) the bar rests for a second. false = resting, nothing sent
 export function sendEmote(i) {

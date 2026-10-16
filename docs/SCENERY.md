@@ -10,7 +10,9 @@ is shown **blurred** behind the buttons: big shapes, strong silhouettes and colo
 
     ctx = { scene, renderer, camera, sun /* the one DirectionalLight, casts the court's shadows */, hemi /* HemisphereLight */,
             fog /* scene.fog, THREE.Fog */, plainSky /* [mesh, ...] the old gradient dome + sphere clouds: hide them if you
-            replace them */, court: () => ({ halfW, halfL, ... }), side: () => 0 | 1 /* which end the local player is at */ }
+            replace them */, court: () => ({ halfW, halfL, ... }), side: () => 0 | 1 /* which end the local player is at */,
+            onShown: (venue) => {} /* optional: called when a venue is swapped in; scene.js times its next drawn frame as
+            scenery:reveal and then resolves scene.sceneryReady, the promise other code waits on (window.__scenery is for tests) */ }
     returns { update(dt, timeS, camera) }
 
 `THREE` is the r160 UMD global, passed in. No imports from a CDN, no network, no image/model files: geometry is built in

@@ -39,8 +39,18 @@ export function createPodView(el) {
   const fwd = new T.Mesh(new T.ConeGeometry(0.07, 0.22, 12), new T.MeshBasicMaterial({ color: 0x4ade80 })); fwd.position.set(0, -1.25, -1.0); fwd.rotation.x = -Math.PI / 2; scene.add(fwd);
 
   const q = new T.Quaternion();
+  let warmed = false, used = false;      // used: update() has drawn (the inset may be on screen): warm() then draws nothing
   return {
-    update(P) { q.set(P[0], P[1], P[2], P[3]); held.quaternion.slerp(q, 0.6); renderer.render(scene, cam); },
+    update(P) { used = true; q.set(P[0], P[1], P[2], P[3]); held.quaternion.slerp(q, 0.6); renderer.render(scene, cam); },
+    // main.js, in idle after the load: this context's programs linked off the main thread (compileAsync: KHR_parallel_shader_compile, polled), then one
+    // frame with the bud AND the phone in it, in a later idle moment: each program's first use (three's synchronous checks) and the GPU's pipelines, so the
+    // first update() on the set-up screen or a court links and checks nothing (it did 2-3 programs there, synchronously). Cleared at once: never seen
+    warm() {
+      if (warmed || used) return; warmed = true;
+      const idle = window.requestIdleCallback || (f => setTimeout(f, 50));
+      const draw = () => { if (used) return; const p = phone.visible; phone.visible = pod.visible = true; try { renderer.render(scene, cam); renderer.clear(); } finally { phone.visible = p; pod.visible = !p; } };
+      (renderer.compileAsync ? renderer.compileAsync(scene, cam) : Promise.resolve()).then(() => idle(draw, { timeout: 2000 }), () => {});
+    },
     setKind(kind) { phone.visible = kind === 'phone'; pod.visible = !phone.visible; },
     el,
   };
