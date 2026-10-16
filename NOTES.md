@@ -5162,3 +5162,4 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   a player joining mid-calibration, tournament courts: all go through the same `players.every(ready)` gate.
 - test/calgate.test.mjs: receiver calibrates while a serve hangs, the server calibrates during their own serve, one human vs Matt
   before the first strike, a calibrating seat's swing. 8 failures on d83150f, all pass with this change.
+- deploy.sh's gate runs test/calgate.test.mjs (about 45 s).
