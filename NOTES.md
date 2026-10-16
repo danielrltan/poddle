@@ -5143,3 +5143,22 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
 ## 256. The tutorial no longer says a shot's name pops up when you hit it
 - web/tutorial.js "Pick your shot": the line under the shot list promised the shot's name on screen at every hit. Nothing shows it:
   `ui.callout()` is never called (main.js keeps only the comment where it used to be). The line is gone; the step is the shot list alone.
+
+## 258. No serve goes out while a seated player is calibrating, not even one already hanging
+- Owner: the game could be started while the other player was still calibrating. The serve already waited for a calibrating seat
+  (NOTES 59, 170, 241), but only BEFORE it went up: SWING_SERVE hangs the ball in front of the server as a live ball (reset()), and the
+  gate in sim() only holds a serve that is not live. So a seat that went back to calibrating while a serve hung (C, the phone's
+  calibrate button, a paddle swap, the pad page reloaded; or the very first serve, put up the moment both were ready, and one of them then
+  pressing C) left the ball up: the server could strike it, and after 9 s it was served for them. Against Matt before the first strike
+  (no self-pause yet) Matt's own serve went 1.1 s later.
+- server/game.js `withdrawServe()`: in sim(), a hanging serve with any seat not ready comes down (not live, no swing or held serve
+  left) and is served again like any waiting serve: once every seat is ready, after the count of three again if the match has had no
+  strike yet. The 'Calibrating' tag on that character is what the others see; slowSeat's 60 s window (the last 30 s counted, then a
+  forfeit) now applies to it too, since the ball is no longer live.
+- A swing from a seat that is not ready strikes nothing (onMessage). The page sends none while calibrating; this keeps a stray or
+  scripted one from serving.
+- Not changed: a rally already in flight when someone calibrates plays on to its point (NOTES 241), and against Matt mid-match calibrating
+  still pauses the room. Checked: rematch, restart vote (endAsk already refuses a calibrating foe), reconnect (ready reset on reclaim),
+  a player joining mid-calibration, tournament courts: all go through the same `players.every(ready)` gate.
+- test/calgate.test.mjs: receiver calibrates while a serve hangs, the server calibrates during their own serve, one human vs Matt
+  before the first strike, a calibrating seat's swing. 8 failures on d83150f, all pass with this change.
