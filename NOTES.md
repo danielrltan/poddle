@@ -5139,3 +5139,7 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
 - web/scenery/sky.js computes the sun halo in JS and web/scenery/park.js uses a pinned constant for the ground grain's mean, instead of
   reading canvases back (each a synchronous GPU/canvas readback in the load). test/scenery-consts.mjs checks the constants still match
   what the readback gave and shoots the sun.
+
+## 256. The tutorial no longer says a shot's name pops up when you hit it
+- web/tutorial.js "Pick your shot": the line under the shot list promised the shot's name on screen at every hit. Nothing shows it:
+  `ui.callout()` is never called (main.js keeps only the comment where it used to be). The line is gone; the step is the shot list alone.

@@ -61,8 +61,7 @@ function cards() {
         + shot('Dink', 'A soft little scoop into the kitchen', 'M6 22 Q16 6 26 22')
         + shot('Slice', 'Roll your wrist or curve the swing', 'M4 18 Q20 22 30 12 T44 8')
         + shot('Block', 'Hold the paddle still in its path at the net', 'M19 3h10v15h-10z M24 18v7')
-        + '</ul>',
-      more: 'The shot’s name pops up on screen the moment you hit it, so you always know what you played.' },
+        + '</ul>' },
     { art: ART.read, title: 'Read the ball',
       body: '<ul class="tut-facts"><li><b>The ring</b> on the court shows where the ball will land.</li>'
         + '<li><b>The swirl</b> around a sliced ball turns the way it will kick when it bounces. Spin only bites on that first bounce.</li>'
