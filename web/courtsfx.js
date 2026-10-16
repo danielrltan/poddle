@@ -1,13 +1,11 @@
 // The court's sounds, synthesised once into buffers (NOTES 259). Pure functions: (sample rate, options) -> Float32Array, mono, peak 1, no
 // Web Audio and no DOM, so test/sfx-ab.mjs renders exactly these in Node to WAV files to listen to. scene.js imports this at the first
 // gesture and fills its bank a job per idle slot (bankJobs); a voice played before its buffers exist falls back to the old oscillators.
-//   whoosh  a paddle cutting the air: broadband noise through two resonances that ride the paddle's speed (a fast rise to the swing's peak,
-//           a slower fall), loudness ~ speed^1.6, a flutter from the edge's vortex shedding, the pitch dropping a little past the peak
+//   whoosh  a paddle pushing air aside: dark noise through two broad resonances that ride the paddle's speed (rise, peak, fall), softened
+//           above ~2.4 kHz; each variant its own length, shape, pitch and depth
 //   pock    the pickleball pop: the old oscillator voice (a pitched knock dropping into place, the hollow ball an octave under, the felt
 //           thump, a bright click) rebuilt as a buffer, with per-variant variation
 //   bounce  the same ball on a hard court: a duller, shorter 'tok' (lower shell modes, the ground's thud), no paddle
-//   squeak  a shoe sole's stick-slip: a steady, harsh 1.3-1.8 kHz slip train ringing the sole and floor (~2.4, ~4.6 kHz), flickering grip, scuff
-//   room    a short stereo impulse response for an outdoor court with walls (two channels): early slaps, then a quick dull tail
 const TAU = Math.PI * 2;
 export const rng = seed => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
@@ -21,18 +19,22 @@ const norm = (d, peak = 1) => { let m = 0; for (let i = 0; i < d.length; i++) m 
 const fadeOut = (d, sr, ms = 4) => { const n = Math.min(d.length, Math.round(sr * ms / 1000)); for (let i = 0; i < n; i++) d[d.length - 1 - i] *= i / n; return d; };
 
 export function whoosh(sr, { p = 0.6, seed = 1 } = {}) {
-  const r = rng(seed * 7919 + 13), T = 0.34 - 0.08 * p + 0.03 * r(), n = Math.round(sr * T), d = new Float32Array(n);
-  const tp = T * (0.4 + 0.06 * r()), up = T * 0.17, down = T * 0.27, f1 = svf(), f2 = svf(), fl = 26 + 18 * p + 8 * r();
-  let pink = 0, flPh = r() * TAU;
+  // Air pushed aside, not a scrape (NOTES 263): only dark noise (no white "edge" layer, no per-sample grain), through two broad resonances that
+  // ride the paddle's speed past the ear, softened above ~2.4 kHz. Each variant draws its own length, peak, rise/fall, pitch and depth, so
+  // swings in a row never sound the same; play() also nudges each one's rate +-3 %.
+  const r = rng(seed * 7919 + 13), T = (0.3 - 0.07 * p) * (0.85 + 0.35 * r()), n = Math.round(sr * T), d = new Float32Array(n);
+  const tp = T * (0.36 + 0.14 * r()), up = T * (0.13 + 0.08 * r()), down = T * (0.22 + 0.12 * r());
+  const pitch = 0.82 + 0.36 * r(), deep = 0.35 + 0.4 * r(), wob = 7 + 9 * r(), wobD = 0.05 + 0.07 * r(), f1 = svf(), f2 = svf(), kLp = 1 - Math.exp(-TAU * (2000 + 900 * p) / sr);
+  let brown = 0, pink = 0, lp = 0, wPh = r() * TAU;
   for (let i = 0; i < n; i++) {
     const t = i / sr, x = (t - tp) / (t < tp ? up : down), v = Math.exp(-x * x);       // the paddle's speed past the ear, 0..1
-    const w = r() * 2 - 1; pink = 0.86 * pink + 0.14 * w;                               // a darker noise for the body, white for the edge
-    const drop = t < tp ? 1 : 0.86 + 0.14 * Math.exp(-(t - tp) / 0.05);                 // past the peak the paddle is going away: a little lower
-    const body = f1(pink * 3, (220 + 680 * v * (0.75 + 0.5 * p)) * drop, 1.1, sr);
-    const edge = f2(w, (700 + 2000 * v * (0.6 + 0.6 * p)) * drop, 2.2, sr);
-    flPh += TAU * fl * (1 + 0.6 * v) / sr;
-    const flutter = 1 + 0.22 * v * Math.sin(flPh) * (0.7 + 0.3 * r());
-    d[i] = (body + edge * (0.25 + 0.3 * p)) * Math.pow(v, 1.6) * flutter;
+    const w = r() * 2 - 1; pink = 0.9 * pink + 0.1 * w; brown = 0.985 * brown + 0.06 * w;  // dark noise only
+    const drop = t < tp ? 1 : 0.84 + 0.16 * Math.exp(-(t - tp) / 0.05);                 // going away past the peak: a little lower
+    const fc = (150 + 520 * v * (0.7 + 0.5 * p)) * pitch * drop;
+    const body = f1(brown * 2.2, fc, 0.8, sr), air = f2(pink * 2, fc * 2.1, 1.1, sr);
+    wPh += TAU * wob / sr;
+    lp += kLp * ((body * (0.6 + deep) + air * (0.55 + 0.35 * p - 0.3 * deep)) * Math.pow(v, 1.5) * (1 + wobD * v * Math.sin(wPh)) - lp);
+    d[i] = lp;
   }
   return fadeOut(norm(d), sr);
 }
@@ -64,36 +66,6 @@ export function bounce(sr, { h = 0.6, seed = 1 } = {}) {
   for (let i = 0; i < len; i++) { const t = i / sr; d[i] += 0.15 * Math.min(1, i / nc) * Math.exp(-t / 0.014) * Math.sin(TAU * 105 * t); }      // the court under it
   const bp = svf(); for (let i = 0; i < nc * 3; i++) d[i] += bp(r() * 2 - 1, 2600, 0.9, sr) * Math.sin(Math.PI * Math.min(1, i / (nc * 2))) * (0.5 + 0.5 * h);
   return fadeOut(norm(d), sr);
-}
-
-export function squeak(sr, { seed = 1 } = {}) {
-  // A rubber sole skidding on a hard court: stick-slip. The sole grabs and lets go 1.3-1.8 kHz, a little unevenly (a pulse train with +-6 %
-  // jitter: harsh and steady, not a smooth tone), and each release rings the sole and the floor (two resonances, ~2.4 and ~4.6 kHz), under a
-  // hiss of scuff. The rate creeps up 5 % as the foot loads and the grip flickers: no vibrato and no rise-and-fall arc (those made NOTES 259's
-  // first squeak sound like an animal, NOTES 260).
-  const r = rng(seed * 2654435761 + 5), T = 0.07 + 0.06 * r(), len = Math.round(sr * T), d = new Float32Array(len);
-  const rate0 = 1300 + 500 * r(), res1 = 2200 + 600 * r(), res2 = 4300 + 800 * r(), a = svf(), b = svf(), sc = svf();
-  let next = 0, grip = 1, lp = 0; const kLp = 1 - Math.exp(-TAU * 3400 / sr);
-  for (let i = 0; i < len; i++) {
-    const t = i / sr, u = t / T;
-    let e = 0;
-    if (i >= next) { e = 0.6 + 0.8 * r(); next = i + Math.max(2, Math.round(sr / (rate0 * (1 + 0.05 * u)) * (0.94 + 0.12 * r()))); }      // a slip
-    if ((i & 63) === 0) grip = 0.55 + 0.45 * r();                                // the grip flickers every ~1.3 ms
-    const env = Math.min(1, t / 0.004) * Math.min(1, (T - t) / 0.012) * grip;
-    lp += kLp * ((a(e, res1, 7, sr) * 0.8 + b(e, res2, 6, sr) * 0.22) * env + sc(r() * 2 - 1, 4800, 0.9, sr) * 0.1 * env - lp); d[i] = lp;      // the sole's rubber softens the top
-  }
-  return fadeOut(norm(d), sr);
-}
-
-export function room(sr, { seed = 1 } = {}) {        // -> [left, right]
-  const T = 0.55, len = Math.round(sr * T), out = [new Float32Array(len), new Float32Array(len)];
-  for (let c = 0; c < 2; c++) {
-    const r = rng(seed * 31 + c * 977), d = out[c];
-    for (const [ms, a] of [[9, 0.5], [17, 0.34], [26, 0.28], [41, 0.2], [58, 0.14]]) { const i = Math.round(sr * (ms + (r() - 0.5) * 4) / 1000); if (i < len) d[i] += a * (r() < 0.5 ? -1 : 1); }      // the back walls and the fence
-    let dark = 0; for (let i = Math.round(sr * 0.02); i < len; i++) { const t = i / sr; dark = 0.7 * dark + 0.3 * (r() * 2 - 1); d[i] += dark * 0.22 * Math.exp(-t / 0.11) * Math.min(1, (t - 0.02) / 0.02); }      // a dull, quick tail: open air
-  }
-  const m = Math.max(...out.map(d => d.reduce((a, x) => a + x * x, 0))); for (const d of out) for (let i = 0; i < len; i++) d[i] /= Math.sqrt(m) * 1.4;
-  return out;
 }
 
 // The result card's jingles (NOTES 262) as scores scene.js plays through its tone() / noise() into the jingle bus, which also feeds the hall
@@ -143,9 +115,8 @@ export function hall(sr, { seed = 1 } = {}) {
 // the same buffer twice running, and a played buffer is also nudged in rate (+-3 %).
 export function bankJobs(sr) {
   const j = [];
-  for (const p of [0.3, 0.65, 1]) for (const s of [1, 2, 3]) j.push(['whoosh' + p, () => whoosh(sr, { p, seed: s })]);
+  for (const p of [0.3, 0.65, 1]) for (const s of [1, 2, 3, 4, 5]) j.push(['whoosh' + p, () => whoosh(sr, { p, seed: s })]);
   for (const n of [0, 0.25, 0.5, 0.75, 1]) for (const s of [1, 2]) j.push(['pock' + n, () => pock(sr, { n, seed: s })]);
   for (const h of [0.35, 0.9]) for (const s of [1, 2, 3]) j.push(['bounce' + h, () => bounce(sr, { h, seed: s })]);
-  for (const s of [1, 2, 3, 4, 5]) j.push(['squeak', () => squeak(sr, { seed: s })]);
   return j;
 }

@@ -1,5 +1,5 @@
 // Court sounds before/after (NOTES 259): renders the OLD oscillator voices (copied from scene.js before the change) and the NEW buffer
-// voices (web/courtsfx.js through scene.js play()'s chain: distance gain + lowpass, pan, room send) in Chrome's OfflineAudioContext, through
+// voices (web/courtsfx.js through scene.js play()'s chain: distance gain + lowpass, pan; dry since NOTES 263) in Chrome's OfflineAudioContext, through
 // the same master (gain 0.7 -> DynamicsCompressor) the game uses, to WAV files to listen to, and prints peak / RMS per file.
 //   node test/sfx-ab.mjs        Env: SFX_AB_OUT=<dir> (default test/sfx-ab/), SFX_AB_PORT=8761 (a static server over web/)
 // Last line: SFX AB PASS (every file rendered, no clipping: peak < 1.0 after the compressor) or SFX AB FAIL.
@@ -20,18 +20,18 @@ const res = await page.evaluate(async () => {
     'swing-mine-medium': [[0.05, 'whoosh', { mine: true, n: 0.65, d: 2.5 }]],
     'swing-mine-hard': [[0.05, 'whoosh', { mine: true, n: 1, d: 2.5 }]],
     'swing-theirs': [[0.05, 'whoosh', { mine: false, n: 0.65, d: 15 }]],
+    'swing-variety': [0.05, 0.55, 1.05, 1.55, 2.05].map((t, i) => [t, 'whoosh', { mine: true, n: [0.65, 1, 0.3, 0.65, 1][i], d: 2.5 }]),
     'hit-dink': [[0.05, 'pock', { n: 0, d: 3 }]],
     'hit-drive': [[0.05, 'pock', { n: 0.5, d: 3 }]],
     'hit-smash': [[0.05, 'pock', { n: 1, d: 3 }]],
     'hit-theirs-drive': [[0.05, 'pock', { n: 0.5, d: 15 }]],
     'bounce-near': [[0.05, 'bounce', { h: 0.8, d: 4 }]],
     'bounce-far': [[0.05, 'bounce', { h: 0.6, d: 13 }]],
-    'squeak': [[0.05, 'squeak', { d: 3, mine: true }], [0.75, 'squeak', { d: 3, mine: true }], [1.45, 'squeak', { d: 14 }]],
     // a short rally: my swing + drive, its bounce at the far end, their swing + hit, the bounce on my side, a plant, my smash
     'rally': [[0.1, 'whoosh', { mine: true, n: 0.6, d: 2.5 }], [0.16, 'pock', { n: 0.55, d: 3 }], [0.85, 'bounce', { h: 0.7, d: 11 }], [1.2, 'whoosh', { mine: false, n: 0.65, d: 15 }],
-      [1.32, 'pock', { n: 0.45, d: 15 }], [1.95, 'bounce', { h: 0.7, d: 5 }], [2.15, 'squeak', { d: 3, mine: true }], [2.35, 'whoosh', { mine: true, n: 1, d: 2.5 }], [2.42, 'pock', { n: 1, d: 3 }], [3.0, 'bounce', { h: 1, d: 12 }]],
+      [1.32, 'pock', { n: 0.45, d: 15 }], [1.95, 'bounce', { h: 0.7, d: 5 }], [2.35, 'whoosh', { mine: true, n: 1, d: 2.5 }], [2.42, 'pock', { n: 1, d: 3 }], [3.0, 'bounce', { h: 1, d: 12 }]],
   };
-  const LEN = { squeak: 2.0, rally: 3.6 };
+  const LEN = { rally: 3.6, 'swing-variety': 2.6 };
   async function render(name, evs, which) {
     const ac = new OfflineAudioContext(2, Math.round(SR * (LEN[name] || 0.8)), SR), master = ac.createGain(); master.gain.value = 0.7;
     const comp = ac.createDynamicsCompressor(); master.connect(comp); comp.connect(ac.destination);
@@ -56,27 +56,24 @@ const res = await page.evaluate(async () => {
     };
     // ---- NEW: scene.js play() ----
     const bank = {}; for (const [k, f] of m.bankJobs(SR)) { const d = f(), b = ac.createBuffer(1, d.length, SR); b.getChannelData(0).set(d); (bank[k] ||= []).push(b); }
-    const rm = m.room(SR), ir = ac.createBuffer(2, rm[0].length, SR); ir.getChannelData(0).set(rm[0]); ir.getChannelData(1).set(rm[1]);
-    const wet = ac.createConvolver(); wet.buffer = ir; wet.connect(master);
     const near = (v, ks) => ks.reduce((a, k) => (Math.abs(k - v) < Math.abs(a - v) ? k : a));
     function play(k, gain, dist, { rate = 1, offset = 0 } = {}) { const list = bank[k], buf = list[(rnd() * list.length) | 0], src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
       const far = Math.max(0, dist - 3), att = 1 / (1 + far / 6); src.buffer = buf; src.playbackRate.value = rate * (0.97 + 0.06 * rnd());
       lp.type = 'lowpass'; lp.frequency.value = 16000 / (1 + far / 3.5); lp.Q.value = 0.5; g.gain.value = gain * att;
-      src.connect(lp); lp.connect(g); g.connect(out(0)); const s = ac.createGain(); s.gain.value = gain * (0.12 + 0.3 * (1 - att)); lp.connect(s); s.connect(wet);
+      src.connect(lp); lp.connect(g); g.connect(out(0));      // dry: no room on the court (NOTES 263)
       src.start(T0, Math.min(offset, buf.duration * 0.9)); }
     const NEW = {
       pock(n, d) { play('pock' + near(n, [0, 0.25, 0.5, 0.75, 1]), 1 + 1.1 * n, d); },
       bounce(h, d) { play(h < 0.6 ? 'bounce0.35' : 'bounce0.9', 0.3 + 0.32 * h, d); },
       whoosh(g, mine, n, d) { const k = 'whoosh' + near(n, [0.3, 0.65, 1]); play(k, g * (0.5 + 0.7 * n), d, { offset: mine ? bank[k][0].duration * 0.3 : 0 }); },
-      squeak(mine, d) { play('squeak', mine ? 0.15 : 0.11, d, { rate: 0.94 + 0.12 * rnd() }); },
     };
     for (const [t, kind, a] of evs) { T0 = t;
       if (which === 'old') { if (kind === 'pock') OLD.pock(a.n); else if (kind === 'bounce') OLD.bounce(); else if (kind === 'whoosh') OLD.whoosh(a.mine ? 0.22 : 0.12, a.mine); }
-      else { if (kind === 'pock') NEW.pock(a.n, a.d); else if (kind === 'bounce') NEW.bounce(a.h, a.d); else if (kind === 'whoosh') NEW.whoosh(a.mine ? 0.22 : 0.12, a.mine, a.n, a.d); else NEW.squeak(a.mine, a.d); } }
+      else { if (kind === 'pock') NEW.pock(a.n, a.d); else if (kind === 'bounce') NEW.bounce(a.h, a.d); else NEW.whoosh(a.mine ? 0.22 : 0.12, a.mine, a.n, a.d); } }
     const b = await ac.startRendering(); return [Array.from(b.getChannelData(0)), Array.from(b.getChannelData(1))];
   }
   const outp = {};
-  for (const [name, evs] of Object.entries(SCENES)) for (const which of ['old', 'new']) { if (which === 'old' && name === 'squeak') continue; outp[which + '-' + name] = await render(name, evs, which); }
+  for (const [name, evs] of Object.entries(SCENES)) for (const which of ['old', 'new']) { outp[which + '-' + name] = await render(name, evs, which); }
   return outp;
 });
 await browser.close(); srv.close();

@@ -1002,7 +1002,6 @@ export function createScene(containerEl) {
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
         pd.vz = lerp(pd.vz, (pd.bodyZ - pz) / Math.max(dt, 1e-3), damp(dt, 0.1));
-        if (bank && !menu && !at.on && !won) squeakCheck(pd, dt);
         if (won && !still && pd.cheer <= 0 && timeS >= vic.hopAt) { pd.cheer = 1.05; vic.hopAt = timeS + 3.6; }      // the winner cannot stand still: three little hops, now and again
         pd.cheer = Math.max(0, pd.cheer - dt);
         const hop = pd.cheer > 0 ? Math.abs(Math.sin(pd.cheer * 9)) * 0.28 : 0, run = Math.min(1, Math.abs(pd.vx) / 3);
@@ -1336,10 +1335,9 @@ export function createScene(containerEl) {
   // The output device is the player's to choose (NOTES 60): an AirPod in one ear is a paddle, not a speaker, so the game
   // can be sent to the laptop's speakers instead. `muted` is kept here because master does not exist until the first gesture.
   let ac = null, master = null, noiseBuf = null, muted = false;
-  let bank = null, wet = null, squeaks = 0;               // the court's sounds as buffers (web/courtsfx.js, NOTES 259) and its room; until a voice's buffers exist it plays the oscillators below
+  let bank = null;                           // the court's sounds as buffers (web/courtsfx.js, NOTES 259), dry: an outdoor court has no room (NOTES 263); until a voice's buffers exist it plays the oscillators below
   let csfx = null, hallIn = null, hallV = null;                         // courtsfx.js once loaded (the jingles' scores, NOTES 262) and the send into the jingles' hall
   const GAIN = 0.7, vS = new THREE.Vector3();
-  const SQ_RUN = 2.2, SQ_BRAKE = 8;                       // squeakCheck: a run of at least 2.2 m/s, braked at more than 8 m/s/s (a plant from 5 m/s peaks ~11 on the drawn body)
   function unlockAudio() {
     try {
       if (!ac) {
@@ -1353,25 +1351,24 @@ export function createScene(containerEl) {
       if (ac.state !== 'running') ac.resume();
     } catch (e) { ac = null; }
   }
-  // The bank: synthesised in idle after the first gesture, one buffer a slot (a few ms each, 31 of them), never in a hit's frame. The room
-  // convolver is made empty (silent) and gets its impulse response first.
+  // The bank: synthesised in idle after the first gesture, one buffer a slot (a few ms each, 32 of them), never in a hit's frame. The jingles'
+  // hall convolver is made empty (silent) and gets its impulse response first.
   function courtBank() {
-    wet = ac.createConvolver(); wet.connect(master);
     hallV = ac.createConvolver(); hallIn = ac.createGain(); hallIn.gain.value = 0.45; hallIn.connect(hallV); hallV.connect(master);      // the jingles' hall (NOTES 262): silent until its IR is in
     import('./courtsfx.js').then(m => {
-      if (!ac) return; csfx = m; const sr = ac.sampleRate, jobs = [['room', () => m.room(sr)], ['hall', () => m.hall(sr)], ...m.bankJobs(sr)], b = {}; bank = b;
+      if (!ac) return; csfx = m; const sr = ac.sampleRate, jobs = [['hall', () => m.hall(sr)], ...m.bankJobs(sr)], b = {}; bank = b;
       const idle = window.requestIdleCallback || (f => setTimeout(f, 30));
       const step = () => { const [k, f] = jobs.shift();
         try { const d = f();
-          if (k === 'room' || k === 'hall') { const ir = ac.createBuffer(2, d[0].length, sr); ir.getChannelData(0).set(d[0]); ir.getChannelData(1).set(d[1]); (k === 'room' ? wet : hallV).buffer = ir; }
+          if (k === 'hall') { const ir = ac.createBuffer(2, d[0].length, sr); ir.getChannelData(0).set(d[0]); ir.getChannelData(1).set(d[1]); hallV.buffer = ir; }
           else { const buf = ac.createBuffer(1, d.length, sr); buf.getChannelData(0).set(d); (b[k] ||= []).push(buf); }
         } catch (e) { /* that voice keeps its oscillators */ }
         if (jobs.length) idle(step, { timeout: 1500 }); };
       idle(step, { timeout: 1500 });
     }).catch(() => {});
   }
-  // One buffer voice at a point on the court: quieter and duller with its distance from the camera (the far end is ~15 m off), and more of it
-  // in the room the further it is. -> false when the bank has no such buffer yet (the caller plays its old voice).
+  // One buffer voice at a point on the court: quieter and duller with its distance from the camera (the far end is ~15 m off), and dry: no
+  // reverb on the court, which is outdoors (NOTES 263). -> false when the bank has no such buffer yet (the caller plays its old voice).
   function play(k, gain, p, { rate = 1, offset = 0 } = {}) {
     const list = bank && bank[k]; if (!list || !list.length || !ac) return false;
     const buf = list[(rndFx() * list.length) | 0], src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
@@ -1379,23 +1376,9 @@ export function createScene(containerEl) {
     src.buffer = buf; src.playbackRate.value = rate * (0.97 + 0.06 * rndFx());
     lp.type = 'lowpass'; lp.frequency.value = 16000 / (1 + far / 3.5); lp.Q.value = 0.5; g.gain.value = gain * att;
     src.connect(lp); lp.connect(g); g.connect(out(p ? panOf(p[0]) : 0));
-    if (wet && wet.buffer) { const s = ac.createGain(); s.gain.value = gain * (0.12 + 0.3 * (1 - att)); lp.connect(s); s.connect(wet); }
     src.start(ac.currentTime, Math.min(offset, buf.duration * 0.9)); src.stop(ac.currentTime + buf.duration + 0.02); return true;
   }
   const near = (v, ks) => ks.reduce((a, k) => (Math.abs(k - v) < Math.abs(a - v) ? k : a));
-  // A hard plant or a cut out of a run: the sole grabs the court (NOTES 259). pd.vx is the drawn body's sideways speed (m/s). The run it comes
-  // out of is the peak speed of the last ~0.35 s; braking = accelerating against the motion (or near stopped). Once in 0.45 s per player
-  function squeakCheck(pd, dt) {
-    const v = pd.vx, a = (v - (pd.sqV ?? v)) / Math.max(dt, 1e-3); pd.sqV = v;
-    pd.sqPk = Math.max(Math.abs(v), (pd.sqPk || 0) * Math.exp(-dt / 0.35));
-    if (window.__sfxVx) window.__sfxVx.push([pd.side, +v.toFixed(2), +a.toFixed(1)]);      // tests only (test/sfx-ab.mjs tunes the trigger on these)
-    if (timeS - (pd.sqAt ?? -9) < 0.45 || pd.sqPk < SQ_RUN) return;
-    if ((Math.sign(a) !== Math.sign(v) || Math.abs(v) < 0.4) && Math.abs(a) > SQ_BRAKE) {
-      pd.sqAt = timeS; pd.sqPk = 0; squeaks++;
-      if (window.__sfxLog) window.__sfxLog.push(['squeak', pd.side, +pd.vx.toFixed(2), +a.toFixed(1)]);
-      play('squeak', isMe(pd.side) ? 0.15 : 0.11, [pd.bodyX, 0.05, pd.bodyZ], { rate: 0.94 + 0.12 * rndFx() });
-    }
-  }
   const panOf = x => (spectator ? 0 : clamp(sgn(localSide) * (x - cam.x) / 4.5, -1, 1));       // a spectator's left and right are not the court's: centred
   function out(pan) {                                     // -> node to connect a voice into
     if (!ac.createStereoPanner) return master;
@@ -1430,7 +1413,7 @@ export function createScene(containerEl) {
     bounce(x, p, h = 0.6) { if (!ac) return; if (play(h < 0.6 ? 'bounce0.35' : 'bounce0.9', 0.3 + 0.32 * h, p || [x, 0, 0])) return; const d = out(panOf(x)); tone(d, 'sine', 760, 560, 0.03, 0.16, 0.07); tone(d, 'triangle', 300, 250, 0.05, 0.1, 0.1); noise(d, 1500, 1100, 800, 0.7, 0.05, 0.03, 0.001); },
     whoosh(x, g = 0.2, mine = false, p = null, n = 0.65) {      // mine: the swing is already under way when it is seen, so its first third is skipped
       if (!ac) return; const k = 'whoosh' + near(n, [0.3, 0.65, 1]), b = bank && bank[k];
-      if (play(k, g * (0.5 + 0.7 * n), p || [x, 1.1, 0], { offset: mine && b && b[0] ? b[0].duration * 0.3 : 0 })) return; noise(out(panOf(x)), 420, 2100, 650, 1.3, g, mine ? 0.22 : 0.3, mine ? 0.025 : 0.09); },   // mine: no slow swell, it is already late
+      if (play(k, g * (0.5 + 0.7 * n), p || [x, 1.1, 0], { offset: mine && b && b[0] ? b[0].duration * 0.3 : 0 })) return; noise(out(panOf(x)), 300, 1100, 450, 0.9, g, mine ? 0.22 : 0.3, mine ? 0.025 : 0.09); },   // mine: no slow swell, it is already late. Before the bank: dark, broad (NOTES 263)
     chime(win) {
       if (!ac) return; const d = out(0), ns = win ? [783.99, 1174.66] : [587.33, 440];
       ns.forEach((f, i) => { tone(d, 'sine', f, f, 0.01, 0.3, 0.7, i * 0.17); tone(d, 'triangle', f * 2, f * 2, 0.01, 0.07, 0.4, i * 0.17); });
@@ -1825,6 +1808,6 @@ export function createScene(containerEl) {
     setLooks(a) { for (const pd of pads) { const k = Array.isArray(a) && LOOKS[a[pd.side]] ? a[pd.side] : null; if (k !== pd.look) { pd.look = k; paint(pd, pd.matt); } } },      // [side 0, side 1]: LOOKS keys (main.js, from lookFor(name, reg)) or null
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at, trophy, vic,               // test harness only
       view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }),
-      sfx: () => ({ ac: ac ? ac.state : null, bank: bank ? Object.fromEntries(Object.entries(bank).map(([k, v]) => [k, v.length])) : null, room: !!(wet && wet.buffer), hall: !!(hallV && hallV.buffer), jingles: !!csfx, squeaks }) },
+      sfx: () => ({ ac: ac ? ac.state : null, bank: bank ? Object.fromEntries(Object.entries(bank).map(([k, v]) => [k, v.length])) : null, hall: !!(hallV && hallV.buffer), jingles: !!csfx }) },
   };
 }

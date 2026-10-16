@@ -5259,3 +5259,19 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   behind the word and a white shock ring spreads, both gone by ~1 s and hidden before it. DEFEAT drops in heavy and squashes, with a faint red
   ring and no rays. Pseudo-elements on the title, only while it has .go, so the corner title has none.
 - test/court-sfx.mjs also checks the hall IR and the scores load. test/victory-e2e.mjs passes (24).
+
+## 263. The court is dry, the shoe squeak is gone, and the swing is air, not a scrape
+- Owner (2026-10-16): "too much reverb; it makes no sense ... for the ball to be reverbing since we're playing outside"; the squeak "just
+  sounds bad. remove it"; the swing "sounds too scratchy", wanted a more variable whoosh.
+- web/scene.js `play()`: no send into a room any more; the `room` convolver, its impulse response (courtsfx.js `room`) and its bank job
+  are gone. Every court voice (hit, bounce, swing) is dry: distance still makes it quieter and duller. The result jingles keep their
+  hall (NOTES 262): that is the music, not the court.
+- The shoe squeak is removed: courtsfx.js `squeak`, its 5 bank buffers, scene.js `squeakCheck` and its call. NOTES 259/260's squeak
+  notes no longer apply.
+- courtsfx.js `whoosh`: NOTES 259's mixed a white-noise "edge" band up to ~3 kHz and a flutter re-randomised every sample: scratchy. Now
+  dark noise only (brown + pink) through two broad resonances that ride the paddle's speed (150-1300 Hz), softened above ~2.4 kHz, a
+  smooth shallow wobble. Each variant draws its own length (+-20 %), peak, rise and fall, pitch (+-18 %) and depth, and there are 5 per
+  power (was 3). Raw synth: energy above 3 kHz 14-20 % -> 3-8 %, zero-crossing rate ~2 kHz -> 430-770 Hz. The fallback before the bank
+  (an oscillator noise band) is darker too: 300 -> 1100 -> 450 Hz, Q 0.9 (was 420 -> 2100 -> 650, Q 1.3).
+- test/court-sfx.mjs: the bank is 31 buffers, no room, no squeak, and sprints/plants/cuts/a rally play no squeak. test/sfx-ab.mjs: dry
+  chain, no squeak, plus swing-variety.wav (five swings in a row).
