@@ -948,6 +948,7 @@ export function createScene(containerEl) {
         pd.bodyX = lerp(pd.bodyX, bx, damp(dt, 0.12)); pd.bodyZ = lerp(pd.bodyZ, bz, damp(dt, 0.12));
         pd.vx = lerp(pd.vx, (pd.bodyX - px) / Math.max(dt, 1e-3), damp(dt, 0.1));
         pd.vz = lerp(pd.vz, (pd.bodyZ - pz) / Math.max(dt, 1e-3), damp(dt, 0.1));
+        if (bank && !menu && !at.on && !won) squeakCheck(pd, dt);
         if (won && !still && pd.cheer <= 0 && timeS >= vic.hopAt) { pd.cheer = 1.05; vic.hopAt = timeS + 3.6; }      // the winner cannot stand still: three little hops, now and again
         pd.cheer = Math.max(0, pd.cheer - dt);
         const hop = pd.cheer > 0 ? Math.abs(Math.sin(pd.cheer * 9)) * 0.28 : 0, run = Math.min(1, Math.abs(pd.vx) / 3);
@@ -1281,7 +1282,9 @@ export function createScene(containerEl) {
   // The output device is the player's to choose (NOTES 60): an AirPod in one ear is a paddle, not a speaker, so the game
   // can be sent to the laptop's speakers instead. `muted` is kept here because master does not exist until the first gesture.
   let ac = null, master = null, noiseBuf = null, muted = false;
-  const GAIN = 0.7;
+  let bank = null, wet = null, squeaks = 0;               // the court's sounds as buffers (web/courtsfx.js, NOTES 259) and its room; until a voice's buffers exist it plays the oscillators below
+  const GAIN = 0.7, vS = new THREE.Vector3();
+  const SQ_RUN = 2.2, SQ_BRAKE = 8;                       // squeakCheck: a run of at least 2.2 m/s, braked at more than 8 m/s/s (a plant from 5 m/s peaks ~11 on the drawn body)
   function unlockAudio() {
     try {
       if (!ac) {
@@ -1290,9 +1293,52 @@ export function createScene(containerEl) {
         const comp = ac.createDynamicsCompressor(); master.connect(comp); comp.connect(ac.destination);
         noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
         const d = noiseBuf.getChannelData(0), r = rng(5); for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1;
+        courtBank();
       }
       if (ac.state !== 'running') ac.resume();
     } catch (e) { ac = null; }
+  }
+  // The bank: synthesised in idle after the first gesture, one buffer a slot (a few ms each, 31 of them), never in a hit's frame. The room
+  // convolver is made empty (silent) and gets its impulse response first.
+  function courtBank() {
+    wet = ac.createConvolver(); wet.connect(master);
+    import('./courtsfx.js').then(m => {
+      if (!ac) return; const sr = ac.sampleRate, jobs = [['room', () => m.room(sr)], ...m.bankJobs(sr)], b = {}; bank = b;
+      const idle = window.requestIdleCallback || (f => setTimeout(f, 30));
+      const step = () => { const [k, f] = jobs.shift();
+        try { const d = f();
+          if (k === 'room') { const ir = ac.createBuffer(2, d[0].length, sr); ir.getChannelData(0).set(d[0]); ir.getChannelData(1).set(d[1]); wet.buffer = ir; }
+          else { const buf = ac.createBuffer(1, d.length, sr); buf.getChannelData(0).set(d); (b[k] ||= []).push(buf); }
+        } catch (e) { /* that voice keeps its oscillators */ }
+        if (jobs.length) idle(step, { timeout: 1500 }); };
+      idle(step, { timeout: 1500 });
+    }).catch(() => {});
+  }
+  // One buffer voice at a point on the court: quieter and duller with its distance from the camera (the far end is ~15 m off), and more of it
+  // in the room the further it is. -> false when the bank has no such buffer yet (the caller plays its old voice).
+  function play(k, gain, p, { rate = 1, offset = 0 } = {}) {
+    const list = bank && bank[k]; if (!list || !list.length || !ac) return false;
+    const buf = list[(rndFx() * list.length) | 0], src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
+    const far = p ? Math.max(0, camera.position.distanceTo(vS.set(p[0], p[1], p[2])) - 3) : 0, att = 1 / (1 + far / 6);
+    src.buffer = buf; src.playbackRate.value = rate * (0.97 + 0.06 * rndFx());
+    lp.type = 'lowpass'; lp.frequency.value = 16000 / (1 + far / 3.5); lp.Q.value = 0.5; g.gain.value = gain * att;
+    src.connect(lp); lp.connect(g); g.connect(out(p ? panOf(p[0]) : 0));
+    if (wet && wet.buffer) { const s = ac.createGain(); s.gain.value = gain * (0.12 + 0.3 * (1 - att)); lp.connect(s); s.connect(wet); }
+    src.start(ac.currentTime, Math.min(offset, buf.duration * 0.9)); src.stop(ac.currentTime + buf.duration + 0.02); return true;
+  }
+  const near = (v, ks) => ks.reduce((a, k) => (Math.abs(k - v) < Math.abs(a - v) ? k : a));
+  // A hard plant or a cut out of a run: the sole grabs the court (NOTES 259). pd.vx is the drawn body's sideways speed (m/s). The run it comes
+  // out of is the peak speed of the last ~0.35 s; braking = accelerating against the motion (or near stopped). Once in 0.45 s per player
+  function squeakCheck(pd, dt) {
+    const v = pd.vx, a = (v - (pd.sqV ?? v)) / Math.max(dt, 1e-3); pd.sqV = v;
+    pd.sqPk = Math.max(Math.abs(v), (pd.sqPk || 0) * Math.exp(-dt / 0.35));
+    if (window.__sfxVx) window.__sfxVx.push([pd.side, +v.toFixed(2), +a.toFixed(1)]);      // tests only (test/sfx-ab.mjs tunes the trigger on these)
+    if (timeS - (pd.sqAt ?? -9) < 0.45 || pd.sqPk < SQ_RUN) return;
+    if ((Math.sign(a) !== Math.sign(v) || Math.abs(v) < 0.4) && Math.abs(a) > SQ_BRAKE) {
+      pd.sqAt = timeS; pd.sqPk = 0; squeaks++;
+      if (window.__sfxLog) window.__sfxLog.push(['squeak', pd.side, +pd.vx.toFixed(2), +a.toFixed(1)]);
+      play('squeak', isMe(pd.side) ? 0.15 : 0.11, [pd.bodyX, 0.05, pd.bodyZ], { rate: 0.94 + 0.12 * rndFx() });
+    }
   }
   const panOf = x => (spectator ? 0 : clamp(sgn(localSide) * (x - cam.x) / 4.5, -1, 1));       // a spectator's left and right are not the court's: centred
   function out(pan) {                                     // -> node to connect a voice into
@@ -1319,14 +1365,16 @@ export function createScene(containerEl) {
     jingleBus = ac.createGain(); jingleBus.gain.value = 1; jingleBus.connect(out(0)); return jingleBus;      // out(0) -> master: mute and the chosen speaker apply
   }
   const sfx = {
-    pock(n, x) {                                          // hollow plastic: pitched body + low cavity + bright click
-      if (!ac) return; const d = out(panOf(x)), f = 880 + 520 * n, g = 0.6 + 0.7 * n;
+    pock(n, x, p) {                                       // the bank's pop (courtsfx.js pock); before it: hollow plastic, pitched body + low cavity + bright click
+      if (!ac) return; if (play('pock' + near(n, [0, 0.25, 0.5, 0.75, 1]), 1 + 1.1 * n, p || [x, 1, 0])) return; const d = out(panOf(x)), f = 880 + 520 * n, g = 0.6 + 0.7 * n;
       tone(d, 'sine', 170 + 60 * n, 70, 0.004, 0.35 + 0.5 * n, 0.16);          // the thump you feel: gets heavier with power
       tone(d, 'sine', f * 1.6, f, 0.018, g, 0.085); tone(d, 'triangle', f * 0.5, f * 0.46, 0.05, g * 0.5, 0.13);
       noise(d, 3200, 2400, 1800, 0.8, g * 0.5, 0.03, 0.001);
     },
-    bounce(x) { if (!ac) return; const d = out(panOf(x)); tone(d, 'sine', 760, 560, 0.03, 0.16, 0.07); tone(d, 'triangle', 300, 250, 0.05, 0.1, 0.1); noise(d, 1500, 1100, 800, 0.7, 0.05, 0.03, 0.001); },
-    whoosh(x, g = 0.2, mine = false) { if (!ac) return; noise(out(panOf(x)), 420, 2100, 650, 1.3, g, mine ? 0.22 : 0.3, mine ? 0.025 : 0.09); },   // mine: no slow swell, it is already late
+    bounce(x, p, h = 0.6) { if (!ac) return; if (play(h < 0.6 ? 'bounce0.35' : 'bounce0.9', 0.3 + 0.32 * h, p || [x, 0, 0])) return; const d = out(panOf(x)); tone(d, 'sine', 760, 560, 0.03, 0.16, 0.07); tone(d, 'triangle', 300, 250, 0.05, 0.1, 0.1); noise(d, 1500, 1100, 800, 0.7, 0.05, 0.03, 0.001); },
+    whoosh(x, g = 0.2, mine = false, p = null, n = 0.65) {      // mine: the swing is already under way when it is seen, so its first third is skipped
+      if (!ac) return; const k = 'whoosh' + near(n, [0.3, 0.65, 1]), b = bank && bank[k];
+      if (play(k, g * (0.5 + 0.7 * n), p || [x, 1.1, 0], { offset: mine && b && b[0] ? b[0].duration * 0.3 : 0 })) return; noise(out(panOf(x)), 420, 2100, 650, 1.3, g, mine ? 0.22 : 0.3, mine ? 0.025 : 0.09); },   // mine: no slow swell, it is already late
     chime(win) {
       if (!ac) return; const d = out(0), ns = win ? [783.99, 1174.66] : [587.33, 440];
       ns.forEach((f, i) => { tone(d, 'sine', f, f, 0.01, 0.3, 0.7, i * 0.17); tone(d, 'triangle', f * 2, f * 2, 0.01, 0.07, 0.4, i * 0.17); });
@@ -1405,18 +1453,18 @@ export function createScene(containerEl) {
       trail.glow = 0.8 + 0.2 * shown; ballTake(ball, m, stampOf);      // the ball record: spin, the blend onto the new path, this contact's arc, and the launch that rides on the hit
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
       const rx = pads[1 - m.side]; if (rx && rx.bot) rx.stance.split = 1;      // Matt split-steps as the ball comes off the other paddle
-      sfx.pock(n, p[0]); if (m.spin > 0.12 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.2 * Math.min(1, m.spin) ** 1.5, 0.11, 0.004);   // spin hisses off the face, as loud as there is spin: 0.5 -> 0.07, 0.8 -> 0.14, 1 -> 0.2
+      sfx.pock(n, p[0], p); if (m.spin > 0.12 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.2 * Math.min(1, m.spin) ** 1.5, 0.11, 0.004);   // spin hisses off the face, as loud as there is spin: 0.5 -> 0.07, 0.8 -> 0.14, 1 -> 0.2
     } else if (m.type === 'swung') {
       const pd = pads[m.side]; if (!pd) return;
       pd.swooshUntil = timeS + 0.5;                          // the blur belongs to the swing, never to plain movement
       if (pd.bot && pd.swingT < 0) startSwing(pd);
       if (timeS - pd.swungAt < 0.25) return; pd.swungAt = timeS;          // main may play it locally AND the server echoes it: once
-      sfx.whoosh(pd.pos.x, isMe(m.side) ? 0.22 : 0.12, isMe(m.side));
+      sfx.whoosh(pd.pos.x, isMe(m.side) ? 0.22 : 0.12, isMe(m.side), [pd.pos.x, pd.pos.y, pd.pos.z], m.n != null && isFinite(m.n) ? clamp(+m.n, 0, 1) : 0.65);
     } else if (m.type === 'bounce') {
       const p = m.p || ball.p; ring(p, true, 0.1, 0.55, 0.4, 0xffffff, 0.7, false);
       burst([p[0], 0.06, p[2]], 0, 5, 1.2, [0xd8e6f5, 0xffffff]);
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
-      sfx.bounce(p[0]);
+      sfx.bounce(p[0], p, clamp(Math.abs((ball.v && ball.v[1]) || 5) / 8, 0.2, 1));      // how hard it came down: the ball's vertical speed, as the server had it
     } else if (m.type === 'serve') { ballTake(ball, m, stampOf); ball.power = 0; ball.kind = ball.betN = null; trail.glow = 0.35; }
     else if (m.type === 'point') {
       if (marker.visible && mk.fade === 0) mk.fade = 1e-4;
@@ -1611,6 +1659,7 @@ export function createScene(containerEl) {
     setSelfBody(on) { selfBody = !!on; },                   // Settings > Show player model (dress() reads it every frame)
     setLooks(a) { for (const pd of pads) { const k = Array.isArray(a) && LOOKS[a[pd.side]] ? a[pd.side] : null; if (k !== pd.look) { pd.look = k; paint(pd, pd.matt); } } },      // [side 0, side 1]: LOOKS keys (main.js, from lookFor(name, reg)) or null
     _dbg: { renderer, scene, camera, VIEW, pads, ball, cam, free, ballMesh, attract: at, trophy, vic,               // test harness only
-      view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }) },
+      view: () => ({ ...getView(), menu, dim, attract: at.on, frozen, spectator, stacked: size.w <= size.h, pixelRatio: renderer.getPixelRatio(), drawn }),
+      sfx: () => ({ ac: ac ? ac.state : null, bank: bank ? Object.fromEntries(Object.entries(bank).map(([k, v]) => [k, v.length])) : null, room: !!(wet && wet.buffer), squeaks }) },
   };
 }

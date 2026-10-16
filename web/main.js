@@ -656,7 +656,7 @@ function onSample(sample, from) {
         const g = 1 - fade(e.final === false && e.pend && e.twist != null ? Math.min(rl, Math.abs(e.twist)) : rl), lob = e.lob * (1 - g);
         game.send({ type: 'swing', power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob, chop: e.chop, age: e.age, net: net.lag(), slice, fix, final: !!e.final, pk: e.raw || 0, src: src === 'phone' ? 'phone' : 'airpod' });      // pk, src: stats only (docs/ACCOUNTS.md 4.5), the UNGAINED peak rad/s (motion.js sw.peak) and which paddle made it. final: the settled power. The first report is a bet that overshoots (a wind-up called 30 settles at 8): the server serves and calls a smash only on a settled one
         unsettled = e.final ? null : { power: e.power, raw: pw(e.raw || 0), rom: e.rom || 0, back: e.back || 0, off: e.off || 0, dir: e.dir, lob: (e.lobRaw != null ? e.lobRaw : e.lob) * fade(rl), chop: e.chop, age: e.age, slice, pk: e.raw || 0, src: src === 'phone' ? 'phone' : 'airpod' };   // standing in for a settled report, the lob is the path as it was, not the look-ahead
-        if (!fix) scene.onEvent({ type: 'swung', side });            // whoosh now; the server's echo is de-duplicated
+        if (!fix) scene.onEvent({ type: 'swung', side, n: e.power });            // whoosh now; the server's echo is de-duplicated
       } }
     else if (e.type === 'swingEnd') { logSwing(e);
       if (unsettled) { game.send({ type: 'swing', ...unsettled, power: e.peak, pk: e.raw || unsettled.pk, net: net.lag(), fix: true, final: true }); unsettled = null; } }      // motion.js settles every swing itself; should one ever end without, the server still hears that it is over

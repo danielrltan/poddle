@@ -5115,3 +5115,33 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   a player joining mid-calibration, tournament courts: all go through the same `players.every(ready)` gate.
 - test/calgate.test.mjs: receiver calibrates while a serve hangs, the server calibrates during their own serve, one human vs Matt
   before the first strike, a calibrating seat's swing. 8 failures on d83150f, all pass with this change.
+## 259. Court sounds: a real swing whoosh, a pickleball pop, a hollow bounce, shoe squeaks, distance and a little room
+- The owner (2026-10-16): the swing sounded unrealistic; add a slight shoe squeak when a player moves across the court fast; make the
+  court's sounds more realistic and satisfying overall.
+- web/courtsfx.js (new, pure functions, no Web Audio): each voice is synthesised into buffers, 3-5 variants per kind, picked at random and
+  nudged in rate (+-3 %) per play, so no two hits are the same buffer twice running.
+  - whoosh: broadband noise through two resonances riding the paddle's speed (a fast rise, a slower fall, the pitch a little lower past the
+    peak), loudness ~ speed^1.6, a flutter from the edge. Three swing powers. Was one band-passed noise sweep (420 -> 2100 -> 650 Hz) that
+    read as a synth zap. My own swing now carries its measured power (main.js: `swung` with `n: e.power`) and skips the build-up it is
+    already past; the server's echo (others' swings) plays the medium one.
+  - pock: the pickleball pop: a contact click whose brightness follows the contact time (a hard hit leaves the face sooner), the hollow
+    ball's shell modes (1.25 kHz and up, where a real pickleball's energy is) and the paddle face's lower, quicker modes; a dink is
+    muted, a drive or smash adds a felt low thump. Five powers. Was three oscillators and a noise burst.
+  - bounce: the same ball on a hard court, a shorter, duller "tok" (lower shell modes, the court's thud), louder when the ball came down
+    harder (its vertical speed). Was a fixed 760 Hz sine blip.
+  - squeak: a shoe sole's stick-slip, a buzzy pitched chirp (1.7-2.6 kHz with harmonics), a fast wobble, an uneven grip, a little scuff.
+  - room: a short stereo impulse response (early slaps off the walls and fence, a quick dull tail) for a convolver every court voice sends
+    to, more of it the further away the sound is.
+- web/scene.js: `courtBank()` imports courtsfx.js at the first gesture (a dynamic import: not on the load path) and builds one buffer
+  per idle slot (30 buffers + the room, ~43 ms in all on an M-series Mac, a few ms each), never in a hit's frame. `play()` gives each voice
+  its place: quieter (1 / (1 + (d - 3) / 6)) and duller (a lowpass from 16 kHz down to ~3.6 kHz at the far baseline) with its distance d
+  from the camera, panned as before, through master (mute and the chosen speaker apply). Until a voice's buffers exist it plays the old
+  oscillators. Spin hiss, whiff, point chimes, jingles and cues are unchanged.
+- Shoe squeak (`squeakCheck`, every drawn player, on court only: not in the menu, attract or the winner's hops): out of a run of at least
+  2.2 m/s (the drawn body's sideways speed, its peak over the last ~0.35 s), braking at more than 8 m/s/s against the motion, at most once
+  per 0.45 s per player; mine at 0.15, the others' at 0.11 before distance. test/court-sfx.mjs: slow sweeps (1 m/s) and a jog (1.9 m/s)
+  never squeak; a sprint and plant squeaks once per plant (6/6); 5 m/s cuts every 0.5 s squeak 7 of 8; a 12 s fake rally gave 6.
+- Levels (test/sfx-ab.mjs, OfflineAudioContext through the game's master gain + compressor, peak dBFS old -> new): drive -3.3 -> -3.6,
+  dink -8.2 -> -8.0, smash -1.1 -> -3.0, my swing -30.9 -> -19.3 (medium) / -16.5 (hard), bounce near -21.2 -> -14.2, far -21.2 -> -21.9, the
+  other end's drive -3.3 -> -14.2 (distance), squeak -18.8. WAVs of every sound before and after and a short rally: test/sfx-ab/ (untracked,
+  `node test/sfx-ab.mjs` remakes them).
