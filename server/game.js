@@ -751,6 +751,13 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   }
   function setAway(me, on) { if (!!me.afk === on) return; me.afk = on; selfPause(me); }
   function setCal(me, on) { if (!!me.cal === on) return; me.cal = on; selfPause(me); }
+  // A hanging serve is live (reset()), so the gate in sim() that holds a serve for a calibrating seat never saw it: the server could strike it
+  // and, 9 s on, it was served for them while the other player calibrated (NOTES 258). Taken back here, it is served again the way any
+  // waiting serve is: once every seat is ready (and, before the first strike of a match, after the count again). slowSeat's window applies.
+  function withdrawServe() {
+    ball.live = false; ball.serving = null; serveAt = now + 0.8; for (const p of players) p.swing = p.servePending = null;
+    if (!started && READY_S > 0) counting = { until: Infinity, said: -1 };
+  }
 
   function point(winner, why) {
     stats.pointEnd(match, winner, why);                          // the rally's length and the play counters, before the score moves (docs/ACCOUNTS.md 4.4, docs/SHARE.md 1)
@@ -1110,6 +1117,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (match) stats.motion(match, me, me.rate, m.q);           // the hand behind every swing (R19, NOTES 198): in every move mode, Auto too
       if (match && !me.auto) stats.sample(match, me, me.x, me.y, ball.live);   // paddle plausibility: 2+ teleports in a row while the ball is live (docs/ACCOUNTS.md 4.8)
     } else if (m.type === 'swing') {
+      if (!ready(me)) return;                                    // a seat that is calibrating strikes nothing (NOTES 258): its client sends no swings then, and a stray one must not serve
       if (match) stats.swingSeen(match, me, !!m.fix, Number.isFinite(m.pk) ? m.pk : null, m.final === true);   // R19: checked against the paddle stream once its window has passed
       let pw = effort(clamp((num(m.power, 6) - 6) / 28, 0, 1));      // 20% more swing to smash (SMASH_IN)
       // No overhead bonus any more (NOTES 82): it lifted any downward stroke past n 0.55 by 0.2 to a smash, however slowly it came
@@ -1194,6 +1202,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     if (now >= newMatchAt) { newMatchAt = Infinity; over = null; broadcast({ type: 'rematchon' }); if (players.length === 2) startMatch(1 - firstServe); }   // LOCAL only
     const counted = !countdown();                                // every tick: the count into a new match starts over if the room comes apart while it runs
     if (!ball.live && counted && now >= serveAt && players.every(ready)) { serveAt = Infinity; if (players.length === 2) reset(server); }   // the serve waits for a human who is still calibrating, and then for the count
+    if (ball.live && ball.serving != null && ball.lastHit !== ball.serving && !players.every(ready)) withdrawServe();   // a seat went back to calibrating while the serve hung: it comes down and waits with the rest (NOTES 258)
 
     for (const pl of players) {
       if (pl.bot) runBot(pl, DT); else if (pl.auto || pl.autoY) runAuto(pl, DT);
