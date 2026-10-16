@@ -348,7 +348,8 @@ console.log('20. database growth: only completed matches create profiles, and ne
 // R19 (NOTES 198): on a server with STATS_MOTION=1, the scripted hitter above (Auto, a swing whenever the ball is close, a paddle that never turns)
 // is exactly the cheapest cheat. Its win over Matt does not count; a client whose paddle stream turns with every swing does.
 {
-  const P4 = PORT + 3, M = await up(P4, { PODDLE_DB: path.join(tmp, 'motion.db'), ...BASE, STATS_MOTION: '1', STATS_MOTION_ENFORCE: '1' });
+  // games to 5 here: R19 marks a seat only after 5 unbacked swings (stats.js MO.bad), and a 2-0 over Rookie could take fewer: the check was a coin toss (NOTES 264)
+  const P4 = PORT + 3, M = await up(P4, { PODDLE_DB: path.join(tmp, 'motion.db'), ...BASE, WIN_AT: '5', STATS_MOTION: '1', STATS_MOTION_ENFORCE: '1' });
   function hand(c) { hit(c); const swing = c.play; let ang = 0, at = 0, hot = 0;   // hit's swings, with a hand behind them: the paddle turns at 20 rad/s around each
     const send = c.send; c.send = o => { if (o.type === 'swing') hot = Date.now(); if (o.type !== 'paddle') return send(o); };
     c.play = m => { swing(m); const t = Date.now(); if (t - at < 50) return; at = t; const r = Math.abs(t - hot) < 250 ? 20 : 0; ang += r * 0.05;

@@ -5301,3 +5301,6 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
 - Tests: accounts-unit R2 checks rewritten (+ R2/R8 with base); stats.test 8 (unverified, guest: held harmless), 19 (0-0: fresh, counts),
   20 (new: snapshot written on SIGINT, read once and deleted, the court comes back verified, the match counts with no restart reason);
   trophies.test 16 (new, its own games-to-2 server: unverified, the winner +30, the loser 100 -> 100 with why restart, no ladder loss).
+- test/stats.test.mjs R19: its server now plays games to 5. R19 marks a seat only after 5 unbacked swings (stats.js MO.bad), and a 2-0
+  over Rookie sometimes took fewer, so "the scripted hitter beats Rookie: saved, not counted" failed at random and kept stopping
+  deploy.sh's gate (2026-10-05, 10-15, 10-16). 3 of 3 runs pass now.
