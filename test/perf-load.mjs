@@ -153,7 +153,7 @@ const marksOf = pg => pg.evaluate(() => Object.fromEntries(performance.getEntrie
   .filter(e => /^(gl|scenery):/.test(e.name)).map(e => [e.name, { at: Math.round(e.startTime * 10) / 10, dur: Math.round(e.duration * 10) / 10 }]))).catch(() => ({}));
 function traceStats(t) {                                                   // the same sample weighting as the live analysis: gap to the next sample, capped at 50 ms
   if (!t || !t.samples || !t.samples.length) return null;
-  const res = t.resources || [], frame = id => { const f = t.frames[id] || {}; return { name: f.name || '', file: f.resourceId != null ? String(res[f.resourceId] || '') : '', line: f.line, col: f.column }; };
+  const res = t.resources || [], frame = id => { const f = t.frames[id] || {}; return { name: f.name || '', file: f.resourceId != null ? String(res[f.resourceId] || '').replace(/[?#].*$/, '') : '', line: f.line, col: f.column }; };
   const memo = new Map(), stackOf = sid => { if (sid == null || !t.stacks[sid]) return []; if (memo.has(sid)) return memo.get(sid); const out = [];
     for (let s = sid, g = 0; s != null && t.stacks[s] && g < 512; s = t.stacks[s].parentId, g++) out.push(frame(t.stacks[s].frameId)); out.reverse(); memo.set(sid, out); return out; };
   const isD = f => f.name === 'D' && /three\.min\.js$/.test(f.file.replace(/[?#].*$/, '')) && f.line === 7 && Math.abs(f.col - D_COL) <= 60;

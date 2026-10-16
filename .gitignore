@@ -10,3 +10,4 @@ test/ui-shots/*/
 *.db
 *.db-wal
 *.db-shm
+web/**/*.br
