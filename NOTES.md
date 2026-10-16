@@ -5097,6 +5097,27 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   queue sounds and needs the Settings speaker choice applied before resume(); left for a separate change.
 - test/menu-audio.mjs: its settings-card checks fail identically on main (the title's settings button moved); the music check passes.
 
+## 257. Auto move is drawn like Matt: no packet steps, a hand that gets going, feet that step
+- The owner found Auto (Settings > Move = Auto) "very very choppy". Cause: in Auto the server runs your player (runAuto: straight to
+  the contact point at 5.5 m/s, y to the contact height at 4 m/s), and main.js drew your own seat 1:1 from the LATEST state packet every
+  frame. Packets come 60 a second, late and bunched, so the paddle stood still on 32% of frames while running at 60 Hz (60% on a 120 Hz
+  screen) and then jumped. The body read the server's paddle height as its head, so a lob stood you up ~0.8 m tall, and the feet slid.
+  Matt's seat is driven the same way but drawn through NOTES 170/175/176, so he looked like a person and you looked like a block on a rail.
+- web/main.js: your own updatePaddle says `auto` (x is the server's) and `autoY` (Move = Auto: y is the server's too).
+- web/scene.js updatePads: such a seat gets what Matt gets. x/y take the same 55 ms lerp as a remote player; the hand rides Matt's
+  critically damped spring (loose while running, tight for the last 0.3 s and the swing, so the face is on the server's paddle by
+  contact); with Move = Auto the paddle waits at your side and comes up as the ball arrives, and the body takes its height off the
+  paddle on a spring (knees for a low ball, toes for a high one); the stride and its bob; the split step as the other side hits.
+  The paddle's attitude stays your real AirPod's 1:1, and nothing on the server changed: where you run, how fast and every hit are
+  exactly as before. Switching back to Body mid-run, the hand settles onto the 1:1 paddle instead of jumping.
+- test/auto-motion.mjs (new): scene-preview with a fake server stepping runAuto and runBot (both at 5.5 m/s), state packets with
+  40-70 ms of bunched latency, the page drawn at 60 and 120 Hz. Before -> after, 60 / 120 Hz: frames the running paddle stood still
+  32% / 60% -> 0%; paddle p95 acceleration 330 / 1320 -> 17 m/s²; body RMS acceleration 17 / 27 -> 9 m/s² (Matt's at the same speed: 7);
+  head under a 2.05 m lob +88 / +75 cm -> +14 / +16 cm. The drawn paddle is within 0.09 m of the server's at contact (the hit pull
+  covers the rest). Screenshots: test/ui-shots/auto-motion/.
+- Not covered: an OPPONENT in Auto is still drawn as a remote human (the state packet does not say a seat is in Auto; adding it would
+  be new data shown to other players).
+
 ## 258. No serve goes out while a seated player is calibrating, not even one already hanging
 - Owner: the game could be started while the other player was still calibrating. The serve already waited for a calibrating seat
   (NOTES 59, 170, 241), but only BEFORE it went up: SWING_SERVE hangs the ball in front of the server as a live ball (reset()), and the

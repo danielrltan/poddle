@@ -872,15 +872,19 @@ export function createScene(containerEl) {
       if (!vis) continue;
       const s = sgn(pd.side), local = isMe(pd.side), t = pd.tgt;
       if (!pd.init) { pd.pos.set(t.x, t.y, t.z); pd.q.copy(t.q); pd.dr = null; pd.bodyX = t.x - s * BODY[0]; pd.bodyZ = t.z + s * BODY[1]; pd.init = true; }
-      // local paddle is 1:1 (only the server-stepped z gets a whisper of filtering); remote is 20Hz -> slerp/lerp
-      const kp = local ? 1 : damp(dt, 0.055);
-      pd.pos.x = lerp(pd.pos.x, t.x, kp); pd.pos.y = lerp(pd.pos.y, t.y, kp); pd.pos.z = lerp(pd.pos.z, t.z, damp(dt, local ? 0.03 : 0.06));
+      // local paddle is 1:1 (only the server-stepped z gets a whisper of filtering); remote is 20Hz -> slerp/lerp. My own seat in Auto
+      // (NOTES 257): the server runs me, so x (and y with Move = Auto) arrive by packet exactly like Matt's do, late and bunched. Drawn
+      // 1:1 they held still on a third of the frames at 60 Hz (on 120 Hz screens, more than half) and then jumped: the same lerp as
+      // a remote player's, and below, Matt's own feet: the spring on the hand, the body off the paddle, the stride, the split step
+      const wire = local && pd.auto, wireY = local && pd.autoY, foot = pd.bot || wire, held = pd.bot || wireY;      // foot: someone else runs this body. held: its y is a paddle, not a head
+      const kp = local ? 1 : damp(dt, 0.055), kx = wire ? damp(dt, 0.055) : kp, ky = wire || wireY ? damp(dt, 0.055) : kp;
+      pd.pos.x = lerp(pd.pos.x, t.x, kx); pd.pos.y = lerp(pd.pos.y, t.y, ky); pd.pos.z = lerp(pd.pos.z, t.z, damp(dt, local && !wire ? 0.03 : 0.06));
       // Matt's paddle waits at his side (NOTES 175). runBot sends it straight up to a lob's contact height the moment he reads the ball, so
       // on a slow lob he stood holding it over his head for a second. Drawn, it comes up only as the ball arrives (from 0.5 s out, all the
       // way by 0.22 s, when the canned swing starts), stays up through the swing and goes back down after. Only up: a low ball's paddle is
       // drawn where it is. `py` is the drawn height; the server's paddle, and so every hit, is untouched.
       let py = pd.pos.y;
-      if (pd.bot) {
+      if (held) {
         const ahead = -(ball.pos.z - pd.pos.z) * s, vz = ball.vel.z * s, k = clamp(((vz > 0.3 ? ahead / vz : 9) - 0.22) / 0.28, 0, 1);
         const up = pd.swingT >= 0 || won ? 1 : ball.live && ball.lastBy !== pd.side && ahead > -0.3 ? 1 - k * k * (3 - 2 * k) : 0;
         pd.raise = lerp(pd.raise, up, damp(dt, up > pd.raise ? 0.04 : 0.2));
@@ -891,7 +895,7 @@ export function createScene(containerEl) {
       // damped spring, loose (w 11) while he runs, tight (w 40) for the last 0.3 s before the ball and through the swing, so the face is on
       // the server's paddle by contact. Exact for a held target, so any frame rate gives the same path.
       let px = pd.pos.x, pz = pd.pos.z;
-      if (pd.bot) {
+      if (foot || local && pd.dr && Math.abs(pd.dr.x - pd.pos.x) + Math.abs(pd.dr.z - pd.pos.z) > 0.01) {      // Auto -> Body (the camera found me again): the hand settles onto the 1:1 paddle instead of jumping to it
         if (!pd.dr) pd.dr = { x: pd.pos.x, z: pd.pos.z, vx: 0, vz: 0 };
         const ahead = -(ball.pos.z - pd.pos.z) * s, vz = ball.vel.z * s, near = pd.swingT >= 0 || (ball.live && ball.lastBy !== pd.side && vz > 0.3 && ahead / vz < 0.3);
         const D = pd.dr, om = lerp(11, 40, D.k = lerp(D.k || 0, near ? 1 : 0, damp(dt, near ? 0.03 : 0.25))), e = Math.exp(-om * dt);
@@ -965,7 +969,7 @@ export function createScene(containerEl) {
         // than riding the paddle 1:1. While a ball is in play the knees stay a little bent: the ready position.
         const hdt = Math.min(dt, 0.033);
         let hh = pd.pos.y;
-        if (pd.bot) {
+        if (held) {
           const dpy = py - STANCE.base, want = STANCE.base - (ball.live && !won ? 0.05 : 0) + (dpy < 0 ? dpy * 0.8 : 0.12 * (1 - Math.exp(-dpy / 0.5)));      // off the DRAWN paddle: no tiptoe while it waits at his side
           sd.byV += ((want - sd.by) * 110 - sd.byV * 21) * hdt; sd.by += sd.byV * hdt; hh = sd.by;      // critically damped (2 * sqrt 110)
         }
@@ -998,7 +1002,7 @@ export function createScene(containerEl) {
         // in turn, and the body rising mid-step. The split step: as the other side hits, a little hop that lands in a dip,
         // ready to push off. Reduced motion keeps the steps flat and skips the hop.
         let gait = 0, bob = 0, splitUp = 0, splitDip = 0;
-        if (pd.bot) {
+        if (foot) {
           const sp = Math.hypot(pd.vx, pd.vz); gait = clamp((sp - 0.25) / 0.9, 0, 1) * (still ? 0 : 1);
           sd.stride = gait > 0 ? sd.stride + sp * dt / STRIDE : Math.round(sd.stride);      // stopping, the feet come down where they are
           bob = Math.abs(Math.sin(Math.PI * sd.stride)) * 0.035 * gait;
@@ -1006,7 +1010,7 @@ export function createScene(containerEl) {
         }
         // ---------- wear it ----------
         const sink = duck * STANCE.sink + sd.spring * (1 + sd.taunt * 0.8) + splitDip, lift = tip * STANCE.toes + reach * 0.1;
-        a.position.set(pd.bodyX, hop + splitUp + (pd.bot ? bob : Math.abs(Math.sin(timeS * 11)) * 0.05 * run), pd.bodyZ);
+        a.position.set(pd.bodyX, hop + splitUp + (foot ? bob : Math.abs(Math.sin(timeS * 11)) * 0.05 * run), pd.bodyZ);
         a.rotation.set(0, (s > 0 ? 0 : Math.PI) - 0.4 * hold - lat * gait * 0.2, 0);      // and Matt turns a little into a run (NOTES 176), square again as he plants      // on the serve it turns a little toward the ball, out in front of the paddle
         a.rotateZ(clamp(-pd.vx * s * 0.05, -0.22, 0.22)); a.rotateX(-0.06 - run * 0.08 - (pd.swingT >= 0 ? 0.1 : 0));      // the body's old whole-of-it lean, unchanged: it carries the feet with it, so it has to stay small
         if (sd.taunt > 0) a.rotateY(Math.sin(timeS * 25) * sd.taunt * 0.1);
@@ -1452,7 +1456,7 @@ export function createScene(containerEl) {
       if (m.kind === 'smash') smashFx(p, m.side, m.spin, rs, sk);
       trail.glow = 0.8 + 0.2 * shown; ballTake(ball, m, stampOf);      // the ball record: spin, the blend onto the new path, this contact's arc, and the launch that rides on the hit
       if (pd) { pd.lunge = 1; pd.reach = pd.has; pd.hitP = [p[0], p[1], p[2]]; if (pd.bot && (pd.swingT < 0 || pd.swingT > 0.32 || pd.swingT < SWING_CONTACT - 0.06)) startSwing(pd, SWING_CONTACT - 0.04); }
-      const rx = pads[1 - m.side]; if (rx && rx.bot) rx.stance.split = 1;      // Matt split-steps as the ball comes off the other paddle
+      const rx = pads[1 - m.side]; if (rx && (rx.bot || rx.auto && isMe(rx.side))) rx.stance.split = 1;      // Matt split-steps as the ball comes off the other paddle
       sfx.pock(n, p[0], p); if (m.spin > 0.12 && ac) noise(out(panOf(p[0])), 5200, 3000, 1600, 0.9, 0.2 * Math.min(1, m.spin) ** 1.5, 0.11, 0.004);   // spin hisses off the face, as loud as there is spin: 0.5 -> 0.07, 0.8 -> 0.14, 1 -> 0.2
     } else if (m.type === 'swung') {
       const pd = pads[m.side]; if (!pd) return;
@@ -1479,6 +1483,7 @@ export function createScene(containerEl) {
     const t = pd.tgt; pd.has = true;
     const st = TAG_WORD[d.status] ? d.status : null; if (st !== pd.status) { pd.status = st; if (st && st !== pd.tagFor) { pd.tagFor = st; pd.tag.material.map = tagTexture(st); pd.tag.material.needsUpdate = true; } }      // the tag keeps its last word while it fades out
     pd.bot = !!d.bot; if (pd.matt !== pd.bot) paint(pd, pd.bot);      // bot:true IS Matt, at every level
+    pd.auto = !!d.auto; pd.autoY = !!d.autoY;      // main.js, my own seat in Auto: x (auto) and y (autoY: Move = Auto) are the server's runAuto, 60 Hz packets, not my body (NOTES 257)
     if (isFinite(d.x)) t.x = d.x; if (isFinite(d.y)) t.y = d.y; if (isFinite(d.z)) t.z = d.z;
     if (d.q && d.q.length === 4 && isFinite(d.q[0] + d.q[1] + d.q[2] + d.q[3])) { t.q.set(d.q[0], d.q[1], d.q[2], d.q[3]); if (t.q.lengthSq() > 1e-6) t.q.normalize(); else t.q.identity(); }
     t.off = d.offset && d.offset.length === 3 && isFinite(d.offset[0] + d.offset[1] + d.offset[2]) ? d.offset : null;
