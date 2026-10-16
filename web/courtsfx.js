@@ -3,10 +3,10 @@
 // gesture and fills its bank a job per idle slot (bankJobs); a voice played before its buffers exist falls back to the old oscillators.
 //   whoosh  a paddle cutting the air: broadband noise through two resonances that ride the paddle's speed (a fast rise to the swing's peak,
 //           a slower fall), loudness ~ speed^1.6, a flutter from the edge's vortex shedding, the pitch dropping a little past the peak
-//   pock    the pickleball pop: a contact click whose brightness is the contact time (a hard hit is a shorter, brighter impulse), the hollow
-//           ball's shell modes (~1.25 kHz and up) and the paddle face's lower, quicker modes; a heavy hit adds a felt low thump
+//   pock    the pickleball pop: the old oscillator voice (a pitched knock dropping into place, the hollow ball an octave under, the felt
+//           thump, a bright click) rebuilt as a buffer, with per-variant variation
 //   bounce  the same ball on a hard court: a duller, shorter 'tok' (lower shell modes, the ground's thud), no paddle
-//   squeak  a shoe sole's stick-slip: a buzzy pitched chirp (1.7-2.6 kHz, harmonics), a fast wobble and a rough grip, plus a little scuff
+//   squeak  a shoe sole's stick-slip: a steady, harsh 1.3-1.8 kHz slip train ringing the sole and floor (~2.4, ~4.6 kHz), flickering grip, scuff
 //   room    a short stereo impulse response for an outdoor court with walls (two channels): early slaps, then a quick dull tail
 const TAU = Math.PI * 2;
 export const rng = seed => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
@@ -37,17 +37,23 @@ export function whoosh(sr, { p = 0.6, seed = 1 } = {}) {
   return fadeOut(norm(d), sr);
 }
 
-const MODES_BALL = [[1250, 1, 0.034], [1890, 0.55, 0.022], [2710, 0.42, 0.015], [3650, 0.26, 0.010], [5200, 0.16, 0.006]];
-const MODES_FACE = [[420, 0.22, 0.016], [690, 0.3, 0.013], [1030, 0.32, 0.020]];
 export function pock(sr, { n = 0.5, seed = 1 } = {}) {
-  const r = rng(seed * 104729 + 7), T = 0.13, len = Math.round(sr * T), d = new Float32Array(len), det = 1 + (r() - 0.5) * 0.05;
-  const tc = (1.5 - 0.75 * n) / 1000, nc = Math.max(2, Math.round(tc * sr));          // contact time: a dink sits on the face, a smash leaves at once
-  const bright = 0.6 + 1.0 * n, damp = 1 - 0.08 * n + (n < 0.2 ? -0.25 : 0);          // a soft touch is muted (the ball held on the face), a hard one bright
-  const add = (modes, amp) => { for (const [f0, a0, tau0] of modes) { const f = f0 * det * (1 + (r() - 0.5) * 0.02), hi = f > 2000 ? bright : 1, a = a0 * amp * hi, tau = tau0 * damp, ph = r() * TAU;
-    for (let i = 0; i < len; i++) { const t = i / sr, att = Math.min(1, i / nc); d[i] += a * att * Math.exp(-t / tau) * Math.sin(TAU * f * t + ph); } } };
-  add(MODES_BALL, 1); add(MODES_FACE, 0.45 + 0.35 * (1 - n));
-  const hp = svf(); for (let i = 0; i < nc * 3; i++) { const e = Math.sin(Math.PI * Math.min(1, i / (nc * 2))); d[i] += hp(r() * 2 - 1, 3800 + 2600 * n, 0.8, sr) * e * (1.2 + 1.4 * n); }      // the crack of contact
-  if (n > 0.45) { const a = 0.17 * (n - 0.45) / 0.55; for (let i = 0; i < len; i++) { const t = i / sr; d[i] += a * Math.exp(-t / 0.028) * Math.sin(TAU * 135 * t) * Math.min(1, i / nc); } }      // a drive or a smash: felt as much as heard
+  // The pop the owner preferred (scene.js's oscillator voice before NOTES 259), rebuilt sample for sample as a buffer: the same four layers,
+  // gains, glides and exponential envelopes (2 ms rise, down to -80 dB at each layer's end), with a few % of pitch and noise variation per
+  // variant. NOTES 259's first pop rang high shell modes (1.25-5.2 kHz sines) and sounded like glass (NOTES 260).
+  const r = rng(seed * 104729 + 7), T = 0.18, len = Math.round(sr * T), d = new Float32Array(len), det = 1 + (r() - 0.5) * 0.06;
+  const f = (880 + 520 * n) * det, g = 0.6 + 0.7 * n, E = 0.0001;
+  const env = (t, peak, end, rise = 0.002) => t >= end ? 0 : t < rise ? E * Math.pow(peak / E, t / rise) : peak * Math.pow(E / peak, (t - rise) / (end - rise));
+  const glide = (f0, f1, tg) => { let ph = r() * TAU; return t => { const fr = t < tg ? f0 * Math.pow(f1 / f0, t / tg) : f1; ph += TAU * fr / sr; return ph; }; };
+  const thump = glide(170 + 60 * n, 70, 0.004), knock = glide(f * 1.6, f, 0.018), hollow = glide(f * 0.5, f * 0.46, 0.05), bp = svf();
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    let x = Math.sin(thump(t)) * env(t, 0.35 + 0.5 * n, 0.16);                    // the thump you feel: heavier with power
+    x += Math.sin(knock(t)) * env(t, g, 0.085);                                     // the pitched knock, dropping into place
+    x += (2 / Math.PI) * Math.asin(Math.sin(hollow(t))) * env(t, g * 0.5, 0.13);    // the hollow ball under it
+    if (t < 0.03) { const fc = t < 0.0135 ? 3200 * Math.pow(0.75, t / 0.0135) : 2400 * Math.pow(0.75, (t - 0.0135) / 0.0165); x += bp(r() * 2 - 1, fc, 0.8, sr) * env(t, g * 0.5, 0.03, 0.001); }      // the click
+    d[i] = x;
+  }
   return fadeOut(norm(d), sr);
 }
 
@@ -61,16 +67,20 @@ export function bounce(sr, { h = 0.6, seed = 1 } = {}) {
 }
 
 export function squeak(sr, { seed = 1 } = {}) {
-  const r = rng(seed * 2654435761 + 5), T = 0.08 + 0.07 * r(), len = Math.round(sr * T), d = new Float32Array(len);
-  const f0 = 1700 + 900 * r(), rise = 0.08 + 0.1 * r(), wob = 38 + 20 * r(), bp = svf(), sc = svf();
-  let ph = 0, grip = 1, wph = r() * TAU;
+  // A rubber sole skidding on a hard court: stick-slip. The sole grabs and lets go 1.3-1.8 kHz, a little unevenly (a pulse train with +-6 %
+  // jitter: harsh and steady, not a smooth tone), and each release rings the sole and the floor (two resonances, ~2.4 and ~4.6 kHz), under a
+  // hiss of scuff. The rate creeps up 5 % as the foot loads and the grip flickers: no vibrato and no rise-and-fall arc (those made NOTES 259's
+  // first squeak sound like an animal, NOTES 260).
+  const r = rng(seed * 2654435761 + 5), T = 0.07 + 0.06 * r(), len = Math.round(sr * T), d = new Float32Array(len);
+  const rate0 = 1300 + 500 * r(), res1 = 2200 + 600 * r(), res2 = 4300 + 800 * r(), a = svf(), b = svf(), sc = svf();
+  let next = 0, grip = 1, lp = 0; const kLp = 1 - Math.exp(-TAU * 3400 / sr);
   for (let i = 0; i < len; i++) {
     const t = i / sr, u = t / T;
-    wph += TAU * wob / sr; grip = 0.92 * grip + 0.08 * (0.55 + 0.9 * r());                // stick-slip: the sole grabs and lets go unevenly
-    const f = f0 * (1 + rise * Math.sin(Math.PI * Math.min(1, u * 1.3)) - 0.06 * u) * (1 + 0.035 * Math.sin(wph));
-    ph += TAU * f / sr; let s = 0; for (let k = 1; k <= 6; k++) s += Math.sin(k * ph) / Math.pow(k, 1.15);      // a buzzy, rubbery tone
-    const env = Math.min(1, t / 0.006) * Math.min(1, (T - t) / 0.03);
-    d[i] = (bp(s, f * 1.15, 2.2, sr) * 0.6 + s * 0.25) * grip * env + sc(r() * 2 - 1, 4200, 1.2, sr) * 0.18 * env;
+    let e = 0;
+    if (i >= next) { e = 0.6 + 0.8 * r(); next = i + Math.max(2, Math.round(sr / (rate0 * (1 + 0.05 * u)) * (0.94 + 0.12 * r()))); }      // a slip
+    if ((i & 63) === 0) grip = 0.55 + 0.45 * r();                                // the grip flickers every ~1.3 ms
+    const env = Math.min(1, t / 0.004) * Math.min(1, (T - t) / 0.012) * grip;
+    lp += kLp * ((a(e, res1, 7, sr) * 0.8 + b(e, res2, 6, sr) * 0.22) * env + sc(r() * 2 - 1, 4800, 0.9, sr) * 0.1 * env - lp); d[i] = lp;      // the sole's rubber softens the top
   }
   return fadeOut(norm(d), sr);
 }

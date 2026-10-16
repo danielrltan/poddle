@@ -5215,3 +5215,15 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   dink -8.2 -> -8.0, smash -1.1 -> -3.0, my swing -30.9 -> -19.3 (medium) / -16.5 (hard), bounce near -21.2 -> -14.2, far -21.2 -> -21.9, the
   other end's drive -3.3 -> -14.2 (distance), squeak -18.8. WAVs of every sound before and after and a short rally: test/sfx-ab/ (untracked,
   `node test/sfx-ab.mjs` remakes them).
+
+## 260. The paddle pop is the old one again, and the shoe squeak no longer sounds like an animal
+- Owner (2026-10-16), on NOTES 259: the paddle hit "sounded better before... now it sounds like glass", and the squeak sounded like an
+  animal, not a shoe.
+- web/courtsfx.js `pock`: NOTES 259's pop rang the ball's shell modes as long sines from 1.25 to 5.2 kHz (the high band rang ~60 ms):
+  glass. It is now the old oscillator voice rebuilt sample for sample as a buffer: thump 170+60n -> 70 Hz, knock f*1.6 -> f in 18 ms,
+  hollow triangle f/2, the 3.2 -> 1.8 kHz click, the same gains and exponential envelopes, with +-3 % pitch and fresh noise per variant.
+  It keeps NOTES 259's distance, pan and room. Rendered at 3 m: drive centroid 839 Hz (old 879), high band done in ~27 ms (glass: ~60).
+- `squeak`: NOTES 259's was a smooth harmonic tone with a rise-and-fall pitch arc and a 38-58 Hz vibrato: a chirp. Now stick-slip: a
+  pulse train at 1.3-1.8 kHz with +-6 % jitter and a 5 % creep, ringing two resonances (~2.4 and ~4.6 kHz), a flickering grip, a little
+  scuff, softened above 3.4 kHz. No vibrato, no arc. Same trigger rule and level (peak -18.9 dBFS at 3 m, centroid 3.3 kHz).
+- test/sfx-ab.mjs re-renders both (WAVs in test/sfx-ab/, untracked); test/court-sfx.mjs passes.
