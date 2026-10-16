@@ -6,35 +6,51 @@
 // Levels are 0..10 (Settings > Sound > Music, Menu sounds). The Sound switch mutes both. The AudioContext is scene.js's
 // (getAc), so the output device chosen in Settings applies here too.
 const SRC = new URL('audio/into-the-blue.m4a', import.meta.url).href;      // beside this file, wherever web/ is served from. AAC-LC 64 kbps (NOTES 199): every browser decodes it, 2.2 MB instead of the 3.7 MB mp3
-function silent() {                                                      // 0.1 s of 8-bit silence, as a WAV: what the first gesture plays to bless the element
+function silent() {                                                      // 0.1 s of 8-bit silence, as a WAV: what the first gesture plays to bless the element. A data: URL, not a blob URL: new Blob + URL.createObjectURL are synchronous trips to the browser process (18 ms and more while the page loads), and this runs inside the first press
   const n = 800, b = new Uint8Array(44 + n).fill(128), v = new DataView(b.buffer), w = (o, t) => { for (let i = 0; i < 4; i++) b[o + i] = t.charCodeAt(i); };
   w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
   v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
-  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+  return 'data:audio/wav;base64,' + btoa(String.fromCharCode.apply(null, b));
 }
 const UI_MAX = 1.5, MUSIC_MAX = 0.6;      // at the defaults (6, 5) a select peaks near -19 dBFS over music peaking near -16: high bells cut through
 const curve = v => Math.pow(Math.max(0, Math.min(10, v)) / 10, 1.7);      // equal steps sound equal: the top half is not all the same loud
 const DOREMI = [0, 2, 4, 5, 7, 9, 11];                                  // the stepper sings up a major scale, do re mi fa so la ti (NOTES 186): 0 is do on C4, 7 is the next do
+const idle = (f, ms) => (window.requestIdleCallback ? requestIdleCallback(f, { timeout: ms }) : setTimeout(f, 50));      // after this frame, when the page has a gap (Safari has no requestIdleCallback: a short timer)
 
 export function menuAudio(getAc) {
-  let ac = null, bus = null, mbus = null, hall = null, muted = false, uiVol = 6, musVol = 5;
+  let ac = null, bus = null, mbus = null, verb = null, hall = null, hallDone = false, muted = false, uiVol = 6, musVol = 5;
   let el = null, loading = false, ready = false, want = false, playing = false, stopT = 0, hoverAt = 0;
   function init() {
     if (bus) return true;
     ac = getAc(); if (!ac) return false;
     try {
       bus = ac.createGain(); bus.gain.value = muted ? 0 : UI_MAX * curve(uiVol);
-      const verb = ac.createConvolver(), wet = ac.createGain(), len = Math.round(ac.sampleRate * 0.7), ir = ac.createBuffer(2, len, ac.sampleRate);
-      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let s = 1234 + c * 77; for (let i = 0; i < len; i++) { s = (s * 16807) % 2147483647; d[i] = ((s / 2147483647) * 2 - 1) * Math.pow(1 - i / len, 3.2); } }
-      verb.buffer = ir; wet.gain.value = 0.28;
+      verb = ac.createConvolver(); const wet = ac.createGain(); wet.gain.value = 0.28;      // the airy reverb: wired now, its 0.7 s impulse is filled in idle (verbTail). A convolver without a buffer is silent, so at most the very first tap is dry
       bus.connect(ac.destination); bus.connect(verb); verb.connect(wet); wet.connect(ac.destination);
       mbus = ac.createGain(); mbus.gain.value = 0; mbus.connect(ac.destination);
-      // the hall: a 2.6 s tail only the start sound is sent into (NOTES 185). Its wet comes back into bus, so Menu sounds and Sound off apply to it
-      const hv = ac.createConvolver(), hw = ac.createGain(), hl = Math.round(ac.sampleRate * 2.6), hir = ac.createBuffer(2, hl, ac.sampleRate);
-      for (let c = 0; c < 2; c++) { const d = hir.getChannelData(c); let r = 991 + c * 313; for (let i = 0; i < hl; i++) { r = (r * 16807) % 2147483647; d[i] = ((r / 2147483647) * 2 - 1) * Math.pow(1 - i / hl, 2.2); } }
-      hv.buffer = hir; hw.gain.value = 0.55; hall = ac.createGain(); hall.connect(bus); hall.connect(hv); hv.connect(hw); hw.connect(bus);
+      // the hall: a 2.6 s tail only the start sound is sent into (NOTES 185). Its wet comes back into bus, so Menu sounds and Sound off apply to it.
+      // Only its dry path is made here: init runs inside the first press (or the first hover after it), and the tail is built in idle just after
+      hall = ac.createGain(); hall.connect(bus); idle(verbTail, 300); idle(hallTail, 1500);
     } catch { bus = null; return false; }
     return true;
+  }
+  function verbTail() {
+    if (!verb || verb.buffer) return;
+    try {
+      const len = Math.round(ac.sampleRate * 0.7), ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let s = 1234 + c * 77; for (let i = 0; i < len; i++) { s = (s * 16807) % 2147483647; d[i] = ((s / 2147483647) * 2 - 1) * Math.pow(1 - i / len, 3.2); } }
+      verb.buffer = ir;
+    } catch { /* the taps play dry */ }
+  }
+  // the hall's tail: a 2.6 s stereo impulse response (~0.25 M samples of Math.pow, ~30 ms at CPU x4, then the convolver's own FFT set-up), which used to
+  // land inside the first press. Built once, in idle after init; the start sound (its only voice) builds it first if it comes sooner, so it always rings the same
+  function hallTail() {
+    if (hallDone || !hall) return; hallDone = true;
+    try {
+      const hv = ac.createConvolver(), hw = ac.createGain(), hl = Math.round(ac.sampleRate * 2.6), hir = ac.createBuffer(2, hl, ac.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = hir.getChannelData(c); let r = 991 + c * 313; for (let i = 0; i < hl; i++) { r = (r * 16807) % 2147483647; d[i] = ((r / 2147483647) * 2 - 1) * Math.pow(1 - i / hl, 2.2); } }
+      hv.buffer = hir; hw.gain.value = 0.55; hall.connect(hv); hv.connect(hw); hw.connect(bus);
+    } catch { /* the start sound plays dry */ }
   }
   // a bell: the note, a soft octave over it, and a short partial that gives the attack its tap. Pitched low and warm (NOTES 183: the owner
   // found the first set, an octave higher with a glassy 3rd partial, far too high): the tap is a quiet 2nd partial now, never a 3rd
@@ -67,6 +83,7 @@ export function menuAudio(getAc) {
     // Quick play (and a difficulty in Play a bot): the "here we go" of starting a match (NOTES 185: made bigger). A deep drop, a fast run up two
     // octaves, then a wide C major chord with a sparkle over it, all into the hall so it rings out for two seconds after
     start: () => {
+      hallTail();      // built already in idle, unless this is the press that made the context
       thump(130, 45, 0, 0.55, 0.26, hall);
       [C4, E4, G4, C5, E5].forEach((f, i) => bell(f, i * 0.04, 0.16, 0.14, 0.97, 'triangle', hall));
       for (const f of [130.81, C4, G4, C5, E5, G5]) bell(f, 0.22, 1.3, f < 200 ? 0.12 : 0.075, 1, 'triangle', hall);
@@ -93,7 +110,8 @@ export function menuAudio(getAc) {
 
   // ---------- music ----------
   // The element is blessed in the first gesture (a silent clip played inside it), so iOS lets the real track start later, after
-  // the fetch. The track is fetched whole into a blob: the static server has no byte ranges, and Safari will not stream without them.
+  // the fetch. The track is fetched whole into a blob: the static server has no byte ranges, and Safari will not stream without them. At low
+  // priority: an early first click must not put 2.2 MB ahead of the scenery modules and the emote faces (browsers without the option ignore it)
   function prime() {
     if (el) return;
     try { el = new Audio(); el.loop = true; el.preload = 'auto'; el.src = silent(); const p = el.play(); if (p) p.then(() => el.pause(), () => { }); } catch { el = null; }
@@ -101,7 +119,7 @@ export function menuAudio(getAc) {
   }
   function load() {
     if (loading || !el || !init()) return; loading = true;
-    fetch(SRC).then(r => r.ok ? r.blob() : Promise.reject(r.status)).then(b => {
+    fetch(SRC, { priority: 'low' }).then(r => r.ok ? r.blob() : Promise.reject(r.status)).then(b => {
       el.pause(); el.src = URL.createObjectURL(b);
       ac.createMediaElementSource(el).connect(mbus); ready = true; apply();
     }).catch(() => { loading = false; });

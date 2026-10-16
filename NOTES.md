@@ -5081,3 +5081,18 @@ swapped the pointing glove for a grab fist for 220 ms per wheel tick and nudged 
 the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fist 0.37 on main).
 - Gone: cursor.js's wheel listener, the FIST drawing and is-roll; cursor.css's .cur-fist, .cur-thumb and is-roll rules. A wheel now
   leaves the pointer exactly as it was. test/cursor-e2e.mjs asserts that instead (no fist in the DOM, no is-roll, hand opacity 1).
+
+## 250. The first press no longer builds the menu reverbs: both impulse responses fill in idle just after it
+- Field profiles (2026-10-09..15, 81 Chromium loads) showed `menuaudio.js init` at 13-81 ms inside the first press on the title (48% of profiles):
+  the press runs unlock -> prime -> load -> init synchronously, and init computed both convolver impulse responses (0.7 s and 2.6 s stereo,
+  ~0.3 M samples of Math.pow) right there.
+- web/menuaudio.js: init now only wires the graph. The 0.7 s airy reverb (`verbTail`) and the 2.6 s hall (`hallTail`, from the unshipped
+  perf-audio 22f33f1) fill their buffers in requestIdleCallback (a short timer on Safari). A convolver with no buffer is silent, so at most the
+  very first tap plays dry; the start sound builds the hall first if it comes sooner, so it always rings the same. Also from 22f33f1: the silent
+  priming clip is a data: URL (no Blob/createObjectURL round trip in the press), the menu track is fetched at `priority: 'low'`, and the corner
+  card formats its trophy count without Intl (profile.js `commas`).
+- Measured (local, Chrome, CPU x4, first pointerdown handler): 69-89 ms on main -> 27-38 ms (8 runs each). Music still starts after the first
+  gesture, select and start sounds play, no console errors.
+- Not changed: `new AudioContext()` in scene.js unlockAudio (46-190 ms on some Windows presses). Creating it suspended before the press would
+  queue sounds and needs the Settings speaker choice applied before resume(); left for a separate change.
+- test/menu-audio.mjs: its settings-card checks fail identically on main (the title's settings button moved); the music check passes.

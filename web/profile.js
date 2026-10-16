@@ -558,13 +558,14 @@ export async function claimName(name) {                    // -> true when the s
 // ---------- who is signed in, everywhere it shows. Everything signed-in-only stays hidden unless /api/me said sign-in is on (9) ----------
 // the player card in the header's corner (NOTES 161): my rank emblem, name and trophies without opening Your stats. Drawn from meLadder, so it follows
 // /api/me, every /api/stats answer and each game's trophies. No trophies yet: the person icon and 0. A guest or an account without a username keeps the plain button
+const commas = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');      // = toLocaleString('en-US') for any whole number, without Intl: the corner card draws during main.js's first evaluation, and the page's first Intl call pays the ICU set-up there (5 ms at 1x, 21 at CPU x4, 60+ on some Windows)
 function drawChip() {
   if (chipFly) return;      // the flight draws the card itself, and draws it whole when the last cup lands
   const b = $('btn-head-acct'); if (!b) return; const a = on && me.enabled ? me.account : null, name = a && a.username, L = name ? meLadder : null;
-  b.classList.toggle('is-card', !!name); show('head-acct-n', !!name); text('head-acct-tr', (L ? L.trophies : 0).toLocaleString('en-US'));
+  b.classList.toggle('is-card', !!name); show('head-acct-n', !!name); text('head-acct-tr', commas(L ? L.trophies : 0));
   { const em = $('head-acct-em'); if (em && em.dataset.r !== (L ? L.tier + '.' + L.div : '')) { em.dataset.r = L ? L.tier + '.' + L.div : ''; h.emblem(em, L ? { tier: L.tier, div: L.div } : null); } show('head-acct-em', !!L); b.classList.toggle('has-em', !!L); }
   { const bar = $('head-acct-bar'); if (bar) { const p = L ? h.progress(L) : 0; bar.style.setProperty('--p', p.toFixed(3)); bar.setAttribute('aria-valuenow', String(Math.round(p * 100))); } show('head-acct-bar', !!name); }      // the trophy bar: the hero's, across the current division
-  if (name) b.setAttribute('aria-label', `${name}, ${(L ? L.trophies : 0).toLocaleString('en-US')} trophies: your stats`);
+  if (name) b.setAttribute('aria-label', `${name}, ${commas(L ? L.trophies : 0)} trophies: your stats`);
   if (document.body.dataset.screen === 'lobby') chipShown = L ? L.trophies : null;      // what the player has seen: a lobby screen is up. On the court the card is out of sight, so the new count waits for landed()
 }
 // ---------- back in the menu after a game: the trophies won fly from Quick play into the corner card (NOTES 203, the owner: 'spawn from the quickplay
