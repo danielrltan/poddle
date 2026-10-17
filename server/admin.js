@@ -12,11 +12,13 @@
 //                               the link grants, so no proof of ownership is needed to stop it), or a link the Terms let us disable
 //   unshare-user <username>     stop the share link of that account (an offensive username on a card: Terms 5)
 //   traffic [days]              page views per day (default 7): people and views in all, then by source (?ref= tag or referring site) and by page (NOTES 219)
+//   swingtime [--json]          the running server's swing timing counts per paddle type (server/swingtime.js, NOTES 265): asks it on 127.0.0.1:$PORT
+//                               with STATS_KEY (both set on the machine); the counts live in that process's memory only
 // Output never carries a Google subject, a device hash or an account id.
 const fs = require('node:fs'), path = require('node:path');
 const db = require('./db');
 
-const USAGE = 'usage: node server/admin.js counts | rename <username> <new> [--reserved] | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username> | traffic [days]';
+const USAGE = 'usage: node server/admin.js counts | rename <username> <new> [--reserved] | release <username> | reset-stats <username> | delete-account <username> | backup [--clean] | sweep | unshare <link or code> | unshare-user <username> | traffic [days] | swingtime [--json]';
 function names() {                                               // usernames.js (7.1-7.2) is loaded only by the commands that need it
   try { return require('./usernames'); } catch { throw new Error('server/usernames.js is not available'); }
 }
@@ -30,9 +32,22 @@ function find(name) { const a = db.accountByKey(keyOf(name)); if (!a) throw new 
 const slugIn = s => { const m = /(?:^|\/c\/)([A-Za-z0-9]{10})(?:\.png)?(?:[?#].*)?$/.exec(String(s || '').trim()); return m ? m[1] : null; };   // the code alone, or any form of the link (poddleball.com/c/<code>, .png, ?v=)
 const stamp = d => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);   // YYYYMMDD-HHMM, UTC
 
+async function swingtime(json) {
+  const key = String(process.env.STATS_KEY || '').trim(); if (!key) throw new Error('STATS_KEY is not set');
+  const r = await fetch('http://127.0.0.1:' + (Number(process.env.PORT) || 8080) + '/api/swingtime', { headers: { Authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(5000) });
+  if (!r.ok) throw new Error('the server answered ' + r.status);
+  const d = await r.json(); if (json) return console.log(JSON.stringify(d, null, 1));
+  const pc = x => (x == null ? '-' : Math.round(x * 100) + '%'), h = (o, u) => (o && o.n ? `p50 ${o.p50}${u} p90 ${o.p90}${u} (${o.n})` : '-');
+  console.log(`since ${d.since}  strike wait ${d.mode.strikeWait ? 'ON' : 'off'}, Matt replan ${d.mode.replanHuman} s`);
+  for (const [src, o] of Object.entries(d.src)) { if (!o.strikes && !o.whiffs) continue;
+    console.log(`${src.padEnd(7)} strikes ${o.strikes - o.exempt} (+ ${o.exempt} near-net, ${pc(o.share.reaimedNear)} of those re-aimed on the push curve): waited ${pc(o.share.waited)}, settled before contact ${pc(o.share.folded)}, re-aimed ${pc(o.share.reaimed)}, window ends ${o.windowEnd} (${pc(o.share.windowEnd)} of waits), late ${o.late}, whiffs ${o.whiffs}, points lost with a swing live ${o.lost} (${o.lostWaiting} of them waiting, ${pc(o.share.lostWaiting)} of waits)`);
+    console.log(`        wait ${h(o.hist.waitMs, ' ms')}; struck ${h(o.hist.aheadCm, ' cm')} in front; bet ${h(o.hist.betMs, ' ms')} / settled ${h(o.hist.settledMs, ' ms')} after the ball at the plane (settled first: ${pc(o.hist.settledMs.under0)}); re-aim ${h(o.hist.reaimMs, ' ms')} after the hit`); }
+}
+
 async function main(argv) {
   const [cmd, a1, a2, a3] = argv;
-  if (!cmd || !['counts', 'rename', 'release', 'reset-stats', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user', 'traffic'].includes(cmd)) throw new Error(USAGE);
+  if (!cmd || !['counts', 'rename', 'release', 'reset-stats', 'delete-account', 'backup', 'sweep', 'unshare', 'unshare-user', 'traffic', 'swingtime'].includes(cmd)) throw new Error(USAGE);
+  if (cmd === 'swingtime') return swingtime(a1 === '--json');   // no database: the counts are in the game process
   if (cmd === 'backup' && a1 === '--clean') {                    // needs no database: deletes the /tmp copies after they were downloaded
     let k = 0; for (const f of fs.readdirSync('/tmp')) if (/^poddle-backup-[0-9-]+\.db$/.test(f)) { const p = path.join('/tmp', f); if (fs.lstatSync(p).isFile()) { fs.unlinkSync(p); k++; } }
     return console.log('removed ' + k + ' backup file(s)');

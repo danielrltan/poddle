@@ -10,7 +10,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); await wait(700);
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const shots = { 0: [], 1: [] };                         // every hit, as the RECEIVER sees it: { hit, at, plan, lands: [{ land, at, n }], bounce }
 let i = 0;
-const PLANS = [{ bet: 33, fix: 33 }, { bet: 33, fix: 8 }, { bet: 20, fix: 20 }, { bet: 20, fix: null }];   // re-aimed to a smash, to a tap; settled the same (no re-aim); no settled report at all
+const PLANS = [{ bet: 33, fix: 33 }, { bet: 33, fix: 8 }, { bet: 20, fix: 20 }, { bet: 20, fix: null }, { bet: 33, fix: 8, pre: 30 }];   // re-aimed to a smash, to a tap; settled the same (no re-aim); no settled report at all;
+// pre: settled 30 ms after the SWING, while the ball is still coming: with STRIKE_WAIT (NOTES 265) it folds in before contact and the strike is settled
+const WAITS = process.env.STRIKE_WAIT !== '0';
 function player(o) {
   const ws = new WebSocket('ws://localhost:' + PORT), P = { ws, side: null, ...o }; let cool = 0, cur = null;
   ws.on('message', raw => { const m = JSON.parse(raw), at = Date.now();
@@ -18,14 +20,15 @@ function player(o) {
     if (P.side == null) return;
     const other = 1 - P.side;
     if (m.type === 'hit' && m.side === other) { cur = { hit: m, at, plan: P.peer.plan, lands: [], bounce: null }; shots[other].push(cur); }
-    if (m.type === 'hit' && m.side === P.side && P.bets) { const pl = P.plan; if (pl.fix != null) setTimeout(() => ws.send(JSON.stringify({ type: 'swing', power: pl.fix, dir: 0.3, lob: 0, fix: true, final: true })), 80); }
+    if (m.type === 'hit' && m.side === P.side && P.bets) { const pl = P.plan; if (pl.fix != null && !pl.pre) setTimeout(() => ws.send(JSON.stringify({ type: 'swing', power: pl.fix, dir: 0.3, lob: 0, fix: true, final: true })), 80); }
     if (m.type === 'launch' && m.by === other && cur && m.land) cur.lands.push({ land: m.land, at, n: m.n });
     if (m.type === 'bounce' && cur && !cur.bounce) cur.bounce = m.p;
     if (m.type !== 'state') return;
     const me = m.paddles[P.side], s = P.side === 0 ? 1 : -1, mine = m.live && m.v[2] * s > 0;
     ws.send(JSON.stringify({ type: 'paddle', x: mine ? m.p[0] : 0, y: mine ? Math.max(0.4, Math.min(1.4, m.p[1])) : 1, z: 6.5 * s, q: [0, 0, 0, 1] }));
     if (mine && me && Date.now() > cool && Math.abs(m.p[2] - me.z) < 1.0) { cool = Date.now() + 500;
-      if (P.bets) { P.plan = PLANS[i++ % PLANS.length]; ws.send(JSON.stringify({ type: 'swing', power: P.plan.bet, dir: 0.3, lob: 0, age: 80, final: false })); }
+      if (P.bets) { const pl = P.plan = PLANS[i++ % PLANS.length]; ws.send(JSON.stringify({ type: 'swing', power: pl.bet, dir: 0.3, lob: 0, age: 80, final: false }));
+        if (pl.pre) setTimeout(() => ws.send(JSON.stringify({ type: 'swing', power: pl.fix, dir: 0.3, lob: 0, fix: true, final: true })), pl.pre); }
       else ws.send(JSON.stringify({ type: 'swing', power: 16, dir: 0.3, lob: 0, age: 80, final: true })); } });
   return P;
 }
@@ -35,7 +38,7 @@ await wait(40000);
 const seen = arr => arr.filter(s => s.bounce);            // shots that came down (a volley never does)
 const a = seen(shots[A.side]), b = seen(shots[B.side]);
 const by = k => a.filter(s => s.plan && s.plan === PLANS[k]);
-ok(PLANS.every((_, k) => by(k).length >= 2) && b.length >= 4, `enough rallies: A's bets ${PLANS.map((_, k) => by(k).length).join('/')} (smash/tap/same/silent), B's settled ${b.length}`);
+ok(PLANS.every((_, k) => by(k).length >= 2) && b.length >= 4, `enough rallies: A's bets ${PLANS.map((_, k) => by(k).length).join('/')} (smash/tap/same/silent/settled early), B's settled ${b.length}`);
 ok(a.every(s => s.lands.length === 1), `every bet shot: ONE landing told to the receiver (counts ${[...new Set(a.map(s => s.lands.length))]})`);
 const off = s => s.lands[0] && Math.hypot(s.lands[0].land[0] - s.bounce[0], s.lands[0].land[1] - s.bounce[2]);
 ok(a.every(s => off(s) < 0.05) && b.every(s => off(s) < 0.05), `and it is where the ball comes down: worst ${Math.max(...a.concat(b).map(off)).toFixed(3)} m off the bounce`);
@@ -44,4 +47,6 @@ ok(by(0).concat(by(1)).every(s => late(s) >= 50 && s.lands[0].n != null), `re-ai
 ok(by(2).every(s => late(s) >= 50 && late(s) < 200), `settled the same: told when the settled report says so (${by(2).map(late).join(', ')} ms)`);
 ok(by(3).every(s => late(s) >= 200 && late(s) < 400), `no settled report: told when the re-aim window closes (${by(3).map(late).join(', ')} ms)`);
 ok(b.every(s => late(s) < 30), `a settled swing: told with the hit itself (${Math.max(...b.map(late))} ms at most)`);
+if (WAITS) ok(by(4).every(s => late(s) < 30 && s.lands[0].n == null && !s.hit.bet), `STRIKE_WAIT: settled before the ball reached the paddle, struck settled (no bet flag) and told with the hit itself (${by(4).map(late).join(', ')} ms), once`);
+else ok(by(4).every(s => late(s) >= 0 && s.lands[0].n != null && s.hit.bet), `STRIKE_WAIT=0: settled 30 ms after a swing struck at once on its bet: told with the re-aim (${by(4).map(late).join(', ')} ms after the hit)`);
 A.ws.close(); B.ws.close(); proc.kill(); console.log(fails ? fails + ' FAILURES' : 'LANDHOLD TESTS PASSED'); process.exit(fails ? 1 : 0);

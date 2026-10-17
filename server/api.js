@@ -8,7 +8,7 @@
 // Public, no sign-in: GET /api/leaderboard (NOTES 126), GET /api/leaderboard/player?u=<name> (a listed player's profile card, NOTES 140) and GET /api/player?name=
 // (the same card's rank, places and friend row, docs/SOCIAL.md 8: rank + places only when not hidden or to a friend, st only to a friend).
 const crypto = require('node:crypto');
-const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic'), perf = require('./perf'), sourcemaps = require('./sourcemaps');
+const auth = require('./auth'), db = require('./db'), stats = require('./stats'), abuse = require('./abuse'), share = require('./share'), traffic = require('./traffic'), perf = require('./perf'), sourcemaps = require('./sourcemaps'), swingtime = require('./swingtime');
 let names = null; try { names = require('./usernames'); } catch { /* usernames need sign-in, which then answers 503 */ }
 
 const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, BODY_MAX = 8192, BODY_MS = 5000;
@@ -313,6 +313,13 @@ function trafficRoute(req, res) {
   send(res, 200, { site, days: traffic.report(days, site) }, cors);
 }
 
+// GET /api/swingtime (NOTES 265): the swing timing counts (server/swingtime.js) since this process started, behind the panel's key. Counts per
+// paddle type only (airpod / phone / none), nothing about any player; gone on restart.
+function swingtimeRoute(req, res) {
+  const cors = panelGate(req, res, '/api/perf/read'); if (!cors) return;
+  send(res, 200, swingtime.report(), cors);
+}
+
 // Page-load diagnostics (server/perf.js, NOTES 232). Writes: POST /api/perf (a view's load or fin part, text/plain JSON from web/rum.js's
 // sendBeacon) and POST /api/perf/profile?v=<id> (its JS profile, gzipped). Both are CORS "simple" requests: no preflight, and no Access-Control
 // header in the answer (the page never reads it). The Origin header names the site and must be poddleball.com or danielrltan.com; no cookie
@@ -382,6 +389,7 @@ async function handle(req, res) {
     const host = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
     if (OLD_HOSTS.has(host)) return fail(res, 404, 'wrong_host');
     if (String(req.url || '').split('?')[0] === '/api/traffic') return trafficRoute(req, res);
+    if (String(req.url || '').split('?')[0] === '/api/swingtime') return swingtimeRoute(req, res);
     const p = String(req.url || '').split('?')[0];
     if (p === '/api/perf' || p.startsWith('/api/perf/')) return await perfRoute(req, res, p);
     const route = ROUTES[String(req.url || '').split('?')[0]];

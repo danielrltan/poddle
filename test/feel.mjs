@@ -9,7 +9,7 @@ await new Promise(r => setTimeout(r, 700));
 const G = 9.81, DT = 1 / 60, ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 }, wait = ms => new Promise(r => setTimeout(r, ms));
 const ms = () => performance.timeOrigin + performance.now();
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
-const FIX = { fix50: 50, fix120: 120, fix200: 200 };
+const FIX = { fix50: 50, fix120: 120, fix200: 200 }, WAITS = process.env.STRIKE_WAIT !== '0';   // the server reads the same env
 
 function player(plans) {
   const ws = new WebSocket('ws://localhost:' + PORT), h = { ws, side: null, st: [], ev: [], ball: 0, acted: false, wasIn: false, swings: [] };
@@ -27,7 +27,7 @@ function player(plans) {
     if (inside) h.wasIn = true;
     const swing = (o, tag) => { if (tag) h.swings.push({ tag, at: ms(), ball: h.ball }); ws.send(JSON.stringify({ type: 'swing', dir: 0, lob: 0, ...o })); };
     // anywhere inside a tick, like a real message
-    if (plan === 'inbox' && inside && ahead < 0.9) { h.acted = true; setTimeout(() => swing({ power: 20, age: 0 }, plan), Math.random() * 16); }
+    if (plan === 'inbox' && inside && ahead < 0.9) { h.acted = true; const due = Math.max(0, ahead - 0.25) / Math.abs(m.v[2]) * 1000; setTimeout(() => { swing({ power: 20, age: 0 }, plan); h.swings[h.swings.length - 1].due = due; }, Math.random() * 16); }
     if (plan === 'late' && h.wasIn && ahead < -1.3) { h.acted = true; swing({ power: 20, age: 250 }, plan); }
     if (FIX[plan] && inside && ahead < 0.9) { h.acted = true; swing({ power: 8, age: 60 }, plan); setTimeout(() => swing({ power: 30, age: 60 + FIX[plan], fix: true }), FIX[plan]); }
   });
@@ -44,7 +44,7 @@ function analyse(h, tag) {
     const hit = h.ev.find(e => e.type === 'hit' && e.side === h.side && e.at >= sw.at && e.at - sw.at < 700); if (!hit) { out.push({ miss: true }); continue; }
     const s = h.side === 0 ? 1 : -1, pre = h.st[hit.i - 1], post = h.st[hit.i]; if (!pre || !post) continue;
     const dt = post.t != null && pre.t != null ? post.t - pre.t : DT;
-    const r = { latency: hit.at - sw.at, ahead: -(hit.p[2] - pre.me.z) * s,
+    const r = { latency: hit.at - sw.at, due: sw.due, ahead: -(hit.p[2] - pre.me.z) * s,
       jump: Math.min(hyp(...[0, 1, 2].map(i => post.p[i] - pre.p[i] - post.v[i] * dt)), hyp(...[0, 1, 2].map(i => post.p[i] - pre.p[i] - pre.v[i] * dt))), kink: 0, steps: 0, land: null, bounce: null };
     // after the hit packet: the largest change of velocity between two packets, gravity taken out
     for (let i = hit.i + 1; i < h.st.length && h.st[i].at - hit.at < 450; i++) {
@@ -76,7 +76,12 @@ for (const tag of Object.keys(FIX)) {
   console.log(`  launches sent: ${rs.map(r => r.launches).join(',')}   final target z: ${rs.map(r => f(r.land && Math.abs(r.land[1]))).join(',')}   bounce off target, m: ${stat(rs.filter(r => r.off != null).map(r => r.off))}`);
 }
 if (process.argv[2] == null) {                        // assertions only for the current build
-  ok(inbox.length >= 3 && Math.max(...inbox.map(r => r.latency)) < 12, 'in the box: hit comes back within a tick of the swing being sent');
+  // STRIKE_WAIT (production, NOTES 265): a swing whose ball is still coming meets it at the contact plane, so swing -> hit is the ball's own
+  // time to the plane (due: from the state it swung on, up to a tick old, + the up-to-16 ms send delay) and it is struck there. STRIKE_WAIT=0: on arrival.
+  if (WAITS) {
+    ok(inbox.length >= 3 && inbox.every(r => r.latency - r.due < 12 + 17 && r.latency - r.due > -34), `in the box (STRIKE_WAIT): swing -> hit is the ball's own time to the plane (minus it: ${inbox.map(r => f(r.latency - r.due, 0)).join(', ')} ms)`);
+    ok(inbox.every(r => Math.abs(r.ahead - 0.25) < 0.3), `...met at the contact plane (${inbox.map(r => f(r.ahead)).join(', ')} m in front of the paddle, CONTACT 0.25)`);
+  } else ok(inbox.length >= 3 && Math.max(...inbox.map(r => r.latency)) < 12, 'in the box: hit comes back within a tick of the swing being sent');
   ok(lh.length >= 2 && lh.length === late.length, 'back-dated swings are still granted');
   ok(lh.every(r => r.ahead > -0.15), 'a back-dated hit launches from the paddle, not from behind the player');
   for (const tag of Object.keys(FIX)) { const rs = analyse(a, tag).filter(r => !r.miss);

@@ -182,7 +182,7 @@ class Client extends EventEmitter {
     }
     if (!go) return;
     const sh = b.shot || { n: 0.4, dir: 0, lob: 0 };
-    c.swung = true; c.sentTick = this.tick; c.sentAhead = ahead;
+    c.swung = true; c.sentTick = this.tick; c.sentAhead = ahead; c.sentClosing = closing;
     this.send({ type: 'swing', power: 9 + 26 * sh.n, dir: sh.dir, lob: sh.lob });
   }
 }
@@ -344,30 +344,39 @@ async function suiteWhiffs() {
   A.close(); B.close(); stopServer(sv);
 }
 
-// (4) forgiving window
+// (4) forgiving window. With STRIKE_WAIT (the production default, NOTES 265) a swing that comes before its ball is met at the contact
+// plane, not on box entry: the lead is measured to the tick the ball entered the box either way (the promise: up to 0.3 s early still
+// connects), and where it connects is the mode's own (on arrival with STRIKE_WAIT=0; at CONTACT in front of the paddle with the wait).
+const WAITS = process.env.STRIKE_WAIT !== '0', CONTACT = 0.25;
 async function suiteWindow() {
   const W = 'window', sv = await startServer(Math.min(SCALE, 3));
   const [A, B] = await pair(sv);
-  const ret = { n: 0.5, dir: 0.3, lob: 0 }, leads = [];
+  const ret = { n: 0.5, dir: 0.3, lob: 0 }, leads = [], met = [];
   for (const lead of [0.1, 0.2, 0.26, 0.29, 0.31, 0.1, 0.2, 0.26, 0.29, 0.31]) {
     const r = await scriptedPoint(A, B, ret, { kind: 'lead', lead, shot: { n: 0.5, dir: 0, lob: 0 } });
     if (!ok(W, r && r.ctx && r.ctx.swungTick != null, `lead ${lead}: no point / no swing`)) continue;
-    const c = r.ctx, arrive = r.hit ? r.hit.tick : c.enterTick - 1;
+    const c = r.ctx, arrive = WAITS || !r.hit ? c.enterTick - 1 : r.hit.tick;
     const measured = (arrive - c.swungTick) * DT;               // sim time from the server accepting the swing to the ball entering the box
     if (measured > 0.3) { notes.push(`window: (a ${lead}s lead came out at ${(measured * 1000).toFixed(0)} ms, beyond the promise; ${r.hit ? 'hit' : 'whiff'})`); continue; }
     if (!r.hit) { fail(W, `swing ${(measured * 1000).toFixed(0)} ms before arrival did not connect, whiffs ${JSON.stringify(r.subjWhiffs)}`); continue; }
-    leads.push(measured);
-    ok(W, r.hit.stat.ahead > ZONE.front - 0.3, `lead ${lead}: did not connect on arrival, ball was already ${r.hit.stat.ahead.toFixed(2)} m from the paddle plane`);
+    leads.push(measured); met.push(r.hit.stat.ahead);
+    if (WAITS) ok(W, Math.abs(r.hit.stat.ahead - CONTACT) < 0.3, `lead ${lead}: waited, but was not met at the contact plane (${r.hit.stat.ahead.toFixed(2)} m in front of the paddle, CONTACT ${CONTACT})`);
+    else ok(W, r.hit.stat.ahead > ZONE.front - 0.3, `lead ${lead}: did not connect on arrival, ball was already ${r.hit.stat.ahead.toFixed(2)} m from the paddle plane`);
     ok(W, r.subjWhiffs.length === 0, `lead ${lead}: hit AND whiff`);
   }
   ok(W, Math.max(...leads) >= 0.25, `never actually tested a long lead (max ${Math.max(...leads)})`);
-  for (const trig of [1.4, 0.5, -0.4]) {                        // ball already in the box -> immediate
+  const inbox = [];
+  for (const trig of [1.4, 0.5, -0.4]) {                        // ball already in the box -> immediate (STRIKE_WAIT: as soon as the ball comes to the plane)
     const r = await scriptedPoint(A, B, ret, good({ n: 0.5, dir: 0, lob: 0 }, { trig }));
     const c = r && r.hit && r.hit.ctx;
     if (!ok(W, c, `in-box swing (trig ${trig}) did not connect`)) continue;
-    ok(W, r.hit.tick - c.swungTick <= 1, `in-box swing connected ${r.hit.tick - c.swungTick} ticks after the swing`);
+    const ticks = r.hit.tick - c.swungTick; inbox.push(ticks);
+    if (!WAITS || c.sentAhead < CONTACT + 0.15) ok(W, ticks <= 1, `in-box swing connected ${ticks} ticks after the swing`);
+    else { const v = Math.abs(c.sentClosing || 0), due = v > 0.3 ? (c.sentAhead - CONTACT) / v / DT : Infinity;   // the ball's own ticks to the plane, from where it was when the swing went
+      ok(W, ticks <= Math.ceil(due) + 2 && Math.abs(r.hit.stat.ahead - CONTACT) < 0.3, `in-box swing ${c.sentAhead.toFixed(2)} m out connected ${ticks} ticks after the swing (the ball's own ${due.toFixed(1)} to the plane), ${r.hit.stat.ahead.toFixed(2)} m out`); }
   }
-  notes.push(`window: swings ${leads.map(l => (l * 1000).toFixed(0)).join('/')} ms before the ball arrived all connected the tick it entered the box; in-box swings connected within 1 tick`);
+  notes.push(WAITS ? `window (STRIKE_WAIT): swings ${leads.map(l => (l * 1000).toFixed(0)).join('/')} ms before the ball entered the box all connected, met ${met.map(a => a.toFixed(2)).join('/')} m in front of the paddle; in-box swings connected ${inbox.join('/')} ticks after the swing`
+    : `window: swings ${leads.map(l => (l * 1000).toFixed(0)).join('/')} ms before the ball arrived all connected the tick it entered the box; in-box swings connected within 1 tick`);
   A.close(); B.close(); stopServer(sv);
 }
 

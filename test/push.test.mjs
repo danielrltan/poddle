@@ -13,13 +13,14 @@ function player(o) {
   const ws = new WebSocket('ws://localhost:' + PORT), P = { ws, side: null, shots: [], ws0: null, ...o }; let cool = 0;
   ws.on('message', raw => { const m = JSON.parse(raw);
     if (m.type === 'welcome') P.side = m.side;
-    if (m.type === 'hit' && m.side === P.side) P.shots.push({ kind: m.kind, n: m.n, hitN: m.n, land: null, at: Date.now() });
+    if (m.type === 'hit' && m.side === P.side) { P.shots.push({ kind: m.kind, n: m.n, hitN: m.n, land: null, at: Date.now(), lat: P.sentAt != null ? performance.now() - P.sentAt : null, z: P.sentZ }); P.sentAt = null; }   // lat: swing -> hit (a held block has none), z: where the player stood
+    if (m.type === 'whiff') P.sentAt = null;                     // a whiffed swing is not the swing of a later held block's hit
     if (m.type === 'launch' && m.by === P.side) { const s = P.shots[P.shots.length - 1]; if (s) { s.land = -m.land[1] * (P.side === 0 ? 1 : -1); if (m.kind) s.kind = m.kind; if (m.n != null) s.n = m.n; } }
     if (m.type !== 'state' || P.side == null) return;
     const me = m.paddles[P.side], s = P.side === 0 ? 1 : -1, mine = m.live && m.v[2] * s > 0;
     // paddle tracks the ball (a player holding it in the ball's path); z = how far from the net this player stands
     ws.send(JSON.stringify({ type: 'paddle', x: mine ? m.p[0] : 0, y: mine ? Math.max(0.4, Math.min(1.6, m.p[1])) : 1, z: P.lean || 6.5, q: [0, 0, 0, 1], r: P.rate || 0 }));
-    if (mine && me && P.swing && Date.now() > cool && Math.abs(m.p[2] - me.z) < (P.at || 1.0)) { cool = Date.now() + 600; P.swing(ws, m); }
+    if (mine && me && P.swing && Date.now() > cool && Math.abs(m.p[2] - me.z) < (P.at || 1.0)) { cool = Date.now() + 600; P.sentAt = performance.now(); P.sentZ = Math.abs(me.z); P.swing(ws, m); }
   });
   return P;
 }
@@ -34,10 +35,26 @@ const runs = [];
 for (const power of [6, 10, 14, 18, 24]) {
   const A = feed(), B = player({ lean: 2.8, at: 1.2, swing: ws => ws.send(JSON.stringify({ type: 'swing', power, dir: 0, lob: 0.1, final: true })) });
   await wait(9000);
-  runs.push({ power, land: avg(land(B)), kinds: [...new Set(B.shots.map(s => s.kind))], n: B.shots.length });
+  runs.push({ power, land: avg(land(B)), kinds: [...new Set(B.shots.map(s => s.kind))], n: B.shots.length, lat: B.shots.filter(s => s.lat != null && s.z < 3.6).map(s => s.lat) });   // at the net: the first ball of a run can find the player still walking in from the baseline (a rally shot, which waits)
   A.ws.close(); B.ws.close(); await wait(400);
 }
 for (const r of runs) console.log(`       power ${String(r.power).padStart(2)} rad/s -> lands ${r.land.toFixed(2)} m past the net (${r.n} shots, ${r.kinds.join('/')})`);
+// Near the net nothing waits (NOTES 265): a strike at the paddle would hold a push ~0.1 s for a ball 1.2 m out, and near-net play is where the
+// rally lives (NOTES 66). Where the paddle is decides it (game.js nearNet), not the stroke: a push is struck the moment it arrives, wherever
+// the ball is in the box, and so is a lofted scoop or a dink (an underhand swing has no push curve, blockWeight 0, but it is just as near).
+const nearLat = runs.flatMap(r => r.lat);   // within PUSH.bounce (3.6 m) of the net, where every swing is on the push curve
+ok(nearLat.length >= 10 && Math.max(...nearLat) < 12, `a push at the net strikes the moment it arrives, with or without STRIKE_WAIT: swing -> hit at most ${Math.max(...nearLat).toFixed(1)} ms over ${nearLat.length} pushes`);
+const scoops = [];
+for (const [lob, bet] of [[0.8, false], [0.8, true], [1, false]]) {
+  const A = feed(), B = player({ lean: 2.8, at: 1.2, swing: ws => {
+    ws.send(JSON.stringify({ type: 'swing', power: 10, dir: 0, lob, final: !bet, age: 60 }));
+    if (bet) setTimeout(() => ws.send(JSON.stringify({ type: 'swing', power: 10, dir: 0, lob, fix: true, final: true })), 100);
+  } });
+  await wait(12000);
+  scoops.push(...B.shots.filter(s => s.lat != null && s.z < 3.4).map(s => s.lat));   // clear of PUSH.bounce (3.6), where footwork can carry a player across the line between the state they swung on and the strike
+  A.ws.close(); B.ws.close(); await wait(400);
+}
+ok(scoops.length >= 5 && Math.max(...scoops) < 12, `a lofted scoop or dink at the net strikes the moment it arrives too, settled or a bet: swing -> hit at most ${Math.max(...scoops).toFixed(1)} ms over ${scoops.length} scoops`);
 const depths = runs.map(r => r.land);
 ok(runs.every(r => r.n > 0), `every push at the net returned the ball (${runs.map(r => r.n).join(', ')} shots)`);
 ok(depths.every((d, i) => i === 0 || d > depths[i - 1] + 0.15), `each harder push lands deeper: ${depths.map(d => d.toFixed(2)).join(' < ')}`);

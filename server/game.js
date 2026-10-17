@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 const http = require('http'), fs = require('fs'), path = require('path');
 const db = require('./db'), stats = require('./stats'), auth = require('./auth'), api = require('./api'), abuse = require('./abuse'), usernames = require('./usernames'), traffic = require('./traffic'), perf = require('./perf');   // player stats (docs/ACCOUNTS.md): none does anything when loaded
 const share = require('./share');                                // share links: /c/<slug>, its page and its picture (docs/SHARE.md 2); nothing runs on require
+const swingtime = require('./swingtime');                         // record-only swing timing per paddle type, in memory (NOTES 265): nothing runs on require
 const LAD = require('./ladder');                                 // trophies and ranks (docs/TROPHIES.md 3): the pure table and the deltas; the hook in record() applies them
 const safeName = (n, fb) => (n && !usernames.impersonates(n) ? n : fb);   // a guest name that passes as Matt or staff is shown as `fb` wherever others see it (docs/ACCOUNTS.md 7.3)
 const HOSTED = !!process.env.FLY_APP_NAME;                        // on Fly: the client address header, the production Origin allowlist, secure cookies, HSTS
@@ -159,8 +160,21 @@ const FIX_WINDOW = 0.25;                  // s after a hit that a corrected powe
 const BEND = { share: 0.5, min: 0.1, max: 0.45, most: 6 };        // most: bends one ball may carry at once (a swoop is two; a legacy client's later re-aims add theirs). Past it a re-aim is refused: only a client flooding settled reports gets there
 const FIX_ALONG = 0.1;                    // a re-aim never stops the ball or sends it back along the court: it reaches the bounce at least this share of the pace it had. Only a guard: no sampled re-aim came near it, old ease or new (slowest 0.11 of 6700, near-net pushes included, NOTES 154)
 const CONTACT = 0.25;                     // a stroke meets the ball this far in front of the paddle
+// Strike at the paddle (NOTES 265, the owner's choice of 2026-10-09 against "I'm still seeing the hit recalculation"): a human's rally swing whose
+// ball is in the box but still coming meets it at the contact plane (CONTACT in front of the paddle), not up to ZONE.front out. It waits only for the
+// BALL, never for a report: a settled report that arrives meanwhile folds into the swing (onMessage's m.fix), so the strike is final and nothing is
+// re-aimed after; one that comes later re-aims as before. Late swings keep the look-back (NOTES 238), near-net swings (nearNet: the push
+// curve, NOTES 66) and serves strike as they always did, and Matt never waits. STRIKE_WAIT=0 (a Fly secret) is today's model, the rollback.
+const STRIKE_WAIT = process.env.STRIKE_WAIT !== '0';
+const WAIT_MAX = 0.4;                     // s a swing may wait from when it first reached its ball (box front to the plane at 3.4 m/s); a slower ball is struck where it is
+// Matt's reaction clock restarts when a re-aimed shot's bend ends (ball.replan, NOTES 154): ~0.2-0.55 s after the bet's strike on 88% of human
+// shots. A strike at the paddle is rarely re-aimed, so a waited strike replans him REPLAN_HUMAN s after it, as the re-aim would have (a re-aim that
+// still comes replaces it). Tuned with seeded runs (test/strikeat.mjs) so each level returns what it did with STRIKE_WAIT=0. Env: tuning only.
+const REPLAN_HUMAN = process.env.REPLAN_HUMAN != null && process.env.REPLAN_HUMAN !== '' && Number.isFinite(+process.env.REPLAN_HUMAN) ? +process.env.REPLAN_HUMAN : 0.45;
+swingtime.init({ strikeWait: STRIKE_WAIT, replanHuman: REPLAN_HUMAN, waitMax: WAIT_MAX });
 const Z_ASSIST = 0.9;                      // share of the forward/back footwork the game does for a player who walks themselves
 const Z_PUSHED = 0.85;                     // most of a player's own lean a deep ball can take back off: you get pushed out of the kitchen, but never yanked all the way home by one shot
+const BAND1 = process.env.BAND1 === '1';      // tests only: Matt's rubber band pinned at 1, so a measured return rate is the level's own (test/strikeat.mjs)
 const BLOCK_ON = process.env.BLOCK !== '0';   // scripted tests with a parked paddle turn the net block off
 // Up at the net a paddle simply held in the ball's path taps it back. The box grows the closer to the net you stand (near:
 // at the kitchen line it is the full swing box), and the ball is met at the paddle, not a metre in front of it: firing early
@@ -811,7 +825,9 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     score[winner]++; ball.live = false;
     const loser = bySide(1 - winner);
     if (loser && loser.swing && ball.lastHit === winner) send(loser, { type: 'whiff', why: whyMissed(loser.swing, inZone(loser)) });
-    for (const pl of players) pl.swing = null;
+    for (const pl of players) { const sw = pl.swing;            // swingtime: a human's rally swing still live when they lost the point (the ball it was for bounced twice; lostWaiting: it was waiting for that ball, NOTES 265)
+      if (sw && !pl.bot && winner !== pl.side && ball.lastHit !== pl.side && ball.serving == null) { swingtime.count(sw.src, 'lost'); if (sw.okAt) swingtime.count(sw.src, 'lostWaiting'); }
+      pl.swing = null; }
     const wa = opts.winAt ?? WIN_AT, gold = opts.gold ?? TOUR_GOLD, capped = MATCH;   // a tournament match: its own target, and a golden point so no game runs for ever
     const final = wa > 0 && (score[winner] >= wa && score[winner] - score[1 - winner] >= WIN_BY || capped && score[winner] >= gold);
     let gp = null;                                               // pressure: the side one point from the game (the client may read it; nothing depends on it)
@@ -833,6 +849,17 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     return { ok: depth && Math.abs(dx) < ZONE.x + REACH_X * r && Math.abs(dy) < ZONE.y + REACH_Y * r, depth, dx, dy, ahead, s };
   }
 
+  // Near the net a swing strikes on arrival, whatever its loft (STRIKE_WAIT never holds it, NOTES 265): where blockWeight's push curve may
+  // apply by position (before the bounce inside BLOCK.volley, after it up at the net, PUSH.bounce), a dink or a scoop as much as a push.
+  const nearNet = pl => (ball.bounces > 0 ? Math.abs(pl.z) <= PUSH.bounce : Math.abs(pl.z) < BLOCK.volley);
+  // How fast the ball closes on this paddle along the court (m/s): its own pace u, less the paddle's z speed away from it over the last two
+  // remembered ticks (footwork and lean move pl.z at up to FOOT_SPEED, so a paddle backing off a slow lob can outrun it)
+  function closing(pl, u, s) {
+    if (hLen < 3) return u;
+    const a = ((hHead - 1 + HN) % HN) * HF, b = ((hHead - 3 + HN) % HN) * HF, k = 4 + pl.side * 3 + 2, dt = hist[a] - hist[b], v = (hist[a + k] - hist[b + k]) / dt;
+    return dt > 0 && Number.isFinite(v) ? u - v * s : u;
+  }
+
   // Contact: a live swing + the ball inside the box around that paddle. Runs every tick AND the instant a swing arrives.
   // A swing reaches us `age` after the hand moved, so the ball may already be past the paddle: it counts if the ball was
   // in the box at any time since the swing began. Either way the ball is struck where it WAS when it was nearest the
@@ -840,22 +867,66 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   // drawn ball onto the new path.
   function tryHit(pl) {
     const sw = pl.swing; if (!sw || !ball.live || ball.serving != null || ball.lastHit === pl.side) return false;
-    const z = inZone(pl), s = z.s, r = pl.bot ? 0 : sw.n, q = 4 + pl.side * 3;
+    const z = inZone(pl), s = z.s, q = 4 + pl.side * 3;
+    const u = ball.v[2] * s, near = !pl.bot && nearNet(pl);                 // u: how fast the ball comes at this paddle (m/s along the court)
+    // Reach: a waiting swing keeps the reach it had when it first had its ball (okAt, okN): a settled report folded in meanwhile mostly has less
+    // n than the capped bet, and REACH_X * n would shrink under a wide ball it had already reached (NOTES 265). It is judged where the paddle IS.
+    const r = pl.bot ? 0 : sw.okAt ? Math.max(sw.n, sw.okN) : sw.n;
+    const reach = Math.abs(z.dx) < ZONE.x + REACH_X * r && Math.abs(z.dy) < ZONE.y + REACH_Y * r, zok = z.depth && reach;
+    // Strike at the paddle (STRIKE_WAIT, NOTES 265): a human's rally swing whose ball is in the box and in reach, still coming and more than half a
+    // tick's closing from the contact plane, waits for the ball to come to it, and is struck where the ball is (kept: no look-back) when:
+    //   it is at the plane; or it no longer closes (the paddle backs off as fast as a slow ball comes: struck now, inside the box, never let run
+    //   out of it to be pulled back); or, after its bounce, the floor comes before the plane (struck on the last tick above the floor: the
+    //   second bounce never beats a swing that had its ball); or it could not reach the plane within WAIT_MAX of okAt (windowEnd).
+    // A waiting swing whose paddle leaves the ball (out of reach, or the ball out of the box) is not struck there and never put back to where it
+    // was: it ends as a whiff unless the paddle comes back to it. Near-net swings (by where the paddle is: nearNet), Matt and serves never wait.
+    let kept = false;
+    if (STRIKE_WAIT && !pl.bot && !near && (zok || sw.okAt) && z.ahead >= 0) {
+      if (!sw.okAt) { sw.okAt = now; sw.okN = sw.n; }
+      if (!zok) return false;
+      sw.inAt = now;
+      const c = closing(pl, u, s), eta = c > 0.3 ? Math.max(0, z.ahead - CONTACT) / c : 0;
+      const tf = ball.bounces >= 1 ? fallLeft(Math.max(ball.p[1], R), ball.v[1], G) : Infinity, go = Math.min(eta, tf);   // tf: s to the second bounce
+      if (c > 0.3 && z.ahead - CONTACT > c * DT / 2 && tf > DT) {
+        if (now + go <= sw.okAt + WAIT_MAX) { sw.until = Math.max(sw.until, now + go + 2 * DT); return false; }
+        sw.capped = true;
+      }
+      kept = true;
+    }
     // A late swing's ball is put back only as far as the paddle face (the nearest remembered point at or in front of it), not
     // to CONTACT: a ball between the face and CONTACT leaves from where it is, and one past the face slides back less (NOTES 238).
-    let grant = z.ok, best = z.ok && z.ahead >= 0 ? z.ahead : Infinity, at = -1, behind = -Infinity, atB = -1;
-    if (!z.ok || z.ahead < 0) for (let k = 1; k <= hLen; k++) {                 // past the paddle (or not in the box now): look back
+    // A swing that waited (okAt) looks back only if its ball slipped past the face within a tick of being in reach, and only that tick.
+    const zk = sw.okAt && !pl.bot ? zok : z.ok, back = !sw.okAt || pl.bot ? sw.from : now - sw.inAt <= DT + 1e-6 ? Math.max(sw.from, sw.inAt - 1e-6) : Infinity;
+    if (sw.okAt && !pl.bot && !kept && z.ahead < 0 && back === Infinity) return false;   // it left its ball and came back to it past the face: never struck from behind (a whiff when the window ends)
+    let grant = zk || kept, best = (zk || kept) && z.ahead >= 0 ? z.ahead : Infinity, at = -1, behind = -Infinity, atB = -1;
+    if (!(zk || kept) || z.ahead < 0) for (let k = 1; k <= hLen; k++) {        // past the paddle (or not in the box now): look back
       const o = ((hHead - k + HN) % HN) * HF; if (!(hist[o] > now - LAG_MAX - DT / 2)) break;
       const ahead = -(hist[o + 3] - hist[o + q + 2]) * s;
       if (!(ahead > -ZONE.behind && ahead < ZONE.front && Math.abs(hist[o + 1] - hist[o + q]) < ZONE.x + REACH_X * r && Math.abs(hist[o + 2] - hist[o + q + 1]) < ZONE.y + REACH_Y * r)) continue;
-      if (hist[o] >= sw.from) grant = true;
+      if (sw.okAt && !pl.bot && hist[o] < back) continue;
+      if (hist[o] >= back) grant = true;
       if (ahead >= 0) { if (ahead < best) { best = ahead; at = o; } }
       else if (ahead > behind) { behind = ahead; atB = o; }
     }
-    if (at < 0 && !(z.ok && z.ahead >= 0) && atB >= 0 && !(z.ok && z.ahead >= behind)) at = atB;   // only ever seen behind the face: the closest of those
+    if (at < 0 && !(zk && z.ahead >= 0) && atB >= 0 && !(zk && z.ahead >= behind)) at = atB;   // only ever seen behind the face: the closest of those
     if (!grant) return false;
-    if (at >= 0) { ball.p[0] = hist[at + 1]; ball.p[1] = hist[at + 2]; ball.p[2] = hist[at + 3]; }
-    strike(pl, sw); return true;
+    // swingtime (record-only, per paddle type): when the ball reaches (reached) the contact plane, from where it is now and how fast it comes
+    const tc = u > 0.3 ? now + (z.ahead - CONTACT) / u : now, late = at >= 0, waited = !!sw.okAt && sw.okAt < now && !late && !sw.capped;
+    if (late) { ball.p[0] = hist[at + 1]; ball.p[1] = hist[at + 2]; ball.p[2] = hist[at + 3]; }
+    const struckAt = late ? -(hist[at + 3] - hist[at + q + 2]) * s : z.ahead;
+    strike(pl, sw);
+    if (!pl.bot) {
+      const src = sw.src, T = swingtime;
+      T.count(src, 'strikes'); if (near) T.count(src, 'exempt');     // a near-net strike is counted apart (exempt, reaimedNear) and kept out of the timing: it never waits, and its settled report re-aims it by design (fixBlock on the push curve)
+      if (!near) { if (waited) T.count(src, 'waited'); if (sw.capped) T.count(src, 'windowEnd'); if (late) T.count(src, 'late');
+        T.count(src, sw.final === false ? 'bet' : 'folded');
+        T.add(src, 'waitMs', (now - sw.at) * 1000); T.add(src, 'aheadCm', struckAt * 100); T.add(src, 'betMs', (sw.at - tc) * 1000);
+        if (sw.finalAt != null) T.add(src, 'settledMs', (sw.finalAt - tc) * 1000); }
+      pl.hit.tm = { tc, src, near, done: sw.final !== false };        // a bet's settled report is counted when it comes (onMessage)
+      // Matt: a waited strike restarts his reaction clock when a re-aim's bend would have ended (REPLAN_HUMAN); a re-aim that still comes sets its own
+      if (STRIKE_WAIT && waited && REPLAN_HUMAN > 0) ball.replan = { side: 1 - pl.side, at: now + REPLAN_HUMAN, keep: true };
+    }
+    return true;
   }
   // reason = where the ball was relative to the paddle (player's own left/right) or the timing
   const aside = z => (Math.abs(z.dx) >= ZONE.x ? (z.dx * z.s > 0 ? 'right' : 'left') : (z.dy > 0 ? 'high' : 'low'));
@@ -911,7 +982,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
   function runBot(pl, dt) {
     const B = BOTS[botLevel], foe = humans()[0];
     // rubber band: ease off when well ahead, sharpen when well behind, so rallies stay alive in a demo
-    const lead = score[pl.side] - score[1 - pl.side], band = opts.tour ? 1 : clamp(1 - lead * 0.06, 0.7, 1.1);   // a tournament's Matt plays at a fixed strength
+    const lead = score[pl.side] - score[1 - pl.side], band = opts.tour || BAND1 ? 1 : clamp(1 - lead * 0.06, 0.7, 1.1);   // a tournament's Matt plays at a fixed strength (BAND1: tests that measure a level, test/strikeat.mjs)
     if (!ball.live || ball.lastHit === pl.side || ball.serving === pl.side) { pl.x += (0 - pl.x) * 2 * dt; pl.y += (1.0 - pl.y) * 2 * dt; return; }
     if (now < pl.react + B.react - 0.3) return;                  // planFootwork sets react = now + 0.3
     const tgt = pl.contact || [ball.p[0], 1.0], foot = B.foot * band;
@@ -1182,7 +1253,8 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (m.fix) {                                               // clients report a swing early, on a predicted peak; this is the real one
         const betN = me.hit ? me.hit.n : null; let ran = false;   // stats: the power the bet struck at, before a re-aim moves it
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
-        if (me.swing) Object.assign(me.swing, { n: pw, dir, lob, slice, final, sure, pk, src });   // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power)
+        if (me.swing && me.swing.shut) return;                    // the reports of a second swing that was turned away while this one waited (below)
+        if (me.swing) { if (final && me.swing.finalAt == null) me.swing.finalAt = now; Object.assign(me.swing, { n: pw, dir, lob, slice, final, sure, pk, src }); }   // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power; with STRIKE_WAIT one waiting for its ball, NOTES 265)
         // A shot struck on the near-net curve: only the SETTLED report may move it along that curve, never another bet.
         // Struck near the net: the ball is already away at the swing's own power, and only a SETTLED report may bend it.
         // Its gate is the near one (PUSH.gate): from up there the ball passes the rally gate of 1 m before any report lands.
@@ -1194,6 +1266,10 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
           ran = true;
         }
         if (final && !me.swing) sayLand(me);                     // settled and it changed nothing: the landing it has is the one
+        const tm = !me.swing && me.hit && me.hit.tm;                // swingtime: a bet-struck rally ball's settled report, and whether it re-aimed (NOTES 265)
+        if (final && tm && !tm.done) { tm.done = true;
+          if (tm.near) { if (ran) swingtime.count(tm.src, 'reaimedNear'); }
+          else { swingtime.add(tm.src, 'settledMs', (now - tm.tc) * 1000); if (ran) { swingtime.count(tm.src, 'reaimed'); swingtime.add(tm.src, 'reaimMs', (now - me.hit.at) * 1000); } else swingtime.count(tm.src, 'settledSame'); } }
         if (sure && !me.swing && stats.fixRecords(me.hit, betN, pw, ran, now, Math.max(FIX_WINDOW, PUSH.fix))) { swingStat(me, pw, pk, src); me.hit.statted = true; }   // a settled report that speaks for the contact (docs/ACCOUNTS.md 4.5)
         return;
       }
@@ -1206,10 +1282,17 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
         if (sure && stats.fixRecords(me.hit, null, pw, true, now, 0)) { swingStat(me, pw, pk, src); me.hit.statted = true; }
         return;
       }
+      // A swing waiting for its ball (STRIKE_WAIT, okAt) is not replaced by the next report unless that one is harder: a follow-through or a
+      // recoil reported as a new swing would otherwise strike a drive as a tap. motion.js runs one swing at a time, so every report after a
+      // new swing's bet is that swing's: a turned-away swing's reports are shut out of the waiting one. A harder one takes over its reach.
+      const wt = STRIKE_WAIT && me.swing && me.swing.okAt && !me.swing.capped ? me.swing : null;
+      if (wt && pw <= wt.n) { wt.shut = true; broadcast({ type: 'swung', side: me.side }); return; }
       me.swing = { until: now + SWING_WINDOW + (1 - pw) * 0.28,   // gentle swings are long, unhurried motions: give them a longer window
+        at: now, finalAt: final ? now : null, okAt: 0,             // swingtime: when it (and its settled report) came. okAt: when it first had its ball in reach (STRIKE_WAIT)
         from: now - clamp((num(m.age, 0) + clamp(num(m.net, 0), 0, 250)) / 1000, 0, LAG_MAX),   // lag compensation: the hand started moving `age` ms ago (sensor + Bluetooth lateness), and `net` = the round trip: the player saw the ball half a trip ago and the swing took the other half to get here
         n: pw,                                                     // power 6 = a tap, 18-23 = a relaxed stroke (a drive), 27.3+ = a smash (only with speed)
         dir, lob, slice, final, sure, pk, src, why: null, best: Infinity };   // final: an early report is a bet, and near the net it strikes soft until it settles. sure/pk/src: stats
+      if (wt) Object.assign(me.swing, { okAt: wt.okAt, okN: Math.max(wt.okN, pw), inAt: wt.inAt, until: Math.max(me.swing.until, wt.until) });
       broadcast({ type: 'swung', side: me.side });
       tryHit(me);                                                // ball already there: struck NOW, not on the next tick
     }
@@ -1286,7 +1369,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
         }
       }
     } else if (ball.live) {
-      if (ball.replan && now >= ball.replan.at - 1e-9) { planFootwork(ball.replan.side, now - DT); ball.replan = null; }   // the bend has all its velocity: plan the receiver again, which restarts Matt's clock, as the old ease's end did (BEND). The ball is still a tick back
+      if (ball.replan && now >= ball.replan.at - 1e-9) { const rp = ball.replan, rc = bySide(rp.side); ball.replan = null; if (!(rp.keep && rc && rc.botSwung)) planFootwork(rp.side, now - DT); }   // the bend has all its velocity: plan the receiver again, which restarts Matt's clock, as the old ease's end did (BEND). The ball is still a tick back. keep (a waited strike's, NOTES 265): never once Matt has swung at it (planFootwork would arm a second swing)
       // Exact (flight()): x, y and a re-aim's bend are solve()'s, fallLeft()'s and coast()'s closed form, tick for tick. A tick that reaches the
       // floor stops the ball there, on the landing itself (rest: what is left of the tick, flown after the bounce below). It used to be found
       // up to a tick late, up to 0.25 m past the marker (NOTES 154).
@@ -1323,7 +1406,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (mine && z.depth && Math.abs(z.ahead) < sw.best) { sw.best = Math.abs(z.ahead); sw.why = aside(z); }
       if (now > sw.until) {
         pl.swing = null;
-        if (mine && ball.serving == null) send(pl, { type: 'whiff', why: whyMissed(sw, z) });
+        if (mine && ball.serving == null) { send(pl, { type: 'whiff', why: whyMissed(sw, z) }); if (!pl.bot) swingtime.count(sw.src, 'whiffs'); }
       }
     }
 

@@ -5304,3 +5304,192 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
 - test/stats.test.mjs R19: its server now plays games to 5. R19 marks a seat only after 5 unbacked swings (stats.js MO.bad), and a 2-0
   over Rookie sometimes took fewer, so "the scripted hitter beats Rookie: saved, not counted" failed at random and kept stopping
   deploy.sh's gate (2026-10-05, 10-15, 10-16). 3 of 3 runs pass now.
+
+## 265. Strike at the paddle: a swing that comes early meets the ball at the paddle, so its settled report is in before contact and the ball is not recalculated in the air
+- "I'm still seeing the hit recalculation" (2026-10-09, with 236-239). Before this change the server struck on the swing's first report, the bet,
+  which comes ~32 ms before the hand's peak, as soon as the ball was anywhere in the 1.6 m contact box. The settled report came ~98 ms later and
+  re-aimed 87-89% of hits, by then with the ball ~1 m out. Of the options the evaluation put to him (test/strikeat.mjs, the judge's plan), the owner
+  chose "Strike at the paddle". The motion.js half (an earlier peak call, "fall2r") was REJECTED: it doubled smashes (3 -> 7%), broke NOTES 222's
+  one-marker rule on reopened swings, and added nothing live.
+- server/game.js tryHit, behind `STRIKE_WAIT`, which is on unless the env says `0`. Production rolls back with the Fly secret STRIKE_WAIT=0.
+  - Which swings wait: a human's rally swing whose ball is in the box and in reach, coming at it, and more than half a tick's closing in
+    front of the contact plane (CONTACT 0.25 m) waits for the ball to get there. It waits only for the ball, never for a report, so 66's rule
+    ("a swing never waits for a better answer") still holds. "Coming" is the closing speed: the ball's pace less the paddle's own z speed
+    away from it over the last two remembered ticks (`closing()`), so a paddle backing off a slow ball is seen for what it is.
+  - When a waiting swing strikes, always where the ball is (no look-back): at the plane; when the ball no longer closes (<= 0.3 m/s: the
+    paddle backs off as fast as the ball comes, so it is struck inside the box instead of being let run out of it); after its bounce, on the
+    last tick above the floor when the second bounce comes before the plane; or when the plane is more than WAIT_MAX past okAt (windowEnd).
+  - A waiting swing whose paddle leaves its ball (out of the kept reach, or the ball out of the box) is not struck, and the look-back never
+    puts the ball back to where the paddle had it: it ends as a window-end whiff unless the paddle comes back. Its look-back runs only if
+    its ball slipped past the face within a tick of being in reach, and only over that tick.
+  - A settled report that arrives meanwhile folds into the swing (the old m.fix branch, now with `finalAt`). The strike is then final: a
+    smash is struck as a smash and curls from contact, a tap is a tap, and the landing is told with the hit (quiet 0). A settled report that
+    comes after contact re-aims as before, with 154's bend.
+  - The reach RADIUS is the one the swing had when it first had its ball (`okAt`, `okN`) and kept, but it is tested every tick against
+    where the paddle IS. Without the kept radius, the folded-in settled n, which is mostly under the capped bet, shrinks REACH_X * n under
+    a wide ball the swing had already reached (the evaluation's PADX run: 42 whiffs without it, 22 with, 20 today). Round 1 of the review
+    found the radius was kept but the paddle never re-checked: a paddle moved 2.5 m off its ball during the wait still struck it beside
+    itself (6 of 6, test/strikewait.test "drift off"); now those are whiffs.
+  - The window grows with the wait (`until` >= the ball's own time to the plane, or to the floor, + 2 ticks), so a waiting swing never
+    whiffs because its window ran out. Only a ball still more than WAIT_MAX (0.4 s) from the plane is struck where it is, as it is today
+    (`windowEnd`, counted).
+  - Not changed: Matt; serves (tryHit returns while the ball hangs); held blocks; late swings, which keep the lag-compensated look-back
+    (238); and near-net swings (`nearNet`: by where the paddle is, whatever the loft: before the bounce inside BLOCK.volley 5.2 m of the
+    net, after it inside PUSH.bounce 3.6 m, which is where blockWeight's push curve may apply, NOTES 66).
+  - Why near-net swings are exempt: push.test run once without the exemption showed pushes at the net waiting up to 300 ms (slow dinks), and
+    a near-net swing struck at the plane loses the PUSH.gate window. The first version exempted blockWeight > 0, which is 0 for any underhand
+    or lofted swing: at the kitchen (z 3.2) a lofted scoop waited p10/50/90 146/152/219 ms (distance-timed 299-319 ms), and every one went
+    into waitMs, enough on its own to trip the 200 ms stop line. By position they strike on arrival: 0.17/0.30/0.51 ms (the review's probe,
+    A at z 3.2, LOB 0.8, 34 swings), push.test's new scoop and dink cases <= 2 ms.
+  - The wire is unchanged and old tabs need nothing.
+- Matt (REPLAN_HUMAN 0.45 s): each re-aim's bend end replanned the receiver (ball.replan, NOTES 154), which restarts Matt's reaction clock
+  on 87% of human shots. A waited strike is rarely re-aimed, so it replans him 0.45 s after the strike; a re-aim that still comes replaces it.
+  `keep` skips the replan once Matt has swung, so planFootwork never arms a second swing. The env REPLAN_HUMAN is for tuning only. BAND1=1
+  (tests only) pins the rubber band. Calibrated with test/strikeat.mjs at ALIGN -60, band pinned, Math.random seeded (test/seedrand.cjs),
+  178 swings per level per seed, 2 seeds (Tour and Pro 356 balls, Rookie and Club fewer where rallies ran out of time).
+  Matt's return rate:
+  | | today (STRIKE_WAIT=0) | wait, no replan | wait, 0.3 s | wait, 0.45 s (shipped) | wait, 0.6 s |
+  |---|---|---|---|---|---|
+  | Rookie | 21% | 28% | 21% | 16% | 16% |
+  | Club | 55% | 71% | 54% | 54% | 55% |
+  | Tour | 83% | 89% | 92% | 90% | 89% |
+  | Pro | 97% | 98% | 99% | 97% | 97% |
+  - At 0.45 s every level is within the +-8 pp target: Rookie -5, Club -1.5, Tour +6.7, Pro +0.3.
+  - Tour is nearest the edge and the replan cannot move it (89-92% at every value). The gain there is the contact sitting ~0.85 m further
+    back, so the ball flies longer, not his clock. Retune Tour's react/whiff if it matters.
+  - The no-replan, 0.3 s and 0.6 s columns are one seed each.
+  - Re-run after round 1's fixes (closing speed, floor, reach, nearNet), seed 1, 145-178 balls: today -> wait 0.45 s: Rookie 19 -> 19%,
+    Club 57 -> 55%, Tour 87 -> 91%, Pro 98 -> 97%. Re-aimed 84-89% -> 39-46%, the rest p50 34-35 ms after the hit.
+  - Smashes (owner decision, review round 1): a folded smash is struck at contact with curl 1, and solve()'s curl brings it back onto its
+    aimed line. Today the same stroke is a bet re-aimed by the swoop, which lands it at least CURVE.swoop off that line. So smashes now land
+    where they are aimed. The reviewer's scripted smash (settled 30 ms after the bet, band pinned, unseeded, small n), first-bounce |x| and
+    Matt's return, today -> wait: Club dir 0.2: |x| 1.42 -> 0.48 m, returned 8% -> 94%; Club dir 0.6: |x| 0.40 -> 1.44 m, 86% -> 78%; Rookie
+    dir 0.6: 30% -> 0%; Pro dir 0.2: 100% -> 94%. Easier for Matt to read on central aims, harder on wide ones. Seeded per level on the real
+    captures (test/strikeat.mjs ONLY=smash, ALIGN -60, seed 1; only 3 captured movements settle as smashes, so each is repeated, 56-113
+    swings): Rookie 34 -> 16%, Club 59 -> 59%, Tour 86 -> 93%, Pro 97 -> 98%; |x| p50 0.81 -> 0.92 m. The aggregate calibration hides it
+    (smashes are ~3% of strokes). The alternative is to keep the swoop's extra bow for a strike that was folded in; not done.
+- Measured (the real captures through the real web/motion.js into the real server; ALIGN = the hand's peak minus the ball reaching the plane,
+  + N(0, 30) ms; reports reach the server 6.5 ms after they are sent). Each row gives today -> with the wait.
+  - test/reaimgap.mjs, 178 hits each:
+    | ALIGN | re-aimed | settled in before contact | re-aim after the hit p50/p90 (ball gone p50) | landing shift p50/p90 | heading p50/p90 | struck p50/p90 m out |
+    |---|---|---|---|---|---|---|
+    | -60 | 89% -> 46% | 1 -> 73 | 96/143 -> 36/79 ms (1.00 -> 0.38 m) | 0.70/1.71 -> 0.42/1.32 m | 1.5/6.1 -> 0.9/3.2 deg | 0.99/1.51 -> 0.25/0.30 |
+    | +30 | 88% -> 88% | 0 -> 1 | 99 -> 84 ms (1.03 -> 0.79 m) | 0.56 -> 0.59 m | 1.1 -> 1.2 deg | 0.31/0.88 -> 0.22/0.29 |
+    | +100 | 87% -> 89% | 0 -> 0 | 99 -> 98 ms | 0.59 -> 0.61 m | 1.0 -> 1.2 deg | 0.07/0.25 -> 0.08/0.23 |
+  - test/strikeat.mjs (Club, 89 hits each):
+    - Re-aimed at -60 / +30 / +100: 87 / 88 / 87% -> 40 / 82 / 87%.
+    - The server's wait after the bet: p50 96 (p90 159, max 379) / 4 / 0 ms.
+    - Onset -> drawn turn p50: 161 -> 247 / 147 -> 171 / 145 -> 154 ms. This is the trade the owner accepted: at -60 the ball turns ~86 ms
+      later, when it reaches the paddle.
+    - Drawn turn minus the drawn paddle's peak (D p50 62 ms) at -60: p50 -67 -> +17 ms. The ball no longer turns before the drawn paddle swings.
+    - Kinds are the same in both modes (drive 64%, tap 24%, slice 9%, smash 3%). 2 curl from contact where 2 swooped at a re-aim.
+    - Whiffs 0 everywhere. Wide balls (PADX 1.45, Club, 2 x 89): 17 -> 18 whiffs. Re-run after round 1 (the reach now re-checked every
+      tick, dx and dy, against the kept radius), seed 1: 19 -> 20 of 178.
+  - test/rewind.mjs: late swings are untouched.
+    | ALIGN | rewound | hitter slide p50/p90 m |
+    |---|---|---|
+    | +100 | 67% -> 72% | 0.42/0.93 -> 0.43/1.05 |
+    | +30 | 14% -> 11% | |
+    | -60 | 0 -> 0 | |
+    - The ball is struck from 0.91 m (p50) out -> 0.25 m at -60. On the hitter's screen, unrewound hits slide p90 0.19 -> 0.02 m at -60.
+  - test/swinglat.mjs MODE=natural (the hand's peak at the plane, ALIGN ~0), 330 s each: onset -> drawn turn p50/p90 140/253 -> 181/331 ms
+    (the review's own run: 143/254 -> 179/332, paired per swing p10/50/90 0 / +32 / +86 ms). The first version of this line said 181/336 ->
+    185/346 from 120 s runs (n 18), which understated it. Even at ALIGN 0 the wait costs ~+35-40 ms p50 onset -> turn: the server holds the
+    swing p50 36 / p90 84 ms (struck on arrival 15 of 62, against 54 of 56 today). That is on top of the ~+86 ms at ALIGN -60 (strikeat).
+    - Strike vs the hand's peak: -29 -> +8 ms.
+    - Hit -> re-aim at the hitter: 96 -> 55 ms p50 (51 of 56 -> 53 of 62 re-aimed: at ALIGN 0 the settled report comes after contact).
+- The go criterion and what is left:
+  - Borderline at -60: re-aimed 40% (strikeat) and 46% (reaimgap) against the line of <= 45%. The remaining re-aims come p50 32 / 36 ms after
+    the hit against the line of <= 35 ms, with the ball 0.27-0.38 m gone (was ~1 m) and heading p50 0.9 deg. One harness is a point over on
+    each line.
+  - Smash rate 3% (<= 5%). Wide whiffs +1 (<= +3). Matt within +-8 pp per level.
+  - At ALIGN >= +30 it changes almost nothing, because the settled report physically arrives ~64 ms after the peak.
+  - So whether players see it depends on live ALIGN. That is what the counts below are for.
+- Live counts, record-only (Step B, server/swingtime.js): aggregate per paddle type (airpod / phone / none), never per player, in memory,
+  reset on restart.
+  - Counts: strikes, exempt (near-net) and reaimedNear, waited, windowEnd, late (look-back), folded (settled at contact), bet, reaimed,
+    settledSame, whiffs (window ends), lost and lostWaiting. lost: a human's swing still live when they lost the point (point() clears it,
+    and before round 1 nothing counted it); lostWaiting: of them, swings that were waiting for that ball, the losses the wait itself can
+    cause. share.lostWaiting is over waited + windowEnd + lostWaiting.
+  - Near-net strikes never wait and their settled reports re-aim them by design (fixBlock on the push curve), so they are counted apart
+    and kept out of every other count and histogram; the shares are over strikes - exempt. Mixed in, push-curve re-aims alone could trip the 60% line, and their
+    zero waits would hide a real wait problem from the 200 ms line.
+  - Fixed-bin histograms: waitMs (arrival -> strike), aheadCm (where it was struck), betMs and settledMs (the report's arrival minus the
+    ball's time at the plane), reaimMs.
+  - ALIGN itself is not on the wire: the hand's peak time is client-side, and no field was added. Measured offsets (test/strikeat.mjs with
+    STATS_KEY, STRIKE_WAIT=0, Club, ALIGN -60 / +30 / +100 played): betMs p50 -101 / -11 / +63 and settledMs p50 -1 / +101 / +160. So
+    ALIGN ~ betMs + 40 (37-41 ms) ~ settledMs - 65 (59-71 ms), on AirPod timing with a 6.5 ms one-way trip. betMs is the steadier proxy.
+    A phone's samples come later (a relay leg each way), so its offsets are rough.
+  - settledMs under0 is the share whose settled report folds in at the plane. With the wait off, that is the counterfactual.
+  - Recorded in both modes.
+  - Read: GET /api/swingtime with the stats panel's key (panelGate: STATS_KEY, 120 a minute), or on the machine `node server/admin.js
+    swingtime [--json]`, which asks the running process on 127.0.0.1.
+  - Roll back (STRIKE_WAIT=0) in the first 48 h if any of the judge's stop lines trips: re-aimed > 60%; waitMs p90 > 200 ms; phone
+    windowEnd > 5% of waits. Since round 1, windowEnd also counts a waiting swing struck where the ball is because the plane is out of
+    WAIT_MAX's reach once the paddle backs off a slow ball (the review's retreat probe: 18 of 18), so read a high phone windowEnd against
+    lostWaiting and whiffs before rolling back on it alone. `admin.js swingtime` prints lost / lostWaiting on its first line.
+- Round 1 of the review (each probe two servers side by side, the same scripted swings; before -> after the fix, STRIKE_WAIT=1):
+  - A paddle backing off a lob (lean to z 8.8 after the swing, 1.5-1.6 m out): struck at 2.16 m, outside the 1.6 m box, after the look-back
+    pulled the ball 0.57 m back in time, 17 of 17 counted late -> struck 31-35 ms after the swing at 1.37 m, inside the box, the ball not moved
+    (late 0). With the lean of 7.5 the wait had stretched to 379-386 ms; now those strike in place too.
+  - A swing at a falling ball after its bounce, leaning back (z 8.8): 5 of 31 lost to a double bounce while waiting -> 0 of 32 (2 of 5 of
+    strikewait's hard slices are struck on the last tick above the floor, 1.47 m out; the rest at the plane). The review's server.test sweep
+    flake (a whiff "late" and a double bounce inside the box) came from this: 0 in 3 full runs since.
+  - A paddle moved 2.5 m off its ball 20 ms after the swing: 6 ghost hits 2.49 m beside the paddle -> 6 whiffs. 0.8 and 1.6 m (inside the
+    kept reach) still hit.
+  - Lofted scoops at the kitchen: see near-net above.
+- A ball that would land OUT (its first bounce) before the plane is now let go: the swing waits, the ball lands out, and the swinger wins
+  the point, where today it was volleyed. That is the rules' answer, and no probe found it in play (the paddle has to stand behind the line).
+- Known and unchanged: the 'swung' broadcast still goes out when the bet arrives. In a two-player game the opponent's view of the hitter's
+  paddle now leads the ball's turn by the wait, ~96 ms p50 at ALIGN -60 (the evaluation's inventory). Matt's games are unaffected.
+- Legal pages: no change. Nothing new is sent, logged or written to disk. The counts are totals over all players for each kind of paddle,
+  with no name, seat, court, id or address (strikewait.test checks the report carries none). The privacy page's triggers (data sent, stored or
+  logged about a person; anything shown to others; storage; permissions; third parties) are all unchanged. Its "swing data ... not stored"
+  line is about a player's swings, and none is kept.
+- Tests:
+  - New test/strikewait.test.mjs runs the same scripted swings at STRIKE_WAIT=1 and =0 (120 s; B feeds what A's next plan needs). It checks:
+    - with the wait, the ball is met at 0.16-0.30 m, within 8 ms of its own time to the plane;
+    - a folded smash is a smash at contact (n 1.00, curl), never a bet; a folded tap is a tap; one landing, told with the hit;
+    - a late settled report re-aims once with its bend, 147 vs 230 ms after the hit;
+    - a 1.6 m-wide ball is still met; an early swing waits past its window (453 ms > 387) and is met at the plane;
+    - the same swings strike at once on the bet and are re-aimed with the wait off;
+    - round 1: a paddle backing off a lob is struck inside the box and the ball is never pulled back; a paddle that leaves its ball 2.5 m to
+      the side is not struck beside it; a hard slice falling to its second bounce is never lost while waiting (lostWaiting 0). On the
+      first version's tree those three fail (2.05 m out pulled back 0.47 m; hits 2.50 m off; 5 of 5 lost to a double bounce).
+    - /api/swingtime is key-only and its counts add up.
+  - bet.test: a second court (STRIKE_WAIT=1) where the settled report comes 30 ms after the swing. Smashes, taps and drives are struck
+    settled, and nothing is re-aimed.
+  - landhold.test: a fifth plan, settled 30 ms after the swing. With the wait it is told with the hit, once; with STRIKE_WAIT=0 it is told
+    with the re-aim.
+  - lagcomp: with the wait, the early in-box report is struck when the ball is due at the plane (65 ms against 61). With STRIKE_WAIT=0 the old
+    on-arrival line runs. Its two other failures ("landing marker 2.84 -> 5.11", "fix before contact n 0.76") fail the same on the old tree,
+    since effort() caps 30 rad/s at SMASH.
+  - push.test: a push within PUSH.bounce of the net strikes on arrival (<= 0.5 ms); so does a lofted scoop or dink, settled or a bet
+    (lob 0.8 and 1; it failed at 303 ms on the first version). One full run on the fixed tree also showed one 303 ms "scoop" among 7, not
+    reproduced in 7 more runs (3 full, 4 of the scoop section alone) and unexplained. Two guesses, both now ruled out of the measure: a
+    whiffed swing followed by a held-paddle block was timed as one swing -> hit (the test now forgets a swing on its whiff), and footwork
+    can carry a player across PUSH.bounce between the state they swung on and the strike (only shots under 3.4 m are counted).
+  - feel.mjs and server.test.mjs's window suite assumed a strike on box entry. They now read STRIKE_WAIT (the server they spawn runs with
+    the same env): with the wait, swing -> hit is the ball's own time to the plane (feel: within -14..+5 ms) and it is met at the plane;
+    the window's lead is measured to box entry, so a 0.3 s lead is still proven to connect (83-300 ms leads, all met 0.29 m out). With
+    STRIKE_WAIT=0 the old on-arrival lines run.
+  - test/strikeat.mjs is the regression harness, ported from the evaluation. The patched copies and motion variants are gone. D is read
+    from motion.js's own pose().
+  - Pass with STRIKE_WAIT on and off: strikewait, bet, landhold, bend, curve, push, serve, bot, records.
+  - Fail the same in both modes, so not the wait: feel.mjs's three "fix* landing marker re-sent" lines (effort() caps 30 rad/s at SMASH, as
+    lagcomp's two); server.test's scoring ("unreturned deep lob / hard return"), whiffs ("high") and window's teleport / outside-the-box
+    lines (the late trig -0.4 swing's 238 look-back and reach-extended contacts the test's plain ZONE does not allow); motion-check's
+    live-play-2 line, as on main.
+  - stats.test R19 "the scripted hitter beats Rookie" (saved, not counted) failed 2 of 3 in each mode in the review and 0 of 5 on 0562d9d;
+    once with the wait here and not with it off. It comes from origin/main's 236-238 commits, not this one: tracked there (play enough
+    swings for MO.bad before asserting, and check R19's minimum count still catches a short scripted win).
+- Round 2 of the review (fixed 2026-10-10; the probes ran with the Mac asleep between steps, so one shot each):
+  - A second swing report while a swing waits for its ball replaced it: a follow-through or recoil reported as a new swing struck the drive
+    as a tap. Now a waiting swing is replaced only by a HARDER report (which takes over its reach and window); a weaker one is turned away,
+    and since motion.js runs one swing at a time, every later report is that swing's and is shut out of the waiting one (`shut`). Probe
+    second100 / second150: tap -> drive n 0.54, struck 0.19-0.20 m out.
+  - A waiting swing whose paddle left the ball and came back to it once the ball was past the face was struck there, up to 1.25 m behind
+    the face, and counted as waited. Now it is never struck from behind the face: it whiffs when its window ends (probe driftBack).
+  - Open, to re-measure on an idle, plugged-in machine before deploying: the waitMs stop line (Tour and Pro wait p90 222-256 ms from the
+    bet, Club 157-170: most of that is the ball's own flight to the box, so read it per level or against STRIKE_WAIT=0), and wide-ball
+    whiffs (the review's seed-1 run 14/143 -> 19/145, inside the noise).
