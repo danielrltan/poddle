@@ -5493,3 +5493,42 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   - Open, to re-measure on an idle, plugged-in machine before deploying: the waitMs stop line (Tour and Pro wait p90 222-256 ms from the
     bet, Club 157-170: most of that is the ball's own flight to the box, so read it per level or against STRIKE_WAIT=0), and wide-ball
     whiffs (the review's seed-1 run 14/143 -> 19/145, inside the noise).
+
+## 266. The strike-at-the-paddle wait is held short: a bet waits at most 60 ms for its settled report, and a volley is never let bounce first
+- "There's so much latency whenever you swing ... I'll swing it and then I can see the ball still hit the floor even though I did a midair
+  swing. Before it was fine, it's just that it would recalculate the ball midair" (2026-10-17, the day 265 shipped).
+- Live /api/swingtime from the owner's own phone session (n 31): the bet reached the server p50 222 ms before the ball reached the contact
+  plane (265 was measured at ALIGN -60, about -100 ms), so 265's wait held swings p50 231 / p90 419 ms, past its own 200 ms stop line.
+- The floor: tf (time to the floor) was only counted after the first bounce, so a swing at a ball still in the air waited for the plane
+  straight through its bounce and struck it off the floor. Now a ball before its bounce that would land before the plane is struck at once,
+  in the air (STRIKE_WAIT=0's volley). This undoes 265's "a ball landing out before the plane is let go".
+- The wait: server/game.js tryHit now holds only a swing that is still its BET (final false), and only until the first of:
+  its settled report folds in (struck on that message, not the next tick), WAIT_CAP (0.06 s) since it first had its ball in reach (okAt),
+  the ball at the plane, or 265's other ends (no longer closing, the second bounce). A swing whose report is already settled strikes on
+  arrival, as with STRIKE_WAIT=0. This is a wait for a better answer, which NOTES 66 ruled out; the owner asked for the balance, and it is
+  capped. WAIT_CAP is env (Fly secret) to retune; /api/swingtime's mode reports it (waitCap, was waitMax).
+- A cap counted from the swing's arrival (the first try) did nothing at live timing: the bet comes before the ball is in the box, so the cap
+  ran out first and every strike was STRIKE_WAIT=0's. Waiting for the plane under a short cap did nothing either (the plane is ~150 ms off).
+- Measured, test/strikeat.mjs, Club, seed 1, 150 s per combo (the real captures through motion.js into the real server), ALIGN -180 (the
+  live phone timing) / -120:
+  | | re-aimed | re-aim after the hit p50, ball gone | onset -> drawn turn p50 | drawn turn - drawn paddle peak p50 |
+  |---|---|---|---|---|
+  | STRIKE_WAIT=0 | 64% / 85% | 63 ms 0.45 m / 91 ms 0.80 m | 214 / 166 ms | -15 / -48 ms |
+  | hold 40 ms | 43% / 74% | 53 ms 0.37 m / 60 ms 0.47 m | 236 / 194 ms | +13 / -20 ms |
+  | hold 60 ms (shipped) | 27% / 54% | 25 ms 0.21 m / 33 ms 0.26 m | 242 / 223 ms | +23 / +4 ms |
+  | hold 80 ms | 15% / 42% | 20 ms 0.17 m / 25 ms 0.21 m | 254 / 236 ms | +31 / +12 ms |
+  - 265 as shipped cost +86 ms onset -> turn at ALIGN -60, and held p50 231 ms live. The 60 ms hold costs +28 / +57 ms and the ball turns
+    with the drawn paddle (it used to turn before it). Whiffs 0 in every run. The remaining re-aims come ~25-33 ms after the hit with the
+    ball ~0.2 m off the paddle, against ~1 m before 265.
+  - Rejected runs: cap from arrival 0 / 40 / 60 ms and cap-for-the-plane from okAt 30 ms: all within noise of STRIKE_WAIT=0 (56-59% re-aimed).
+- windowEnd now counts a bet held to the cap without its report: the normal case for a slow phone report, not a stop line (swingtime.js).
+- Matt's REPLAN_HUMAN was tuned against 265's long wait; per-level return rates at 60 ms are not re-measured yet.
+- Tests: strikewait.test runs three servers: WAIT_CAP 0.5 (a late report still waits for the plane: 265's mechanics), STRIKE_WAIT=0, and
+  the default cap. A bet whose settled report comes 30 ms later is struck on that report (30-39 ms, 1.1-1.3 m out), not at the plane; with
+  the cap an in-box bet strikes within 60 ms + two ticks (a report 230 ms late: 63-67 ms); /api/swingtime reports waitCap. SW_PLANS=a,b runs
+  only those plans. The volley fix has no scripted test: the test's feeds always bounce before they reach the box (tried leaning in, lobs,
+  four powers), so it rests on the code (tf counted before the first bounce too) and on the harness runs' zero whiffs.
+- lagcomp, feel.mjs and server.test's window suite send swings without a bet flag, which now strike on arrival in both modes: their wait
+  branches read as STRIKE_WAIT=0. Still failing as on main: lagcomp's "landing marker 2.84 -> 5.11" and "fix before contact n 0.76", feel's
+  three "fix* landing marker re-sent". Pass: strikewait, bet, landhold, push, bend, curve, serve.
+- Legal pages: no change (nothing new sent, kept or shown).

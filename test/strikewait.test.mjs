@@ -7,7 +7,10 @@
 // could go wrong (round 1 of the review): a paddle that backs off a slow ball is struck where the ball is, inside the box, never pulled back
 // in time; a paddle that leaves the ball sideways is not struck beside it; a ball falling to its second bounce before the plane is struck on
 // the last tick above the floor, so the wait never loses the point to a double bounce.
-//   TEST_PORT=<port> node test/strikewait.test.mjs        (ports TEST_PORT, TEST_PORT + 1)
+// NOTES 266: only a BET is held, for its settled report, and at most WAIT_CAP (0.06 s) from when it first had its ball; a settled report
+// strikes at once. Server A runs WAIT_CAP=0.5 (a bet whose report is late still waits for the plane: 265's mechanics stay tested), server C
+// the default cap. SW_PLANS=a,b runs only those plans.
+//   TEST_PORT=<port> node test/strikewait.test.mjs        (ports TEST_PORT .. TEST_PORT + 2)
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
 const PORT = +process.env.TEST_PORT || 9560, root = new URL('..', import.meta.url).pathname, KEY = 'strikewait-test-key', SECS = +process.env.SW_S || 120;
@@ -15,11 +18,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
 const f2 = x => (Number.isFinite(x) ? x.toFixed(2) : '-'), f0 = x => (Number.isFinite(x) ? x.toFixed(0) : '-');
 const q = (a, p) => { const b = a.filter(Number.isFinite).sort((x, y) => x - y); return b.length ? b[Math.min(b.length - 1, Math.floor(p * (b.length - 1) + 1e-9))] : NaN; };
-const procs = [0, 1].map(k => spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: String(PORT + k), AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0', STATS_KEY: KEY, STRIKE_WAIT: k ? '0' : '1' }, stdio: ['ignore', 'ignore', 'inherit'] }));
+const CAP = 60;                                                              // ms: server/game.js WAIT_CAP's default
+const procs = [0, 1, 2].map(k => spawn('node', ['server/game.js'], { cwd: root, env: { ...process.env, PORT: String(PORT + k), AUTOBOT: '0', SWING_SERVE: '0', WIN_AT: '0', BLOCK: '0', STATS_KEY: KEY, STRIKE_WAIT: k === 1 ? '0' : '1', WAIT_CAP: k === 0 ? '0.5' : '' }, stdio: ['ignore', 'ignore', 'inherit'] }));
 await wait(800);
 // What A does with each ball, in turn. at: when it swings (m in front of its paddle, the ball coming). settled: the settled report, `after` ms
 // after the swing (real clients: 60-250 ms, p50 ~100). dx: the paddle held this far to the side of the ball once it swings.
-const PLANS = [
+const PLANS0 = [
   { name: 'fold smash', at: [1.15, 1.45], bet: { power: 33, dir: 0.5 }, settled: { power: 34, dir: 0.6 }, after: 30 },
   { name: 'fold tap', at: [1.15, 1.45], bet: { power: 33, dir: 0 }, settled: { power: 8, dir: 0.1 }, after: 30 },
   { name: 'settled after contact', at: [0.9, 1.1], bet: { power: 22, dir: 0.2 }, settled: { power: 18, dir: -0.5 }, after: 230 },
@@ -33,6 +37,7 @@ const PLANS = [
   // before the plane (the review's probe lost 5 of 31 such swings to a double bounce, all on this feed)
   { name: 'falling', at: [1.1, 1.5], z: 8.8, falling: true, feed: { power: 16, slice: 0.9, dir: -0.2 }, bet: { power: 16, dir: 0 }, settled: { power: 16, dir: 0 }, after: 100 },
 ];
+const PLANS = process.env.SW_PLANS ? PLANS0.filter(p => process.env.SW_PLANS.split(',').includes(p.name)) : PLANS0;
 const ORIG = ['fold smash', 'fold tap', 'settled after contact', 'wide ball', 'early swing'];
 function court(port) {
   const shots = [], log = { port }; let k = 0, skip = 0;          // k: A's next plan (B feeds for it)
@@ -70,25 +75,27 @@ function court(port) {
   log.A = player(true);
   return wait(300).then(() => { log.B = player(false); return { shots, log }; });
 }
-const [ON, OFF] = await Promise.all([court(PORT), court(PORT + 1)]);
+const [ON, OFF, CAPPED] = await Promise.all([court(PORT), court(PORT + 1), court(PORT + 2)]);
 await wait(SECS * 1000);
 const report = async port => { try { const r = await fetch(`http://localhost:${port}/api/swingtime`, { headers: { Authorization: 'Bearer ' + KEY } }); return r.ok ? r.json() : { status: r.status }; } catch (e) { return { err: String(e) }; } };
-const [RON, ROFF] = await Promise.all([report(PORT), report(PORT + 1)]);
+const [RON, ROFF, RCAP] = await Promise.all([report(PORT), report(PORT + 1), report(PORT + 2)]);
 const noKey = await fetch(`http://localhost:${PORT}/api/swingtime`).then(r => r.status).catch(() => 0);
-for (const c of [ON, OFF]) { c.log.A.ws.close(); c.log.B.ws.close(); }
+for (const c of [ON, OFF, CAPPED]) { c.log.A.ws.close(); c.log.B.ws.close(); }
 procs.forEach(p => p.kill());
 
 const by = (c, name) => c.shots.filter(s => s.plan.name === name && (s.hit || s.whiff || s.lost));
 const reaims = s => s.launches.filter(l => l.n != null);
 const told = s => s.launches.filter(l => l.land);
-for (const [c, tag] of [[ON, 'STRIKE_WAIT=1'], [OFF, 'STRIKE_WAIT=0']]) console.log(`  ${tag}: ${c.shots.length} swings: ` + PLANS.map(p => `${p.name} ${by(c, p.name).filter(s => s.hit).length} hit / ${by(c, p.name).filter(s => s.whiff).length} whiff`).join(', ') + (c.log.skipped ? `; ${c.log.skipped} plans skipped` : ''));
+for (const [c, tag] of [[ON, 'STRIKE_WAIT=1 WAIT_CAP=0.5'], [OFF, 'STRIKE_WAIT=0'], [CAPPED, 'STRIKE_WAIT=1 (WAIT_CAP default)']]) console.log(`  ${tag}: ${c.shots.length} swings: ` + PLANS.map(p => `${p.name} ${by(c, p.name).filter(s => s.hit).length} hit / ${by(c, p.name).filter(s => s.whiff).length} whiff`).join(', ') + (c.log.skipped ? `; ${c.log.skipped} plans skipped` : ''));
 ok(PLANS.every(p => by(ON, p.name).length >= 2 && by(OFF, p.name).length >= 2), 'every plan came round at least twice on both servers');
 
 // ---- with the wait (production) ----
 const atPlane = s => s.hit && Math.abs(s.ahead - 0.25) <= s.vz / 60 / 2 + 0.06;      // within half a tick's travel of CONTACT (+ the paddle's own step)
-const waitable = ON.shots.filter(s => s.hit && ORIG.includes(s.plan.name) && s.plan.name !== 'settled after contact');
-ok(waitable.length >= 6 && waitable.every(atPlane), `a swing that came early meets the ball at the contact plane: ${waitable.map(s => f2(s.ahead)).join(', ')} m in front of the paddle (CONTACT 0.25; today up to 1.6)`);
-ok(waitable.every(s => Math.abs(s.lat - s.eta) < 30), `...and waits only for the ball: swing -> hit minus the ball's own time to the plane ${waitable.map(s => f0(s.lat - s.eta)).join(', ')} ms`);
+const waitable = [ON, CAPPED].flatMap(c => c.shots.filter(s => s.hit && ['fold smash', 'fold tap', 'wide ball'].includes(s.plan.name)));
+const inReach = waitable.filter(s => s.plan.name !== 'wide ball');          // the wide ball is out of reach until the ball comes to it (as with STRIKE_WAIT=0)
+ok(inReach.length >= 8 && inReach.every(s => s.lat >= s.plan.after - 2 && s.lat < s.plan.after + 14 && s.ahead > 0.25), `a bet whose settled report comes 30 ms later is struck on that report, before the plane (NOTES 266): swing -> hit ${inReach.map(s => f0(s.lat)).join(', ')} ms, ${inReach.map(s => f2(s.ahead)).join(', ')} m out; the wide ball ${waitable.filter(s => s.plan.name === 'wide ball').map(s => f0(s.lat)).join(', ')} ms`);
+const LA = by(ON, 'settled after contact').filter(s => s.hit);
+ok(LA.length >= 2 && LA.every(atPlane), `...one whose report is late waits for the plane under a long cap (WAIT_CAP 0.5): ${LA.map(s => f2(s.ahead)).join(', ')} m out (CONTACT 0.25)`);
 const S1 = by(ON, 'fold smash').filter(s => s.hit), T1 = by(ON, 'fold tap').filter(s => s.hit);
 ok(S1.length >= 2 && S1.every(s => !s.hit.bet && s.hit.kind === 'smash' && s.hit.n > 0.9 && Math.abs(+s.hit.c || 0) > 0), `a settled report in before contact strikes at its own power: a smash at contact (${S1.map(s => s.hit.kind + ' n ' + f2(s.hit.n) + ' c ' + f2(+s.hit.c || 0)).join(', ')}), curling from contact, never flagged a bet`);
 ok(T1.length >= 2 && T1.every(s => !s.hit.bet && s.hit.kind === 'tap' && s.hit.n < 0.1), `...a bet of 33 that settles at 8 is a tap at contact (${T1.map(s => s.hit.kind + ' n ' + f2(s.hit.n)).join(', ')})`);
@@ -98,7 +105,7 @@ ok(L1.length >= 2 && L1.every(s => s.hit.bet && reaims(s).length === 1 && reaims
 const W1 = by(ON, 'wide ball');
 ok(W1.length >= 2 && W1.every(s => s.hit), `a wide ball the swing reached when it came is still met at the plane after its settled report shrank the reach (${W1.filter(s => s.hit).length} hits, ${W1.filter(s => s.whiff).length} whiffs; paddle 1.6 m off the ball, reach 1.29 m at the settled n)`);
 const E1 = by(ON, 'early swing');
-ok(E1.length >= 2 && E1.every(s => s.hit && atPlane(s)), `an early swing (ball ~3 m out) waits as long as the ball takes and never whiffs for it: swing -> hit ${E1.map(s => f0(s.lat)).join(', ')} ms (the window it came with: 387 ms), met ${E1.map(s => f2(s.ahead)).join(', ')} m out`);
+ok(E1.length >= 2 && E1.every(s => s.hit), `an early swing (ball ~3 m out, settled before the ball is in the box) never whiffs for its window and is struck when its ball comes: swing -> hit ${E1.map(s => f0(s.lat)).join(', ')} ms (the window it came with: 387 ms), met ${E1.map(s => f2(s.ahead)).join(', ')} m out`);
 
 // ---- where a wait could go wrong ----
 const R1 = by(ON, 'retreat'), R0 = by(OFF, 'retreat').filter(s => s.hit);
@@ -111,6 +118,15 @@ const F1 = by(ON, 'falling'), F0 = by(OFF, 'falling'), early = F1.filter(s => s.
 ok(F1.length >= 3 && F1.every(s => s.hit && !s.lost), `a swing at a ball falling to its second bounce never loses the point waiting: ${F1.filter(s => s.hit).length} hit, ${F1.filter(s => s.lost).length} lost (${F1.filter(s => s.lost).map(s => s.lost).join(', ')}), met ${F1.filter(s => s.hit).map(s => f2(s.ahead)).join(', ')} m out; ${early.length} struck before the plane because the floor came first`);
 ok(F0.every(s => s.hit), `...STRIKE_WAIT=0 too (${F0.filter(s => s.hit).length} of ${F0.length})`);
 
+// ---- the cap (NOTES 266): an in-box swing is held at most WAIT_CAP after it arrives ----
+const inBox = CAPPED.shots.filter(s => s.hit && ['fold smash', 'fold tap', 'settled after contact'].includes(s.plan.name));
+ok(inBox.length >= 6 && inBox.every(s => s.lat <= CAP + 2 * 1000 / 60 + 8), `with the cap, a swing at a ball in the box strikes within ${CAP} ms (+ two ticks) of arriving: ${inBox.map(s => s.plan.name + ' ' + f0(s.lat)).join(', ')} ms`);
+const SC = by(CAPPED, 'fold smash').filter(s => s.hit);
+ok(SC.length >= 2 && SC.every(s => !s.hit.bet && s.hit.kind === 'smash'), `...a settled report 30 ms after the swing still folds in before contact (${SC.map(s => s.hit.kind + (s.hit.bet ? ' bet' : '')).join(', ')})`);
+const EC = by(CAPPED, 'early swing');
+ok(EC.length >= 2 && EC.every(s => s.hit), `...an early swing (ball ~3 m out) is struck when its ball comes into the box, as with STRIKE_WAIT=0 (${EC.map(s => s.hit ? f2(s.ahead) + ' m out' : s.whiff).join(', ')})`);
+ok(RCAP.mode && RCAP.mode.waitCap === CAP / 1000 && RON.mode && RON.mode.waitCap === 0.5, `/api/swingtime says which cap runs (${RCAP.mode && RCAP.mode.waitCap} / ${RON.mode && RON.mode.waitCap})`);
+
 // ---- today's model (the rollback) ----
 const S0 = by(OFF, 'fold smash').filter(s => s.hit), T0 = by(OFF, 'fold tap').filter(s => s.hit);
 ok(S0.concat(T0).length >= 4 && S0.concat(T0).every(s => s.hit.bet && s.lat < 12 && s.ahead > 0.8), `STRIKE_WAIT=0: the same swings strike at once on the bet (${S0.concat(T0).map(s => f0(s.lat) + ' ms, ' + f2(s.ahead) + ' m out').join('; ')})`);
@@ -122,8 +138,8 @@ ok(share(ON) < share(OFF) - 0.3 && reDt(ON) < reDt(OFF) - 40, `fewer and earlier
 // ---- the counts (/api/swingtime): per paddle type, nothing about anyone ----
 const a = RON.src && RON.src.airpod, b = ROFF.src && ROFF.src.airpod;
 ok(noKey === 401 && RON.mode && RON.mode.strikeWait === true && ROFF.mode && ROFF.mode.strikeWait === false, `GET /api/swingtime answers the stats key only (no key: ${noKey}) and says which model runs (${RON.mode && RON.mode.strikeWait} / ${ROFF.mode && ROFF.mode.strikeWait})`);
-ok(a && a.strikes >= ON.shots.filter(s => s.hit).length && a.waited >= waitable.length - 1 && a.folded > 0 && a.reaimed >= L1.length && a.windowEnd <= by(ON, 'retreat').length, `with the wait: ${a && a.strikes} strikes (B's included), ${a && a.waited} waited, ${a && a.folded} settled before contact, ${a && a.reaimed} re-aimed, ${a && a.windowEnd} window ends (the retreats', struck where the ball is), ${a && a.whiffs} whiffs`);
-ok(a && a.hist.waitMs.p50 > 30 && a.hist.aheadCm.n > 0 && a.hist.settledMs.n > 0 && a.hist.betMs.p50 < 0, `...wait p50 ${a && a.hist.waitMs.p50} ms, struck p50 ${a && a.hist.aheadCm.p50} cm out, the bet p50 ${a && a.hist.betMs.p50} ms and the settled report p50 ${a && a.hist.settledMs.p50} ms after the ball at the plane`);
+ok(a && a.strikes >= ON.shots.filter(s => s.hit).length && a.waited >= 1 && a.folded > 0 && a.reaimed >= L1.length && a.windowEnd <= by(ON, 'retreat').length, `with the wait: ${a && a.strikes} strikes (B's included), ${a && a.waited} waited, ${a && a.folded} settled before contact, ${a && a.reaimed} re-aimed, ${a && a.windowEnd} window ends (the retreats', struck where the ball is), ${a && a.whiffs} whiffs`);
+ok(a && a.hist.waitMs.n > 0 && a.hist.aheadCm.n > 0 && a.hist.settledMs.n > 0 && a.hist.betMs.p50 < 0, `...wait p50 ${a && a.hist.waitMs.p50} ms, struck p50 ${a && a.hist.aheadCm.p50} cm out, the bet p50 ${a && a.hist.betMs.p50} ms and the settled report p50 ${a && a.hist.settledMs.p50} ms after the ball at the plane`);
 ok(a && a.lostWaiting === 0, `no swing lost its point while waiting (lostWaiting ${a && a.lostWaiting}; lost in all ${a && a.lost})`);
 ok(b && b.waited === 0 && b.reaimed > 0 && b.hist.settledMs.under0 > 0, `without it: ${b && b.waited} waited, ${b && b.reaimed} re-aimed, and the settled reports that would have folded in at the plane are counted (${b && b.hist.settledMs.under0} of them)`);
 ok(!JSON.stringify(RON).match(/"(name|cid|side|code|ip|user)"/i), 'the counts carry no name, seat, court or id');

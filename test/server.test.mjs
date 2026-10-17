@@ -347,7 +347,7 @@ async function suiteWhiffs() {
 // (4) forgiving window. With STRIKE_WAIT (the production default, NOTES 265) a swing that comes before its ball is met at the contact
 // plane, not on box entry: the lead is measured to the tick the ball entered the box either way (the promise: up to 0.3 s early still
 // connects), and where it connects is the mode's own (on arrival with STRIKE_WAIT=0; at CONTACT in front of the paddle with the wait).
-const WAITS = process.env.STRIKE_WAIT !== '0', CONTACT = 0.25;
+const WAITS = false, CONTACT = 0.25;   // NOTES 266: STRIKE_WAIT holds only a swing flagged as a bet (final: false); this file's swings carry no flag, so they strike on arrival in both modes
 async function suiteWindow() {
   const W = 'window', sv = await startServer(Math.min(SCALE, 3));
   const [A, B] = await pair(sv);

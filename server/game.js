@@ -166,12 +166,16 @@ const CONTACT = 0.25;                     // a stroke meets the ball this far in
 // re-aimed after; one that comes later re-aims as before. Late swings keep the look-back (NOTES 238), near-net swings (nearNet: the push
 // curve, NOTES 66) and serves strike as they always did, and Matt never waits. STRIKE_WAIT=0 (a Fly secret) is today's model, the rollback.
 const STRIKE_WAIT = process.env.STRIKE_WAIT !== '0';
-const WAIT_MAX = 0.4;                     // s a swing may wait from when it first reached its ball (box front to the plane at 3.4 m/s); a slower ball is struck where it is
+// WAIT_CAP: s a bet may be held for its settled report, from when it first had its ball in reach (okAt: box entry, or its own arrival if the
+// ball was already in); past it the bet is struck where the ball is and re-aimed as with STRIKE_WAIT=0 (NOTES 266). Live phone bets arrived
+// p50 222 ms before the plane and the 265 wait (0.4 s, for the plane) held them p50 231 / p90 419 ms: the owner felt it as lag. Env WAIT_CAP
+// (a Fly secret) retunes it; /api/swingtime's mode shows the live value.
+const WAIT_CAP = process.env.WAIT_CAP != null && process.env.WAIT_CAP !== '' && Number.isFinite(+process.env.WAIT_CAP) ? Math.max(0, +process.env.WAIT_CAP) : 0.06;
 // Matt's reaction clock restarts when a re-aimed shot's bend ends (ball.replan, NOTES 154): ~0.2-0.55 s after the bet's strike on 88% of human
 // shots. A strike at the paddle is rarely re-aimed, so a waited strike replans him REPLAN_HUMAN s after it, as the re-aim would have (a re-aim that
 // still comes replaces it). Tuned with seeded runs (test/strikeat.mjs) so each level returns what it did with STRIKE_WAIT=0. Env: tuning only.
 const REPLAN_HUMAN = process.env.REPLAN_HUMAN != null && process.env.REPLAN_HUMAN !== '' && Number.isFinite(+process.env.REPLAN_HUMAN) ? +process.env.REPLAN_HUMAN : 0.45;
-swingtime.init({ strikeWait: STRIKE_WAIT, replanHuman: REPLAN_HUMAN, waitMax: WAIT_MAX });
+swingtime.init({ strikeWait: STRIKE_WAIT, replanHuman: REPLAN_HUMAN, waitCap: WAIT_CAP });
 const Z_ASSIST = 0.9;                      // share of the forward/back footwork the game does for a player who walks themselves
 const Z_PUSHED = 0.85;                     // most of a player's own lean a deep ball can take back off: you get pushed out of the kitchen, but never yanked all the way home by one shot
 const BAND1 = process.env.BAND1 === '1';      // tests only: Matt's rubber band pinned at 1, so a measured return rate is the level's own (test/strikeat.mjs)
@@ -873,11 +877,15 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
     // n than the capped bet, and REACH_X * n would shrink under a wide ball it had already reached (NOTES 265). It is judged where the paddle IS.
     const r = pl.bot ? 0 : sw.okAt ? Math.max(sw.n, sw.okN) : sw.n;
     const reach = Math.abs(z.dx) < ZONE.x + REACH_X * r && Math.abs(z.dy) < ZONE.y + REACH_Y * r, zok = z.depth && reach;
-    // Strike at the paddle (STRIKE_WAIT, NOTES 265): a human's rally swing whose ball is in the box and in reach, still coming and more than half a
-    // tick's closing from the contact plane, waits for the ball to come to it, and is struck where the ball is (kept: no look-back) when:
-    //   it is at the plane; or it no longer closes (the paddle backs off as fast as a slow ball comes: struck now, inside the box, never let run
-    //   out of it to be pulled back); or, after its bounce, the floor comes before the plane (struck on the last tick above the floor: the
-    //   second bounce never beats a swing that had its ball); or it could not reach the plane within WAIT_MAX of okAt (windowEnd).
+    // Strike at the paddle (STRIKE_WAIT, NOTES 265, held short since 266): a human's rally swing that is still its BET (final false: the settled
+    // report not in yet) whose ball is in the box and in reach, still coming and more than half a tick's closing from the contact plane, is held
+    // for its settled report, and is struck where the ball is (kept: no look-back) when:
+    //   the settled report folds in (the next tick: the strike is final, nothing to re-aim); or WAIT_CAP has passed since okAt (windowEnd: struck
+    //   on the bet, re-aimed as STRIKE_WAIT=0 would); or the ball is at the plane; or it no longer closes (the paddle backs off as fast as a slow
+    //   ball comes: struck now, inside the box, never let run out of it to be pulled back); or, after its bounce, the floor comes before the plane
+    //   (struck on the last tick above the floor: the second bounce never beats a swing that had its ball). Before its bounce a ball that would
+    //   land before the plane is struck now, in the air: a volley is never let bounce first. NOTES 266: the 265 wait held every early swing until
+    //   the plane, p50 231 / p90 419 ms live on phones, and through a volley's bounce; the owner felt it as lag and saw the ball hit the floor.
     // A waiting swing whose paddle leaves the ball (out of reach, or the ball out of the box) is not struck there and never put back to where it
     // was: it ends as a whiff unless the paddle comes back to it. Near-net swings (by where the paddle is: nearNet), Matt and serves never wait.
     let kept = false;
@@ -886,9 +894,10 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
       if (!zok) return false;
       sw.inAt = now;
       const c = closing(pl, u, s), eta = c > 0.3 ? Math.max(0, z.ahead - CONTACT) / c : 0;
-      const tf = ball.bounces >= 1 ? fallLeft(Math.max(ball.p[1], R), ball.v[1], G) : Infinity, go = Math.min(eta, tf);   // tf: s to the second bounce
-      if (c > 0.3 && z.ahead - CONTACT > c * DT / 2 && tf > DT) {
-        if (now + go <= sw.okAt + WAIT_MAX) { sw.until = Math.max(sw.until, now + go + 2 * DT); return false; }
+      const tf = fallLeft(Math.max(ball.p[1], R), ball.v[1], ball.bounces >= 1 ? G : gOf(ball.spin)), go = Math.min(eta, tf);   // tf: s to the next bounce
+      if (sw.final === false && c > 0.3 && z.ahead - CONTACT > c * DT / 2 && tf > DT && (ball.bounces >= 1 || eta < tf)) {
+        const end = sw.okAt + WAIT_CAP;
+        if (now + DT / 2 < end) { sw.until = Math.max(sw.until, Math.min(now + go, end) + 2 * DT); return false; }
         sw.capped = true;
       }
       kept = true;
@@ -1254,7 +1263,7 @@ function createRoom(code, pub, opts = {}) {   // opts (tournaments, docs/COURTS-
         const betN = me.hit ? me.hit.n : null; let ran = false;   // stats: the power the bet struck at, before a re-aim moves it
         if (!me.swing && me.hit) pw = Math.max(pw, me.hit.floor);                              // correcting a serve: it keeps the serve floor
         if (me.swing && me.swing.shut) return;                    // the reports of a second swing that was turned away while this one waited (below)
-        if (me.swing) { if (final && me.swing.finalAt == null) me.swing.finalAt = now; Object.assign(me.swing, { n: pw, dir, lob, slice, final, sure, pk, src }); }   // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power; with STRIKE_WAIT one waiting for its ball, NOTES 265)
+        if (me.swing) { if (final && me.swing.finalAt == null) me.swing.finalAt = now; Object.assign(me.swing, { n: pw, dir, lob, slice, final, sure, pk, src }); if (final && me.swing.okAt) tryHit(me); }   // hasn't met the ball yet: just correct it (final: a swing that settles before contact strikes at its real power; a bet held for it, STRIKE_WAIT, is struck NOW, NOTES 265-266)
         // A shot struck on the near-net curve: only the SETTLED report may move it along that curve, never another bet.
         // Struck near the net: the ball is already away at the swing's own power, and only a SETTLED report may bend it.
         // Its gate is the near one (PUSH.gate): from up there the ball passes the rally gate of 1 m before any report lands.

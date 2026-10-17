@@ -3,7 +3,8 @@
 // written to disk or logged, and a restart starts it over. Read with GET /api/swingtime (the stats panel's key, api.js) or, on the machine,
 // `node server/admin.js swingtime` (which asks the running server for it). game.js calls the recorders; none of them can throw into the game.
 //
-// What it answers (the strike-at-paddle rollout, NOTES 265; the judge's stop lines are re-aims > 60%, wait p90 > 200 ms, phone window ends > 5%):
+// What it answers (the strike-at-paddle rollout, NOTES 265; the judge's stop lines are re-aims > 60%, wait p90 > 200 ms, phone window ends > 5%;
+// since NOTES 266 a wait is capped at WAIT_CAP after the swing arrives, so window ends are the normal case for an early swing, not a stop line):
 //   strikes    rally swings struck by tryHit (never a serve or a held block). exempt: of them near-net (game.js nearNet: where the paddle is, any
 //              loft), struck on arrival and re-aimed by design (reaimedNear); they are kept out of every other count and histogram, and the shares are
 //              over strikes - exempt. waited: struck at the contact plane after waiting for the ball; windowEnd: a waiting swing whose window ran out before the plane

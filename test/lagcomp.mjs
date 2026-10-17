@@ -43,11 +43,9 @@ ok(b1.length && Array.isArray(b1[0].v) && b1[0].v.length === 3 && b1[0].v.every(
 
 const ah = mine(a, 1, 'hit'), al = mine(a, 1, 'launch');
 ok(ah.length === 1 && Math.abs(ah[0].n - 2 / 28) < 0.01, `early report in the box: struck on the early power (n=${ah[0] && ah[0].n.toFixed(2)})`);
-// STRIKE_WAIT (NOTES 265, on unless STRIKE_WAIT=0): a swing whose ball is still coming meets it at the contact plane, so the hit comes when the
-// ball gets there (its own time to the plane, give or take a tick), never on a later tick; without it, on arrival
-const WAITS = process.env.STRIKE_WAIT !== '0', due = a.eta && a.eta[1], lat1 = a.lat && a.lat[1];
-if (WAITS) ok(lat1 != null && Math.abs(lat1 - due) < 20 && Math.abs(aheadOf(a, ah[0]) - 0.25) < 0.15, `...when the ball reaches the paddle, not before and not a tick late (swing -> hit ${lat1 != null ? lat1.toFixed(1) : '-'} ms, the ball due at the plane in ${due != null ? due.toFixed(0) : '-'}; met ${ah[0] ? aheadOf(a, ah[0]).toFixed(2) : '-'} m in front)`);
-else ok(lat1 != null && lat1 < 12, `...on arrival, not on the next tick (swing -> hit ${lat1 != null ? lat1.toFixed(1) : '-'} ms)`);
+// STRIKE_WAIT holds only a swing flagged as a bet (final: false) since NOTES 266; this report carries no flag, so it strikes on arrival either way
+const lat1 = a.lat && a.lat[1];
+ok(lat1 != null && lat1 < 12, `...on arrival, not on the next tick (swing -> hit ${lat1 != null ? lat1.toFixed(1) : '-'} ms)`);
 ok(al.length === 2 && al[1].at - al[0].at < 200, `...and the fix 100 ms later re-aimed it (${al.length} launches, ${al.length > 1 ? al[1].at - al[0].at : '-'} ms apart), still one hit`);
 ok(al.length === 2 && Math.abs(Math.abs(al[1].land[1]) - 5.43) < 0.05 && Math.abs(Math.abs(al[0].land[1]) - 2.84) < 0.05, `landing marker: provisional ${al[0] && Math.abs(al[0].land[1]).toFixed(2)} m -> refined ${al[1] && Math.abs(al[1].land[1]).toFixed(2)} m deep`);
 if (ah.length && al.length === 2) {

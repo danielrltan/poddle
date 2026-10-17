@@ -9,7 +9,7 @@ await new Promise(r => setTimeout(r, 700));
 const G = 9.81, DT = 1 / 60, ZONE = { x: 1.15, y: 0.95, front: 1.6, behind: 1.25 }, wait = ms => new Promise(r => setTimeout(r, ms));
 const ms = () => performance.timeOrigin + performance.now();
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok   ' : '  FAIL ') + m); if (!c) fails++; };
-const FIX = { fix50: 50, fix120: 120, fix200: 200 }, WAITS = process.env.STRIKE_WAIT !== '0';   // the server reads the same env
+const FIX = { fix50: 50, fix120: 120, fix200: 200 }, WAITS = false;   // NOTES 266: STRIKE_WAIT holds only a swing flagged as a bet (final: false), and these send no flag: on arrival in both modes
 
 function player(plans) {
   const ws = new WebSocket('ws://localhost:' + PORT), h = { ws, side: null, st: [], ev: [], ball: 0, acted: false, wasIn: false, swings: [] };
