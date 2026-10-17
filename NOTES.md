@@ -5522,7 +5522,8 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
     ball ~0.2 m off the paddle, against ~1 m before 265.
   - Rejected runs: cap from arrival 0 / 40 / 60 ms and cap-for-the-plane from okAt 30 ms: all within noise of STRIKE_WAIT=0 (56-59% re-aimed).
 - windowEnd now counts a bet held to the cap without its report: the normal case for a slow phone report, not a stop line (swingtime.js).
-- Matt's REPLAN_HUMAN was tuned against 265's long wait; per-level return rates at 60 ms are not re-measured yet.
+- Matt (Club, same runs): returned 71% -> 71% at ALIGN -180, but 54% -> 65% at -120 (+11 pp, over 265's +-8 line; one seed). Smash 3-4%, whiffs 0.
+  REPLAN_HUMAN was tuned against 265's long wait; other levels are not re-measured. Retune it if Club plays too easy.
 - Tests: strikewait.test runs three servers: WAIT_CAP 0.5 (a late report still waits for the plane: 265's mechanics), STRIKE_WAIT=0, and
   the default cap. A bet whose settled report comes 30 ms later is struck on that report (30-39 ms, 1.1-1.3 m out), not at the plane; with
   the cap an in-box bet strikes within 60 ms + two ticks (a report 230 ms late: 63-67 ms); /api/swingtime reports waitCap. SW_PLANS=a,b runs
