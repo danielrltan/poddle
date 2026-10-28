@@ -118,6 +118,8 @@ try {
     ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>') && /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/.test(xml) && xml.trim().endsWith('</urlset>') && opens === closes && !/&(?!amp;|lt;|gt;|quot;|apos;)/.test(xml), `sitemap.xml is well formed (${opens} tags open, ${closes} close)`);
     ok(locs.join() === `${ORIGIN}/,${ORIGIN}/how-to-play.html,${ORIGIN}/pickleball-browser-game.html,${ORIGIN}/phone-paddle.html,${ORIGIN}/pickleball-no-download.html,${ORIGIN}/privacy.html,${ORIGIN}/terms.html`, `it lists ${locs.join(' and ')}`);
     ok(mods.length === locs.length && mods.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d)) && Date.parse(d) <= Date.now() + 864e5), `lastmod is a W3C date, not in the future: ${mods}`);
+    for (const [i, l] of locs.entries()) { const f = path.join(WEB, new URL(l).pathname === '/' ? 'index.html' : new URL(l).pathname), mod = (fs.readFileSync(f, 'utf8').match(/"dateModified":\s*"([^"]*)"/) || [])[1];   // a page that says when it changed (privacy, terms) is never newer than its sitemap entry (NOTES 267: both sat on old dates)
+      if (mod) ok(mods[i] >= mod, `${new URL(l).pathname}: sitemap lastmod ${mods[i]} is on or after its dateModified ${mod}`); }
     for (const l of locs) { const p = new URL(l).pathname, r = await req(p); ok(r.status === 200 && /text\/html/.test(r.h['content-type']), `${p} from the sitemap: ${r.status}`);
       if (r.status === 200) { const c = [...r.body.toString().matchAll(/<link rel="canonical" href="([^"]*)"/g)].map(m => m[1]); ok(c.length === 1 && c[0] === l, `its canonical is itself: ${c}`); } } }
 

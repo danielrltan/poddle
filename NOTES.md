@@ -5533,3 +5533,14 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   branches read as STRIKE_WAIT=0. Still failing as on main: lagcomp's "landing marker 2.84 -> 5.11" and "fix before contact n 0.76", feel's
   three "fix* landing marker re-sent". Pass: strikewait, bet, landhold, push, bend, curve, serve.
 - Legal pages: no change (nothing new sent, kept or shown).
+
+## 267. The sitemap's dates are the pages' real last changes; a page that dates itself can never be newer than its sitemap entry
+- Search Console (2026-10-28 export): 5 indexed, 15 not. Excluded by noindex 1, alternate with canonical 1, page with redirect 5, crawled
+  not indexed 5, discovered not indexed 3. A crawl of the live site found every sitemap page 200, `index, follow`, canonical to itself; the
+  noindex ones are /pad.html and /c/ share cards, on purpose (a phone controller and a per-player card). The redirects are www, poddle.fly.dev
+  and the clean URLs (MOVED); the menu paths (/play, /courts ...) are the home canonical to /.
+- What was wrong: web/sitemap.xml still had every page at 2026-10-05 and privacy/terms at 10-12 / 10-06, though both changed on 10-16 (their
+  own dateModified) and How to play on 10-13 (Helper 1.1.0). Now: / 10-06, how-to-play 10-13, the three landing pages 10-06, privacy and
+  terms 10-16, each the last visible change (code-only commits such as modulepreload do not count).
+- test/seo.test.mjs: each sitemap page with a JSON-LD dateModified must have a lastmod on or after it (fails on the old sitemap, 2 checks).
+- Legal pages: no change.
