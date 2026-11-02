@@ -2353,6 +2353,7 @@ body[data-settings="menu"]::after{opacity:1;visibility:visible;transition-delay:
    Turn off? sits beside it, or under it when the window has no room; a small quiet text button a clear step from the ad, so it is never pressed by mistake or read as part of it */
 .ad-home{flex:none;align-self:center;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.5rem .875rem;max-width:calc(100% - 1rem);margin:var(--s-5) auto var(--s-4);padding:.5rem;position:relative;z-index:2}
 .ad-unit{flex:none;width:var(--ad-w);height:var(--ad-h)} .ad-unit ins{display:block} .ad-unit.is-test{background:repeating-linear-gradient(135deg,#d7e4ec 0 .75rem,#cbdce6 .75rem 1.5rem);outline:.0625rem solid #a9c3d2}
+.ad-side{position:absolute;z-index:2}      /* a side margin, placed by web/ads.js from the tiles' measured edge (NOTES 281) */
 .ad-toggle{flex:none;font:inherit;font-size:var(--t-sm);font-weight:700;color:var(--ink-soft);background:none;border:0;padding:.375rem .25rem;text-decoration:underline;text-underline-offset:.1875em;cursor:pointer}
 @media (hover:hover){ .ad-toggle:hover{color:var(--ink-strong)} } .ad-toggle:focus-visible{outline:.1875rem solid var(--line);outline-offset:.125rem;border-radius:.25rem}
 .ad-ask{position:absolute;right:.5rem;bottom:calc(100% + .75rem);width:min(24rem,calc(100vw - 2rem));padding:var(--s-4);text-align:left;z-index:4} .ad-ask p{margin:0;color:var(--ink);font-size:var(--t-sm)} .ad-ask .ad-ask-btns{display:flex;gap:var(--s-3);margin-top:var(--s-3)}

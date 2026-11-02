@@ -14,7 +14,7 @@ also opens from Friends with /api/player's rank emblem and leaderboard places); 
 - Fly.io, Inc. (host; Toronto region `yyz`): process memory, request logs (~7 days), the database volume `poddle_data`
   and its daily snapshots (kept 5 days; snapshot storage location to be confirmed by the operator, Q6).
 - No analytics or data broker recipients. Google LLC (AdSense, independent controller) receives IP, browser details, page address and its own
-  cookies from the visitor's browser when the home banner loads (since 2026-11-02, NOTES 280; consent through Google's message). Poddle gives it nothing else.
+  cookies from the visitor's browser when the home banners load (since 2026-11-02, NOTES 280; consent through Google's message). Poddle gives it nothing else.
 
 ## 1. Playing the game (live match)
 - Data: display name typed (12 chars), tab id `cid`, phone pairing code, court/tournament codes, seats, score, swings,

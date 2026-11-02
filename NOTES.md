@@ -5563,3 +5563,8 @@ even and offers to turn them off. The October Fly bill was $35.74 ($47.26 before
   and pickleball-no-download.html, which said "no ads" (now: no video ads, one banner). Personalized ads stay on by default; serving non-personalized only (13-17s, the toy art) is the owner's open call.
 - test/ads.mjs (not in the deploy gate; drives a browser) covers all of this against a stubbed Google script: no real ad has been rendered yet.
 
+## 281. Side ads in the home's margins
+The owner (2026-11-02): "put ads around the empty margins on the left, right and bottom". web/ads.js adds a 160x600 (120x600 in a thinner margin) in each side margin beside the bottom banner, placed from the tiles' measured edge,
+between the header and the footer or Product Hunt badge; the same ADSENSE_SLOT serves all three. Decisions: no side ads where they do not fit (a phone, a short window); a shrinking window drops them, a growing one does not add any until the next visit;
+each slot fills or closes alone, and Turn off? stays while any ad is up, even if the bottom unit went empty. Three ads on a menu with little text raises the review risk NOTES 280 names: if Google objects, take the sides off first (openSides). Legal text now says banners, plural.
+
