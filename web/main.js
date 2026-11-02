@@ -10,6 +10,7 @@ import * as ui from './ui.js';                  // every HUD / screen DOM change
 import * as profile from './profile.js';        // player stats (docs/ACCOUNTS.md 9): the device id, the hello, /api, sign-in. Its DOM is its own
 import * as tut from './tutorial.js';          // the tutorial (NOTES 217): once for a new browser, then Settings > Tutorial
 import * as social from './social.js';          // friends (docs/SOCIAL.md 6, 8): search, requests, who is online, the profile card's friend row. Its DOM is its own too
+import './ads.js';      // the home banner (NOTES 280): self-contained, dormant without /ads.json
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);

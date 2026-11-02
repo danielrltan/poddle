@@ -5544,3 +5544,22 @@ the two hands, caught mid-crossfade (test/cursor-e2e.mjs measured hand 0.63 / fi
   terms 10-16, each the last visible change (code-only commits such as modulepreload do not count).
 - test/seo.test.mjs: each sitemap page with a JSON-LD dateModified must have a lastmod on or after it (fails on the old sitemap, 2 checks).
 - Legal pages: no change.
+
+## 280. One banner on the home menu, with Turn off?
+The owner (2026-11-02): ads to pay for the servers, banners only, no intrusive video; then: a "turn off?" button beside the ad that explains we run ads strictly to break
+even and offers to turn them off. The October Fly bill was $35.74 ($47.26 before credits), about 85% of it the machine. This number skips 268-279, which the stadium branch already uses.
+- web/ads.js, self-contained, imported by main.js and nothing else: it watches #screen-lobby's class and data-view and body data-overlay, so the rebuilt home on urban-aero/stadium keeps it if
+  `.menu-body` stays. 728x90, or 320x50 under 768 px wide, a fixed <ins> with no responsive format and no Auto ads. A band between the menu and the footer, clear of every button (tested at 24 px+).
+- Two values in fly.toml [env]: ADSENSE_CLIENT (set) makes /ads.txt, ADSENSE_SLOT (not set yet: needs an ad unit in the dashboard, after Google approves the site) makes /ads.json and so the banner. Without
+  both nothing mounts and nothing goes to Google. index.html's <meta google-adsense-account> is the site check; the owner's pasted <script> was NOT put in the page head on purpose: it would run on every screen.
+- Decisions, edge cases: the title has no ad (first paint, policy); a phone's home has one; a window under 560 px high has none; every other view, any overlay and a court REMOVE the slot (hidden units are against
+  policy); a fresh unit per home visit, none if the last was under 60 s ago (no refresh); blocked or unfilled closes the slot and the menu takes the space back; pad.html never loads it; guests and accounts are the same; the glove gives
+  way to the native cursor over .ad-unit because a cross-origin iframe never sees has-cur; Turn off? is plain text a step from the ad. poddle.adsOff keeps the choice per browser (Privacy 5), Settings > Screen > Ads puts it back
+  (shown only when ads are configured). Turning off mid-visit leaves Google's script in the page until reload; no ad shows and later loads never fetch it.
+- Known cost: Google's script lives in the page into any match that follows without a reload. Nothing is displayed, but it is third-party code in the tab during play. Watch swing latency and RUM long frames once it runs.
+- Policy risk, unresolved: Google bans ads on screens without publisher content, and the home is a menu. If review refuses, the fallback is how-to-play and the landing pages.
+- Consent: Google's own message, set up in AdSense > Privacy & messaging, not code. Without it EEA, UK and Swiss traffic gets restricted ads. No home-page notice was added: the owner's no-notices rule wins over the policy pages' wording.
+- Legal, same commit: Privacy (summary, teens, 2, 5 + poddle.adsOff, 6, 10, 13, CCPA, 14, 15, descriptions, dates; it also says we do not tag the site as child-directed), Terms 7, docs/ropa.md, sitemap, CLAUDE.md flows,
+  and pickleball-no-download.html, which said "no ads" (now: no video ads, one banner). Personalized ads stay on by default; serving non-personalized only (13-17s, the toy art) is the owner's open call.
+- test/ads.mjs (not in the deploy gate; drives a browser) covers all of this against a stubbed Google script: no real ad has been rendered yet.
+

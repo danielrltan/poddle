@@ -4,6 +4,7 @@
 <script async src="/rum.js" data-profile="0.5"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Poddle: pickleball you play with your phone</title>
+<meta name="google-adsense-account" content="ca-pub-4617974897101882">
 <meta name="description" content="Swing your phone like a paddle. Play pickleball with friends, earn trophies and climb the ranks or take on Matt. Any computer, any phone, nothing to install.">
 <link rel="canonical" href="https://poddleball.com/">
 <meta name="robots" content="index, follow, max-image-preview:large">
@@ -77,6 +78,7 @@
 <!-- Every module main.js and cursor.js import statically, fetched now with the HTML instead of in three serial waves (main.js's imports,
      then emblems.js after ui.js parses): evaluation waits for the last one. Exactly the static graph, never import()ed modules (scenery/,
      qrcode, MediaPipe); test/modulepreload.test.mjs (in deploy.sh) fails when this list drifts and prints the right one. -->
+<link rel="modulepreload" href="ads.js">
 <link rel="modulepreload" href="motion.js">
 <link rel="modulepreload" href="netq.js">
 <link rel="modulepreload" href="rec.js">
@@ -242,6 +244,7 @@
     <button class="set-row set-switch" id="tog-full" role="switch" aria-checked="false"><span>Full screen</span><i></i></button>
     <button class="set-row set-switch" id="tog-body" role="switch" aria-checked="true"><span>Show player model</span><i></i></button>
     <button class="set-row set-switch" id="tog-cam" role="switch" aria-checked="true"><span>Show camera</span><i></i></button>
+    <button class="set-row set-switch" id="tog-ads" role="switch" aria-checked="true" hidden><span>Ads</span><i></i></button>
   </div></section>
   <!-- Friends (docs/SOCIAL.md 6): opens the friends card over the court (a match against a person does not pause). Shown where accounts are on -->
   <section class="set-group" id="grp-social" hidden><h3 class="set-label">Social</h3><div class="set-list">

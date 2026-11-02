@@ -41,4 +41,6 @@ primary_region = "yyz"
   PODDLE_DB = "/data/poddle.db"      # server/db.js; never under web/ (db.open refuses that)
   GOOGLE_CLIENT_ID = "722523597650-q0fitrq9nast0c2gh4gbdtt5keva6q0d.apps.googleusercontent.com"   # public (it is in every sign-in request); sign-in is off without it
   ROOM_CAP = "120"                   # courts at once, Matt games included (server/game.js; 40 without this): 240 players before "Courts are full"
+  ADSENSE_CLIENT = "ca-pub-4617974897101882"   # public: turns on /ads.txt, which Google checks before it serves (NOTES 280)
+  # ADSENSE_SLOT = "..."             # with the client: the home banner (web/ads.js). Both are public. Auto ads stay OFF in the AdSense dashboard
   ADDR_ROOMS = "8"                   # courts one address may hold (4 without this): an office or campus behind one NAT is many players

@@ -44,6 +44,7 @@ function notFound(req, res) {                                                   
   res.writeHead(404, { 'Content-Type': PAGE_404 ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex' });
   res.end(req.method === 'HEAD' ? undefined : body);
 }
+const ADS = { client: /^ca-pub-\d{10,20}$/.test(process.env.ADSENSE_CLIENT || '') ? process.env.ADSENSE_CLIENT : '', slot: /^\d{6,14}$/.test(process.env.ADSENSE_SLOT || '') ? process.env.ADSENSE_SLOT : '' };      // the home banner (NOTES 280, web/ads.js): both public, fly.toml [env]
 const SITE = 'poddleball.com', OLD_HOSTS = new Set(['poddle.fly.dev', 'www.poddleball.com']);      // the site's one name, and the names that forward to it
 const httpServer = http.createServer((req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -61,6 +62,8 @@ const httpServer = http.createServer((req, res) => {
   if (rel === '/status.json') { let pl = 0, sp = 0; for (const c of wss.clients) if (c.room) (c.spec ? sp++ : pl++);      // who a restart would interrupt (deploy.sh reads it)
     const body = JSON.stringify({ courts: rooms.size, tours: tourneys.size, playing: pl, watching: sp, online: wss.clients.size - pads.size, phones: pads.size, upSeconds: Math.round((Date.now() - BOOT) / 1000) });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
+  if (rel === '/ads.txt' && ADS.client) { const body = `google.com, ${ADS.client.slice(3)}, DIRECT, f08c47fec0942fa0\n`; res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }      // Google checks this file before it serves; without the ID it is a plain 404
+  if (rel === '/ads.json' && ADS.client && ADS.slot) { const body = JSON.stringify(ADS); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex', 'Content-Length': Buffer.byteLength(body) }); return res.end(req.method === 'HEAD' ? undefined : body); }
   if (rel === '/ph-badge.svg') return void phBadge().then(body => { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=600', 'Content-Length': Buffer.byteLength(body) }); res.end(req.method === 'HEAD' ? undefined : body); });      // the Product Hunt badge (NOTES 182), from our cache: the player's browser never calls Product Hunt
   if (rel === '/404.html') return notFound(req, res);
   if (rel.startsWith('/c/')) return void share.page(req, res, rel, notFound).catch(() => {});   // a share link's page and card picture (server/share.js; docs/SHARE.md 2), never a file

@@ -11,7 +11,7 @@
 // a touch mid-session hands the native cursor back until the mouse moves again.
 import { SEL, SCOPE } from './menuaudio.js';
 
-const NATIVE = 'input, textarea, select, [contenteditable], .room-bar, .is-opening[aria-busy="true"]';      // mirrors the :not() list in cursor.css
+const NATIVE = 'input, textarea, select, [contenteditable], .room-bar, .ad-unit, .is-opening[aria-busy="true"]';      // mirrors the :not() list in cursor.css
 export const HOT = [14, 4], BOX = 64;                                                                        // the drawing: a 64-unit square, the fingertip at (14,4) = the hot spot
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));

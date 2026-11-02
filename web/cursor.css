@@ -10,7 +10,7 @@
 
 /* the native cursor goes where the hand shows. Text fields, the court list's scrollbar grab and a busy name keep theirs:
    cursor.js hides the hand over them (is-off) and they say what they are better than a glove could */
-html.has-cur, html.has-cur :where(*):not(input, textarea, select, [contenteditable], .room-bar, .room-bar *, .is-opening[aria-busy="true"]){cursor:none!important}
+html.has-cur, html.has-cur :where(*):not(input, textarea, select, [contenteditable], .room-bar, .room-bar *, .ad-unit, .ad-unit *, .is-opening[aria-busy="true"]){cursor:none!important}
 
 #cur{position:fixed;left:0;top:0;z-index:100;width:3.5rem;height:3.5rem;pointer-events:none;transform-origin:0 0;will-change:transform;
   opacity:0;transition:opacity 120ms linear}      /* the box: its origin is the hot spot (the fingertip); cursor.js writes translate3d(x,y) rotate(tilt) */
